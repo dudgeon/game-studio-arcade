@@ -1,3 +1,5 @@
+> **Status (2026-11-07):** saved unchanged from the kickoff. Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
+
 # game-studio-arcade — Handoff Brief
 
 Written Nov 7, 2026 from two planning sessions (text and voice) between Geoff and Claude.
