@@ -40,8 +40,13 @@ const TYPES = {
  *   examples?: boolean,
  *   checker?: string | null,
  *   players?: number,
+ *   origin?: "desktop" | "cabinet",
+ *   checkerFromBody?: boolean,
  *   now?: () => Date,
  * }} PlayerOptions
+ *   origin: logged on play records (default "desktop"). The cabinet service passes "cabinet".
+ *   checkerFromBody: the page says who answered you-check, since a cabinet has
+ *     many players; otherwise it's always `checker`.
  *   libraryDir: the dev cart library (default <data>/carts).
  *   logsDir: where JSONL logs go (default <data>/logs).
  *   examples: also list runtime/examples/* (the library wins on a clash).
@@ -135,7 +140,7 @@ export function createPlayerHandler(opts = {}) {
       cart_version: cart.version,
       commit: cart.commit,
       session_id: cart.session_id,
-      origin: "desktop",
+      origin: opts.origin ?? "desktop",
       sides,
       started_at: new Date(started).toISOString(),
       duration_s: Math.round(duration * 10) / 10,
@@ -169,7 +174,7 @@ export function createPlayerHandler(opts = {}) {
       cart_version: cart.version,
       commit: cart.commit,
       session_id: cart.session_id,
-      checker,
+      checker: opts.checkerFromBody ? str(b.checker, 64) : checker,
       play_id: playId && PLAY_ID.test(playId) ? playId : null,
       answered_at: now().toISOString(),
       answers,

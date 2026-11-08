@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arcade</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
+      body { display: flex; align-items: center; justify-content: center; }
+      #screen { display: block; image-rendering: pixelated; }
+      #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <canvas id="screen" width="256" height="192"></canvas>
+    <div id="stage" hidden></div>
+    <script type="module" src="/launcher/app.js"></script>
+  </body>
+</html>
