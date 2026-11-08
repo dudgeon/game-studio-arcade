@@ -27,7 +27,7 @@ declare namespace Arcade {
   /** A palette index, 0..31. See `G.colors` for names. */
   type Color = number;
 
-  /** The cabinet's buttons per player. The ★ (MAKE) button is reserved for the cabinet and never reaches a cart. */
+  /** The cabinet's buttons per player. ★ (the Picade's ESC button, Escape on the dev keyboard) leaves the game and goes back to the shelf (D88); it belongs to the cabinet and never reaches a cart. */
   type Button = "up" | "down" | "left" | "right" | "a" | "b" | "x" | "y" | "start";
 
   /**

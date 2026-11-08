@@ -1,9 +1,10 @@
 // Input mapping (D21, D110, D111): keyboard and the Gamepad API to the
 // cabinet's buttons. A player's input is a bitmask over BUTTONS; the whole
 // input for a frame is one mask per controller, an array of length `players`
-// (the console's controller count, 1..MAX_PLAYERS, default 1). ★ (MAKE) is
-// reserved for the cabinet: it is reported to the host separately and never
-// reaches a cart.
+// (the console's controller count, 1..MAX_PLAYERS, default 1). ★ is the
+// leave-game key (D88: the Picade's ESC button, Escape on the dev keyboard,
+// guide on a gamepad): it is reported to the host separately (onStar), which
+// leaves the game, and it never reaches a cart.
 
 /** @type {readonly Arcade.Button[]} */
 export const BUTTONS = Object.freeze(["up", "down", "left", "right", "a", "b", "x", "y", "start"]);
