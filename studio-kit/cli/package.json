@@ -1,0 +1,20 @@
+{
+  "name": "@game-studio-arcade/studio-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "studio make: drives a Studio session from the terminal, playing the cabinet's role.",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "bin": {
+    "studio": "./bin/studio.js"
+  },
+  "scripts": {
+    "test": "tsc -p tsconfig.json && node --test",
+    "studio": "node bin/studio.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0"
+  }
+}

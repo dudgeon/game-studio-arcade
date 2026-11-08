@@ -1,0 +1,12 @@
+{
+  "request": "A frog that hops across the road and dodges stuff, and it gets harder",
+  "maker": "A",
+  "questions": [
+    { "choice": "A" },
+    { "choice": "C", "said": "medium and it gets faster" }
+  ],
+  "plan": [
+    { "choice": "change", "said": "the frog should have three lives" },
+    { "choice": "build" }
+  ]
+}

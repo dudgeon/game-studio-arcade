@@ -28,6 +28,21 @@ Sources: platform.claude.com/docs/en/managed-agents/{overview, quickstart, agent
 - **Branding:** don't present the product as "Claude Code". "Powered by Claude" is fine.
 - **Cache-write pricing** (not in the brief): Sonnet 5.5 $2.50 (5 min) / $4 (1 h); Opus 5.5 $5 / $8. `inference_geo: "us"` costs 1.1×.
 
+**Checked 2026-11-07 for tasks 7–8** (agent-setup, tools, sessions, events-and-streaming, files, budgets, session-observability, environments, skills, reference; cli/apply; SDK 1.6.0 types). Not yet run live:
+
+- **Where list cost is reported:** the session object's `usage.list_cost` is `{amount: "<whole cents>", currency: "USD"}`, alongside token counts, `cache_creation`, `active_seconds` and `server_tool_use`. A `session.usage` event with the same snapshot arrives right before every idle. Task 1's probe should confirm it.
+- **Idle stop reasons** (SDK types): `end_turn`, `requires_action` (with `event_ids`), `budget_reached`, `retries_exhausted`, `refusal`. A `user.custom_tool_result` sent twice is accepted and ignored.
+- **Per-session model:** `agent: {type: "agent_with_overrides", id, version?, model: {id}}`. It never versions the agent, and replaces the whole `model` object, so effort falls back to the model's default.
+- **`ant apply` (≥ 1.30):**
+  - It writes `claude-lock.json` in the current directory.
+  - It infers a file's kind from its directory (`agents/`, `environments/`).
+  - Under `tools`, a path glob such as `./tools/*.json` inserts tool definitions from files.
+  - `--dry-run` shows the plan; `--yes` is needed without a terminal.
+  - It can't adopt resources created elsewhere.
+- **Session outputs:** the Files API lists only a `filename` per output, with no path. Folder structure isn't guaranteed, so we ship one `cart.tgz` (D42).
+- **Custom tool names** also can't match a built-in tool name (`bash`, `read`…).
+- **Custom skills** attach as `{type: custom, skill_id, version}`, up to 500 per session. They need the `read` tool.
+
 ## Guidelines for organizations serving minors
 
 support.claude.com article 9307344 (dated 2026-03-16). It applies to products where minors interact directly with the API. It expects age-appropriate safeguards (content moderation and filtering, monitoring and reporting, a child-safety system prompt), compliance with child-safety and privacy law, and **disclosure that users are talking to an AI**. It requires no notification, approval or parental-consent mechanism. Our plan already covers this: an AI disclosure screen, request screening, a kid brief in the system prompt, and the activity log as monitoring.
