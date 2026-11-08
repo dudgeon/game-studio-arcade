@@ -147,7 +147,7 @@ game-studio-arcade/
   runtime/             house console: SDK + starter library
   studio-kit/
     spec/              spec.md template, guide to writing checkable rules
-    context-pack/      library reference, recipes, 3-4 tiny example carts
+    context-pack/      short catalog, guides read on demand, 4 templates and a blank start (D160, D161)
     playtest/          Playwright harness: scripted input, frames, per-rule JSON report
     tools/             new_cart, validate_cart, import_asset
     plugin/            Claude Code plugin "game-studio": skill build-cart + studio.* tools
@@ -262,7 +262,7 @@ The Manager's Activity view joins these: request → session → cart version �
 
 Collision (overlap, plus who destroys whom); gravity, jump, platforms; grid movement and rotation; tile maps and a scrolling camera; spawners and waves; particles; timers and tweening; score, lives, high scores; title → play → game-over flow; turn taking for more than one player, built for any number of controllers (D85); chip-synth sound effects and jingles; sprite and palette helpers.
 
-Context pack: the library reference, short recipes, and 3–4 tiny example carts. Keep it lean. Use the logs to promote helpers Claude keeps rewriting.
+Context pack (D160–D166): a short catalog the agent always reads, modules and guides it fetches only when a game needs them, and four tested templates plus a blank start. Keep it lean. Use the logs to promote helpers Claude keeps rewriting.
 
 ## 11. Safety and kids
 

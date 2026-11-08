@@ -23,10 +23,10 @@ export default {
 
 ## `t.bot`
 
-- `start(o?)`: title into play: waits the 30 ignored frames, presses START, checks `mode === "play"`. `o.button`, `o.mode`. Returns the probe.
-- `hold(buttons, frames)`: hold (`"right"`, `"left up"`, `""`) for exact frames. Returns the probe.
-- `press(button, then = 1)`: press for one frame, then run `then` more. Returns the probe.
-- `wait(frames)`: run with nothing held. Returns the probe.
+- `start(o?)`: title into play: waits the 30 ignored frames, presses START, checks `mode === "play"`. `o.button`, `o.mode`. Returns the probe, with **1 frame of play already run**, so count from its frame number, not 0.
+- `hold(buttons, frames)`: hold (`"right"`, `"left up"`, `""`) for exact frames. Returns the probe, as do the next two.
+- `press(button, then = 1)`: press for one frame, then run `then` more.
+- `wait(frames)`: run with nothing held.
 - `reach(steer, until, what, o?)`: every `o.every` frames (default 3) hold `steer(p)`, until `until(p)`. Returns the probe. Fails with "the bot couldn't get to <what>" if the mode changes (game over) or `o.max` frames pass (default 3000). `o.anyMode: true` keeps going across a mode change; use it when reaching the mode change itself is the goal.
 - `play(steer, { until, max, every, anyMode })`: the same, but returns `{ p, frames, reached }` and never fails.
 - `delta(get, { frames = 1, held = "" })`: how much `get(probe)` changes.
@@ -37,11 +37,11 @@ export default {
 
 ## `t`
 
-`t.probe()`, `t.step(n)`, `t.input([{ frames, p1: "right a" }])` (queues; nothing moves until `step`), `t.sounds()` (`[{ frame, kind }]`), `t.frame()` (pixels; rarely needed), `t.reset({ seed?, keepSave?, players? })`. All async: `await` each. Best score: end a game, `await t.reset({ keepSave: true })`, probe `best`.
+`t.probe()`, `t.step(n)`, `t.input([{ frames, p1: "right a" }])` (nothing moves until `step`), `t.sounds()` (`[{ frame, kind }]`), `t.frame()`, `t.reset({ seed?, keepSave?, players? })`. All async: `await` each. Best score: end a game, `await t.reset({ keepSave: true })`, probe `best`.
 
 ## `t.poke`: setting up, not testing
 
-`await t.poke({ lives: 99 })` calls the cart's `poke(g, s, o)`. **Use it to keep a bot alive so a check can reach the late game** instead of writing a bot good enough to survive.
+`await t.poke({ lives: 99 })` calls the cart's `poke(g, s, o)`. **Use it to keep a bot alive so a check can reach the late game.**
 - Never poke what the rule is about: a rule about losing lives plays with real lives; a rule about score doesn't poke score.
 - Keep the real thing happening: read a speed from real movement, not from a poked or probed number.
 

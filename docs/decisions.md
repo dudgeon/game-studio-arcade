@@ -553,3 +553,9 @@ Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like
 - Keep prompts well under 100k: Haiku's price jumps about 5× past it. The first builds under this design are the check.
 
 **D165. Ask before reading more.** *(Claude; from the cost breakdown's "ask questions before reading the kit".)* The brief reads only the catalog before asking, which is enough to ask good questions. Modules and templates come after the questions, so a kid's long think (over 5 minutes expires the cache) rewrites about 10k tokens rather than 37k.
+
+**D166. Recommendation: catalog and fetch for every build; templates stay available, with a condition.** *(Claude, library worker; Geoff's to accept. Measured in [phase-0-results.md](phase-0-results.md#the-library-redesign-d160d166).)* Same request, Sonnet 5.5, one build each: up-front bundle 56.9¢, catalog and fetch from blank 40.4¢, from the `catch` template 13.7¢. Peak prompts 69k, 44k and 25k.
+- **Fetch on demand is the default.** It costs less at the same question depth, and it makes the prompt small while the kid is thinking. How it's packaged stays files in the tarball (D45).
+- **The template build isn't a like-for-like saving.** It reskinned `catch`, and used one of three recorded answers: the slippery penguin and "more boots" weren't built. Part of that is the replay (an unmatched question gets D, D47), and part may be that it read the template before asking.
+- **Condition before relying on templates:** the brief should make the agent ask first and treat a template's rules as defaults, then one more build should show a template honouring the kid's answers. Not done here: the task allowed two sessions, and the brief as measured is the brief on this branch.
+- `studio make --context-pack no-templates` builds the blank-only kit for this comparison. The `skill` route is untouched and unused.
