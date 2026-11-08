@@ -51,7 +51,7 @@ async function askUntilSaid(io, prompt) {
 
 /**
  * Replay a recorded answers file by position. When it runs out, questions get D
- * and the plan gets build, and notes() reports replay_exhausted.
+ * and notes() reports replay_exhausted; an extra plan gets build and replay_replanned.
  * @param {{questions?: QuestionAnswer[], plan?: PlanAnswer[]}} recorded
  * @param {{print?: (text: string) => void}} [io]
  * @returns {Answerer}
@@ -77,7 +77,8 @@ export function replayAnswerer(recorded, io = {}) {
       print(formatPlan(p));
       const a = ps.shift();
       if (!a) {
-        if (recorded.plan?.length) notes.add("replay_exhausted");
+        // A re-plan the recording never saw (D44) isn't the questions running out.
+        if (recorded.plan?.length) notes.add("replay_replanned");
         print("(replay) build");
         return { choice: "build" };
       }

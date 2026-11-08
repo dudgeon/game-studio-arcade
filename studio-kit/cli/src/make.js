@@ -5,7 +5,7 @@ import { runSession, listCostUsd } from "./driver.js";
 import { downloadOutputs, extractCart, readJsonIfExists } from "./outputs.js";
 import { commitNewCart, specTitle } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
-import { analyzeFreeze } from "./freeze.js";
+import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -37,6 +37,26 @@ export async function makeCart(o) {
   const ui = o.ui;
   const kit = await o.kit();
 
+  // D44: fetch the frozen snapshot as the first playtest starts, so nothing the
+  // agent writes later can change the baseline. It's written well before then.
+  /** @type {Record<string, Buffer>} */
+  const captured = {};
+  let captureTries = 0;
+  const captureSnapshot = async (ev, sessionId) => {
+    if (ev.type !== "agent.tool_use" || ev.name !== "bash" || !isPlaytestRun(String(ev.input?.command ?? ""))) return;
+    if (SNAPSHOT_NAMES.every((n) => captured[n]) || captureTries >= 3) return;
+    captureTries++;
+    try {
+      const files = await o.api.listOutputs(sessionId);
+      for (const name of SNAPSHOT_NAMES) {
+        const f = files.filter((x) => x.filename === name).at(-1);
+        if (f && !captured[name]) captured[name] = await o.api.download(f.id);
+      }
+    } catch {
+      // The stream matters more than the capture; analyzeFreeze falls back without it.
+    }
+  };
+
   const result = await runSession({
     api: o.api,
     session: {
@@ -57,6 +77,7 @@ export async function makeCart(o) {
     answerer: o.answerer,
     ui,
     now,
+    onEvent: captureSnapshot,
   });
 
   // Keep everything first (D43): answers and the raw session result.
@@ -72,6 +93,10 @@ export async function makeCart(o) {
   if (o.recordFile) writeJson(o.recordFile, answers);
   const { events, ...rest } = result;
   writeJson(path.join(sessionDir, "session.json"), rest);
+  for (const [name, body] of Object.entries(captured)) {
+    fs.mkdirSync(path.join(sessionDir, "frozen"), { recursive: true });
+    fs.writeFileSync(path.join(sessionDir, "frozen", name), body);
+  }
   fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
 
   ui.progress("Bringing your game home");
@@ -106,6 +131,8 @@ export async function makeCart(o) {
     frozenSpec: readTextIfExists(path.join(dl.dir, "spec.frozen.md")),
     finalChecks: cartDir ? readTextIfExists(path.join(cartDir, "checks.js")) : null,
     finalSpec: spec,
+    capturedChecks: captured["checks.frozen.js"]?.toString("utf8") ?? null,
+    capturedSpec: captured["spec.frozen.md"]?.toString("utf8") ?? null,
   });
   if (freeze.checks_changed_after_playtest.unjustified.length) {
     ui.info(`Checks changed with no spec change: ${freeze.checks_changed_after_playtest.unjustified.join(", ")} (D44)`);

@@ -46,6 +46,9 @@ test("parsePlaytestLines and splitChecks", () => {
   const s = splitChecks('const h = 1;\nexport default {\n  R1: async (t) => { await t.step(1); },\n  "R2": async (t) => {},\n};\n');
   assert.equal(s.header, "const h = 1; export default {");
   assert.deepEqual(Object.keys(s.rules), ["R1", "R2"]);
+  const methods = splitChecks("const h = 1;\nexport default {\n  async R1(t) {\n    await t.step(1);\n  },\n  async R2(t) {},\n};\n");
+  assert.deepEqual(Object.keys(methods.rules), ["R1", "R2"], "the method form that real carts use");
+  assert.equal(methods.header, "const h = 1; export default {");
 });
 
 test("the recorded penguin build: 5 first-run failures, 3 check edits, no game edits", () => {
@@ -150,4 +153,36 @@ test("no playtest at all: nothing to report, nothing thrown", () => {
   const a = analyzeFreeze([], { frozenChecks: null, frozenSpec: null, finalChecks: null, finalSpec: null });
   assert.equal(a.first_playtest, null);
   assert.equal(a.checks_changed_after_playtest.changed, false);
+});
+
+test("a run stopped by validate isn't the first playtest", () => {
+  const events = [use("a", SNAP), use("b", `node validate-cart.js . && ${RUN}`), result("b", "error  checks.js:1  [types] nope\nnot valid  1 error(s)"), use("c", `sed -i 's/x/y/' checks.js; ${RUN}`), result("c", "  FAIL      R2: no\n  PASS      R1\n")];
+  const a = analyzeFreeze(events, { frozenChecks: CHECKS("t.step(2)"), frozenSpec: SPEC("x"), finalChecks: CHECKS("t.step(2)"), finalSpec: SPEC("x") });
+  assert.deepEqual(a.first_playtest?.fail, ["R2"]);
+  assert.equal(a.playtest_runs, 1);
+  assert.deepEqual(a.edits_after_first_playtest, { game_js: 0, checks_js: 0, spec_md: 0 });
+});
+
+test("an overwritten snapshot isn't trusted; the CLI's own capture still sees the change", () => {
+  const events = [use("a", SNAP), use("b", RUN), use("c", "sed -i 's/x/y/' checks.js"), use("d", "cd /workspace/cart && O=/mnt/session/outputs && cp checks.js $O/checks.frozen.js")];
+  const final = CHECKS("t.step(9)");
+  // The agent copied its edited checks over the snapshot, so they look identical.
+  const without = analyzeFreeze(events, { frozenChecks: final, frozenSpec: SPEC("x"), finalChecks: final, finalSpec: SPEC("x") }).checks_changed_after_playtest;
+  assert.equal(without.snapshot_overwritten, true);
+  assert.equal(without.baseline, "none");
+  assert.equal(without.changed, true, "the edit is still seen from the stream");
+  const withCapture = analyzeFreeze(events, { frozenChecks: final, frozenSpec: SPEC("x"), finalChecks: final, finalSpec: SPEC("x"), capturedChecks: CHECKS("t.step(2)"), capturedSpec: SPEC("x") }).checks_changed_after_playtest;
+  assert.equal(withCapture.baseline, "captured");
+  assert.equal(withCapture.snapshot_overwritten, true);
+  assert.deepEqual(withCapture.unjustified, ["R2"]);
+});
+
+test("changed helpers need some spec change", () => {
+  const events = [use("a", SNAP), use("b", RUN), use("c", "sed -i 's/x/y/' checks.js")];
+  const base = "const h = 1;\n" + CHECKS("t.step(2)");
+  const edited = "const h = 2;\n" + CHECKS("t.step(2)");
+  const bare = analyzeFreeze(events, { frozenChecks: base, frozenSpec: SPEC("x"), finalChecks: edited, finalSpec: SPEC("x") }).checks_changed_after_playtest;
+  assert.deepEqual([bare.changed, bare.helpers_changed, bare.helpers_unjustified], [true, true, true]);
+  const noted = analyzeFreeze(events, { frozenChecks: base, frozenSpec: SPEC("x"), finalChecks: edited, finalSpec: SPEC("x", "- A1: Fish are worth 10.\n- A2: The helper moves less often.") }).checks_changed_after_playtest;
+  assert.equal(noted.helpers_unjustified, false);
 });

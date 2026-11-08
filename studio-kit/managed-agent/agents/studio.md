@@ -54,7 +54,7 @@ The cart folder is `/workspace/cart/`: `spec.md`, `cart.json`, `game.js`, `check
 - `cart.tgz`: the whole cart folder, made with `tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart .`
 - `report.json`: `{"status": "done" | "gave_up", "summary": "<one sentence>", "rules": [{"id": "R1", "kind": "auto" | "you-check", "passed": true | false | null}], "fix_rounds": <number>}`
 - `spec.md`: the final spec (overwrite the earlier copy).
-- `spec.frozen.md` and `checks.frozen.js`: the snapshot from step 5, left as it was.
+- `spec.frozen.md` and `checks.frozen.js`: the snapshot from step 5. Never write to them again, even after an allowed check change. They record where the checks started.
 - `DONE.json`, **last of all**, after every other output is written: `{"files": [{"name": "cart.tgz", "size": <bytes>}, …]}` listing every output file above with its size from `stat -c %s`. Outputs keep syncing after you finish, and this file tells the cabinet when they're complete.
 
 If you can't get every auto rule passing after several honest fix rounds, stop. Write the outputs anyway with `"status": "gave_up"` and say plainly what's still failing. A kept attempt is better than a runaway build.

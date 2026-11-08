@@ -190,10 +190,32 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - Checks are written from the spec before any game code, then frozen. A failing check means fix `game.js`.
 - A check may change only if the agent **first** changes the spec rule or adds an Assumption naming the rule, so the numbers live in the spec. That includes a check that is simply buggy.
 - Every such change shows in the plan: the agent calls `show_plan` again with a `changes` list (`[{id, text}]`, rule id and plain words).
-- Every such change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest. The CLI compares each rule's check in that snapshot with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
-- Edits are also detected from the event stream, independently of the snapshot. A missing or late snapshot gives `baseline: "none"` and the edits are still counted, with `rules_known: false`.
+- Every such change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest, and the CLI fetches them itself when that playtest starts, so later writes can't change the baseline (the first trial overwrote its snapshot at pack-up). The CLI compares each rule's check there with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
+- Edits are also detected from the event stream, independently of the snapshot. `baseline` is `captured`, `snapshot` or `none`; with `none` the edits are still counted, with `rules_known: false`. `snapshot_overwritten` flags a rewritten snapshot.
 - The record also gets `first_playtest` (which rules passed and failed on the first run) and `edits_after_first_playtest` (`game_js`, `checks_js`, `spec_md`).
 - This logs and doesn't block: a cart with an unjustified change can still commit (no approval loop; the activity log is the oversight).
+
+**D45. The context pack stays in the kit tarball, not a custom skill.** *(Claude, tasks 7+8 worker; settles D40's experiment, on the director's clearance.)* Two builds of the penguin request on Sonnet 5.5, 300¢ cap, the D44 brief, replaying the recorded answers (2026-11-08):
+
+| | Tarball | Skill |
+|---|---|---|
+| Session | `sesn_0137VBbwE4xHnZy1Bupx84v6` | `sesn_01Mt89MxLgQtq7L6Ezeqf3Jh` |
+| List cost (recomputed) | 80¢ ($0.798) | 60¢ ($0.595) |
+| Active time | 534 s | 296 s |
+| Questions | 2 | 3 |
+| Auto rules passing on the first playtest | 10 of 10 | 10 of 11 (R2 failed) |
+| Fix rounds (agent's report) | 1 | 1 |
+| `game.js` edits after the first playtest | 1 (title screen polish) | 0 |
+| Check edits after the first playtest | 1 (R2, R6: too slow for the browser driver) | 1 (R2: test ran until the game ended) |
+| Spec change and plan first? | Yes: A10 naming both, re-plan | Yes: A10, re-plan |
+| Driver runs in the browser | 4 | 1 |
+
+Why tarball, though the skill run was cheaper:
+- **The gap isn't from how the pack arrives.** Cost by phase, tarball vs skill: read and ask $0.20 vs $0.24; build $0.41 vs $0.16; test and fix $0.18 vs $0.20. Context at the first plan was 44.7k vs 42.0k tokens: the brief says to read the whole pack, so the skill's load-on-demand saves nothing. The whole gap is the build phase, where the tarball run wrote 28k output tokens to the skill run's 9k.
+- **One run each, and not the same game.** Answers replay by position, and the two runs asked different questions, so the tarball run built a lane-hopping penguin and the skill run a slippery slider. Earlier, a tarball build under the old brief cost 68¢, so 60–80¢ looks like ordinary variation.
+- **The tarball is simpler.** One artifact, versioned by content hash with the runtime and tools it describes. A skill is a second resource to keep in step with the kit.
+
+Revisit if a test with more runs, or a brief that doesn't say to read everything, shows a real saving. The experiment's skill stays in the workspace (`claude-lock.skill.json`, `studio make --context-pack skill`).
 
 ## 2026-11-07 — Starter library (Phase 0 task 3)
 

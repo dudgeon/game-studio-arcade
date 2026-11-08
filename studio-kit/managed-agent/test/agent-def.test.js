@@ -51,6 +51,7 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "checks.frozen.js",
     "spec.frozen.md",
     "The checks are now frozen",
+    "Never write to them again",
     "A failing check means fix `game.js`",
     "**first** change the spec rule",
   ]) {

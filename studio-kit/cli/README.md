@@ -68,6 +68,8 @@ The frog-hop stream is hand-written from the docs. Replace it with a recorded st
   - Committed to the dev cart library. The stream dropped once and the driver reconnected.
   - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
 
+- **2026-11-08, D44 and D45:** two more builds of the same request under the frozen-checks brief, tarball and skill. See D45 for the comparison.
+
 ## Still needs a live session
 
 - Confirm the SDK calls in `src/api.js` (`beta.sessions.*`, `beta.files.list({scope_id, betas})`, `files.download`, `files.upload`) behave as the docs and SDK 1.6.0 types say. Also confirm the SDK resolves the `game-studio-arcade` profile (task 1).

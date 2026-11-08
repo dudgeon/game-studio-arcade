@@ -61,6 +61,7 @@ const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted
  *   request: string, maker: string, withPlayer?: string|null,
  *   answerer: Answerer, ui: Ui,
  *   message?: object,
+ *   onEvent?: (ev: SessionEvent, sessionId: string) => Promise<void>,
  *   now?: () => Date, maxReconnects?: number,
  * }} o
  * @returns {Promise<SessionResult>}
@@ -142,6 +143,7 @@ export async function runSession(o) {
       seen.add(ev.id);
     }
     events.push(ev);
+    if (o.onEvent) await o.onEvent(ev, sessionId);
     switch (ev.type) {
       case "agent.custom_tool_use":
         pendingTools.set(ev.id, ev);

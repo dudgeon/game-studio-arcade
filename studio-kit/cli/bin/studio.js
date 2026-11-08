@@ -12,6 +12,7 @@ import { ensureKitUploaded } from "../src/kit.js";
 import { liveAnswerer, loadAnswers, replayAnswerer } from "../src/answers.js";
 import { defaultChecker } from "../src/checks.js";
 import { makeCart } from "../src/make.js";
+import { reanalyzeSession } from "../src/reanalyze.js";
 import { buildKit, SKILL_KIT, stageContextPackSkill } from "../../managed-agent/scripts/pack-kit.js";
 
 const USAGE = `usage:
@@ -20,6 +21,7 @@ const USAGE = `usage:
                           [--commit-anyway] [--verbose]
   studio kit [--upload]            build the studio kit tarball (and upload it once)
   studio skill --upload            create the context-pack skill through the API
+  studio reanalyze <session> "<why>"   redo the D44 analysis; appends a correction record
   studio fork <cart> "<change>"    stretch goal (task 11), not built yet
 
 Data goes to $GSA_DATA_DIR or ~/game-studio-data (D14).`;
@@ -29,6 +31,7 @@ async function main(argv) {
   if (cmd === "make") return make(rest);
   if (cmd === "kit") return kit(rest);
   if (cmd === "skill") return skill(rest);
+  if (cmd === "reanalyze") return reanalyze(rest);
   if (cmd === "fork") {
     console.error("studio fork isn't built yet (phase-0 task 11, stretch).");
     return 2;
@@ -125,6 +128,16 @@ async function kit(args) {
   const api = sdkApi(await createClient());
   const r = await ensureKitUploaded({ api, cacheFile: dataPaths(dataDir()).kitUploads, out, log: console.log });
   console.log(r.fileId);
+  return 0;
+}
+
+async function reanalyze(args) {
+  const [session, why] = args;
+  if (!session || !why) {
+    console.error(USAGE);
+    return 2;
+  }
+  console.log(JSON.stringify(reanalyzeSession({ paths: dataPaths(dataDir()), session, why }), null, 2));
   return 0;
 }
 
