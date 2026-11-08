@@ -71,3 +71,4 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: model comparison adds Haiku 5.5: run Opus and Haiku comparisons (Geoff, after the token breakdown put the same build at about 4.5c on Haiku vs 68c on Sonnet)
 - 2026-11-08: when a check contradicts the unchanged spec's own words (a check bug), the agent fixes the check, quoting the rule; it's logged as a check bug and shown in the build summary. Changing what a rule means still needs the spec changed first (Geoff)
 - 2026-11-08: a check-bug fix that tests less of its rule must say which words are no longer tested; such a rule is flagged in the build summary and becomes a you-check question on first play (Geoff)
+- 2026-11-08: Studio builds fetch modules on demand and start from a template when the kid's idea fits one, else from blank; templates get some visual polish (pop-ups, life icons) (Geoff, D166/D169)
