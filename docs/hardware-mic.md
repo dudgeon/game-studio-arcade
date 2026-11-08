@@ -7,7 +7,7 @@ Every price and stock line below was read live from the page cited: options A–
 
 ## What the mic has to do
 
-- The mic records only while the Studio is listening: when a kid makes a request, or picks the C "Something else" tile. There's no physical MAKE button (D86). What starts and stops listening is still Geoff's question (D86: hold a button, press to start and stop, or voice activity). There's no wake word and no always-on listening.
+- The mic records only while the Studio is listening: when a kid makes a request, or picks the C "Something else" tile. There's no physical MAKE button (D86). The kid holds a player button to talk and lets go to send, and the mic records only while it's held (D87). There's no wake word and no always-on listening.
 - The kid is 30–60 cm from the cabinet, standing or sitting at a bartop. Talking is mostly the opening request and "C: Something else" answers; it's short clips.
 - Audio goes to Groq Whisper (primary) or Moonshine on the Pi (offline). Both want 16 kHz mono. Clean, close speech matters more than range.
 - Basement: probably some echo off hard walls and floor, plus the cabinet's own speaker. The cabinet can mute its speaker while the Studio is listening, so the game's sound isn't recorded with the kid's voice.

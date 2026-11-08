@@ -16,7 +16,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 
 ## 2. Vocabulary
 
-- **Studio**: everything that makes games. Studio sessions (an agent building or forking a cart against its spec), the studio kit, and the Studio's front ends: the cabinet's MAKE flow, Claude Code on the Mac mini, and later a browser front end. Replaces the earlier name "the Forge".
+- **Studio**: everything that makes games. Studio sessions (an agent building or forking a cart against its spec), the studio kit, and the Studio's front ends: the cabinet's Make flow, Claude Code on the Mac mini, and later a browser front end. Replaces the earlier name "the Forge".
 - **Arcade**: everything that plays games: the cabinet, launcher, shelf, game players, play telemetry.
 - **Cabinet-initiated**: a kid makes or forks a game at the cabinet, solo. The core workflow.
 - **Desktop-initiated**: Geoff, with a kid, builds or changes a game in local Claude Code on the Mac mini and publishes it to the cabinet.
@@ -96,7 +96,7 @@ CLOUD
   GitHub (private): nightly cart-library backup <- from cabinet
 
 CABINET  (Raspberry Pi 5, basement, mesh Wi-Fi)
-  Launcher (full-screen browser): shelf, MAKE flow, tiles
+  Launcher (full-screen browser): shelf, Make flow, tiles
   House runtime (browser) | native RetroArch, TIC-80, PICO-8
   Cabinet service
     Arcade side: local web server, git cart library, play log,
