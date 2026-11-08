@@ -4,9 +4,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { execFileSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { activeSeconds, attribute, bill, parseEvents, requestsOf, runtimeCents, simulate, stepsOf, thinkingRange } from "../scripts/cost-attribution.js";
+import { activeSeconds, attribute, bill, loggedCents, modelKey, parseEvents, requestsOf, runtimeCents, simulate, stepsOf, thinkingRange } from "../scripts/cost-attribution.js";
 
 const eventsFile = fileURLToPath(new URL("../fixtures/penguin-catch/events.jsonl", import.meta.url));
 const script = fileURLToPath(new URL("../scripts/cost-attribution.js", import.meta.url));
@@ -67,4 +69,64 @@ test("the command line prints the total and runs a what-if", () => {
   const what = JSON.parse(execFileSync(process.execPath, [script, eventsFile, "--no-expiry", "--json", "--drop", "16,17,18"], { encoding: "utf8" }));
   const noFixes = stepsOf(a.rows).filter((s) => ![16, 17, 18].includes(s.n ?? 0));
   near(what.cents, simulate(noFixes, { start: a.start.tokens }).cents + runtime, 1e-6);
+});
+
+/** A tiny recorded session: one request per prompt size, with a logged list cost. */
+function session(usages, listCost) {
+  const lines = [];
+  usages.forEach((u, i) => {
+    lines.push({ id: `s${i}`, type: "span.model_request_start", processed_at: "2026-11-08T00:00:00Z" });
+    lines.push({ id: `e${i}`, type: "span.model_request_end", model_request_start_id: `s${i}`, processed_at: "2026-11-08T00:00:01Z", model_usage: u });
+  });
+  lines.push({ id: "u", type: "session.usage", usage: { active_seconds: 0, list_cost: { amount: String(listCost), currency: "USD" } } });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cost-"));
+  const file = path.join(dir, "events.jsonl");
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+  return file;
+}
+const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+const usage = (read, output = 1000) => ({ input_tokens: 0, cache_creation_input_tokens: 1000, cache_read_input_tokens: read, output_tokens: output });
+
+test("--model prices the run as recorded, with the full table, not as a what-if", () => {
+  const file = session([usage(50_000)], 0);
+  const r = run(file, "--model", "haiku");
+  assert.match(r.stdout, /# prefix written/, "the per-request table");
+  assert.match(r.stdout, /TOTAL 0\.11c as haiku; the session logged 0c/);
+  assert.doesNotMatch(r.stdout, /what-if/);
+  const json = JSON.parse(run(file, "--model", "opus", "--json").stdout);
+  assert.equal(json.model, "opus");
+  near(json.totalCents, 2.5 + 1, 0.01);
+  assert.ok(json.rows.length === 1);
+});
+
+test("--model charges Haiku's over-100k rate request by request", () => {
+  const under = JSON.parse(run(session([usage(90_000)], 0), "--model", "haiku", "--json").stdout);
+  const over = JSON.parse(run(session([usage(110_000)], 1), "--model", "haiku", "--json").stdout);
+  near(under.totalCents, (90_000 * 0.01 + 1000 * 0.125 + 1000 * 0.5) / 1e4, 1e-6);
+  near(over.totalCents, (110_000 * 0.05 + 1000 * 0.625 + 1000 * 2.5) / 1e4, 1e-6);
+});
+
+test("full model ids work", () => {
+  assert.equal(modelKey("claude-haiku-5-5"), "haiku");
+  assert.equal(modelKey("opus"), "opus");
+  assert.equal(modelKey("gpt"), "gpt");
+  assert.notEqual(run(eventsFile, "--model", "gpt").status, 0);
+});
+
+test("a total that disagrees with the logged cost warns; a match doesn't", () => {
+  assert.equal(loggedCents(events), 68);
+  const right = run(eventsFile, "--model", "claude-sonnet-5-5");
+  assert.match(right.stdout, /TOTAL 68\.00c as sonnet; the session logged 68c/);
+  assert.equal(right.stderr, "");
+  const wrong = run(eventsFile, "--model", "haiku");
+  assert.match(wrong.stderr, /warning: priced as haiku .* but the session logged 68c/);
+  assert.equal(wrong.status, 0);
+});
+
+test("--what-if still re-simulates on another model", () => {
+  const what = JSON.parse(run(eventsFile, "--what-if", "--model", "haiku", "--json").stdout);
+  assert.equal(what.model, "haiku");
+  near(what.cents, simulate(stepsOf(a.rows), { start: a.start.tokens, model: "haiku", expiryAt: 7 }).cents + runtime, 1e-6);
+  assert.ok(!("rows" in what));
+  assert.match(run(eventsFile, "--what-if", "--model", "haiku").stdout, /^what-if \(haiku/);
 });

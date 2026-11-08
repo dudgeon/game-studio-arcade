@@ -2,8 +2,14 @@
 // Per-request token and cost attribution of a recorded Studio session, from its
 // event stream. Makes no API calls. See docs/cost-penguin-catch.md.
 //
-//   node studio-kit/cli/scripts/cost-attribution.js <events.jsonl>
-//     [--model sonnet|haiku|opus] [--no-expiry] [--drop 16,17,18] [--json]
+//   node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> [--model sonnet|haiku|opus] [--json]
+//     Prices the session as recorded. Events don't say which model ran, so --model
+//     says it (default sonnet; full ids like claude-haiku-5-5 work). A total that
+//     disagrees with the session's logged list cost gets a warning.
+//
+//   ... <events.jsonl> --what-if [--model haiku] [--no-expiry] [--drop 16,17,18] [--json]
+//     Re-simulates the session: on another model, without the cache expiry, without
+//     given requests. --no-expiry and --drop imply --what-if.
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -182,15 +188,26 @@ export function thinkingRange(reqs) {
 /** @param {number} n */
 const fmt = (n) => n.toFixed(2);
 
+/** "claude-haiku-5-5" -> "haiku". @param {string} name */
+export function modelKey(name) {
+  return Object.keys(PRICES).find((k) => name.toLowerCase().includes(k)) ?? name;
+}
+
+/** The session's own list cost in cents, from its last usage snapshot. @param {any[]} events @returns {number|null} */
+export function loggedCents(events) {
+  const amount = events.filter((e) => e.type === "session.usage").at(-1)?.usage?.list_cost?.amount;
+  return amount == null ? null : Number(amount);
+}
+
 /** @param {string[]} argv */
 function main(argv) {
   const file = argv.find((a, i) => !a.startsWith("--") && argv[i - 1] !== "--model" && argv[i - 1] !== "--drop");
   if (!file) {
-    console.error("usage: cost-attribution.js <events.jsonl> [--model sonnet|haiku|opus] [--no-expiry] [--drop 16,17,18] [--json]");
+    console.error("usage: cost-attribution.js <events.jsonl> [--model sonnet|haiku|opus] [--what-if] [--no-expiry] [--drop 16,17,18] [--json]");
     return 2;
   }
   const flag = (/** @type {string} */ name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
-  const model = flag("--model") ?? "sonnet";
+  const model = modelKey(flag("--model") ?? "sonnet");
   const events = parseEvents(fs.readFileSync(file, "utf8"));
   const reqs = requestsOf(events);
   const a = attribute(reqs, model);
@@ -199,7 +216,7 @@ function main(argv) {
 
   const dropped = (flag("--drop") ?? "").split(",").filter(Boolean).map(Number);
   const noExpiry = argv.includes("--no-expiry");
-  if (dropped.length || noExpiry || model !== "sonnet") {
+  if (dropped.length || noExpiry || argv.includes("--what-if")) {
     const steps = stepsOf(a.rows).filter((s) => !dropped.includes(s.n ?? 0));
     const missed = a.rows.find((r) => r.rewritten > 0)?.n;
     const expiryAt = noExpiry ? null : steps.findIndex((s) => s.n === missed);
@@ -209,8 +226,14 @@ function main(argv) {
     return 0;
   }
 
+  const total = b.tokenCents + runtime;
+  const logged = loggedCents(events);
+  // list_cost is whole cents, so a real match is within half a cent.
+  if (logged !== null && Math.abs(total - logged) > 1) {
+    console.error(`warning: priced as ${model} this comes to ${fmt(total)}c, but the session logged ${logged}c. Did it really run on ${model}? Use --model, or --what-if for a re-simulation.`);
+  }
   if (argv.includes("--json")) {
-    console.log(JSON.stringify({ ...a, bill: b, runtimeCents: runtime, totalCents: b.tokenCents + runtime, thinking: thinkingRange(reqs) }));
+    console.log(JSON.stringify({ ...a, model, bill: b, runtimeCents: runtime, totalCents: total, loggedCents: logged, thinking: thinkingRange(reqs) }));
     return 0;
   }
   console.log("  # prefix written re-read output returned rewrit    c own+carry tools");
@@ -224,7 +247,7 @@ function main(argv) {
   console.log(`cache expiry premium ${fmt(a.expiryCents)}c`);
   console.log(`thinking (estimated) ${thinkingRange(reqs).low}-${thinkingRange(reqs).high} of ${b.tokens.output} output tokens`);
   console.log(`output ${fmt(b.cents.output)}c, writes ${fmt(b.cents.write)}c, reads ${fmt(b.cents.read)}c, input ${fmt(b.cents.input)}c, runtime ${fmt(runtime)}c`);
-  console.log(`TOTAL ${fmt(b.tokenCents + runtime)}c`);
+  console.log(`TOTAL ${fmt(total)}c as ${model}${logged === null ? "" : `; the session logged ${logged}c`}`);
   return 0;
 }
 
