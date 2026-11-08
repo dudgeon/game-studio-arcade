@@ -119,3 +119,10 @@ Still open:
 - Ids are stable for the life of a cart and its forks: never renumbered, never reused. A removed rule leaves a gap, and the Changelog says why. A fork adds rules after the parent's highest id.
 - `checks.js` must be self-contained (no `import`); everything it needs comes through the test handle `t`. `validate_cart` reads its keys by importing it in a child Node process with the permission model on (read access to the cart folder only, no child processes or workers) and a 5-second timeout. Node 22's permission model doesn't block the network, so this limits, not seals; the playtest harness is where checks really run.
 - Coverage rules: every `auto` rule needs a check (error); a check with no matching rule, or on a `you check` rule, is an error too, since it means the spec and checks have drifted.
+
+**D50. Carts reach the starter library as `g.lib`.** *(Claude, director-approved; Phase 0 task 3, keeps D21's "a cart imports nothing".)*
+- `runtime/lib/index.js` exports one namespace per module: `g.lib.collide`, `g.lib.grid`, `g.lib.timers`, `g.lib.score`, `g.lib.flow`. The runtime (headless.js and frame.js) imports it and sets `g.lib`. `cart.d.ts` types it as `typeof import("./lib/index.js")`. No import maps, no loader hooks, no tsc `paths`.
+- Library code is cart-side: it type-checks under the cart rules (ES2023, no DOM, no Node), imports nothing outside `runtime/lib`, and uses no `Math.random`, wall clock or module-level state. One copy is shared across `reset()`, so all state lives in plain JSON objects the cart keeps in its own state. That also lets `probe()` return those objects as they are.
+- Functions that need the console take `g` as their first argument. Everything else is pure.
+- `g.save()` holds one value per cart, so the score helpers read and merge a field of a saved object (`{ best: 1200, ... }`) and never overwrite the cart's other saved fields.
+- The reference is `runtime/lib/REFERENCE.md`: one paragraph per exported function, written for an agent. A test fails if an export is missing from it.

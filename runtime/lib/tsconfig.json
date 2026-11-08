@@ -1,0 +1,14 @@
+{
+  // Library code is cart-side (D50): it must type-check under the cart rules
+  // (ES2023, no DOM, no Node), like runtime/tsconfig.cart.json.
+  // test/cart-safe.test.js runs this config, so root `npm test` enforces it.
+  // The tests themselves are checked by the root tsconfig.json (Node types).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["*.js", "../cart.d.ts"]
+}
