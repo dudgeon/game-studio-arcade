@@ -7,6 +7,8 @@ import { commitNewCart, specTitle } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
 import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
 import { addYouCheckRules, questionsFor } from "./untested.js";
+import { checkAppliedBrief, staleMessage } from "./brief.js";
+import { readAgentDef } from "./config.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -27,6 +29,8 @@ import { addYouCheckRules, questionsFor } from "./untested.js";
  * @property {"tarball"|"no-templates"|"skill"} [contextPack]   how this run got the library (D45, D166)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
  * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
+ * @property {boolean} [allowStaleBrief]   run the applied agent even if it differs from the repo (D173)
+ * @property {{system: string, tools: any[]}} [repoBrief]   what the applied agent should match; default agents/studio.md
  * @property {string} [recordFile]     also write the answers here
  * @property {() => Date} [now]
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
@@ -42,6 +46,16 @@ function recordedAnswer(t) {
 export async function makeCart(o) {
   const now = o.now ?? (() => new Date());
   const ui = o.ui;
+  // D173: a stale applied brief can't run silently. Checked before anything is uploaded or started.
+  /** @type {{match: boolean, agent_version: number|null, diffs: string[]}|null} */
+  let briefCheck = null;
+  if (!o.brief) {
+    briefCheck = await checkAppliedBrief({ api: o.api, lock: o.lock, def: o.repoBrief ?? readAgentDef() });
+    if (!briefCheck.match) {
+      if (!o.allowStaleBrief) throw new Error(staleMessage(briefCheck));
+      ui.info(`Running an applied brief that differs from the repo, as asked: ${briefCheck.diffs.join(", ")}.`);
+    }
+  }
   const kit = await o.kit();
 
   // D44: fetch the frozen snapshot as the first playtest starts, so nothing the
@@ -208,6 +222,7 @@ export async function makeCart(o) {
     context_pack: o.contextPack ?? "tarball",
     started_from: typeof report?.started_from === "string" ? report.started_from : null,
     brief: o.brief ? "file-override" : "applied-agent",
+    brief_check: briefCheck,
     first_playtest: freeze.first_playtest,
     playtest_runs: freeze.playtest_runs,
     edits_after_first_playtest: freeze.edits_after_first_playtest,

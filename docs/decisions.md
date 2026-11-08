@@ -588,4 +588,14 @@ Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like
 
 **D172. `studio make` runs the brief in the repo by default.** *(Geoff's acceptance of D166 and D169 says this is the default; Claude, library worker.)*
 - The applied agent is still v1, from before D44, because `ant apply` is blocked. So a plain `studio make` would have run the old read-everything brief. It now sends `agents/studio.md` as a session override unless `--applied-brief` says otherwise; `--brief-from-file` still works and does nothing new.
-- **Not done:** applying the agent. The cabinet service will use the applied agent, so `ant --profile game-studio-arcade apply .` must happen before the virtual cabinet makes games.
+- **Not done:** applying the agent. The cabinet service will use the applied agent, so `ant --profile game-studio-arcade apply .` must happen before the virtual cabinet makes games. *(Done 2026-11-08, and the default changed back: see D173.)*
+
+## 2026-11-08 — Applied agent v2
+
+**D173. `studio make` runs the applied agent again, and refuses a stale one.** *(Director asked for the decision; decided by Claude, tasks 7+8 worker. Changes D172's default.)*
+- Agent v2 is applied, carrying the repo's brief at that time (D44, D46, D48, D49, fetch on demand). `claude-lock.json` pins it, and a re-apply reports nothing to do.
+- **Default back to the applied agent.** The cabinet service will run the applied agent, so that's what a CLI build should test. Its version is pinned and logged, where an override is just text in a session.
+- **A stale brief can't run silently.** Before anything is uploaded or started, `studio make` reads the pinned agent version from the API and compares its system prompt, custom tools and toolset safeguards with `agents/studio.md`. On a mismatch it stops and says what differs and how to fix it. A live read, because the lockfile only knows what was last applied, not what the repo says now or what changed in the Console. If the agent can't be read, that counts as a mismatch.
+- **Two ways past it, both on purpose:** `--brief-from-file` runs the repo's brief as a session override (the way to try a brief before applying it), and `--applied-brief` runs the applied one anyway. The record says which: `brief` is `applied-agent` or `file-override`, and `brief_check` holds the result of the check.
+- `studio check-brief` runs just the check. The cabinet service should make the same check.
+- **Apply with bare `ant --profile game-studio-arcade apply`,** not `apply .` as D40 said. Bare apply updates only what the lockfile tracks. `apply .` also walks the folder, and it planned to create a second skill from D45's leftover `skills-staged/`. `studio skill` now stages in a temp folder so this can't recur.

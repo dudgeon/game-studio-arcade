@@ -16,6 +16,8 @@ import { reanalyzeSession } from "../src/reanalyze.js";
 import { addYouCheckRules, questionsFor } from "../src/untested.js";
 import { parseSpec, formatSpec, validateRuleCoverage } from "@game-studio-arcade/spec";
 import { readCart } from "../../player/src/library.js";
+import { compareBrief } from "../src/brief.js";
+import { readAgentDef } from "../src/config.js";
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/frog-hop");
 const script = JSON.parse(fs.readFileSync(path.join(fixtures, "session.json"), "utf8"));
@@ -51,10 +53,11 @@ const passing = {
   },
 };
 
+/** @param {any} [opts] */
 function setup(opts = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-data-"));
   const paths = dataPaths(root);
-  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5, input_tokens: 41000, output_tokens: 9800, cache_read_input_tokens: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } }, sessionId: opts.sessionId });
+  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, appliedAgent: opts.appliedAgent, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5, input_tokens: 41000, output_tokens: 9800, cache_read_input_tokens: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } }, sessionId: opts.sessionId });
   const info = [];
   let t = Date.parse("2026-11-07T21:00:00Z");
   const make = (extra = {}) =>
@@ -340,4 +343,75 @@ test("D49 summary: a narrowed rule that won't say what still gets flagged, and s
     [{ rule: "R20", from: "R7", words: null }],
   );
   assert.deepEqual(lines, ["Test changed with no explanation: R7.", "Test may prove less: R7, and it doesn't say what. You check it on first play: R20.", "Shared test code may prove less. Worth reading."]);
+});
+
+const DEF = readAgentDef();
+// As the API returns it: defaults filled in on the toolset, keys in another order.
+const asReturned = () => ({
+  version: 2,
+  system: DEF.system + "\n",
+  tools: DEF.tools.map((t) => {
+    const tool = /** @type {any} */ (t);
+    if (tool.type === "custom") return { input_schema: tool.input_schema, description: tool.description, name: tool.name, type: "custom" };
+    return { ...tool, configs: tool.configs.map((c) => ({ ...c, type: c.name })) };
+  }),
+});
+
+test("D173: compareBrief ignores what the API fills in, and catches what matters", () => {
+  assert.deepEqual(compareBrief(asReturned(), DEF), []);
+  const changed = (fn) => {
+    const a = asReturned();
+    fn(a);
+    return compareBrief(a, DEF);
+  };
+  assert.deepEqual(changed((a) => (a.system = "You are an old brief.")), ["system prompt"]);
+  assert.deepEqual(changed((a) => (a.tools.find((t) => t.name === "show_plan").description = "old")), ["tool show_plan"]);
+  assert.deepEqual(changed((a) => (a.tools = a.tools.filter((t) => t.name !== "ask_player"))), ["tool ask_player missing"]);
+  assert.deepEqual(changed((a) => a.tools.push({ type: "custom", name: "extra", description: "x", input_schema: {} })), ["tool extra not in the repo"]);
+  assert.deepEqual(changed((a) => (a.tools[0].configs = [])), ["web_fetch is not disabled", "web_search is not disabled"]);
+  assert.deepEqual(changed((a) => (a.tools = a.tools.slice(1))), ["toolset missing"]);
+});
+
+test("D173: a build on a matching applied agent runs, pinned, and logs the check", async () => {
+  const s = setup({ appliedAgent: asReturned() });
+  const { record } = await s.make();
+  assert.equal(s.m.calls[0], "retrieveAgent:agent_x@2", "the version sessions pin, before anything else");
+  assert.equal(record.brief, "applied-agent");
+  assert.deepEqual(record.brief_check, { match: true, agent_version: 2, diffs: [] });
+  assert.equal(s.m.created.system, undefined, "no override");
+  assert.equal(s.m.created.tools, undefined);
+});
+
+test("D173: a stale applied brief stops the build before anything is uploaded or started", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  let kitAsked = false;
+  await assert.rejects(s.make({ kit: async () => ((kitAsked = true), { fileId: "f", hash: "h" }) }), /applied Studio agent \(v2\) doesn't match agents\/studio\.md: system prompt[\s\S]*ant --profile game-studio-arcade apply[\s\S]*--brief-from-file/);
+  assert.equal(kitAsked, false);
+  assert.ok(!s.m.calls.includes("createSession"));
+  assert.ok(!fs.existsSync(path.join(s.paths.logs, "studio_session.jsonl")), "no build, no record");
+});
+
+test("D173: an agent that can't be read counts as stale", async () => {
+  const s = setup({ appliedAgent: new Error("network down") });
+  await assert.rejects(s.make(), /couldn't read the agent: network down/);
+  assert.ok(!s.m.calls.includes("createSession"));
+});
+
+test("D173: --applied-brief runs a stale one on purpose, says so, and logs it", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  const { record } = await s.make({ allowStaleBrief: true });
+  assert.ok(s.m.calls.includes("createSession"));
+  assert.deepEqual(record.brief_check, { match: false, agent_version: 2, diffs: ["system prompt"] });
+  assert.equal(record.brief, "applied-agent");
+  assert.match(s.info[0], /differs from the repo, as asked: system prompt/);
+});
+
+test("D173: --brief-from-file needs no check, and logs the override", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  const { record } = await s.make({ brief: DEF });
+  assert.ok(!s.m.calls.some((c) => c.startsWith("retrieveAgent")));
+  assert.equal(record.brief, "file-override");
+  assert.equal(record.brief_check, null);
+  assert.equal(s.m.created.system, DEF.system);
+  assert.deepEqual(s.m.created.tools, DEF.tools);
 });

@@ -17,7 +17,8 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
 | `--context-pack V` | `tarball` (default): the library in the kit, with its templates. `no-templates`: the same with only the blank start (D166). `skill`: attach the context pack as a skill and leave it out of the kit (D45) |
-| `--applied-brief` | run the applied agent's own brief. By default a session runs `agents/studio.md` as an override, since the applied agent is behind the file (D172); `--brief-from-file` says the same and is kept for scripts |
+| `--brief-from-file` | run the brief in `agents/studio.md` as a session override, without applying it |
+| `--applied-brief` | run the applied agent even if it differs from the repo |
 | `--commit-anyway` | commit even if validate or the playtest fails |
 | `-v` | show the agent's own messages and debug lines |
 
@@ -25,6 +26,7 @@ Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes 
 
 ## What a run does
 
+0. Checks the applied agent matches `agents/studio.md`, and stops if it doesn't (D173).
 1. Builds the studio kit; uploads it unless that exact kit is already uploaded.
 2. Creates a session from the agent and environment in `studio-kit/managed-agent/claude-lock.json`, with the kit mounted and a budget.
 3. Opens the event stream, **then** sends the request.

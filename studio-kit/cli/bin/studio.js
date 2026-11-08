@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // studio: the terminal stand-in for the cabinet's MAKE flow (phase-0 task 8).
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import readline from "node:readline/promises";
@@ -13,15 +14,17 @@ import { liveAnswerer, loadAnswers, replayAnswerer } from "../src/answers.js";
 import { defaultChecker } from "../src/checks.js";
 import { makeCart } from "../src/make.js";
 import { reanalyzeSession } from "../src/reanalyze.js";
+import { checkAppliedBrief, staleMessage } from "../src/brief.js";
 import { buildKit, NO_TEMPLATES_KIT, SKILL_KIT, stageContextPackSkill } from "../../managed-agent/scripts/pack-kit.js";
 
 const USAGE = `usage:
   studio make "<request>" --maker A [--with O] [--model ID] [--answers FILE] [--record FILE]
-                          [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--applied-brief]
+                          [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--brief-from-file] [--applied-brief]
                           [--replay-unmatched D|A]
                           [--commit-anyway] [--verbose]
   studio kit [--upload]            build the studio kit tarball (and upload it once)
   studio skill --upload            create the context-pack skill through the API
+  studio check-brief               does the applied agent match agents/studio.md?
   studio reanalyze <session> "<why>"   redo the D44 analysis; appends a correction record
   studio fork <cart> "<change>"    stretch goal (task 11), not built yet
 
@@ -33,6 +36,7 @@ async function main(argv) {
   if (cmd === "kit") return kit(rest);
   if (cmd === "skill") return skill(rest);
   if (cmd === "reanalyze") return reanalyze(rest);
+  if (cmd === "check-brief") return checkBrief();
   if (cmd === "fork") {
     console.error("studio fork isn't built yet (phase-0 task 11, stretch).");
     return 2;
@@ -100,7 +104,10 @@ async function make(args) {
       lock,
       contextPack,
       skills,
-      brief: values["applied-brief"] ? undefined : readAgentDef(), // D172: the repo's brief unless asked
+      // D173: the applied agent, checked against the repo. --brief-from-file overrides it for this
+      // build; --applied-brief runs it even if it's stale.
+      brief: values["brief-from-file"] ? readAgentDef() : undefined,
+      allowStaleBrief: values["applied-brief"],
       kit: () =>
         ensureKitUploaded({
           api,
@@ -140,6 +147,12 @@ async function kit(args) {
   return 0;
 }
 
+async function checkBrief() {
+  const check = await checkAppliedBrief({ api: sdkApi(await createClient()), lock: readLock(), def: readAgentDef() });
+  console.log(check.match ? `The applied Studio agent (v${check.agent_version}) matches agents/studio.md.` : staleMessage(check));
+  return check.match ? 0 : 1;
+}
+
 async function reanalyze(args) {
   const [session, why] = args;
   if (!session || !why) {
@@ -162,7 +175,8 @@ async function skill(args) {
     console.log(`already created: ${JSON.stringify(readSkillLock(lockFile))}`);
     return 0;
   }
-  const stageDir = path.join(MANAGED_AGENT_DIR, "skills-staged");
+  // Outside this folder, or a later `ant apply .` would find it and create a second skill (D173).
+  const stageDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-skill-"));
   const staged = stageContextPackSkill({ outDir: stageDir });
   const zip = path.join(MANAGED_AGENT_DIR, "dist/studio-context-pack.zip");
   fs.mkdirSync(path.dirname(zip), { recursive: true });
