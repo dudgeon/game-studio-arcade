@@ -53,3 +53,5 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: mic: not chosen; research an XLR jack on the front with an XLR gooseneck mic (Geoff)
 - 2026-11-08: Studio mic is hold-a-button-to-talk while the "tell me" screen is up; Make is a "Make a new game" tile in the game list; picking Make asks who's making, listing existing names plus a new-name slot for friends (Geoff, answering D86)
 - 2026-11-08: build a virtual cabinet on the mini, as faithful as practical and logically isolated from the mini, for use until the Picade arrives (Geoff)
+- 2026-11-08: back to the shelf: press ESC (the Escape key), the guest players' own default, not an invented mechanism (Geoff)
+- 2026-11-08: mic: a USB mic for now; Geoff will find one that fits the cabinet (the researched picks didn't integrate well with the hardware)
