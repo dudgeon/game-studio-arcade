@@ -1,0 +1,19 @@
+{
+  // Type-check carts the way validate_cart should: no DOM, no Node, only the
+  // cart and test-hook globals. Copy or extend this for a cart folder elsewhere
+  // (set "include" to that cart's game.js and checks.js plus the two .d.ts files).
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "include": ["cart.d.ts", "test-hook.d.ts", "examples/**/*.js"]
+}
