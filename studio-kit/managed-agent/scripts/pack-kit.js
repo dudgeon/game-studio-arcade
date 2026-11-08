@@ -24,8 +24,8 @@ export const REPO_ROOT = path.resolve(here, "../../..");
 /** Folders (relative to the repo root) that go into the kit, in KIT.md order. */
 export const KIT_PARTS = [
   { dir: "runtime", what: "House runtime and starter library (runtime/lib/). Carts run on this." },
-  { dir: "studio-kit/spec", what: "spec.md template, the guide to writing checkable rules, the checks.js format, and the spec parser." },
-  { dir: "studio-kit/tools", what: "Cart tools such as validate_cart." },
+  { dir: "studio-kit/spec", what: "spec.md template, the guide to writing checkable rules, the checks.js format, the spec parser, and validate_cart (the `validate-cart` command)." },
+  { dir: "studio-kit/tools", what: "Other cart tools (new_cart, import_asset), once they exist." },
   { dir: "studio-kit/playtest", what: "Playtest harness. Uses the sandbox's preinstalled Playwright and Chromium; never install another." },
   { dir: "studio-kit/context-pack", what: "Library reference, recipes and three tiny example carts. Read it before designing." },
 ];
