@@ -222,6 +222,27 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - For development on the mini, `studio-kit/playtest` pins `playwright` **1.56.0** exactly, the sandbox's version (D18; Chromium 141.0.7390.37). The packed kit leaves it out.
 - The harness imports the spec package and the runtime by relative path (`../../spec`, `../../../runtime`), not by package name, because the packed kit has no `node_modules` (D42). Checked by running a packed and extracted kit.
 
+## 2026-11-07 — Local player (Phase 0 task 9)
+
+Decided by Claude (the task 9 worker). The player is `studio-kit/player/`; it grows into the Cabinet Manager's simulator in Phase 1.
+
+**D70. The local player is one Node server in front of the runtime's handler.** *(Claude; implements phase-0 task 9.)*
+- `studio-play [--port 8330] [--host 127.0.0.1] [--carts DIR] [--examples] [--checker G]` serves the player page at `/`, a small JSON API at `/api/…`, and hands every other path to the runtime's `createHandler` (`/runtime/…`, `/carts/<id>/…`), so carts load exactly as in the playtest.
+- The cart library is read on every request (`~/game-studio-data/carts`, or `GSA_DATA_DIR`), so a cart the CLI just committed shows up without a restart. Only folders with a `game.js` count. `--examples` adds `runtime/examples/*` for trying it without a library.
+- It binds to 127.0.0.1 by default and never opens a browser window itself; it prints the URL.
+- The page takes the screen size and scale from the runtime's host (it never names 320×256), so a new screen size needs no player change.
+- Menus work with the keyboard and a gamepad through the runtime's own input map: stick up/down to move, A or START to pick, B or ★ (Escape, guide) to go back. ★ during play leaves the game.
+
+**D71. You-check questions come after the first play of each cart version.** *(Claude; implements D1 for Phase 0.)*
+- When a play of a cart version ends and nobody has answered that version's `you check` rules yet, the player asks them one at a time, each with the rule in the spec's words and three answers: **Yes**, **No**, **Not sure**, plus an optional typed note. "Later" skips; "Check rules" on the cart list asks again any time.
+- Each round of answers appends one record; nothing is overwritten (§3.1 "never delete data"). The latest record per cart version is the current answer.
+- The server fills in the cart's version, library commit and session from the library, and accepts only rule ids that are `you check` rules of that cart's spec.
+
+**D72. Two new log records, in the CLI's JSONL shape.** *(Claude; extends §9.5, follows D14 and D43.)* Appended as `{ "type": …, … }` lines to `~/game-studio-data/logs/<type>.jsonl`, like `studio_session` and `cart_version`.
+- `you_check`: `id`, `cart_id`, `cart_version`, `commit`, `session_id`, `checker`, `play_id`, `answered_at`, `answers: [{rule, text, answer: "yes"|"no"|"not_sure", said}]`. `said` is the note (or null), the same name the CLI uses for typed text. `checker` comes from `--checker` (default `G`, since Geoff answers in Phase 0).
+- `play` (§9.5): `id`, `cart_id`, `cart_version`, `commit`, `session_id`, `origin: "desktop"`, `sides` (which players pressed anything: `["p1"]`, `["p1","p2"]` or `[]`), `started_at`, `duration_s`, `ticks`, `early_quit`, `ended` (`star`, `back`, `left_page`), `errors` (cart error count).
+- `early_quit` means the play lasted under 30 seconds. A cart can't tell us "game over" yet, so this is a stand-in; revisit when the launcher logs plays in Phase 1.
+
 ## 2026-11-07 — Switch to the 10" Picade
 
 Specs were checked live on 2026-11-07. Sources and details are in [platform-notes.md](platform-notes.md#picade-10-inch-2025-edition).

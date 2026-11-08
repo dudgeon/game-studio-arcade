@@ -1,0 +1,27 @@
+{
+  "name": "@game-studio-arcade/player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local player: lists the dev cart library, plays a cart with keyboard or gamepad, asks its you-check rules and logs plays and answers (phase-0 task 9, D70-D72).",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "exports": {
+    ".": "./src/server.js"
+  },
+  "bin": {
+    "studio-play": "./bin/studio-play.js"
+  },
+  "scripts": {
+    "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\"",
+    "start": "node bin/studio-play.js"
+  },
+  "dependencies": {
+    "@game-studio-arcade/runtime": "0.0.0",
+    "@game-studio-arcade/spec": "0.1.0"
+  },
+  "devDependencies": {
+    "playwright": "1.65.0"
+  }
+}
