@@ -1,0 +1,13 @@
+# Packages the provisioning script installs, one per line, as name or name=version.
+# Versions get pinned from the first good boot: run `cabinet/vm/drive apt-lock` and commit the result.
+cage
+chromium
+grim
+wlr-randr
+nodejs
+avahi-daemon
+nftables
+openssh-server
+alsa-utils
+git
+device-tree-compiler

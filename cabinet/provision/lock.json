@@ -1,0 +1,25 @@
+{
+  "provision_version": "0.1.0",
+  "image": {
+    "name": "2026-10-06-raspios-trixie-arm64-lite.img.xz",
+    "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-10-06/2026-10-06-raspios-trixie-arm64-lite.img.xz",
+    "sha256": "483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843"
+  },
+  "virtual": {
+    "kernel_release": "6.12.107+deb13-arm64",
+    "kernel_deb": {
+      "name": "linux-image-6.12.107+deb13-arm64_6.12.107-1_arm64.deb",
+      "url": "https://deb.debian.org/debian/pool/main/l/linux-signed-arm64/linux-image-6.12.107+deb13-arm64_6.12.107-1_arm64.deb",
+      "sha256": "20c92f3f97dd466e0400a6fcb792bde85af842fbb5e8b471370065e3de9d9fc9"
+    },
+    "busybox_deb": {
+      "name": "busybox-static_1.37.0-6+b9_arm64.deb",
+      "url": "https://deb.debian.org/debian/pool/main/b/busybox/busybox-static_1.37.0-6+b9_arm64.deb",
+      "sha256": "c833be48abfa16bc19c4966ec93e289ff1ce5d2f1476cad3a57bd105378cd15c"
+    }
+  },
+  "picade": {
+    "picade_hat_repo": "https://github.com/pimoroni/picade-hat",
+    "picade_hat_commit": "f97c2ac7211c8d9ff866b22a82c3b2ae6d01e0df"
+  }
+}

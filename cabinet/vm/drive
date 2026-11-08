@@ -1,0 +1,87 @@
+#!/bin/bash
+# Drives the virtual cabinet's own screens from the mini over SSH, with no window (D144).
+#
+#   drive press KEY [MS]      tap a D82 key (default 80 ms)
+#   drive hold KEY MS         hold it for MS, as hold-to-talk does
+#   drive down KEY            press and keep held, until `drive up KEY`
+#   drive up KEY
+#   drive type TEXT           type lower-case letters, digits, space, . , - /
+#   drive screenshot FILE     save the 1024x768 screen as a PNG; checks its size
+#   drive playtest            run the harness on the cabinet's carts, labelled virtual (D128)
+#   drive apt-lock            print apt.lock with the versions the cabinet has now
+#   drive status              services, screen mode, provisioned version
+#   drive ssh [COMMAND]       a shell on the cabinet as its admin
+#
+# Keys: up down left right a b x y q e start enter esc star f1 f2 (D82).
+# ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124).
+set -euo pipefail
+
+HOST="${ARCADE_HOST:-arcade-virtual.local}"
+VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
+KEY="$VM_ROOT/ssh/arcade-virtual_ed25519"
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+
+cabinet() {
+  ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$VM_ROOT/ssh/known_hosts" \
+    "cabinet@$HOST" "$@"
+}
+
+keycode() {
+  case "$1" in
+    up) echo 103 ;; down) echo 108 ;; left) echo 105 ;; right) echo 106 ;;
+    a) echo 44 ;; b) echo 45 ;; x) echo 46 ;; y) echo 47 ;;
+    q) echo 16 ;; e) echo 18 ;;
+    start|enter) echo 28 ;; esc|star) echo 1 ;;
+    f1) echo 59 ;; f2) echo 60 ;;
+    *) echo "unknown key: $1 (up down left right a b x y q e start enter esc star f1 f2)" >&2; return 1 ;;
+  esac
+}
+
+# Linux key codes for typing, as CODE:SHIFT, US layout.
+typecodes() {
+  local text="$1" out="" i c row code
+  for ((i = 0; i < ${#text}; i++)); do
+    c="${text:i:1}"
+    case "$c" in
+      [1-9]) code=$((c + 1)) ;;
+      0) code=11 ;;
+      ' ') code=57 ;; .) code=52 ;; ,) code=51 ;; -) code=12 ;; /) code=53 ;;
+      [a-z])
+        row="qwertyuiop"; if [[ "$row" == *"$c"* ]]; then local p="${row%%"$c"*}"; code=$((16 + ${#p}));
+        else row="asdfghjkl"; if [[ "$row" == *"$c"* ]]; then local p="${row%%"$c"*}"; code=$((30 + ${#p}));
+        else row="zxcvbnm"; local p="${row%%"$c"*}"; code=$((44 + ${#p})); fi; fi ;;
+      *) echo "can't type: '$c'" >&2; return 1 ;;
+    esac
+    out+=" $code:0"
+  done
+  echo "$out"
+}
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  press) code="$(keycode "$1")"; cabinet sudo arcade-keyd tap "${2:-80}" "$code" ;;
+  hold) code="$(keycode "$1")"; cabinet sudo arcade-keyd tap "$2" "$code" ;;
+  down) code="$(keycode "$1")"; cabinet sudo arcade-keyd down "$code" ;;
+  up) code="$(keycode "$1")"; cabinet sudo arcade-keyd up "$code" ;;
+  type) codes="$(typecodes "$1")"; [ -z "$codes" ] || cabinet sudo arcade-keyd seq $codes ;;
+  screenshot)
+    out="$1"
+    cabinet sudo arcade-screenshot > "$out.tmp"
+    size="$(file -b "$out.tmp")"
+    case "$size" in
+      *"PNG image data, 1024 x 768"*) mv "$out.tmp" "$out"; echo "$out" ;;
+      *) echo "not a 1024x768 PNG: $size (kept as $out.tmp)" >&2; exit 1 ;;
+    esac
+    ;;
+  playtest) cabinet sudo -u arcade node /opt/arcade/current/cabinet/vm/guest/playtest-virtual.mjs ;;
+  apt-lock)
+    names="$(grep -vE '^[[:space:]]*(#|$)' "$REPO/cabinet/provision/apt.lock" | cut -d= -f1 | tr '\n' ' ')"
+    cabinet "dpkg-query -W -f='\${Package}=\${Version}\n' $names"
+    ;;
+  status)
+    cabinet 'cat /etc/hostname; cat /etc/arcade/provisioned-version; uname -r; systemctl is-active arcade-launcher arcade-kiosk arcade-keyd nftables avahi-daemon; sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user/$(id -u arcade) WAYLAND_DISPLAY=wayland-0 wlr-randr'
+    ;;
+  ssh) cabinet "$@" ;;
+  *) sed -n '2,15p' "$0" >&2; exit 2 ;;
+esac

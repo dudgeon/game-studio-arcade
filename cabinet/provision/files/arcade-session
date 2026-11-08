@@ -1,0 +1,20 @@
+#!/bin/bash
+# Runs inside the compositor: fix the screen size if the backend needs it, then the kiosk.
+set -u
+if [ -n "${ARCADE_OUTPUT:-}" ]; then
+  wlr-randr --output "$ARCADE_OUTPUT" --custom-mode 1024x768 || echo "arcade-session: could not set 1024x768" >&2
+fi
+# shellcheck disable=SC2086  # CHROMIUM_EXTRA is a list of flags
+exec chromium \
+  --ozone-platform=wayland \
+  --kiosk \
+  --no-first-run \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-features=Translate,MediaRouter \
+  --autoplay-policy=no-user-gesture-required \
+  --password-store=basic \
+  --user-data-dir=/var/lib/arcade/chromium \
+  ${CHROMIUM_EXTRA:-} \
+  "http://127.0.0.1:8330/"

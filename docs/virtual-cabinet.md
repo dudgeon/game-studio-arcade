@@ -1,6 +1,6 @@
 # Virtual cabinet on the Mac mini
 
-**Status:** design only, nothing built (2026-11-08). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
+**Status:** V0 scripts written, VM not yet booted (2026-11-08; D140–D146). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
 
 Geoff (2026-11-08): "It will be a while before the Picade arrives, so we will need a full emulator stack running as close to accurate a version of a logically isolated (I think this is the term?) version of the cabinet on the mini."
 

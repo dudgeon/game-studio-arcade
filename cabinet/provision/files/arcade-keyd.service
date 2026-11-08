@@ -1,0 +1,12 @@
+[Unit]
+Description=Arcade driver keyboard (uinput, virtual cabinet only, D144)
+Before=arcade-kiosk.service
+
+[Service]
+ExecStart=/usr/local/bin/arcade-keyd serve
+Restart=always
+RestartSec=1
+RuntimeDirectory=arcade
+
+[Install]
+WantedBy=multi-user.target

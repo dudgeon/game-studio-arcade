@@ -460,3 +460,37 @@ Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full
 - The mini is unchanged: it keeps the `ant` CLI login (D16) and must never have `ANTHROPIC_API_KEY` set. The cabinet service reads its key from its config file and hands it to the SDK directly, not through a shell environment variable on the mini. So the two rules don't meet: the mini has no key, and a cabinet has only its own.
 - Code follows (not done here): the auth helper (D17) gets a cabinet path that reads the key file, while the mini path stays profile-only.
 - Why not the alternatives: WIF needs the account converted to an organization (D15, D16); browser login needs a person present, which fits an unattended cabinet badly.
+
+## 2026-11-08 — Virtual cabinet V0 build
+
+Decided by Claude (the V0 worker) unless marked. **The VM has not booted yet: see D146.** Anything marked "unproven" needs the first boot.
+
+**D140. V0 boots Plan A's way: the pinned Pi OS root filesystem, Debian's kernel, our own small initramfs, UTM's direct Linux boot.** *(Claude; implements D121. The Plan A/B verdict waits for the first boot.)*
+- Kernel: Debian trixie `linux-image-6.12.107+deb13-arm64`. Its `vmlinuz` is already the uncompressed arm64 Image that Apple's Linux boot loader needs (checked 2026-11-08).
+- Initramfs: `busybox-static` plus the kernel modules needed to mount the root, built by our script. It installs the kernel's modules on the root filesystem and hands over to the stock systemd.
+- Direct boot, not UEFI, because UTM only creates a UEFI variable store when its GUI saves a VM, and direct boot is fully scriptable. If the display (D141) needs UEFI, it comes with that step.
+
+**D141. V0's VM has no display device, and the kiosk draws to a headless compositor at 1024×768.** *(Claude; proposes a change to D123 and D126 for V0. Follows Geoff's "no windows without my OK" and his request that Claude can drive the screens from the mini without any window.)*
+- UTM opens a window for any VM with a display device. A VM without one runs headless.
+- Same kiosk above the compositor: `cage` and Chromium, with `WLR_BACKENDS=headless,libinput` and software rendering in the `virtual` profile. The `picade` profile uses `cage`'s normal DRM backend.
+- Geoff's window (D126) is still wanted for playing with a kid (D130). It is a later generator option plus his OK. V0 doesn't prove it. Also not proven in V0: the window-focus checks and how the display behaves.
+- Sound-in is off in the VM config (`AudioInput` false), so UTM never asks for the microphone. Sound-out stays on.
+
+**D142. Where it lives.** *(Claude.)* `cabinet/provision/` holds the script, its profiles, files and locks. `cabinet/vm/` holds the driver. `scripts/virtual-cabinet/` holds the generator and boot commands (D123). VM disks, downloads and keys live in `~/game-studio-data/vm/`, never in git.
+
+**D143. The seed goes on the image's FAT partition.** *(Claude; extends D4.)* macOS can't write ext4, but it can write the FAT boot partition without sudo. The generator puts the script, the bundle, the kernel modules and the cabinet's SSH public key in `seed/`. A one-shot systemd service runs `provision.sh` on first boot and logs to `seed/provision.log`, which the mini can read with the VM off. The real Pi can use the same seed, so the same script runs on both.
+
+**D144. The driver: uinput for keys, `grim` for screenshots, both over SSH.** *(Claude; implements Geoff's request, via the director, that Claude can drive the virtual cabinet's own screens.)*
+- `cabinet/vm/drive` has `press`, `hold`, `down`, `up`, `type` and `screenshot`, using the D82 key names.
+- Keys go through a small uinput daemon in the VM, `arcade-keyd` (Python standard library only, `virtual` profile only). So they travel kernel → libinput → compositor → Chromium, the same path as the Picade overlay's virtual keyboard. Chromium's DevTools protocol would skip that path. A real hold is two events apart, which hold-to-talk (D87) needs.
+- Screenshots are the compositor's actual 1024×768 output.
+- Simulating audio in for hold-to-talk later, not built: load `snd-aloop` in the `virtual` profile and play a WAV into the loopback while `drive hold` holds the talk button, so the speech pipeline hears it through ALSA as if from a mic. Testing the pipeline alone can feed the WAV straight to it.
+
+**D145. Node comes from the pinned image's apt sources in V0, and `gsa-playtest` uses its node driver in the VM.** *(Claude; stays inside the installs approved for V0.)*
+- Trixie's Node is 20, while the repo's `engines` says 22. Nothing the player and harness use was found to need 22 in a text search, but that is unproven until the first boot. If it fails, Node 22 needs the director's OK: it isn't on the approved list.
+- Playwright isn't installed in the VM (not on the approved list), so V0's frame-time numbers come from the node driver, labelled `host: "virtual"` by `cabinet/vm/` (D128). The browser-driver gate is V1.
+
+**D146. Starting the VM needs two steps from Geoff, once.** *(Claude; facts checked 2026-11-08. Geoff decides.)*
+- **Gatekeeper:** UTM (notarized, Developer ID Turing Software, WDNLXAD4W8) is still quarantined. Anything that runs from `UTM.app`, even `utmctl --help`, raises the first-open dialog. Removing quarantine by script was OK'd through the director, but Claude Code's permission system refused it, so it stands. Geoff clears it by opening UTM once.
+- **Automation:** the only scripted way to start a VM is `utmctl start`, which uses Apple Events. So the first start should raise one "control UTM" consent prompt. UTM removed `utm://start` in v4.5.1 and has no start-on-launch setting (its `shouldAutoStartVM` only applies to a display window already opened), so no route without Apple Events was found. Its remote server needs pairing through the GUI, and Shortcuts would need a shortcut made by hand.
+- `scripts/virtual-cabinet/up.sh` is the one command for after that. It refuses to run while quarantine is on.
