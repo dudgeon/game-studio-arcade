@@ -153,3 +153,5 @@ Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also
 
 **Cabinet and assembly:** powder-coated MDF, acrylic screen cover, marquee and console; 310 × 260 × 250 mm (H × W × D) assembled. About 2–3 hours with a cross-head and a small flat-blade screwdriver. Guide warnings: make sure screw terminals grip the bare wire; seat the ribbon cable under its grey clip, not on top ("it _won't_ work"); if only one joystick direction works when mapping, recheck the joystick wiring. Includes a PICO-8 licence (Geoff's copy for the guest player, see Guest players).
 
+**Escape in the guest players** (checked 2026-11-08, for D88): RetroArch's default Escape is "Exit RetroArch" and F1 toggles the menu (docs.libretro.com/guides/input-and-controls). TIC-80: "ESC: Switch console/editor or open menu while in game" (github.com/nesbox/TIC-80/wiki/Hotkeys). PICO-8 manual v0.2.7: "Press escape to stop the program, and once more to enter editing mode"; Enter/P is its pause menu. So PICO-8 drops to its own console on Escape, and the launcher has to take over when it does.
+

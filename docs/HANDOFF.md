@@ -1,4 +1,4 @@
-> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions), then for Geoff's player and MAKE answers (D85, D86) and the Make flow details (D87). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
+> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions), then for Geoff's player and MAKE answers (D85, D86) and the Make flow details (D87), back to the shelf and the mic (D88, D89), and the virtual cabinet (D120–D129). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
 
 # game-studio-arcade — Handoff Brief
 
@@ -25,6 +25,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 - **House runtime**: our small JavaScript fantasy console (SDK plus starter library). Ships on the cabinet; used by every playtest.
 - **Cabinet service**: the single long-running process on the cabinet's Pi, with an Arcade side and a Studio side.
 - **Cabinet Manager**: local web app on the Mac mini: simulator, carts, activity, cabinet health, updates.
+- **Virtual cabinet**: a second, complete cabinet in an isolated VM on the Mac mini, running the same OS, provisioning script, cabinet service, launcher and runtime as the Pi, with its own cart library, logs and API identity ([virtual-cabinet.md](virtual-cabinet.md), D120–D129). Not the Manager's simulator, which is a quick cart player in a browser for iterating on one game.
 - **Shelf**: the launcher's game list. Shows the latest version of each branch.
 - **Tiles**: the four on-screen answers to a Studio question: A, B, C, D.
 - **Publish gate**: the cabinet re-running a cart's playtest before it reaches the shelf.
@@ -76,8 +77,8 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 - ~~Which cabinet (§13).~~ Picade 10" + Pi 5 8 GB, ordered 2026-11-07 (D80).
 - ~~Second player~~: games default to single player, with turns well supported; the controller count is a setting; external controllers later (D85).
 - ~~The MAKE (★) button~~: no physical button assumed; the Studio starts from the launcher/shelf (D86).
-- The mic (D84; no external USB on the case; an XLR jack plus gooseneck is being researched).
-- ~~Opened by D86~~: hold a button to talk, a "Make a new game" tile, and an open list of makers (D87). Still open: how a kid gets back to the shelf from a game (D86).
+- The mic: a USB mic, Geoff is choosing one (D89). No external USB on the case.
+- ~~Opened by D86~~: hold a button to talk, a "Make a new game" tile, and an open list of makers (D87). ~~How a kid gets back to the shelf from a game~~: press ESC (Escape), the guest players' default (D88).
 - Speech bake-off results.
 - Default build model and per-build cap.
 - Starter library v1 contents.
@@ -111,12 +112,16 @@ MAC MINI  (office)
     simulator, carts, activity, health, updates
   Claude Code (Geoff's account) + game-studio plugin -> cabinet MCP
     local dev server, local playtest, asset import
+  Virtual cabinet (isolated VM, D120-D129): the same cabinet stack as
+    the Pi, own data and identity; reached only over the network,
+    like the real cabinet (Manager API, arcade MCP)
 ```
 
 Placement rules:
 - If the kids are only playing, only the cabinet is active.
 - A Wi-Fi drop slows a build or delays a log sync. It never stops a game.
 - The Mac mini is never in the cabinet's play path or its cabinet-initiated build path.
+- The virtual cabinet runs on the mini's hardware, so its independence is logical, not physical: no mini software is in its play or build path, but it can't run with the mini off. The rules above still govern the real cabinet unchanged (D129).
 
 ## 5. Platform facts (checked Nov 7, 2026; re-verify, Managed Agents is in beta)
 
@@ -297,9 +302,9 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 
 *Done when:* Falling Blocks exists as `spec.md` plus `game.js`, every rule passes, it plays in a browser with the keyboard, real cost per build is recorded, and Sonnet 5.5 vs Opus 5.5 has been compared once. Stretch: one fork ("make it lava") end to end.
 
-**Phase 1 — cabinet service and Cabinet Manager (2–3 weekends).** Develop the service on the Mac mini or a spare Pi (development there is fine; production play never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. Check Playwright's Chromium on Raspberry Pi OS arm64, or point it at system Chromium, for the publish gate. Run the gate at low priority and defer it while a game is being played.
+**Phase 1 — cabinet service and Cabinet Manager (2–3 weekends), in the virtual cabinet.** Develop and run the service in the virtual cabinet on the mini (virtual-cabinet.md steps V0–V2; production play on the real cabinet never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. Check Playwright's Chromium on Raspberry Pi OS arm64, or point it at system Chromium, for the publish gate (doable in the VM, which is arm64 on the same OS; speed still needs the Pi). Run the gate at low priority and defer it while a game is being played.
 
-**Phase 2 — the cabinet (on arrival).** Hardware ordered 2026-11-07 (D80). Assemble the Picade (check the edition, fit the Active Cooler), scripted image on a new card including the Picade overlay and key map (D82, D83), the mic (D84), the launcher's Make entry (D86), Manager pairing, day-one library.
+**Phase 2 — hardware bring-up (on arrival).** Hardware ordered 2026-11-07 (D80). The software already runs in the virtual cabinet on the same script, so this phase is the hardware layer (virtual-cabinet.md V3): assemble the Picade (check the edition, fit the Active Cooler), the same script with the `picade` profile on a new card, the overlay and key map (D82, D83), the X HAT's DAC and speaker, the panel and power button, the USB mic in the case (D89), basement Wi-Fi, Manager pairing, the day-one library, and calibrating the publish gate against the virtual cabinet (D128).
 
 **Phase 3 — voice and kid builds (2 weekends).** Groq vs Moonshine bake-off with both kids' recordings; guardrails; first real cabinet-initiated builds and forks.
 

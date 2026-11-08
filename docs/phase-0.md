@@ -19,7 +19,7 @@ Spend ceiling for all of Phase 0: **$25** of API list cost (proposed). Each buil
 3. **About 30 minutes for task 10**: answer the tile questions at the terminal (A/B/C/D) for one build, then play the results and rate them. The other builds replay your answers automatically.
 4. **A GitHub remote, if you want one**: should I create a private `dudgeon/game-studio-arcade` and push?
 
-Not needed yet: a Groq key (Phase 3). ~~Hardware (Phase 2)~~: done 2026-11-07, Geoff ordered the 10" Picade and a Pi 5 8 GB (D80). Since decided: single player by default, turns well supported, controller count as a setting (D85); Make on the shelf, no button (D86). Then hold-to-talk, a "Make a new game" tile, and an open list of makers (D87). Still open: the mic (D84) and how to get back to the shelf from a game (D86).
+Not needed yet: a Groq key (Phase 3). ~~Hardware (Phase 2)~~: done 2026-11-07, Geoff ordered the 10" Picade and a Pi 5 8 GB (D80). Since decided: single player by default, turns well supported, controller count as a setting (D85); Make on the shelf, no button (D86). Then hold-to-talk, a "Make a new game" tile, and an open list of makers (D87). Back to the shelf is ESC/Escape (D88); the mic is a USB mic, Geoff choosing (D89). Before the Picade arrives, Phase 1 develops in the **virtual cabinet** on the mini ([virtual-cabinet.md](virtual-cabinet.md), D120–D129); Phase 0 is unchanged.
 
 I'll install these on the mini unless you object: `ant` (`brew install anthropics/tap/ant`) and Node 22 (`brew install node@22`, used through `.nvmrc`).
 
