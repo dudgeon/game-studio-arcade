@@ -39,6 +39,7 @@ Sources: platform.claude.com/docs/en/managed-agents/{overview, quickstart, agent
   - Under `tools`, a path glob such as `./tools/*.json` inserts tool definitions from files.
   - `--dry-run` shows the plan; `--yes` is needed without a terminal.
   - It can't adopt resources created elsewhere.
+- **Confirmed live 2026-11-08 (Studio agent apply, ant 2.7.1):** a `./tools/*.json` glob under `tools` expands into the custom tools; `allowed_hosts: []` with both `allow_*: false` is accepted; a second `ant apply` with no edits reports "Everything is up to date". `ant --profile <name> apply` shows `credentials profile <name>` in the plan.
 - **Session outputs:** the Files API lists only a `filename` per output, with no path. Folder structure isn't guaranteed, so we ship one `cart.tgz` (D42).
 - **Custom tool names** also can't match a built-in tool name (`bash`, `read`…).
 - **Custom skills** attach as `{type: custom, skill_id, version}`, up to 500 per session. They need the `read` tool.
