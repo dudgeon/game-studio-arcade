@@ -232,8 +232,8 @@ export async function playtest(cartDir, opts = {}) {
 
   /** @type {Report["generic"]} */
   const generic = [];
-  /** @param {string} id @param {boolean} ok @param {string | null} reason */
-  const g = (id, ok, reason) => generic.push({ id, name: id, status: ok ? "pass" : "fail", passed: ok, reason: ok ? null : reason });
+  /** @param {string} id @param {boolean} ok @param {string | null} reason @param {number | null} [frame] */
+  const g = (id, ok, reason, frame = null) => generic.push({ id, name: id, status: ok ? "pass" : "fail", passed: ok, reason: ok ? null : reason, ...(!ok && frame !== null ? { frame } : {}) });
 
   g("loads", load.status === "pass", load.reason);
 
@@ -268,19 +268,28 @@ export async function playtest(cartDir, opts = {}) {
   const frameTime = frameStats(times, budgetMs);
   g("frame-time", times.length > 0 && frameTime.p95Ms <= budgetMs, times.length === 0 ? "no soak frames ran, so there's nothing to time" : `95% of frames should take at most ${budgetMs} ms for update+draw; the slowest 5% took ${frameTime.p95Ms} ms or more (max ${frameTime.maxMs} ms)`);
 
-  /** Why two runs with the same seed and input differ, or null. @param {any} x @param {any} y @param {string} what */
+  /**
+   * How two runs with the same seed and input differ, or null. The frame goes in
+   * its own field, not the reason: on a cart that really is random it's random
+   * too, and the reason has to stay comparable (D65).
+   * @param {any} x @param {any} y @param {string} what
+   * @returns {{ reason: string, frame: number | null } | null}
+   */
   const differ = (x, y, what) => {
     const hx = x.hashes ?? [];
     const hy = y.hashes ?? [];
     for (let i = 0; i < Math.min(hx.length, hy.length); i++) {
-      if (hx[i].hash !== hy[i].hash) return `two runs with the same seed and ${what} drew a different screen at frame ${hx[i].frame}; the game may be using Math.random or the clock instead of g.rand`;
+      if (hx[i].hash !== hy[i].hash) return { reason: `two runs with the same seed and ${what} drew different screens; the game may be using Math.random or the clock instead of g.rand`, frame: hx[i].frame };
     }
-    if (x.status !== y.status || x.frames !== y.frames) return `two runs with the same seed and ${what} ended differently (after ${x.frames} vs ${y.frames} frames)`;
+    if (x.status !== y.status || x.frames !== y.frames) {
+      const ends = [x.frames, y.frames].filter((n) => n !== null);
+      return { reason: `two runs with the same seed and ${what} ended differently`, frame: ends.length ? Math.min(...ends) : null };
+    }
     return null;
   };
-  let detReason = differ(idleA, idleB, "no input") ?? differ(soakA, soakB, "random input");
-  if (!detReason && [idleA, idleB, soakA, soakB].every((r) => !(r.hashes ?? []).length)) detReason = "no run got far enough to compare two runs";
-  g("deterministic", detReason === null, detReason);
+  let det = differ(idleA, idleB, "no input") ?? differ(soakA, soakB, "random input");
+  if (!det && [idleA, idleB, soakA, soakB].every((r) => !(r.hashes ?? []).length)) det = { reason: "no run got far enough to compare two runs", frame: null };
+  g("deterministic", det === null, det?.reason ?? null, det?.frame);
 
   frames.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
@@ -327,14 +336,15 @@ function withPassed(r) {
 
 /**
  * The part of a report that must be identical on every machine (D62):
- * everything but `env`, the timing numbers and the frame-time verdict.
+ * everything but `env`, the timing numbers, the frame-time verdict and the
+ * frame where two runs of a random cart first differed (D65).
  * @param {Report} report
  */
 export function comparable(report) {
   const { env, frameTime, ...rest } = report;
   return {
     ...rest,
-    generic: rest.generic.filter((x) => x.id !== "frame-time"),
+    generic: rest.generic.filter((x) => x.id !== "frame-time").map(({ frame, ...x }) => x),
     frameTime: { frames: frameTime.frames, budgetMs: frameTime.budgetMs },
   };
 }

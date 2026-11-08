@@ -285,6 +285,11 @@ Revisit if a test with more runs, or a brief that doesn't say to read everything
 - The agent runs the node driver first (the default) and the browser driver for parity.
 - **Palette:** every job reads `t.warnings()` when the handle has it. The report lists each warning once in `warnings`, and any color warning fails `palette` with the runtime's message. `comparable()` keeps `warnings`, since they're deterministic.
 
+**D65. The frame where two runs first differ is its own field, outside `comparable()`.** *(Claude, playtest parity flake; refines D61, D62.)*
+- On a cart that really uses `Math.random`, the first differing frame is random too. It was in the `deterministic` reason, so the same cart could give two different "same" reports, about 1 run in 256 on `dot-catch-broken`.
+- The reason now has no frame in it. A failed `deterministic` carries `frame` (the first sampled frame that differed, or the earlier of the two ending frames), and the CLI prints it. `comparable()` drops `frame`, as it does the other numbers that can't match.
+- The check itself is unchanged: the same frames are hashed and compared, and it fails on the same carts.
+
 ## 2026-11-07 — Local player (Phase 0 task 9)
 
 Decided by Claude (the task 9 worker). The player is `studio-kit/player/`; it grows into the Cabinet Manager's simulator in Phase 1.

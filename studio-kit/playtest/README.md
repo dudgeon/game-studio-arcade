@@ -39,7 +39,7 @@ const report = await playtest(cartDir, { driver: "node", out: null }); // out: n
 
 ## The report
 
-`playtest.json` (D62) has `ok`, `rules` (`id`, `kind`, `text`, `status`, `passed`, `reason`, `frames`), `coverage` (spec/checks drift), `generic` (`id`, `name`, `status`, `passed`, `reason`), `frameTime`, `errors`, `warnings` (runtime dev warnings), `frames` (the PNGs in `playtest-frames/`) and `env`. `comparable(report)` drops `env` and the timing numbers. What's left must match on every machine.
+`playtest.json` (D62) has `ok`, `rules` (`id`, `kind`, `text`, `status`, `passed`, `reason`, `frames`), `coverage` (spec/checks drift), `generic` (`id`, `name`, `status`, `passed`, `reason`, and on a failed `deterministic` the `frame` where two runs first differed), `frameTime`, `errors`, `warnings` (runtime dev warnings), `frames` (the PNGs in `playtest-frames/`) and `env`. `comparable(report)` drops `env`, the timing numbers and that `frame`, which is random on a random cart (D65). What's left must match on every machine.
 
 ## Tests
 
