@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { buildKit, collectKit, stageContextPackSkill } from "../scripts/pack-kit.js";
+import { buildKit, collectKit, SKILL_KIT, stageContextPackSkill } from "../scripts/pack-kit.js";
 
 function fakeRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kit-repo-"));
@@ -79,5 +79,28 @@ test("stageContextPackSkill writes a SKILL.md beside the pack", () => {
   const skill = fs.readFileSync(path.join(r.dir, "SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: studio-context-pack\n/);
   assert.match(skill, /- `reference.md`/);
+  assert.match(skill, /under `\/workspace\/kit\/`/);
   assert.ok(fs.existsSync(path.join(r.dir, "examples/dodge/spec.md")));
+});
+
+test("the skill kit leaves the context pack out and says where it is", () => {
+  const repo = fakeRepo();
+  const out = path.join(repo, "dist/noctx.tgz");
+  buildKit({ repoRoot: repo, out, ...SKILL_KIT });
+  const x = fs.mkdtempSync(path.join(os.tmpdir(), "kit-x-"));
+  execFileSync("tar", ["-xzf", out, "-C", x]);
+  assert.ok(!fs.existsSync(path.join(x, "studio-kit/context-pack")));
+  const kitMd = fs.readFileSync(path.join(x, "KIT.md"), "utf8");
+  assert.match(kitMd, /attached to this session as the skill `studio-context-pack`/);
+  assert.doesNotMatch(kitMd, /Not in this kit yet[\s\S]*context-pack/);
+});
+
+test("the staged skill keeps the reading and carts, not the pack's tooling", () => {
+  const repo = fakeRepo();
+  fs.writeFileSync(path.join(repo, "studio-kit/context-pack/package.json"), "{}");
+  fs.mkdirSync(path.join(repo, "studio-kit/context-pack/carts/dodge"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "studio-kit/context-pack/carts/dodge/game.js"), "export default {};");
+  const r = stageContextPackSkill({ repoRoot: repo, outDir: path.join(repo, "skills") });
+  assert.ok(!fs.existsSync(path.join(r.dir, "package.json")));
+  assert.ok(fs.existsSync(path.join(r.dir, "carts/dodge/game.js")));
 });

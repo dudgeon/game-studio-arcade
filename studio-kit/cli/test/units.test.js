@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { formatPlan, formatQuestion, parseChoice, planResult, questionResult } from "../src/tiles.js";
 import { liveAnswerer, loadAnswers } from "../src/answers.js";
 import { sessionCreateBody } from "../src/api.js";
-import { readLock } from "../src/config.js";
+import { readLock, readSkillLock } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
 import { progressFor } from "../src/progress.js";
 import { judgeReport } from "../src/checks.js";
@@ -33,6 +33,9 @@ test("tiles: question, plan and results", () => {
   const plan = formatPlan({ summary: "Dodge cars.", rules: [{ id: "R1", kind: "auto", text: "Up moves up." }, { id: "R2", kind: "you-check", text: "Frog smiles." }] });
   assert.match(plan, /R1\. Up moves up\.\n/);
   assert.match(plan, /R2\. Frog smiles\.  \(you check\)/);
+  assert.doesNotMatch(plan, /What changed/);
+  const replan = formatPlan({ summary: "s", rules: [], changes: [{ id: "R8", text: "Boots start at 15%." }] });
+  assert.match(replan, /What changed:\n  R8\. Boots start at 15%\./);
 });
 
 test("live answerer: re-asks on bad input, C needs words", async () => {
@@ -59,6 +62,8 @@ test("session body: pinned agent, model override, kit mount, budget as cents str
   const over = sessionCreateBody({ ...base, agentVersion: 4, model: "claude-opus-5-5" });
   assert.deepEqual(over.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-opus-5-5" }, version: 4 });
   assert.equal(sessionCreateBody(base).agent, "agent_1");
+  const sk = sessionCreateBody({ ...base, model: "claude-sonnet-5-5", skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
+  assert.deepEqual(sk.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-sonnet-5-5" }, skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
   const sys = sessionCreateBody({ ...base, system: "harness", extraFiles: [{ fileId: "file_p", mountPath: "/mnt/session/uploads/parity.tgz" }] });
   assert.deepEqual(sys.agent, { type: "agent_with_overrides", id: "agent_1", system: "harness" });
   assert.deepEqual(sys.resources[1], { type: "file", file_id: "file_p", mount_path: "/mnt/session/uploads/parity.tgz" });
@@ -79,6 +84,13 @@ test("readLock finds the agent and environment by path", () => {
     }),
   );
   assert.deepEqual(readLock(f), { agentId: "agent_9", agentVersion: 3, environmentId: "env_9" });
+});
+
+test("readSkillLock finds the skill's id and version", () => {
+  const f = path.join(tmp(), "claude-lock.skill.json");
+  assert.throws(() => readSkillLock(f), /apply the context-pack skill/);
+  fs.writeFileSync(f, JSON.stringify({ resources: { "./skills-staged/studio-context-pack": { kind: "skill", id: "skill_9", version: "123" } } }));
+  assert.deepEqual(readSkillLock(f), { type: "custom", skill_id: "skill_9", version: "123" });
 });
 
 test("library ids: slug, suffix, title from spec", () => {

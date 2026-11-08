@@ -15,6 +15,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--answers FILE` | replay recorded answers by position (D43); runs out → D |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
+| `--context-pack skill` | attach the context pack as a skill and leave it out of the kit (default `tarball`; D45) |
 | `--commit-anyway` | commit even if validate or the playtest fails |
 | `-v` | show the agent's own messages and debug lines |
 
@@ -29,7 +30,7 @@ Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes 
 5. Reconnects if the stream drops, replaying missed events from the history without repeats. Answers any tool call the stream missed when the session reports `requires_action`.
 6. Polls the session's files until `DONE.json` is there and every size in it matches (D19), skipping the session's inputs. Then it downloads every output into `~/game-studio-data/sessions/<id>/` and extracts `cart.tgz`.
 7. Runs `validate_cart` and the local playtest. Commits the cart to `~/game-studio-data/carts/` only if both pass.
-8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`.
+8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`. Also the frozen-checks record (D44): `first_playtest`, `edits_after_first_playtest` and `checks_changed_after_playtest`.
 
 Set `GSA_DATA_DIR` to use another data folder.
 

@@ -38,9 +38,12 @@ The spec (`spec.md`) is the source of truth. Questions change the spec, code is 
    - **D means stop asking.** Ask no more questions in this build. Fill every remaining gap yourself, record each as an Assumption in the spec, and build.
 3. **Write the spec** in `/workspace/cart/spec.md`, following the template and rule guide in the kit. Every rule has an id (R1, R2…) and is tagged `(auto)` if the playtest can prove it, or `(you check)` if only the player can judge it ("the cat looks happy when you clear a line"). Every rule must be checkable by a machine or a person. Write the Assumptions you made and a Changelog entry for v1.
 4. **Show the plan.** Call `show_plan` with a one-line summary and every rule in plain words. If the player asks for a change, update the spec (rules and Changelog), then call `show_plan` again. When they say build, copy `spec.md` to `/mnt/session/outputs/spec.md` and start building.
-5. **Build from the spec.** Write `game.js` for the house runtime, `cart.json`, any assets, and `checks.js` with one check per `(auto)` rule, as the kit describes. Reuse library pieces rather than rewriting them.
-6. **Test and fix.** Run the kit's validate command, then its playtest. Fix the code until every `(auto)` rule and every generic check passes. Don't weaken, delete or re-tag a rule to make it pass. If a rule truly can't be built, change the spec openly: say why in the Changelog, and tell the player with `tell_player`.
-7. **Pack up.** Write the outputs (below) and finish with a short message saying what you built.
+5. **Write the checks, from the spec, before any game code.** Write `checks.js` with one check per `(auto)` rule, as the kit describes. Any number a check needs must already be in the spec, in the rule or an Assumption; if it isn't, put it there first. The checks decide what `probe()` must return. Then save the snapshot: `cp /workspace/cart/spec.md /mnt/session/outputs/spec.frozen.md && cp /workspace/cart/checks.js /mnt/session/outputs/checks.frozen.js`. **The checks are now frozen.**
+6. **Build from the spec.** Write `game.js` for the house runtime, `cart.json` and any assets. Reuse library pieces rather than rewriting them.
+7. **Test and fix the game.** Run the kit's validate command, then its playtest. A failing check means fix `game.js`, not the check. Keep going until every `(auto)` rule and every generic check passes. Don't weaken, delete or re-tag a rule to make it pass.
+   - A check may change only if you **first** change the spec rule or add an Assumption that names the rule (`- A4: R8 boots start at 15% ...`), with a Changelog line. That applies to a check that's simply buggy too. Then call `show_plan` again with `changes` listing each rule, and only then edit the check.
+   - If a rule truly can't be built, change the spec the same way and say why.
+8. **Pack up.** Write the outputs (below) and finish with a short message saying what you built.
 
 Use `tell_player` at each milestone (setting up, writing the spec, building, each test run, each fix, packing up) with one short line in kid language. Your own text messages aren't shown to the player.
 
@@ -51,7 +54,8 @@ The cart folder is `/workspace/cart/`: `spec.md`, `cart.json`, `game.js`, `check
 - `cart.tgz`: the whole cart folder, made with `tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart .`
 - `report.json`: `{"status": "done" | "gave_up", "summary": "<one sentence>", "rules": [{"id": "R1", "kind": "auto" | "you-check", "passed": true | false | null}], "fix_rounds": <number>}`
 - `spec.md`: the final spec (overwrite the earlier copy).
-- `DONE.json`, **last of all**, after every other output is written: `{"files": [{"name": "cart.tgz", "size": <bytes>}, …]}` listing each output file above with its size from `stat -c %s`. Outputs keep syncing after you finish, and this file tells the cabinet when they're complete.
+- `spec.frozen.md` and `checks.frozen.js`: the snapshot from step 5, left as it was.
+- `DONE.json`, **last of all**, after every other output is written: `{"files": [{"name": "cart.tgz", "size": <bytes>}, …]}` listing every output file above with its size from `stat -c %s`. Outputs keep syncing after you finish, and this file tells the cabinet when they're complete.
 
 If you can't get every auto rule passing after several honest fix rounds, stop. Write the outputs anyway with `"status": "gave_up"` and say plainly what's still failing. A kept attempt is better than a runaway build.
 

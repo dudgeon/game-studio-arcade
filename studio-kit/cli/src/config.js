@@ -23,6 +23,20 @@ export function dataPaths(root) {
 }
 
 /**
+ * The context-pack skill's id and version from its lockfile (D45).
+ * @param {string} [lockFile]
+ * @returns {{type: "custom", skill_id: string, version?: string}}
+ */
+export function readSkillLock(lockFile = path.join(MANAGED_AGENT_DIR, "claude-lock.skill.json")) {
+  if (!fs.existsSync(lockFile)) throw new Error(`no ${path.relative(REPO_ROOT, lockFile)} yet: stage and apply the context-pack skill first (see studio-kit/managed-agent/README.md)`);
+  const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+  const entry = Object.values(lock.resources ?? {}).find((r) => /** @type {any} */ (r).kind === "skill");
+  if (!entry) throw new Error("the skill lockfile has no skill in it");
+  const { id, version } = /** @type {any} */ (entry);
+  return { type: "custom", skill_id: id, ...(version ? { version: String(version) } : {}) };
+}
+
+/**
  * Read the Studio agent and environment ids from the committed claude-lock.json.
  * @param {string} [lockFile]
  * @returns {{agentId: string, agentVersion?: number, environmentId: string}}

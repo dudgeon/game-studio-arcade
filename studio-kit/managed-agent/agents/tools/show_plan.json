@@ -1,7 +1,7 @@
 {
   "type": "custom",
   "name": "show_plan",
-  "description": "Show the player \"Here's the plan\": a one-line summary and every rule in spec.md in plain words. Call it after the questions, once spec.md is written and before any game code. The player either says build, or asks to change something. After a change, update spec.md (the rules and the Changelog) and call show_plan again with the new rules. Rule text must be plain words a 10-year-old understands, never code. The result is JSON text: {\"choice\":\"build\"} or {\"choice\":\"change\",\"said\":\"<what the player wants changed>\"}.",
+  "description": "Show the player \"Here's the plan\": a one-line summary and every rule in spec.md in plain words. Call it after the questions, once spec.md is written and before any game code. The player either says build, or asks to change something. After a change, update spec.md (the rules and the Changelog) and call show_plan again with the new rules. Also call it again, with `changes`, if a frozen check has to change during the build. Rule text must be plain words a 10-year-old understands, never code. The result is JSON text: {\"choice\":\"build\"} or {\"choice\":\"change\",\"said\":\"<what the player wants changed>\"}.",
   "input_schema": {
     "type": "object",
     "properties": {
@@ -17,6 +17,18 @@
             "text": { "type": "string", "description": "The rule in plain words." }
           },
           "required": ["id", "kind", "text"]
+        }
+      },
+      "changes": {
+        "type": "array",
+        "description": "Only when you call this again after the first playtest: each rule whose check has to change, and what changed in the spec, in plain words.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Rule id, e.g. R3." },
+            "text": { "type": "string", "description": "What changed and why, in plain words." }
+          },
+          "required": ["id", "text"]
         }
       }
     },

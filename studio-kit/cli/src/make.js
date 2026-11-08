@@ -5,6 +5,7 @@ import { runSession, listCostUsd } from "./driver.js";
 import { downloadOutputs, extractCart, readJsonIfExists } from "./outputs.js";
 import { commitNewCart, specTitle } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
+import { analyzeFreeze } from "./freeze.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -22,6 +23,8 @@ import { appendLog, newSpecDiff } from "./log.js";
  * @property {() => Promise<{fileId: string, hash: string}>} kit
  * @property {"cabinet"|"desktop"} [origin]
  * @property {boolean} [commitAnyway]
+ * @property {"tarball"|"skill"} [contextPack]   how this run got the context pack (D45)
+ * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
  * @property {string} [recordFile]     also write the answers here
  * @property {() => Date} [now]
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
@@ -41,6 +44,7 @@ export async function makeCart(o) {
       environmentId: o.lock.environmentId,
       model: o.model,
       kitFileId: kit.fileId,
+      skills: o.skills,
       budgetCents: o.budgetCents,
       title: `make: ${o.request.slice(0, 60)}`,
       metadata: { maker: o.maker, origin: o.origin ?? "cabinet", via: "studio-cli" },
@@ -95,6 +99,16 @@ export async function makeCart(o) {
     writeJson(path.join(sessionDir, "local-checks.json"), { validation, playtest: local });
   }
 
+  const freeze = analyzeFreeze(events, {
+    frozenChecks: readTextIfExists(path.join(dl.dir, "checks.frozen.js")),
+    frozenSpec: readTextIfExists(path.join(dl.dir, "spec.frozen.md")),
+    finalChecks: cartDir ? readTextIfExists(path.join(cartDir, "checks.js")) : null,
+    finalSpec: spec,
+  });
+  if (freeze.checks_changed_after_playtest.unjustified.length) {
+    ui.info(`Checks changed with no spec change: ${freeze.checks_changed_after_playtest.unjustified.join(", ")} (D44)`);
+  }
+
   const passed = Boolean(cartDir && validation?.ok && local?.ok);
   const commit = Boolean(cartDir && (passed || o.commitAnyway));
   /** @type {{id: string, dir: string, commit: string}|null} */
@@ -143,6 +157,11 @@ export async function makeCart(o) {
     questions: result.turns.filter((t) => !t.auto).length,
     ended_by: result.endedBy,
     spec_diff: newSpecDiff(spec),
+    context_pack: o.contextPack ?? "tarball",
+    first_playtest: freeze.first_playtest,
+    playtest_runs: freeze.playtest_runs,
+    edits_after_first_playtest: freeze.edits_after_first_playtest,
+    checks_changed_after_playtest: freeze.checks_changed_after_playtest,
     playtest: {
       sandbox: report ? { status: report.status ?? null, rules: report.rules ?? [], fix_rounds: report.fix_rounds ?? null } : null,
       local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [] } : null,
@@ -181,6 +200,10 @@ export async function makeCart(o) {
   else if (cartDir) ui.info(`The game didn't pass its checks, so it wasn't added. Everything is kept in ${sessionDir}`);
   else ui.info(`No game came back (${result.stopReason || "unknown"}). Everything is kept in ${sessionDir}`);
   return { record, sessionDir, committed };
+}
+
+function readTextIfExists(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
 }
 
 function writeJson(file, data) {

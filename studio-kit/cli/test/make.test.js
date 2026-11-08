@@ -123,6 +123,11 @@ test("a passing build is committed with complete log records", async () => {
   assert.equal(session.cart_id, "frog-hop");
   assert.deepEqual(session.missing_outputs, []);
   assert.equal(session.outputs_complete, true);
+  assert.equal(session.context_pack, "tarball");
+  assert.deepEqual(session.edits_after_first_playtest, { game_js: 1, checks_js: 0, spec_md: 0 });
+  assert.equal(session.playtest_runs, 1);
+  assert.equal(session.checks_changed_after_playtest.changed, false);
+  assert.equal(session.checks_changed_after_playtest.baseline, "none", "that fixture has no snapshot");
   assert.equal(session.active_seconds, 312.5);
   assert.deepEqual(session.tokens, { input: 41000, output: 9800, cache_read: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } });
   assert.deepEqual({ type: "studio_session", ...rec }, session);

@@ -10,6 +10,7 @@
  * @property {string} environmentId
  * @property {string} [model]          per-run model override (D40)
  * @property {string} [system]         per-session system prompt override (toolchain checks only)
+ * @property {{type: string, skill_id: string, version?: string}[]} [skills]   skills attached through agent overrides
  * @property {string} kitFileId        Files API id of the studio kit tarball
  * @property {{fileId: string, mountPath: string}[]} [extraFiles]
  * @property {number} budgetCents      hard list-cost cap for the session
@@ -44,11 +45,12 @@ export const KIT_MOUNT = "/mnt/session/uploads/studio-kit.tgz";
 export function sessionCreateBody(p) {
   /** @type {any} */
   let agent = p.agentVersion ? { type: "agent", id: p.agentId, version: p.agentVersion } : p.agentId;
-  if (p.model || p.system) {
+  if (p.model || p.system || p.skills?.length) {
     agent = { type: "agent_with_overrides", id: p.agentId };
     if (p.agentVersion) agent.version = p.agentVersion;
     if (p.model) agent.model = { id: p.model };
     if (p.system) agent.system = p.system;
+    if (p.skills?.length) agent.skills = p.skills;
   }
   if (!Number.isInteger(p.budgetCents) || p.budgetCents <= 0) throw new Error("budgetCents must be a positive whole number");
   return {

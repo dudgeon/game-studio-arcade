@@ -186,6 +186,15 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - Log records (§9.5) are appended to `~/game-studio-data/logs/studio_session.jsonl` and `cart_version.jsonl`. List cost is read from the session's `usage.list_cost` (whole cents as a string; D19). It rounds to the cent, so each record also logs `active_seconds` and the token counts.
 - Answers replay by position: `--answers <file>` gives the same answers in the same order to every model. If a run asks more questions than were recorded, the replay answers D and the log marks `replay_exhausted`. Every run saves its answers, so a live run can be replayed.
 
+**D44. Checks frozen; fix the game.** *(Geoff, 2026-11-08, after the first real build changed only `checks.js` to get its rules passing; implemented by Claude, tasks 7+8 worker.)*
+- Checks are written from the spec before any game code, then frozen. A failing check means fix `game.js`.
+- A check may change only if the agent **first** changes the spec rule or adds an Assumption naming the rule, so the numbers live in the spec. That includes a check that is simply buggy.
+- Every such change shows in the plan: the agent calls `show_plan` again with a `changes` list (`[{id, text}]`, rule id and plain words).
+- Every such change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest. The CLI compares each rule's check in that snapshot with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
+- Edits are also detected from the event stream, independently of the snapshot. A missing or late snapshot gives `baseline: "none"` and the edits are still counted, with `rules_known: false`.
+- The record also gets `first_playtest` (which rules passed and failed on the first run) and `edits_after_first_playtest` (`game_js`, `checks_js`, `spec_md`).
+- This logs and doesn't block: a cart with an unjustified change can still commit (no approval loop; the activity log is the oversight).
+
 ## 2026-11-07 — Starter library (Phase 0 task 3)
 
 **D50. Carts reach the starter library as `g.lib`.** *(Claude, director-approved; Phase 0 task 3, keeps D21's "a cart imports nothing".)*
