@@ -363,7 +363,6 @@ How the runtime and library carry out D85 (Geoff's answer to D84's second-player
 
 **D114. `host.destroy()` removes every listener it added.** *(Claude; fixes the leak the player worker found.)* The window `blur` and `pointerdown` (capture) listeners were anonymous, so `destroy()` couldn't remove them; a page that made several hosts kept every old host's listeners. They're named now, and a test counts the window's listeners before and after.
 
-
 ## 2026-11-08 — Virtual cabinet
 
 Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full emulator stack running as close to accurate a version of a logically isolated … version of the cabinet on the mini". Design, sources and Geoff's open questions: [virtual-cabinet.md](virtual-cabinet.md). Nothing is built yet.
