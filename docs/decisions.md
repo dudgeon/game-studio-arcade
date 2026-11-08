@@ -86,7 +86,7 @@ What we use instead:
 
 Still open:
 - ~~Confirm in Phase 0 task 1 that the TypeScript SDK resolves the profile.~~ Closed by D17: `createClient()` passes the profile explicitly and the live check passes.
-- **Cabinet auth is undecided** (Phase 1–2). Browser login fits a machine with a person present, not an unattended Pi. The options: convert the Console account to an organization (unlocks WIF; `scripts/wif/` is ready), or a workspace-scoped key on the Pi. Ask Geoff when Phase 1 starts.
+- ~~**Cabinet auth is undecided**~~ **Closed by D131 (Geoff, 2026-11-08): each cabinet has its own workspace-scoped API key.** (Was: Phase 1–2. Browser login fits a machine with a person present, not an unattended Pi. The options: convert the Console account to an organization (unlocks WIF; `scripts/wif/` is ready), or a workspace-scoped key on the Pi. Ask Geoff when Phase 1 starts.)
 
 **D17. One way to get a Claude API client: `@game-studio-arcade/auth`.** *(Claude, Phase 0 task 1; implements D16.)*
 - `createClient()` returns an SDK client (`@anthropic-ai/sdk` pinned at 1.6.0) and passes the profile **explicitly**: `GSA_PROFILE` if set, otherwise `game-studio-arcade`. An explicit profile outranks `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so a stray key in a shell is ignored rather than refused (verified live with a bogus key). This replaces the task wording "refuse to run if ANTHROPIC_API_KEY is set": ignoring the key is safer and never blocks.
@@ -445,5 +445,18 @@ Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full
 - The real Pi's gate stays the final word (D8).
 
 **D129. The virtual cabinet is a separate cabinet with its own data and identity; the locked independence rule is unchanged.** *(Claude; proposes how the virtual cabinet fits §3.1, for Geoff to see.)*
-- Its own cart library, logs, play telemetry, Manager token and API identity (never the mini's `game-studio-arcade` profile; kind per D16, still Geoff's). All inside the VM's disk; never deleted (D5); a UTM snapshot before each update; backups as for the real cabinet.
+- Its own cart library, logs, play telemetry, Manager token and API identity (never the mini's `game-studio-arcade` profile; a workspace-scoped API key of its own, D131). All inside the VM's disk; never deleted (D5); a UTM snapshot before each update; backups as for the real cabinet.
 - It shares the mini's hardware, so it can't run with the mini off: its independence is logical. No mini software (Claude Code, Node servers, files) is in its play or build path. The §3.1 rule "the mini is never in the play path" still governs the real cabinet and isn't relaxed by this.
+
+## 2026-11-08 — Virtual cabinet users and cabinet auth (Geoff)
+
+**D130. The virtual cabinet is used by Geoff with a kid.** *(Geoff; answers virtual-cabinet.md question 1.)*
+- Not Geoff alone for testing, and not a kid alone at the mini. The mini is Geoff's logged-in Mac with Claude Code a window away, and the kids never use Geoff's login solo (§5), so a kid plays or makes at the virtual cabinet with Geoff there.
+- The virtual cabinet itself still never holds Geoff's login (D129, D131).
+
+**D131. Each cabinet signs in with its own workspace-scoped API key.** *(Geoff; answers virtual-cabinet.md question 2 and closes D16's cabinet-auth question.)*
+- One key per cabinet: the virtual cabinet now, the Picade later. Each key belongs to a **dedicated cabinet workspace with its own spend limit**, separate from the mini's `game-studio-arcade` workspace, so a cabinet's builds are capped, counted and revocable on their own. (Workspace-scoped keys can reach only their workspace's resources, and spend limits are set per workspace in the Console: platform.claude.com/docs/en/manage-claude/workspaces, checked 2026-11-08.)
+- The key is stored **only on that cabinet**, in the cabinet service's own config file, mode 0600. Never in git, logs, carts or the launcher (§11). Creating the keys and workspace in the Console is Geoff's step; nothing pasted into chat.
+- The mini is unchanged: it keeps the `ant` CLI login (D16) and must never have `ANTHROPIC_API_KEY` set. The cabinet service reads its key from its config file and hands it to the SDK directly, not through a shell environment variable on the mini. So the two rules don't meet: the mini has no key, and a cabinet has only its own.
+- Code follows (not done here): the auth helper (D17) gets a cabinet path that reads the key file, while the mini path stays profile-only.
+- Why not the alternatives: WIF needs the account converted to an organization (D15, D16); browser login needs a person present, which fits an unattended cabinet badly.

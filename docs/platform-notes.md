@@ -104,6 +104,10 @@ Sources: platform.claude.com/docs/en/manage-claude/{workload-identity-federation
 
 **Account limit (verified 2026-11-07):** WIF and the Admin API are unavailable to *Individual* Console accounts. With an `org:admin` OAuth token, `/v1/organizations/service_accounts` and `/federation_issuers` returned 404, and `/workspaces` and `/me` returned 403. Converting the account to an organization (`platform.claude.com/settings/organization`) is the documented path. Its side effects are unverified.
 
+## Cabinet API keys (what the cabinets use, D131)
+
+Checked 2026-11-08 (platform.claude.com/docs/en/manage-claude/workspaces): an API key "can be scoped to a single workspace" and then "can only access resources within that workspace". A workspace's **spend limit** is set on the Console's Workspaces page (select the workspace → Spend limits: a monthly cap plus alerts). Rate limits are set per workspace under Console → Rate limits. Archiving a workspace archives every key created for it. Each cabinet gets its own key in a dedicated cabinet workspace (D131); the mini keeps the CLI login below.
+
 ## CLI browser login (what the mini uses)
 
 - `ant auth login --profile <name>` opens a browser. After approval, the page shows a code to paste into the terminal (the `platform.claude.com/oauth/code/callback` redirect). A workspace picker binds the token to one workspace; `--workspace-id` skips the picker.

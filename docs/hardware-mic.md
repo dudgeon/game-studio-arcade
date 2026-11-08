@@ -1,5 +1,7 @@
 # Microphone for the Picade cabinet
 
+> **Superseded by D89 (2026-11-08):** Geoff is choosing a USB mic himself. The options below are research, not recommendations.
+
 Status: **research done; Geoff picks.** No decision recorded yet (D90–D99 reserved for it).
 Every price and stock line below was read live from the page cited: options A–C on 2026-11-07, the XLR option D on 2026-11-08.
 
