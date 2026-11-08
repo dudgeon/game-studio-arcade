@@ -7,7 +7,18 @@
   "engines": {
     "node": ">=22 <23"
   },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./cart.d.ts": "./cart.d.ts",
+    "./test-hook.d.ts": "./test-hook.d.ts",
+    "./dev-server": "./dev-server.js",
+    "./*": "./src/*"
+  },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "dev": "node dev-server.js"
   }
 }
