@@ -8,21 +8,21 @@
 //   /** @typedef {{ x: number, score: number }} State */
 //   /** @type {Arcade.Cart<State>} */
 //   export default {
-//     init(g) { return { x: 160, score: 0 }; },
+//     init(g) { return { x: g.W / 2, score: 0 }; },
 //     update(g, s) { if (g.btn("right")) s.x += 1; },
 //     draw(g, s) { g.cls(0); g.text("HI", s.x, 120, g.colors.white); },
 //     probe(g, s) { return { x: s.x, score: s.score }; },
 //   };
 //
-// Rules a cart lives by: the screen is 320x256 with 32 fixed colors; input is
+// Rules a cart lives by: the screen is 256x192 with 32 fixed colors; input is
 // the cabinet's buttons only; no DOM, no network, no timers, no Math.random
 // (use g.rand); persistence only through g.save()/g.load().
 
 declare namespace Arcade {
   /** Screen width in pixels. */
-  type Width = 320;
+  type Width = 256;
   /** Screen height in pixels. */
-  type Height = 256;
+  type Height = 192;
 
   /** A palette index, 0..31. See `G.colors` for names. */
   type Color = number;

@@ -16,8 +16,8 @@ export type InputScript = Arcade.InputScript;
 export type Frame = Arcade.Frame;
 export type Checks = Arcade.Checks;
 
-export const W: 320;
-export const H: 256;
+export const W: 256;
+export const H: 192;
 export const BUTTONS: readonly Arcade.Button[];
 /** The 32-color house palette as "#rrggbb", index 0..31 (D3). */
 export const PALETTE: readonly string[];
@@ -35,4 +35,4 @@ export interface HeadlessOptions {
  * Load a cart module in Node and return a test handle with no browser
  * (runtime/headless.js). `cart` is a game.js path or file URL, or a Cart object.
  */
-export function headless(cart: string | URL | Arcade.Cart, opts?: HeadlessOptions): Promise<Arcade.TestHandle>;
+export function headless(cart: string | URL | Arcade.Cart, opts?: HeadlessOptions): Promise<Arcade.TestHandle & { warnings(): Promise<Arcade.Warning[]> }>;

@@ -11,13 +11,13 @@ const noisy = {
   update: (g, s) => {
     if (g.btn("right")) s.x += 3;
     if (g.btnp("a")) g.sfx("pop");
-    s.dots.push({ x: g.rnd(320), y: g.rnd(256), c: 1 + g.rnd(31) });
+    s.dots.push({ x: g.rnd(g.W), y: g.rnd(g.H), c: 1 + g.rnd(31) });
     if (s.dots.length > 200) s.dots.shift();
   },
   draw: (g, s) => {
     g.cls(0);
     for (const d of s.dots) g.pset(d.x, d.y, d.c);
-    g.rectfill(s.x % 320, 120, 8, 8, g.colors.yellow);
+    g.rectfill(s.x % g.W, 96, 8, 8, g.colors.yellow);
     g.text(`f${g.frame}`, 2, 2);
   },
   probe: (g, s) => ({ x: s.x, n: s.dots.length }),

@@ -8,7 +8,7 @@ import { noteToFreq } from "../src/sound.js";
 import checks from "../examples/hello/checks.js";
 
 const HELLO = new URL("../examples/hello/game.js", import.meta.url);
-const at = (f, x, y) => f.pixels[y * 320 + x];
+const at = (f, x, y) => f.pixels[y * f.width + x];
 
 /** A cart whose draw is a function of the test. */
 const drawing = (fn) => ({ init: () => ({}), update: () => {}, draw: (g) => fn(g) });
@@ -27,9 +27,10 @@ test("frame 0 shows init's first draw; g.frame counts updates", async () => {
   await t.step(3);
   const f = await t.frame();
   assert.equal(f.frame, 3);
-  assert.equal(at(f, 319, 255), 3);
-  assert.equal(f.width, 320);
-  assert.equal(f.height, 256);
+  assert.equal(at(f, 255, 191), 3);
+  assert.equal(f.width, 256);
+  assert.equal(f.height, 192);
+  assert.equal(f.pixels.length, 256 * 192);
 });
 
 test("shapes land on the right pixels and clip at the edges", async () => {
@@ -38,7 +39,7 @@ test("shapes land on the right pixels and clip at the edges", async () => {
       g.cls(0);
       g.rectfill(-5, -5, 10, 10, 7);
       g.rect(100, 100, 10, 5, 8);
-      g.line(0, 255, 319, 255, 9);
+      g.line(0, 191, 255, 191, 9);
       g.circfill(200, 50, 3, 10);
       g.pset(400, 400, 11);
     }),
@@ -50,7 +51,7 @@ test("shapes land on the right pixels and clip at the edges", async () => {
   assert.equal(at(f, 100, 100), 8);
   assert.equal(at(f, 109, 104), 8);
   assert.equal(at(f, 105, 102), 0, "rect is an outline");
-  assert.equal(at(f, 319, 255), 9);
+  assert.equal(at(f, 255, 191), 9);
   assert.equal(at(f, 200, 50), 10);
   assert.equal(at(f, 203, 50), 10);
   assert.equal(at(f, 204, 50), 0);
@@ -64,7 +65,7 @@ test("camera and clip", async () => {
       g.pset(10, 0, 5);
       g.camera();
       g.clip(50, 50, 10, 10);
-      g.rectfill(0, 0, 320, 256, 6);
+      g.rectfill(0, 0, g.W, g.H, 6);
       g.clip();
     }),
   );
@@ -84,13 +85,13 @@ test("font: 95 glyphs, text width and alignment", async () => {
     drawing((g) => {
       g.cls(0);
       widths = { hi: g.text("HI", 0, 0, 5), big: g.textWidth("HI", 2), empty: g.textWidth("") };
-      g.text("I", 160, 100, 5, { align: "center" });
+      g.text("I", 128, 100, 5, { align: "center" });
     }),
   );
   assert.deepEqual(widths, { hi: 11, big: 22, empty: 0 });
   const f = await t.frame();
   assert.equal(at(f, 0, 0), 5, "H's top-left pixel");
-  assert.equal(at(f, 160, 100), 5, "centered I's top bar includes x=160");
+  assert.equal(at(f, 128, 100), 5, "centered I's top bar includes x=128");
 });
 
 test("sprites: characters to palette indices, transparency, flips and recolor", async () => {

@@ -7,7 +7,7 @@ const expect = (/** @type {boolean} */ ok, /** @type {string} */ why) => {
 /** Move the basket so the current dot lands in it (aim = true) or misses it. */
 async function steer(/** @type {Arcade.TestHandle} */ t, /** @type {boolean} */ aim) {
   const p = await t.probe();
-  const target = aim ? p.dot.x - 12 : p.dot.x > 160 ? 0 : 296;
+  const target = aim ? p.dot.x - 12 : p.dot.x > 128 ? 0 : 232;
   const dx = target - p.bx;
   const frames = Math.ceil(Math.abs(dx) / 2);
   if (frames > 0) await t.input([{ frames, p1: dx > 0 ? "right" : "left" }]);
@@ -25,7 +25,7 @@ export default {
     await t.input([{ frames: 200, p1: "right" }]);
     await t.step(200);
     const edge = await t.probe();
-    expect(edge.bx === 296, `the basket should stop at the right edge (x=296), but it's at ${edge.bx}`);
+    expect(edge.bx === 232, `the basket should stop at the right edge (x=232), but it's at ${edge.bx}`);
   },
 
   async R2(t) {

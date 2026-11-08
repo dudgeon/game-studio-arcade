@@ -1,6 +1,6 @@
 # House runtime
 
-A small JavaScript fantasy console: 320×256, 32 fixed colors, 4-voice chip synth, the cabinet's buttons, deterministic under test. Design: D3, D10, D11, D13, D21 and D50 in [../docs/decisions.md](../docs/decisions.md).
+A small JavaScript fantasy console: 256×192 (shown 4× on the Picade 10"'s 1024×768 panel, D81), 32 fixed colors, 4-voice chip synth, the cabinet's buttons, deterministic under test. Design: D3, D10, D11, D13, D21 and D50 in [../docs/decisions.md](../docs/decisions.md).
 
 - **Cart API:** [cart.d.ts](cart.d.ts) (`Arcade.Cart`, `Arcade.G`, `Arcade.Lib.*`)
 - **Test hook:** [test-hook.d.ts](test-hook.d.ts) (`Arcade.Checks`, `Arcade.TestHandle`)
@@ -16,7 +16,7 @@ A cart's `game.js` is one ES module that **imports nothing**. Its default export
 /** @typedef {{ x: number, score: number, board: Arcade.Lib.Grid }} State */
 /** @type {Arcade.Cart<State>} */
 export default {
-  init(g) { return { x: 160, score: 0, board: g.lib.grid.make(10, 20) }; },
+  init(g) { return { x: g.W / 2, score: 0, board: g.lib.grid.make(10, 20) }; },
   update(g, s) { if (g.btn("right")) s.x += 2; if (g.btnp("a")) g.sfx("coin"); },
   draw(g, s) { g.cls(g.colors.night); g.text(`SCORE ${s.score}`, 4, 4, g.colors.white); },
   probe(g, s) { return { x: s.x, score: s.score }; },  // what checks.js can see
@@ -30,13 +30,14 @@ export default {
   - `g.btnr(b, p)` is true on the frame it's released.
   
   Buttons are `up down left right a b x y start`, and `p` is 1 or 2 (default 1).
-- **Drawing** on 320×256, with colors 0–31 or by name (`g.colors.red`):
+- **Drawing** on 256×192 (`g.W`, `g.H`; use those, never the numbers), with colors 0–31 or by name (`g.colors.red`):
   - shapes: `cls pset pget line rect rectfill circ circfill`;
   - text: `text(s, x, y, c, {scale, align})` and `textWidth`;
   - sprites: `sprite(rows)` and `spr(s, x, y, {flipX, flipY, scale, color})`. In sprite rows, `0`–`9` and `a`–`v` are colors 0–31 and `.` is transparent;
   - view: `camera`, `clip`.
 - **Randomness:** `g.rand()`, `g.rnd(n)` and `g.pick(arr)`. These are seeded, so tests reproduce. Never use `Math.random`.
 - **Sound:** `g.sfx(name)` takes `blip select jump coin pop hit explode powerup lose win`. Also `g.tone({ note: "C5", wave, frames, vol, slide })` and `g.stop()`.
+- **Colors outside 0–31** still draw (wrapped), but each one is reported once as a dev warning (`t.warnings()`, `arcade.warnings`, the browser console), so the playtest's palette check can flag it.
 - **Saves:** `g.save(data)` and `g.load()` hold one JSON value of at most 4 KB, e.g. for a high score.
 - **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score` and `g.lib.flow`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
 - **Not allowed:** `document`, `window`, `fetch`, timers, `eval` and imports. The frame's sandbox blocks them anyway, and the type-check flags them.
@@ -45,7 +46,7 @@ export default {
 
 Commands (package.json `bin`):
 
-- `arcade-run <game.js> [--frames N] [--seed N] [--input JSON] [--checks checks.js]` runs the cart headless and prints `{ ok, frame, hash, probe, sounds, checks }`. It exits 1 on a cart error or a failed check.
+- `arcade-run <game.js> [--frames N] [--seed N] [--input JSON] [--checks checks.js]` runs the cart headless and prints `{ ok, frame, hash, probe, sounds, warnings, checks }`. It exits 1 on a cart error or a failed check.
 - `arcade-dev-server [--port N] [--cart name=dir]` serves carts for a browser (below).
 - Type-check a cart with no DOM: `tsc -p runtime/tsconfig.cart.json`, or copy that config for your cart folder.
 

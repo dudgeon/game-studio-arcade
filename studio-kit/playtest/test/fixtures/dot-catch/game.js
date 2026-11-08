@@ -5,20 +5,20 @@
 /** @typedef {{ mode: "play" | "over", bx: number, dot: { x: number, y: number }, score: number, lives: number }} State */
 
 const BW = 24;
-const BY = 230;
+const BY = 166;
 
 /** @param {Arcade.G} g */
-const newDot = (g) => ({ x: 10 + g.rnd(300), y: 0 });
+const newDot = (g) => ({ x: 10 + g.rnd(236), y: 0 });
 
 /** @type {Arcade.Cart<State>} */
 export default {
   init(g) {
-    return { mode: "play", bx: 148, dot: newDot(g), score: 0, lives: 3 };
+    return { mode: "play", bx: 116, dot: newDot(g), score: 0, lives: 3 };
   },
 
   update(g, s) {
     if (s.mode === "over") {
-      if (g.btnp("start")) Object.assign(s, { mode: "play", bx: 148, dot: newDot(g), score: 0, lives: 3 });
+      if (g.btnp("start")) Object.assign(s, { mode: "play", bx: 116, dot: newDot(g), score: 0, lives: 3 });
       return;
     }
     if (g.btn("left")) s.bx -= 2;
@@ -40,7 +40,7 @@ export default {
   draw(g, s) {
     g.cls(g.colors.night);
     if (s.mode === "over") {
-      g.rectfill(100, 110, 120, 30, g.colors.red);
+      g.rectfill(68, 80, 120, 30, g.colors.red);
       return;
     }
     g.circfill(s.dot.x, s.dot.y, 3, g.colors.gold);

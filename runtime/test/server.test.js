@@ -42,11 +42,12 @@ test("cartsIn finds cart folders by game.js", () => {
   assert.deepEqual(cartsIn(path.join(RUNTIME, "no-such-dir")), {});
 });
 
-test("integer scale in device pixels: 4x on the Picade's 1280x1024", () => {
-  assert.equal(integerScale(1280, 1024, 1), 4);
-  assert.equal(integerScale(1279, 1024, 1), 3);
-  assert.equal(integerScale(1280, 1024, 2), 8, "Retina: 8 device px = 4 CSS px");
-  assert.equal(integerScale(1920, 1080, 1), 4);
+test("integer scale in device pixels: 4x on the Picade 10-inch's 1024x768 (D81)", () => {
+  assert.equal(integerScale(1024, 768, 1), 4);
+  assert.equal(integerScale(1023, 768, 1), 3);
+  assert.equal(integerScale(1024, 767, 1), 3);
+  assert.equal(integerScale(1024, 768, 2), 8, "Retina: 8 device px = 4 CSS px");
+  assert.equal(integerScale(1920, 1080, 1), 5, "1080p: 5x (1280x960)");
   assert.equal(integerScale(100, 100, 1), 1, "never below 1");
 });
 

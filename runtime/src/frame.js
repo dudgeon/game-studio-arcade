@@ -5,13 +5,14 @@
 //   frame -> host: { type: "ready" } | { type: "out", audio, save }
 //                  { type: "error", error } | { type: "result", id, value?, error? }
 //                  { type: "key", code, down }           keys pressed while the frame has focus
+import { H, W } from "./gfx.js";
 import { checkCart } from "./machine.js";
 import { rgbaTable } from "./palette.js";
 import { cartError, createTestHandle } from "./testhandle.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d", { alpha: false }));
-const image = ctx.createImageData(320, 256);
+const image = ctx.createImageData(W, H);
 const out32 = new Uint32Array(image.data.buffer);
 const RGBA = rgbaTable();
 
@@ -38,7 +39,9 @@ function flush() {
   const m = t.machine();
   const audio = m.drainAudio();
   const save = m.drainSave();
-  if (audio.length || save !== undefined) post({ type: "out", audio, save });
+  const warnings = m.drainWarnings();
+  for (const w of warnings) console.warn(`[cart] frame ${w.frame}: ${w.message}`);
+  if (audio.length || save !== undefined || warnings.length) post({ type: "out", audio, save, warnings });
 }
 
 async function boot({ cartUrl, seed, save }) {
@@ -79,7 +82,7 @@ function tick(n, masks) {
   flush();
 }
 
-const METHODS = new Set(["step", "input", "probe", "frame", "sounds", "reset"]);
+const METHODS = new Set(["step", "input", "probe", "frame", "sounds", "warnings", "reset"]);
 
 async function call(id, method, args) {
   try {
