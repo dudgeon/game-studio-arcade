@@ -8,7 +8,7 @@
 export default {
   init(g) {
     const saved = g.load();
-    return { face: g.sprite(FACE), x: 152, y: 120, color: g.colors.yellow, beeps: 0, best: saved?.best ?? 0, sparks: [] };
+    return { face: g.sprite(FACE), x: g.W / 2 - 8, y: g.H / 2 - 8, color: g.colors.yellow, beeps: 0, best: saved?.best ?? 0, sparks: [] };
   },
 
   update(g, s) {

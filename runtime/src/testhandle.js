@@ -28,7 +28,7 @@ export function createTestHandle(cart, opts = {}) {
   /** @type {[number, number][]} */
   let queue = [];
 
-  /** @type {Arcade.TestHandle & { machine: () => import("./machine.js").Machine }} */
+  /** @type {Arcade.TestHandle & { warnings: () => Promise<Arcade.Warning[]>, machine: () => import("./machine.js").Machine }} */
   const t = {
     async step(n = 1) {
       n = Math.floor(n);
@@ -62,6 +62,9 @@ export function createTestHandle(cart, opts = {}) {
     },
     async sounds() {
       return m.sounds();
+    },
+    async warnings() {
+      return m.warnings();
     },
     async reset(r = {}) {
       m = start(r.seed ?? 1, r.keepSave ? m.saved : null);

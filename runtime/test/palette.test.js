@@ -66,3 +66,28 @@ test("whatever a cart draws, the framebuffer only holds palette indices", async 
   const f = await t.frame();
   for (let i = 0; i < f.pixels.length; i++) assert.ok(f.pixels[i] >= 0 && f.pixels[i] < 32);
 });
+
+test("out-of-range colors still draw (wrapped) but each kind is reported once", async () => {
+  const t = await headless({
+    init: () => ({}),
+    update: () => {},
+    draw: (g) => {
+      g.cls(0);
+      g.rectfill(0, 0, 4, 4, 40);
+      g.rectfill(8, 0, 4, 4, 40);
+      g.pset(20, 0, 2.5);
+      g.text("x", 30, 0, g.colors.white);
+    },
+  });
+  await t.step(3);
+  const f = await t.frame();
+  assert.equal(f.pixels[0], 8, "40 wraps to 8");
+  const w = await t.warnings();
+  assert.deepEqual(
+    w.map((x) => x.message),
+    ["g.rectfill() got color 40; colors are 0..31, so it was drawn as 8", "g.pset() got color 2.5; colors are 0..31, so it was drawn as 2"],
+  );
+  assert.equal(w[0].frame, 0, "first seen in init's draw");
+  await t.reset();
+  assert.equal((await t.warnings()).length, 2, "a reset starts a fresh list (init's draw re-reports both)");
+});

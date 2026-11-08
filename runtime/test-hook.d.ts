@@ -10,7 +10,7 @@
 //       await t.input([{ frames: 30, p1: "right" }]);
 //       await t.step(30);
 //       const p = await t.probe();
-//       if (!(p.x > 160)) throw new Error(`holding right for 30 frames should move the cat right, x=${p.x}`);
+//       if (!(p.x > 128)) throw new Error(`holding right for 30 frames should move the cat right, x=${p.x}`);
 //     },
 //   };
 //
@@ -50,9 +50,9 @@ declare namespace Arcade {
   interface Frame {
     /** g.frame when this was drawn. */
     frame: number;
-    width: 320;
-    height: 256;
-    /** Palette indices (0..31), row-major: pixel (x, y) is pixels[y * 320 + x]. */
+    width: 256;
+    height: 192;
+    /** Palette indices (0..31), row-major: pixel (x, y) is pixels[y * width + x]. */
     pixels: ArrayLike<number>;
     /** Hash of the pixels (hex). Same seed + same input => same hash. */
     hash: string;
@@ -73,6 +73,12 @@ declare namespace Arcade {
     voice: number;
   }
 
+  /** A dev warning: something the cart did that works but is probably a mistake. */
+  interface Warning {
+    frame: number;
+    message: string;
+  }
+
   interface TestHandle {
     /**
      * Advance n frames (default 1): each frame runs update, consuming one
@@ -88,6 +94,12 @@ declare namespace Arcade {
     frame(): Promise<Frame>;
     /** Sounds started since the last reset, oldest first. */
     sounds(): Promise<SoundEvent[]>;
+    /**
+     * Dev warnings since the last reset, each kind once: today, a color outside
+     * 0..31 (it still draws, wrapped into the palette). For the palette check.
+     * Optional so older handle wrappers stay valid; every runtime handle has it.
+     */
+    warnings?(): Promise<Warning[]>;
     /** Restart the cart from init with a fresh RNG and an empty input queue. */
     reset(opts?: ResetOptions): Promise<void>;
   }

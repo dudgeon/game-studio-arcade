@@ -42,7 +42,7 @@ test("a deliberately broken cart fails the right rules with readable reasons", a
     rules: { R1: "fail", R2: "fail", R3: "pass", R4: "you-check", R5: "fail" },
     generic: { loads: "pass", "no-errors": "fail", soak: "fail", palette: "fail", "frame-time": "pass", deterministic: "fail" },
   });
-  assert.equal(reason(r, "R1"), "holding right for 10 frames should move the basket from x=148 to 168, but it went to 158");
+  assert.equal(reason(r, "R1"), "holding right for 10 frames should move the basket from x=116 to 136, but it went to 126");
   assert.match(reason(r, "R2"), /^catching one dot should make the score 10, but it's [01]$/);
   assert.match(reason(r, "R5"), /^the game crashed during frames \d+-\d+: .*restart is not a function$/);
   assert.match(reason(r, "soak"), /random input: the game crashed at frame 1 of the random-input soak: .*reading 'use'/);
@@ -113,8 +113,8 @@ test("writes playtest.json and key frames as indexed PNGs", async () => {
     for (const f of r.frames) assert.ok(existsSync(join(dir, f.file)), f.file);
     const png = await readFile(join(dir, "playtest-frames", "load.png"));
     const px = decodeIndexedPng(png);
-    assert.equal(px.width, 320);
-    assert.equal(px.height, 256);
+    assert.equal(px.width, 256);
+    assert.equal(px.height, 192);
     assert.equal(px.pixels[0], 1); // night sky
   } finally {
     await rm(dir, { recursive: true, force: true });

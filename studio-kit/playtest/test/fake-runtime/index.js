@@ -6,8 +6,8 @@
 // (text draws nothing); that's enough to test the harness, not carts.
 // Plain browser-safe JS: the browser test serves this file to a page too.
 
-export const W = 320;
-export const H = 256;
+export const W = 256;
+export const H = 192;
 export const BUTTONS = ["up", "down", "left", "right", "a", "b", "x", "y", "start"];
 const NAMES = ["black", "night", "slate", "gray", "silver", "white", "maroon", "red", "coral", "pink", "brown", "orange", "tan", "peach", "gold", "yellow", "forest", "green", "lime", "mint", "teal", "aqua", "navy", "blue", "sky", "ice", "indigo", "purple", "lilac", "plum", "magenta", "rose"];
 export const COLORS = Object.freeze(Object.fromEntries(NAMES.map((n, i) => [n, i])));

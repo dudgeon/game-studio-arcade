@@ -5,7 +5,7 @@ import * as lib from "../lib/index.js";
 import { Framebuffer, H, W, hashPixels, makeSprite } from "./gfx.js";
 import { textWidth } from "./font.js";
 import { BIT } from "./input.js";
-import { COLORS, PALETTE } from "./palette.js";
+import { COLORS, PALETTE, colorIndex } from "./palette.js";
 import { createRng } from "./rng.js";
 import { SFX, Voices, toneToSegment } from "./sound.js";
 
@@ -48,6 +48,25 @@ export function createMachine({ cart, seed = 1, save = null }) {
   /** @type {SoundCommand[]} */
   const soundLog = [];
   let saveDirty = false;
+  /** @type {{ frame: number, message: string }[]} */
+  const warnings = [];
+  /** @type {{ frame: number, message: string }[]} */
+  let warningsOut = [];
+  const warned = new Set();
+
+  /** Colors outside 0..31 still wrap (a kid's game shouldn't crash over it), but each kind is reported once. */
+  const col = (c, fn) => {
+    if (c !== undefined && !(Number.isInteger(c) && c >= 0 && c < 32)) {
+      const message = `g.${fn}() got color ${c}; colors are 0..31, so it was drawn as ${colorIndex(c)}`;
+      if (!warned.has(message) && warnings.length < 50) {
+        warned.add(message);
+        const w = { frame, message };
+        warnings.push(w);
+        warningsOut.push(w);
+      }
+    }
+    return c;
+  };
 
   const playerIndex = (p) => {
     if (p === undefined || p === 1) return 0;
@@ -91,18 +110,21 @@ export function createMachine({ cart, seed = 1, save = null }) {
       return (cur[i] & m) === 0 && (prev[i] & m) !== 0;
     },
 
-    cls: (c) => fb.cls(c),
-    pset: (x, y, c) => fb.pset(x, y, c),
+    cls: (c) => fb.cls(col(c, "cls")),
+    pset: (x, y, c) => fb.pset(x, y, col(c, "pset")),
     pget: (x, y) => fb.pget(x, y),
-    line: (x0, y0, x1, y1, c) => fb.line(x0, y0, x1, y1, c),
-    rect: (x, y, w, h, c) => fb.rect(x, y, w, h, c),
-    rectfill: (x, y, w, h, c) => fb.rectfill(x, y, w, h, c),
-    circ: (x, y, r, c) => fb.circ(x, y, r, c),
-    circfill: (x, y, r, c) => fb.circfill(x, y, r, c),
-    text: (s, x, y, c, opts) => fb.text(s, x, y, c, opts),
+    line: (x0, y0, x1, y1, c) => fb.line(x0, y0, x1, y1, col(c, "line")),
+    rect: (x, y, w, h, c) => fb.rect(x, y, w, h, col(c, "rect")),
+    rectfill: (x, y, w, h, c) => fb.rectfill(x, y, w, h, col(c, "rectfill")),
+    circ: (x, y, r, c) => fb.circ(x, y, r, col(c, "circ")),
+    circfill: (x, y, r, c) => fb.circfill(x, y, r, col(c, "circfill")),
+    text: (s, x, y, c, opts) => fb.text(s, x, y, col(c, "text"), opts),
     textWidth: (s, scale) => textWidth(String(s), Math.max(1, Math.floor(scale ?? 1))),
     sprite: (rows) => makeSprite(rows),
-    spr: (s, x, y, opts) => fb.spr(s, x, y, opts),
+    spr: (s, x, y, opts) => {
+      if (opts?.color !== undefined) col(opts.color, "spr");
+      fb.spr(s, x, y, opts);
+    },
     camera: (x, y) => fb.camera(x, y),
     clip: (x, y, w, h) => fb.clip(x, y, w, h),
 
@@ -174,6 +196,14 @@ export function createMachine({ cart, seed = 1, save = null }) {
     /** The live framebuffer (palette indices); don't keep it across frames. */
     pixels: fb.pixels,
     sounds: () => soundLog.map((c) => ({ frame: c.frame, kind: c.kind, voice: c.voice })),
+    /** Dev warnings since start (e.g. out-of-range colors), each kind once. */
+    warnings: () => warnings.map((w) => ({ ...w })),
+    /** Warnings since the last call, for a host to show. */
+    drainWarnings() {
+      const out = warningsOut;
+      warningsOut = [];
+      return out;
+    },
     /** Audio commands since the last call, for a host to play. */
     drainAudio() {
       const out = audioOut;

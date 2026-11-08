@@ -137,6 +137,8 @@ Still open:
   - a frame costs 0.4 ms median and 1.2 ms p95, including the postMessage round trip and the canvas draw;
   - browser and headless Node gave the same frame hash for the same seed and input;
   - a hostile test cart was blocked from fetch, localStorage, cookies, the parent DOM, eval, images and remote imports.
+- **Resized to 256×192 for D81.** Rechecked in headless Chromium: 60 fps, scale 4 on 1024×768, a frame costs 0.6 ms median, and the browser and Node hashes match.
+- **Out-of-range colors** (e.g. 40, or 2.5) still draw, wrapped into 0–31, so a kid's game never crashes over one. Each kind is reported once as a dev warning, through `t.warnings()`, `window.arcade.warnings` and the browser console, so the playtest's palette check can catch it. `warnings` is optional on `Arcade.TestHandle`, so existing wrappers stay valid.
 
 **D30. The `spec.md` line format, rule ids, and how `checks.js` is read.** *(Claude, Phase 0 task 4; settles the §7 details.)*
 - The title line is `# <Title>`, followed by one byline: `maker: <initial> · with: <initial or —> · parent: <cart@version or —> · session: <id or —>`. `cart.json` stays the machine record; the byline is for people.

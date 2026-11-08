@@ -4,7 +4,7 @@
 //   node runtime/run-cart.js <game.js> [--frames 300] [--seed 1]
 //        [--input '[{"frames":30,"p1":"right"}]'] [--checks checks.js]
 //
-// Prints { ok, frame, hash, probe, sounds, checks?, error? } and exits 1 if the
+// Prints { ok, frame, hash, probe, sounds, warnings, checks?, error? } and exits 1 if the
 // cart threw or any check failed. With --checks, each check runs on a fresh cart.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -34,7 +34,7 @@ try {
   await t.input(input);
   if (frames > 0) await t.step(frames);
   const f = await t.frame();
-  Object.assign(out, { frame: f.frame, hash: f.hash, probe: await t.probe(), sounds: (await t.sounds()).length });
+  Object.assign(out, { frame: f.frame, hash: f.hash, probe: await t.probe(), sounds: (await t.sounds()).length, warnings: await t.warnings() });
 
   if (checksFile) {
     const mod = await import(pathToFileURL(path.resolve(checksFile)).href);

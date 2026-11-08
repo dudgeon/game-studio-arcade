@@ -1,6 +1,7 @@
 // The host page side (D21): puts a cart in a sandboxed iframe and owns the
 // clock, input, sound and saves. Players (the local player, the launcher,
 // the Manager's simulator) and the playtest all use this.
+import { H, W } from "./gfx.js";
 import { DEFAULT_KEYMAP, readInput } from "./input.js";
 import { Synth } from "./synth.js";
 
@@ -25,9 +26,9 @@ const SLACK_MS = 4;
  *   persist: keep g.save() data in localStorage (default: true unless test).
  */
 
-/** Largest integer scale (in device pixels) that fits 320x256 in w x h CSS pixels. */
+/** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
 export function integerScale(w, h, dpr = 1) {
-  const k = Math.floor(Math.min((w * dpr) / 320, (h * dpr) / 256));
+  const k = Math.floor(Math.min((w * dpr) / W, (h * dpr) / H));
   return Math.max(1, k);
 }
 
@@ -58,8 +59,8 @@ export function createHost(opts) {
     const dpr = window.devicePixelRatio || 1;
     const r = opts.container.getBoundingClientRect();
     const k = integerScale(r.width || window.innerWidth, r.height || window.innerHeight, dpr);
-    iframe.style.width = `${(320 * k) / dpr}px`;
-    iframe.style.height = `${(256 * k) / dpr}px`;
+    iframe.style.width = `${(W * k) / dpr}px`;
+    iframe.style.height = `${(H * k) / dpr}px`;
     arcade.scale = k;
   };
 
@@ -116,6 +117,7 @@ export function createHost(opts) {
     probe: () => call("probe", []),
     frame: () => call("frame", []),
     sounds: () => call("sounds", []),
+    warnings: () => call("warnings", []),
     reset: (o) => call("reset", [o]),
   };
 
@@ -125,6 +127,9 @@ export function createHost(opts) {
     ready,
     /** @type {CartErrorInfo[]} */
     errors: [],
+    /** Dev warnings from live play (e.g. out-of-range colors), each kind once. */
+    /** @type {{ frame: number, message: string }[]} */
+    warnings: [],
     test: testHandle,
     iframe,
     scale: 1,
@@ -174,6 +179,7 @@ export function createHost(opts) {
             else s.stop(a.voice);
           }
         }
+        for (const w of msg.warnings ?? []) arcade.warnings.push(w);
         if (msg.save !== undefined && persist) {
           try {
             localStorage.setItem(saveKey, msg.save);

@@ -1,9 +1,9 @@
-// The framebuffer and drawing primitives: 320x256 palette indices (D3).
+// The framebuffer and drawing primitives: 256x192 palette indices (D3, D81).
 import { colorIndex } from "./palette.js";
 import { ADVANCE, GLYPH_H, GLYPH_W, LINE_H, glyph, textWidth } from "./font.js";
 
-export const W = 320;
-export const H = 256;
+export const W = 256;
+export const H = 192;
 
 const SPRITE_CHARS = "0123456789abcdefghijklmnopqrstuv";
 
