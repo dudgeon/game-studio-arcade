@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 // Relative imports, not package names: the packed kit has no node_modules (D63).
-import { parseSpec, validateRuleCoverage, validateCart, formatIssues } from "../../spec/index.js";
+import { formatSpec, parseSpec, validateRuleCoverage, validateCart, formatIssues } from "../../spec/index.js";
 import { playtest } from "../../playtest/index.js";
 import { KIT_PARTS, collectKit } from "../../managed-agent/scripts/pack-kit.js";
 import * as lib from "../../../runtime/lib/index.js";
@@ -41,6 +41,11 @@ for (const c of TEMPLATES) {
     assert.ok(spec.rules.some((r) => r.kind === "auto") && spec.rules.some((r) => r.kind === "you-check"));
     const cov = await validateRuleCoverage(dirOf(c));
     assert.ok(cov.ok, JSON.stringify(cov.errors));
+  });
+
+  test(`${c}: spec.md round-trips byte for byte`, () => {
+    const text = read(path.join(dirOf(c), "spec.md"));
+    assert.equal(formatSpec(parseSpec(text)), text);
   });
 
   test(`${c}: cart.json is the agent's part: id, title (as in the spec) and one player`, () => {
