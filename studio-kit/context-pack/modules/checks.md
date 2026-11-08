@@ -1,6 +1,6 @@
 # checks.js
 
-One async check per `(auto)` rule, keyed by rule id, written from the spec's words. It imports nothing. A check passes by returning and fails by throwing; the message goes in the report, so it says what was expected and what happened. Each check gets a fresh cart: seed 1, nothing saved, one controller. Keep them short: the bot below is tested, so don't write your own loops.
+One async check per `(auto)` rule, keyed by rule id, written from the spec's words. A check passes by returning and fails by throwing, with a message saying what was expected and what happened. Each gets a fresh cart: seed 1, nothing saved. The bot below is tested, so don't write your own loops.
 
 ```js
 // @ts-check

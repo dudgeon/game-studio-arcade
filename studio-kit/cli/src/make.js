@@ -206,6 +206,7 @@ export async function makeCart(o) {
     ended_by: result.endedBy,
     spec_diff: newSpecDiff(spec),
     context_pack: o.contextPack ?? "tarball",
+    started_from: typeof report?.started_from === "string" ? report.started_from : null,
     brief: o.brief ? "file-override" : "applied-agent",
     first_playtest: freeze.first_playtest,
     playtest_runs: freeze.playtest_runs,

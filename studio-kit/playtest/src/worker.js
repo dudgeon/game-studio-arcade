@@ -94,8 +94,7 @@ function wrap(base) {
   const handle = {
     stepped: () => total,
     gameFrame: () => gameFrame,
-    /** @type {Arcade.CheckHandle} */
-    t: withBot({
+    t: withBot(/** @type {Arcade.TestHandle} */ ({
       async step(n = 1) {
         if (!Number.isInteger(n) || n < 1) throw new Error(`t.step(n) needs a whole number of frames >= 1, got ${n}`);
         if (total + n > data.maxFrames) throw new LimitError(`the check stepped more than ${data.maxFrames} frames (${data.maxFrames / 60} s of game time) and was stopped`);
@@ -120,7 +119,7 @@ function wrap(base) {
         gameFrame = 0;
         await base.reset(o);
       },
-    }),
+    })),
   };
   return handle;
 }
