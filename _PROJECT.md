@@ -6,8 +6,8 @@ aliases:
   - Quarter Deck
 status: active
 goal: A basement arcade cabinet where Owen and Alina describe a game out loud, answer Claude's questions with the joystick, and play the new game minutes later
-health: on-track — kickoff docs done; Phase 0 waiting on WIF setup
-next: Run scripts/setup-anthropic-auth.sh (WIF), then give the go-ahead for Phase 0 code
+health: on-track — auth works (ant CLI login, D16); runtime, library, spec, validator, playtest, player and offline CLI on main; context pack being fixed; Picade 10" ordered
+next: Land the context pack, then a first live `studio make` and task 10 (Falling Blocks with Geoff); design the virtual cabinet on the mini
 created: 2026-11-07
 repo: https://github.com/dudgeon/game-studio-arcade
 ---
@@ -51,3 +51,5 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: players: games default to single player; the starter library supports turn-based play well as an optional mechanic; the number of controllers is a configuration setting, ready for any number later; external controllers come later (Geoff, answering D84)
 - 2026-11-08: MAKE: a physical MAKE button isn't assumed; starting a Studio session can live in the launcher / game shelf (Geoff, answering D84)
 - 2026-11-08: mic: not chosen; research an XLR jack on the front with an XLR gooseneck mic (Geoff)
+- 2026-11-08: Studio mic is hold-a-button-to-talk while the "tell me" screen is up; Make is a "Make a new game" tile in the game list; picking Make asks who's making, listing existing names plus a new-name slot for friends (Geoff, answering D86)
+- 2026-11-08: build a virtual cabinet on the mini, as faithful as practical and logically isolated from the mini, for use until the Picade arrives (Geoff)
