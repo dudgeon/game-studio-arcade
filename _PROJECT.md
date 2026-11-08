@@ -64,3 +64,4 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: back to the shelf: press ESC (the Escape key), the guest players' own default, not an invented mechanism (Geoff)
 - 2026-11-08: mic: a USB mic for now; Geoff will find one that fits the cabinet (the researched picks didn't integrate well with the hardware)
 - 2026-11-08: virtual cabinet users: Geoff with a kid; cabinets (virtual and Picade) sign in with a workspace-scoped API key each, stored only on the cabinet (Geoff)
+- 2026-11-08: checks are frozen once written from the spec: a failing check means fix the game; a check may change only after the spec rule or an Assumption changes first, shown in the plan and logged (Geoff, after the first live build bent its checks to fit the game)
