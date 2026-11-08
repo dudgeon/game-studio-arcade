@@ -47,6 +47,8 @@ export interface Report {
   generic: GenericResult[];
   frameTime: FrameTime;
   errors: { where: string; frame: number | null; message: string }[];
+  /** Runtime dev warnings (t.warnings()), each message once. Color warnings fail the palette check. */
+  warnings: { where: string; frame: number | null; message: string }[];
   frames: { name: string; file: string; frame: number; hash: string }[];
   env: { node: string; platform: string; playwright: string | null; browser: string | null; at: string };
 }
@@ -70,7 +72,7 @@ export interface PlaytestOptions {
   frames?: boolean;
   /** Frames of random input in the soak. Default 600. */
   soakFrames?: number;
-  /** p95 frame-time budget in ms. Default 4 (D61). */
+  /** p95 frame-time budget in ms. Default 4 for node, 16.7 for browser (D61, D64). */
   budgetMs?: number;
   /** Wall-time limit per check in ms (x3 for the browser). Default 10000. */
   timeoutMs?: number;

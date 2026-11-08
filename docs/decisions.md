@@ -206,8 +206,8 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - `loads`: the cart imports, `init` runs, one frame steps and draws, and `probe()` returns JSON.
 - `no-errors`: nothing the cart did threw anywhere in the run (checks and generic runs).
 - `soak`: 600 frames (10 s, as in D8's gate) of seeded random input on both players, START included, from our own PRNG, plus 600 frames with no input. No crash, no hang, and `probe()` stays JSON.
-- `palette`: every captured frame (load, one per 60 soak frames, and the end of each check) holds only palette indices 0–31. The runtime wraps any color number into 0–31 (`colorIndex`), so today this guards against runtime regressions rather than cart bugs; a cart that passes color 40 gets color 8 without a warning.
-- `frame-time`: update+draw time per soak frame. Default budget: **p95 ≤ 4 ms** off the Pi (a quarter of a 60 Hz frame, leaving headroom for a Pi that is several times slower) and ≤ 16.7 ms when `--budget-ms` is set for the Pi gate (D8). Provisional until Phase 2 measures the Pi.
+- `palette`: every captured frame (load, one per 60 soak frames, and the end of each check) holds only palette indices 0–31. The runtime wraps any color number into 0–31 and records a dev warning, so the check also fails on any color warning from `t.warnings()` (see D64).
+- `frame-time`: update+draw time per soak frame. Default budget (D64 sets the browser's): **p95 ≤ 4 ms** off the Pi (a quarter of a 60 Hz frame, leaving headroom for a Pi that is several times slower) and ≤ 16.7 ms when `--budget-ms` is set for the Pi gate (D8). Provisional until Phase 2 measures the Pi.
 - **`deterministic` (new):** the no-input run and the soak each run twice from the same seed and input, and the frame hashes (one per 60 frames) must match. The no-input pair still measures this when the soak crashes early. A cart that uses `Math.random` or the clock breaks D10, and every other report from it would be unreproducible.
 
 **D62. `playtest.json` and key frames.** *(Claude, Phase 0 task 5; settles the §7 "last report" shape.)*
@@ -225,6 +225,12 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 ## 2026-11-07 — Switch to the 10" Picade
 
 Specs were checked live on 2026-11-07. Sources and details are in [platform-notes.md](platform-notes.md#picade-10-inch-2025-edition).
+
+**D64. Frame time is judged with a whole-frame budget in the browser; colors are judged by runtime warnings.** *(Claude, Phase 0 task 5 follow-up; refines D61 after the sandbox parity run.)*
+- In the sandbox, trivial `dot-catch` took p95 3.5 ms (max 108.7 ms) per frame in the browser driver. Most of that is the page round trip and cloud-VM noise, not the cart, so a 4 ms budget would fail heavier carts for the wrong reason.
+- **Default budgets:** the node driver keeps p95 ≤ 4 ms (update+draw only, the number that predicts the Pi). The browser driver gets p95 ≤ 16.7 ms, a whole 60 Hz frame, which still catches a cart that can't keep up. `--budget-ms` overrides either. The real frame-time verdict stays on the Pi (D8).
+- The agent runs the node driver first (the default) and the browser driver for parity.
+- **Palette:** every job reads `t.warnings()` when the handle has it. The report lists each warning once in `warnings`, and any color warning fails `palette` with the runtime's message. `comparable()` keeps `warnings`, since they're deterministic.
 
 **D80. Cabinet hardware: Pimoroni Picade with 10" display, plus a Raspberry Pi 5 8 GB. Both ordered 2026-11-07.** *(Geoff; supersedes D2.)*
 - Picade: Pimoroni PIM469, PiShop US SKU 2009, $349.95, in stock (pishop.us/product/picade-with-10-inch-display). Pi 5 8 GB: PiShop SKU 8GB-9028, $175.00, in stock.

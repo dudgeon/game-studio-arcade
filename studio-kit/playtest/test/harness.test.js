@@ -169,15 +169,26 @@ const hasReal = existsSync(join(realDir, "index.js"));
 const hasHost = hasReal && existsSync(join(realDir, "dev-server.js")) && existsSync(join(realDir, "play.html"));
 const real = { runtime: pathToFileURL(join(realDir, "index.js")).href, runtimeDevServer: pathToFileURL(join(realDir, "dev-server.js")).href, out: null };
 
-// The real runtime wraps color 40 to a palette color, so palette passes there.
+// The real runtime wraps color 40 into the palette but records a dev warning,
+// which fails the palette check.
 const BROKEN_REAL = {
   rules: { R1: "fail", R2: "fail", R3: "pass", R4: "you-check", R5: "fail" },
-  generic: { loads: "pass", "no-errors": "fail", soak: "fail", palette: "pass", "frame-time": "pass", deterministic: "fail" },
+  generic: { loads: "pass", "no-errors": "fail", soak: "fail", palette: "fail", "frame-time": "pass", deterministic: "fail" },
 };
 
 test("real runtime: headless driver", { skip: !hasReal && "runtime/index.js isn't here yet" }, async () => {
-  assert.equal((await playtest(fixture("dot-catch"), real)).ok, true);
-  assert.deepEqual(status(await playtest(fixture("dot-catch-broken"), real)), BROKEN_REAL);
+  const good = await playtest(fixture("dot-catch"), real);
+  assert.equal(good.ok, true);
+  assert.deepEqual(good.warnings, []);
+  const r = await playtest(fixture("dot-catch-broken"), real);
+  assert.deepEqual(status(r), BROKEN_REAL);
+  assert.equal(r.warnings.length, 1);
+  assert.match(reason(r, "palette"), /^the game drew with a color outside the palette \(load, frame \d+\): .*color 40/);
+});
+
+test("frame-time budget: 4 ms for node, a whole frame for the browser (D64)", async () => {
+  assert.equal((await playtest(fixture("dot-catch"), opts)).frameTime.budgetMs, 4);
+  assert.equal((await playtest(fixture("dot-catch"), { ...opts, budgetMs: 16.7 })).frameTime.budgetMs, 16.7);
 });
 
 let browserSkip = !hasHost && "the runtime host page isn't here yet";
@@ -196,6 +207,8 @@ test("real runtime: browser driver gives the same report as headless", { skip: b
     const a = comparable(await playtest(fixture(cart), { ...real, driver: "node" }));
     const b = comparable(await playtest(fixture(cart), { ...real, driver: "browser" }));
     assert.equal(b.driver, "browser");
+    assert.equal(b.frameTime.budgetMs, 16.7);
+    a.frameTime.budgetMs = b.frameTime.budgetMs;
     delete a.driver;
     delete b.driver;
     assert.deepEqual(b, a, cart);
