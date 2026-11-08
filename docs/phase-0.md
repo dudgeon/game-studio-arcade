@@ -14,8 +14,8 @@ Spend ceiling for all of Phase 0: **$25** of API list cost (proposed). Each buil
 
 ## What I need from Geoff
 
-1. **An Anthropic API key under commercial terms.** Ideally create a dedicated Console workspace `game-studio-arcade` with a monthly spend limit (e.g. $50), then put the key in `.env` as `ANTHROPIC_API_KEY=…` (the file is gitignored; `.env.example` shows the shape). If Managed Agents beta isn't enabled for the org, task 1 will tell us.
-2. **Alina's request in her own words**: a sentence or two, typed or dictated. Phase 0 has no speech, so a typed transcript is fine.
+1. **Connect the mini to the Claude API (Workload Identity Federation, D15).** Run `scripts/setup-anthropic-auth.sh`, which walks you through the Console. It creates the `game-studio-arcade` workspace and spend limit, connects the workload, and runs a live test that also checks Managed Agents access. You need the org admin or owner role. Nothing secret is pasted; `.env` gets only IDs.
+2. ~~Alina's request in her own words~~. Claude wrote a stand-in (below). Swap in her real words whenever you have them.
 3. **About 30 minutes for task 10**: answer the tile questions at the terminal (A/B/C/D) for one build, then play the results and rate them. The other builds replay your answers automatically.
 4. **A GitHub remote, if you want one**: should I create a private `dudgeon/game-studio-arcade` and push?
 
@@ -23,13 +23,30 @@ Not needed yet: a Groq key (Phase 3), hardware (Phase 2).
 
 I'll install these on the mini unless you object: `ant` (`brew install anthropics/tap/ant`) and Node 22 (`brew install node@22`, used through `.nvmrc`).
 
+## The Phase 0 request (stand-in for Alina)
+
+Claude made this up. It's meant to sound like a bright 10-year-old speaking into a mic: run-on, enthusiastic, specific about feelings and looks, vague about rules. It's the `request transcript` for every task 10 build:
+
+> "Can you make Tetris but way cuter? Like the blocks are made of candy and when you finish a whole line it goes POP and there's sparkles. And there's a little cat at the bottom and he gets really happy when you clear lines, and sad if it gets too high. And it gets faster but not like super hard right away. And can Owen play too? But not on my side."
+
+What it tests, on purpose:
+- **Inspired-by guardrail.** It names Tetris. The result must be her own falling-blocks game (candy theme, its own name), with no Tetris name or look.
+- **Looks and feelings → you-check rules.** "Way cuter", sparkles, the happy and sad cat can't be proven by the playtest, so they should become `(you check)` rules (D1).
+- **Vague difficulty → a good question.** "Faster but not super hard right away" should prompt an A/B question about the speed curve, or a clear Assumption if she picks D.
+- **Scope ambiguity → a good question.** "Can Owen play too? But not on my side" could mean a second board side by side, taking turns, or sharing one board. Claude should ask rather than guess. This is also the first test of 2-player input.
+- **Things she didn't say.** Controls, what ends the game, scoring and the name are all for Claude to ask about or record as Assumptions.
+
+Recorded tile answers for replays go in `studio-kit/cli/fixtures/` once task 10 runs live. The request is invented, so it can live in the repo; real kid transcripts never do.
+
 ## Tasks, in order
 
 ### 0. Repo scaffolding
 npm workspaces (`runtime`, `studio-kit/*`, later `cabinet/*` and `manager`), TypeScript, Node 22 pinned (D9), `node:test` for unit tests (no test framework to ship into the offline sandbox), `.gitignore` (`.env`, `node_modules`, build output), `.env.example`, a README pointing at the docs.
 *Accept:* `npm install && npm test` passes on Node 22, and `git status` is clean after a build.
 
-### 1. Probe session (needs the API key)
+### 1. Probe session (needs D15 auth set up)
+First, auth plumbing: a `scripts/ant` wrapper that mints a fresh identity token file per invocation, and a shared `credentials()` helper for our TypeScript code that mints in-process through the SDK's identity-token provider. Both read `.env`.
+
 In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limited}`, no hosts) and a throwaway agent, applied with `ant apply`, plus one session that reports:
 - Node version, and the **exact Playwright version** and where it lives (global npm path, `require.resolve`)
 - the Chromium version, and that headless Chromium launches offline
@@ -37,7 +54,7 @@ In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limit
 - the `/mnt/session/uploads` and `/mnt/session/outputs` round trip, with a tarball mounted, extracted and an output listed and downloaded
 - **where a session's list cost is reported** (session object or usage fields), so we can log real cost
 
-*Accept:* the findings are added to [platform-notes.md](platform-notes.md), the local Playwright is pinned to the sandbox's version in `package.json`, and the probe cost is under $0.50.
+*Accept:* `ant` and the SDK both authenticate through federation (`ant auth status` shows federation), the findings are added to [platform-notes.md](platform-notes.md), the local Playwright is pinned to the sandbox's version in `package.json`, and the probe cost is under $0.50.
 
 ### 2. House runtime v0 (`runtime/`)
 - A 320×256 canvas with integer scaling and a fixed 32-color palette (D3).

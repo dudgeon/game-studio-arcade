@@ -59,3 +59,24 @@ Sources: code.claude.com/docs/en/{plugins-reference, plugins/create, plugins/ins
 
 - **TIC-80** v1.4.1 (2026-10-27) has official linux-arm64 builds. Surf mode exists but is compiled only with `BUILD_SURF`, so check that the arm64 build includes it.
 - **PICO-8** v0.2.7 costs $14.99 and has an official Raspberry Pi 64-bit build. It's personally licensed: **the image script must not download or bundle it.** Geoff supplies his copy and the script installs it from a local path. BBS carts belong to their authors.
+
+## Workload Identity Federation
+
+Sources: platform.claude.com/docs/en/manage-claude/{workload-identity-federation, wif-reference, authentication}; /cli-sdks-libraries/cli/authentication. Checked 2026-11-07.
+
+- **Resources:** a service account (`svac_`), a federation issuer (`fdis_`) and a federation rule (`fdrl_`). The Console wizard is at `platform.claude.com/settings/workload-identity-federation` → Connect workload → Custom OIDC. **Requires the admin or owner role.**
+- **Inline JWKS** suits issuers that aren't on the public internet. The `issuer_url` is then only string-compared with `iss`, so it may be an internal hostname. There's no automatic key rotation: update the issuer by hand.
+- **JWT rules:**
+  - asymmetric algorithms only (ES256 and others);
+  - a `kid` header that matches a key in the issuer;
+  - `sub`, `iat` and `exp` claims are required;
+  - `exp − iat` is at most 1 h by default;
+  - 30 s of clock-skew leeway;
+  - a `jti` makes the token single-use per issuer;
+  - at most 16 KiB.
+- **Rules** match on `subject_prefix` (exact match, or a trailing `*` for a prefix) plus optional `audience`, `claims` or a CEL `condition`. `oauth_scope` `workspace:developer` covers Messages, Models, **Managed Agents**, Files and Skills. `token_lifetime_seconds` is 60–86,400; the wizard defaults to 600.
+- **Minted token lifetime** is min(rule lifetime, 2 × the JWT's remaining life). The SDK refreshes 120 s before expiry and re-reads `ANTHROPIC_IDENTITY_TOKEN_FILE` on every exchange.
+- **SDK and CLI environment variables:** `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, `ANTHROPIC_SERVICE_ACCOUNT_ID`, `ANTHROPIC_IDENTITY_TOKEN_FILE` or `ANTHROPIC_IDENTITY_TOKEN`, and `ANTHROPIC_WORKSPACE_ID`. **`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` override federation**, and so does an empty-but-set variable. `ant auth status` shows which source won.
+- **Profiles:** `~/.config/anthropic/configs/<name>.json` with `authentication.type: oidc_federation`. Claude Code and the Agent SDK honor the same profiles.
+- **Debugging:** a denied exchange always returns an opaque 401 "Authentication failed". The reason is in the Console's authentication history: `…/settings/workload-identity-federation?tab=history`.
+- **Interactive alternative for dev machines:** `ant auth login` (browser OAuth, workspace-scoped, stored in `~/.config/anthropic/credentials/`).

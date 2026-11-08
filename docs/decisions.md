@@ -49,3 +49,26 @@ Every rule is still written so it's checkable, by a machine or by a person. The 
 **D13. Carts run in a sandboxed iframe** (`sandbox="allow-scripts"`, no same-origin, CSP `default-src 'none'`) and talk to the runtime host through `postMessage`. *(Claude.)* This enforces no network and no host DOM. `validate_cart` also lints for DOM and network APIs.
 
 **D14. Phase 0 logs and the dev cart library live outside this repo**, in `~/game-studio-data/` (logs as JSONL, the cart library as its own git repo). *(Claude; follows §15.)*
+
+**D15. API auth uses Workload Identity Federation, not API keys.** *(Geoff asked for WIF; Claude designed it.)*
+
+How it works:
+- Each machine that calls the Claude API (the mini now, the cabinet later) has its own ES256 signing key in `~/.config/game-studio-arcade/identity/<device>.key.pem` (0600, never in the repo).
+- One "Custom OIDC" federation issuer, `https://game-studio-arcade.home.arpa`, carries the devices' public keys inline. Anthropic only string-compares that URL and never fetches it, so no public endpoint is needed.
+- Each device gets its own service account and federation rule (`studio-<device>`), matched on subject `device:<device>` and audience `https://api.anthropic.com`, with scope `workspace:developer` in the `game-studio-arcade` workspace and a 600 s token lifetime.
+- Devices mint 5-minute, single-use (`jti`) identity tokens with `scripts/wif/identity.mjs`.
+- `.env` holds only non-secret IDs.
+
+Setup: `scripts/setup-anthropic-auth.sh` (set `GSA_DEVICE=cabinet` for the Pi, and add its public key to the same issuer).
+
+Phase 0 work:
+- Our TypeScript code mints in-process for every exchange, through the SDK's identity-token provider. Check that the SDK accepts a function there.
+- The `ant` CLI gets a wrapper that mints a fresh token file per invocation.
+
+Honest trade-off: on home machines the signing key is still a long-lived secret on disk, so a stolen key is about as bad as a stolen API key. The gains:
+- nothing secret is ever shown, copied or pasted, and the private key never leaves the device;
+- API credentials expire in 10 minutes;
+- each device has its own identity, with authentication history in the Console;
+- revoking access means archiving one rule.
+
+Fallback if WIF gets in the way: an API key from a dedicated workspace (one env var).
