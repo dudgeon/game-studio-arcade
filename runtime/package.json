@@ -17,8 +17,12 @@
     "./dev-server": "./dev-server.js",
     "./*": "./src/*"
   },
+  "bin": {
+    "arcade-run": "./run-cart.js",
+    "arcade-dev-server": "./dev-server.js"
+  },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test \"test/*.test.js\" \"lib/test/*.test.js\"",
     "dev": "node dev-server.js"
   }
 }

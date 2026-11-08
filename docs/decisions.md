@@ -111,6 +111,12 @@ Still open:
 - **Sound:** 4 voices (square, pulse, triangle, saw, noise) with `g.tone` and named `g.sfx` presets.
 - **Saves:** `g.save` is one JSON value per cart, at most 4 KB.
 - **Dev keyboard:** P1 is the arrows, Z X C V for A B X Y, and Enter for START. P2 is W A S D, then 1 2 3 4 for A B X Y and 5 for START. Escape stands in for ★ and never reaches the cart. Gamepads use the standard mapping: pad 0 is P1, pad 1 is P2, with face buttons A B X Y = 0 1 2 3, START = 9, the d-pad or left stick (dead zone 0.5), and guide = ★. The Picade's own key map is set in Phase 2.
+- **Timing and taps:** the host gives `requestAnimationFrame` 4 ms of slack, so a jittery 16.5 ms frame still gets exactly one tick, and it never runs more than 4 ticks per frame. A key pressed and released between two ticks still counts as held for one frame, so quick taps aren't lost.
+- **Checked 2026-11-07 in Chrome on the mini:**
+  - the hello cart ran at 60 fps, 60 ticks/s;
+  - a frame costs 0.4 ms median and 1.2 ms p95, including the postMessage round trip and the canvas draw;
+  - browser and headless Node gave the same frame hash for the same seed and input;
+  - a hostile test cart was blocked from fetch, localStorage, cookies, the parent DOM, eval, images and remote imports.
 
 **D30. The `spec.md` line format, rule ids, and how `checks.js` is read.** *(Claude, Phase 0 task 4; settles the §7 details.)*
 - The title line is `# <Title>`, followed by one byline: `maker: <initial> · with: <initial or —> · parent: <cart@version or —> · session: <id or —>`. `cart.json` stays the machine record; the byline is for people.
