@@ -102,7 +102,7 @@ The profile is one config value read by the script, so the Cabinet Manager's upd
 | **Audio out** | Same browser audio path (WebAudio → ALSA/PipeWire), different device: virtio sound to the mini's speakers, in stereo. | Optional mono downmix in the `virtual` profile to hear what the 3 W mono speaker will play. Volume and tone only on the real speaker. |
 | **Mic and push-to-talk** | The mini has **no built-in mic**. With a USB mic passed through (macOS 27), the VM sees the actual USB device, the same as the Pi will. Push-to-talk is just a key, whatever D86 Q1 decides. | D127: pass the cabinet's own mic through; fallback is the mini's audio input via virtio sound. Basement echo and the cabinet's speaker feedback only on site. |
 | **Network and name** | Its own DHCP address on the home mesh, like the Pi, and its own mDNS name `arcade-virtual.local`, so it can run alongside the real `arcade.local` later. | D124: bridged on the mini's Wi-Fi. UTM notes bridging on Wi-Fi "may require additional configuration"; fallback is Shared networking (only the mini can reach it). Basement Wi-Fi strength only on site. |
-| **API identity** | Its own, never the mini's `game-studio-arcade` profile. What kind is Geoff's call (D16): see question 2. | Same mechanism as the real cabinet, a separate credential. |
+| **API identity** | Its own, never the mini's `game-studio-arcade` profile: a workspace-scoped API key in a cabinet workspace with its own spend limit (D131). | Same mechanism as the real cabinet, a separate credential. |
 | **Data** | Own cart library, logs, play telemetry, Manager token, all inside the VM's disk. Never deleted (D5); UTM snapshot before each update. | Backups like the real cabinet's (nightly to GitHub, §4). Moving carts to the real cabinet: question 3. |
 | **Storage** | A virtual disk on an SSD, much faster than microSD; no sudden-power-loss corruption. | Pi only. |
 | **Heat** | None. The Pi under the HAT was reported at ~85 °C and throttling (D83). | Pi only. |
@@ -125,7 +125,7 @@ What "isolated from the mini the way the real Pi is" means here, and how each pa
 | No access to the mini's files or Claude Code | No shared folders, clipboard, Rosetta or mini keys in the VM config (D123). The VM's disk is its own file. |
 | The mini is reached only the way the real cabinet reaches it, which is never | The `virtual` profile's firewall refuses new outbound connections to the mini's addresses. Replies to the mini's own requests (Manager, MCP) still flow. |
 | The mini reaches the cabinet only through the network | Cabinet Manager → Manager API, Claude Code → `arcade` MCP at `http://arcade-virtual.local:<port>/mcp` (D7), with its own pairing token. Which cabinet they talk to is one config value (`ARCADE_HOST`). |
-| Own API identity | Never the mini's profile (question 2). |
+| Own API identity | Never the mini's profile; its own workspace-scoped key, stored only in the VM (D131). |
 | Desktop builds publish the real way | Claude Code's `publish_cart` goes over MCP and runs the virtual cabinet's publish gate (D8). |
 | Kid data stays out of git | The VM, its disk and snapshots live in UTM's library, outside the repo (§15). |
 
@@ -173,8 +173,8 @@ Placed into the build plan (HANDOFF §14). Each step ends with something Geoff c
 
 ## Questions for Geoff
 
-1. **Who uses the virtual cabinet?** (a) Geoff only, for testing. (b) Geoff with a kid next to him. (c) A kid alone at the mini. *Lean: (b).* The mini is Geoff's logged-in Mac with Claude Code one window away, and the kids never use Geoff's login solo (§5). The VM itself never has Geoff's login.
-2. **The cabinet's API identity** (D16, open; this needs answering by V2, and the virtual cabinet gets its own copy of whichever you choose). The options:
+1. **Answered (D130, Geoff): (b), Geoff with a kid.** **Who uses the virtual cabinet?** (a) Geoff only, for testing. (b) Geoff with a kid next to him. (c) A kid alone at the mini. *Lean: (b).* The mini is Geoff's logged-in Mac with Claude Code one window away, and the kids never use Geoff's login solo (§5). The VM itself never has Geoff's login.
+2. **Answered (D131, Geoff): (a), a workspace-scoped API key per cabinet, in a dedicated cabinet workspace with its own spend limit, stored only on that cabinet.** The options were:
    - (a) A workspace-scoped API key per cabinet, stored on the cabinet. Works on the Individual account today. A long-lived secret on disk; separate keys per cabinet keep costs and revocation separate.
    - (b) Convert the Console account to an organization, unlocking Workload Identity Federation (`scripts/wif/` is ready): per-device identity, 10-minute credentials, no pasted secret.
    - (c) The `ant` CLI browser login on each cabinet, as on the mini. Nothing pasted, but it needs a person to log in, which fits an unattended cabinet badly.

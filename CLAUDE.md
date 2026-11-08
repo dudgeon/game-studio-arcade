@@ -47,7 +47,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 
 - Spec-first here too: decisions land in `docs/` (and `docs/decisions.md`) before code; keep the brief current.
 - Never put the Mac mini in the play path. Never delete cart data; append versions.
-- No secrets in git. On the mini, API auth is the `ant` CLI login, profile `game-studio-arcade` (D16). Re-check it with `scripts/setup-anthropic-auth.sh`. Never set `ANTHROPIC_API_KEY`: it silently overrides the profile. Cabinet auth is undecided. Credentials never go in the launcher, carts or logs.
+- No secrets in git. On the mini, API auth is the `ant` CLI login, profile `game-studio-arcade` (D16). Re-check it with `scripts/setup-anthropic-auth.sh`. Never set `ANTHROPIC_API_KEY` on the mini: it silently overrides the profile. Each cabinet (virtual, then Picade) has its own workspace-scoped API key in its cabinet service config file (0600), read by the service, never an env var on the mini (D131). Credentials never go in git, the launcher, carts or logs.
 - The kids' transcripts and logs never enter this repo. No raw audio stored anywhere.
 - Check current docs for Anthropic products (Managed Agents, Claude Code plugins) rather than memory; Managed Agents is beta.
 - Verify prices, stock and links live before writing them down.
