@@ -38,6 +38,14 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 
 - **Merge and push checked work:** when a worker's branch passes the director's own checks (tests run by the director, deliverable read), the director may merge it into main and push main to the private GitHub repo without asking each time, and lists each merge in its digest. (Geoff, 2026-11-07)
 
+## Done
+
+- 2026-11-08: [tasks/phase-0-task-0-2-repo-scaffolding-and-house-runtime-v0.md](tasks/phase-0-task-0-2-repo-scaffolding-and-house-runtime-v0.md): npm workspaces on Node 22 and the house runtime v0 (now 256×192), deterministic test hook, sandboxed frame; 60 fps checked headless only
+- 2026-11-08: [tasks/phase-0-task-1-credentials-helper-and-probe-session.md](tasks/phase-0-task-1-credentials-helper-and-probe-session.md): auth through the ant profile (D16/D17) and a $0.003 sandbox probe: Playwright 1.56.0, Node 22.22, network blocked
+- 2026-11-08: [tasks/phase-0-task-3-starter-library-falling-blocks-subset.md](tasks/phase-0-task-3-starter-library-falling-blocks-subset.md): starter library as g.lib (collide, grid, timers, score, flow) with an agent-facing reference
+- 2026-11-08: [tasks/phase-0-task-5-playtest-harness.md](tasks/phase-0-task-5-playtest-harness.md): playtest harness with node and browser drivers; sandbox parity matched exactly
+- 2026-11-08: [tasks/full-validate-cart.md](tasks/full-validate-cart.md): validate_cart covering rule coverage, cart.json, the D13 lint and a cart type check
+
 ## Decisions
 
 - 2026-11-07: spec rules come in two kinds: auto (playtest) and you-check (the kid confirms on first play) (D1)
