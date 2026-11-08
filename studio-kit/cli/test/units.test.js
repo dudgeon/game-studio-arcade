@@ -172,3 +172,11 @@ test("outputs: waits for DONE.json and final sizes; gives up as incomplete", asy
   const none = await downloadOutputs({ api: m3.api, sessionId: "s", dir: tmp(), sleep: async () => {}, tries: 2 });
   assert.deepEqual([none.complete, none.missing], [false, ["DONE.json", "report.json"]]);
 });
+
+test("the fixture spec is in canonical form: format(parse(x)) === x", async () => {
+  const { parseSpec, formatSpec } = await import("@game-studio-arcade/spec");
+  const text = fs.readFileSync(new URL("../fixtures/frog-hop/cart/spec.md", import.meta.url), "utf8");
+  const spec = parseSpec(text);
+  assert.deepEqual(spec.errors, []);
+  assert.equal(formatSpec(spec), text);
+});
