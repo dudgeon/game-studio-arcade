@@ -1,0 +1,14 @@
+{
+  "name": "@game-studio-arcade/managed-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Studio agent and environment for Claude Managed Agents (ant apply), and the studio kit packager.",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "test": "tsc -p tsconfig.json && node --test",
+    "pack-kit": "node scripts/pack-kit.js"
+  }
+}

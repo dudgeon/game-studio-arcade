@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://platform.claude.com/schemas/ant/beta/environment.json
+# Studio sandbox: no outbound network at all (D40). Node 22, Playwright and
+# Chromium come preinstalled, and mounted files stay available without network.
+# Environments aren't versioned: record any change to this file in docs/decisions.md.
+name: game-studio-arcade-studio
+description: Offline cloud sandbox for Studio sessions. One cart per session; no network.
+config:
+  type: cloud
+  networking:
+    type: limited
+    allowed_hosts: []
+    allow_package_managers: false
+    allow_mcp_servers: false

@@ -1,0 +1,25 @@
+{
+  "type": "custom",
+  "name": "show_plan",
+  "description": "Show the player \"Here's the plan\": a one-line summary and every rule in spec.md in plain words. Call it after the questions, once spec.md is written and before any game code. The player either says build, or asks to change something. After a change, update spec.md (the rules and the Changelog) and call show_plan again with the new rules. Rule text must be plain words a 10-year-old understands, never code. The result is JSON text: {\"choice\":\"build\"} or {\"choice\":\"change\",\"said\":\"<what the player wants changed>\"}.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "summary": { "type": "string", "description": "One sentence: what the game is." },
+      "rules": {
+        "type": "array",
+        "description": "Every rule in spec.md, in order.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Rule id from the spec, e.g. R3." },
+            "kind": { "type": "string", "enum": ["auto", "you-check"], "description": "auto: the playtest proves it. you-check: the player checks it on first play." },
+            "text": { "type": "string", "description": "The rule in plain words." }
+          },
+          "required": ["id", "kind", "text"]
+        }
+      }
+    },
+    "required": ["summary", "rules"]
+  }
+}
