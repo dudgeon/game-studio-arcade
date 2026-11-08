@@ -47,7 +47,8 @@ test("a deliberately broken cart fails the right rules with readable reasons", a
   assert.match(reason(r, "R5"), /^the game crashed during frames \d+-\d+: .*restart is not a function$/);
   assert.match(reason(r, "soak"), /random input: the game crashed at frame 1 of the random-input soak: .*reading 'use'/);
   assert.match(reason(r, "palette"), /^frame 1 has 108 pixels of color 40, which isn't in the 32-color palette/);
-  assert.match(reason(r, "deterministic"), /no input drew a different screen at frame 60; the game may be using Math.random/);
+  assert.match(reason(r, "deterministic"), /no input drew different screens; the game may be using Math.random/);
+  assert.equal(r.generic.find((g) => g.id === "deterministic").frame % 60, 0); // usually 60; the twinkle can land on the same pixel twice
   assert.match(reason(r, "no-errors"), /^3 errors; first in soak at frame 1/);
   assert.deepEqual(r.errors.map((e) => e.where), ["soak", "soak-2", "R5"]);
 });
@@ -100,6 +101,42 @@ test("the same cart gives the same comparable report twice", async () => {
   const b = await playtest(fixture("dot-catch-broken"), opts);
   assert.deepEqual(comparable(a), comparable(b));
   assert.equal(comparable(a).env, undefined);
+});
+
+test("a random cart fails deterministic with the same comparable report wherever it first differs (D65)", async () => {
+  // dot-catch plus random pixels from a chosen frame on. The two runs are sampled
+  // every 60 frames, so starting at 10 is caught at 60 and starting at 70 at 120.
+  const dir = await tmp();
+  try {
+    const source = await readFile(join(fixture("dot-catch"), "game.js"), "utf8");
+    const randomFrom = async (from) => {
+      const cart = join(dir, String(from), "cart");
+      await cp(fixture("dot-catch"), cart, { recursive: true });
+      const game = source.replace(
+        "g.cls(g.colors.night);",
+        `g.cls(g.colors.night);
+    if (++globalThis.drawn >= ${from}) for (let i = 0; i < 16; i++) g.pset(Math.floor(Math.random() * g.W), 20 + i, g.colors.white);`,
+      );
+      assert.notEqual(game, source);
+      await writeFile(join(cart, "game.js"), `globalThis.drawn = 0;\n${game}`);
+      return playtest(cart, opts);
+    };
+    const [early, late] = [await randomFrom(10), await randomFrom(70)];
+    const det = (r) => r.generic.find((g) => g.id === "deterministic");
+    assert.equal(det(early).status, "fail");
+    assert.equal(det(early).frame, 60);
+    assert.equal(det(late).status, "fail");
+    assert.equal(det(late).frame, 120);
+    assert.deepEqual(comparable(early), comparable(late));
+    assert.equal(comparable(early).generic.find((g) => g.id === "deterministic").frame, undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a good cart's deterministic check has no frame", async () => {
+  const r = await playtest(fixture("dot-catch"), opts);
+  assert.equal("frame" in r.generic.find((g) => g.id === "deterministic"), false);
 });
 
 test("writes playtest.json and key frames as indexed PNGs", async () => {
