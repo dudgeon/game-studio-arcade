@@ -2,7 +2,7 @@
 // Run a cart headless (no browser) and print what happened, as JSON.
 //
 //   node runtime/run-cart.js <game.js> [--frames 300] [--seed 1]
-//        [--input '[{"frames":30,"p1":"right"}]'] [--checks checks.js]
+//        [--players 1] [--input '[{"frames":30,"p1":"right"}]'] [--checks checks.js]
 //
 // Prints { ok, frame, hash, probe, sounds, warnings, checks?, error? } and exits 1 if the
 // cart threw or any check failed. With --checks, each check runs on a fresh cart.
@@ -17,12 +17,13 @@ const flag = (name, fallback) => {
 };
 const file = args.find((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
 if (!file) {
-  console.error("usage: run-cart.js <game.js> [--frames N] [--seed N] [--input JSON] [--checks checks.js]");
+  console.error("usage: run-cart.js <game.js> [--frames N] [--seed N] [--players N] [--input JSON] [--checks checks.js]");
   process.exit(2);
 }
 
 const frames = Number(flag("frames", "300"));
 const seed = Number(flag("seed", "1"));
+const players = Number(flag("players", "1"));
 const input = JSON.parse(flag("input", "[]"));
 const checksFile = flag("checks", undefined);
 
@@ -30,7 +31,7 @@ const checksFile = flag("checks", undefined);
 const out = { ok: true };
 try {
   const cart = await loadCart(file);
-  const t = await headless(cart, { seed });
+  const t = await headless(cart, { seed, players });
   await t.input(input);
   if (frames > 0) await t.step(frames);
   const f = await t.frame();
@@ -42,7 +43,7 @@ try {
     const checks = mod.default ?? {};
     out.checks = {};
     for (const [id, check] of Object.entries(checks)) {
-      const ct = await headless(cart, { seed: 1 });
+      const ct = await headless(cart, { seed: 1, players });
       try {
         await check(ct);
         out.checks[id] = { pass: true };

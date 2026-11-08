@@ -4,6 +4,8 @@ import {
   BIT,
   BUTTONS,
   DEFAULT_KEYMAP,
+  MAX_PLAYERS,
+  checkPlayers,
   expandScript,
   gamepadToMask,
   heldToMask,
@@ -77,10 +79,34 @@ test("gamepad: guide is star, not a cart button; missing pads are empty", () => 
 });
 
 test("readInput: pad 0 is P1, pad 1 is P2, OR-ed with the keyboard", () => {
-  const r = readInput(["ArrowUp", "KeyD"], [pad([0]), pad([1])]);
+  const r = readInput(["ArrowUp", "KeyD"], [pad([0]), pad([1])], undefined, 2);
   assert.deepEqual(r.masks, [BIT.up | BIT.a, BIT.right | BIT.b]);
   assert.equal(r.star, false);
-  assert.equal(readInput([], [null, pad([16])]).star, true);
+  assert.equal(readInput([], [null, pad([16])], undefined, 2).star, true);
+});
+
+test("readInput: one controller by default (D110); extra keys and pads are ignored, guide still counts", () => {
+  const r = readInput(["ArrowUp", "KeyD", "Digit1"], [pad([0]), pad([1])]);
+  assert.deepEqual(r.masks, [BIT.up | BIT.a], "player 2's keys and pad 1 have no controller");
+  assert.equal(readInput([], [null, pad([16])]).star, true, "guide on any pad is ★");
+});
+
+test("readInput: N controllers, pad k is player k+1", () => {
+  const pads = [pad([0]), null, pad([2]), pad([3]), pad([9])];
+  const r = readInput(["KeyW"], pads, undefined, 4);
+  assert.deepEqual(r.masks, [BIT.a, BIT.up, BIT.x, BIT.y], "pad 4 is beyond 4 controllers");
+  assert.equal(readInput([], [], undefined, 8).masks.length, 8);
+  assert.equal(MAX_PLAYERS, 8);
+  for (const bad of [0, 9, 1.5, "2", NaN]) {
+    assert.throws(() => readInput([], [], undefined, /** @type {any} */ (bad)), /whole number from 1 to 8/);
+  }
+});
+
+test("checkPlayers: default 1, 1..8, otherwise a readable error", () => {
+  assert.equal(checkPlayers(undefined), 1);
+  assert.equal(checkPlayers(null), 1);
+  assert.equal(checkPlayers(3), 3);
+  assert.throws(() => checkPlayers("two"), /must be a whole number from 1 to 8, got "two"/);
 });
 
 test("test scripts: held strings and arrays", () => {
@@ -92,9 +118,14 @@ test("test scripts: held strings and arrays", () => {
   assert.throws(() => heldToMask("jump"), /unknown button "jump"/);
 });
 
-test("test scripts expand to one mask pair per frame", () => {
+test("test scripts expand to one mask per controller per frame", () => {
   const frames = expandScript([{ frames: 2, p1: "left" }, { frames: 1, p2: "a" }, { frames: 1 }]);
   assert.deepEqual(frames, [[BIT.left, 0], [BIT.left, 0], [0, BIT.a], [0, 0]]);
+  assert.deepEqual(expandScript([{ frames: 1, p1: "a", p2: "b" }], 1), [[BIT.a]], "p2 has no controller at players 1");
+  assert.deepEqual(expandScript([{ frames: 1, p3: "x", p8: "y" }], 8), [[0, 0, BIT.x, 0, 0, 0, 0, BIT.y]]);
+  // @ts-expect-error p9 isn't a player
+  assert.throws(() => expandScript([{ frames: 1, p9: "a" }], 2), /p9; players are p1 to p8/);
+  assert.throws(() => expandScript([{ frames: 1, p2: "jump" }], 1), /unknown button "jump"/, "bad names fail even for a missing player");
   assert.throws(() => expandScript([{ frames: 0 }]), /frames >= 1/);
   // @ts-expect-error not an array
   assert.throws(() => expandScript({ frames: 1 }), /array/);

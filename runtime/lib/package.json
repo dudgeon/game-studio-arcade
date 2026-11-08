@@ -2,7 +2,7 @@
   "name": "@game-studio-arcade/lib",
   "version": "0.1.0",
   "private": true,
-  "description": "House starter library: collision, grids and rotation, timers, score and lives, title/play/over flow. Carts use it as g.lib (D50).",
+  "description": "House starter library: collision, grids and rotation, timers, score and lives, title/play/over flow, turns. Carts use it as g.lib (D50).",
   "type": "module",
   "main": "index.js",
   "engines": { "node": ">=22 <23" },

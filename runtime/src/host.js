@@ -2,7 +2,7 @@
 // clock, input, sound and saves. Players (the local player, the launcher,
 // the Manager's simulator) and the playtest all use this.
 import { H, W } from "./gfx.js";
-import { DEFAULT_KEYMAP, readInput } from "./input.js";
+import { DEFAULT_KEYMAP, checkPlayers, readInput } from "./input.js";
 import { Synth } from "./synth.js";
 
 const STEP_MS = 1000 / 60;
@@ -18,12 +18,15 @@ const SLACK_MS = 4;
  *   save?: unknown,
  *   test?: boolean,
  *   persist?: boolean,
+ *   players?: number,
  *   keymap?: typeof DEFAULT_KEYMAP,
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
  * }} HostOptions
  *   test: paused clock and no live input; frames only advance through `test.step()`.
  *   persist: keep g.save() data in localStorage (default: true unless test).
+ *   players: how many controllers this console has, 1..8 (default 1, D110). The
+ *     cabinet passes its config's `players`; play.html takes `?players=N`.
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
@@ -38,6 +41,7 @@ export function createHost(opts) {
   const persist = opts.persist ?? !test;
   const saveKey = `gsa.save.${opts.cartUrl}`;
   const keymap = opts.keymap ?? DEFAULT_KEYMAP;
+  const players = checkPlayers(opts.players);
 
   let initialSave = null;
   if (opts.save !== undefined) initialSave = JSON.stringify(opts.save);
@@ -132,6 +136,8 @@ export function createHost(opts) {
     warnings: [],
     test: testHandle,
     iframe,
+    /** Controllers this console has (g.players in the cart). */
+    players,
     scale: 1,
     /** Frames the cart drew in the last second (live mode). */
     fps: 0,
@@ -155,6 +161,8 @@ export function createHost(opts) {
       removeEventListener("keyup", onKey);
       removeEventListener("message", onMessage);
       removeEventListener("resize", fit);
+      removeEventListener("blur", onBlur);
+      removeEventListener("pointerdown", onPointer, { capture: true });
       synth?.stop(undefined);
       iframe.remove();
     },
@@ -228,12 +236,16 @@ export function createHost(opts) {
   };
   addEventListener("keydown", onKey);
   addEventListener("keyup", onKey);
-  addEventListener("blur", () => keys.clear());
-  addEventListener("pointerdown", () => !test && audio(), { capture: true });
+  const onBlur = () => keys.clear();
+  const onPointer = () => {
+    if (!test) audio();
+  };
+  addEventListener("blur", onBlur);
+  addEventListener("pointerdown", onPointer, { capture: true });
   addEventListener("resize", fit);
 
   iframe.addEventListener("load", () => {
-    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave });
+    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players });
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).
@@ -261,7 +273,7 @@ export function createHost(opts) {
         acc = 0;
       }
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const input = readInput(tapped.size ? new Set([...keys, ...tapped]) : keys, pads, keymap);
+      const input = readInput(tapped.size ? new Set([...keys, ...tapped]) : keys, pads, keymap, players);
       tapped.clear();
       if (input.star && !star) opts.onStar?.();
       star = input.star;

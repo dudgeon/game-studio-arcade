@@ -282,7 +282,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
   | power button | (KEY_POWER) | | safe shutdown |
 - Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then.
-- P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet.)*
+- P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet; implemented by D110–D112, so P2 gets input only when it is 2 or more.)*
 
 **D83. Pi 5 setup facts the provisioning script must handle.** *(Claude, from Pimoroni's setup guide and the picade-hat repo, 2026-11-07.)*
 - Build and install the overlay from `pimoroni/picade-hat` at a pinned commit (Pi 5 support merged July 2025, PR #49), not with the `curl | bash` installer, which isn't reproducible.
@@ -321,3 +321,32 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   3. **How a kid leaves a game and gets back to the shelf** now that ★ isn't MAKE: (a) a utility button (the ESC one, D82) held for a second, or (b) a pause menu on START.
   4. **Who is making:** the shelf shows the maker's initial, and there's no longer a "side" to hint at it. (a) Ask "Who's making? O or A" when the kid picks Make, or (b) leave it unattributed at the cabinet and tag it later in the Manager.
 
+## 2026-11-08 — Players setting and turns in the runtime (implements D85)
+
+How the runtime and library carry out D85 (Geoff's answer to D84's second-player question).
+
+**D110. The number of controllers is a setting, `players`, default 1.** *(Claude, runtime-players worker; implements D85, refines D21 and D82.)*
+- One integer, 1 to 8 (`MAX_PLAYERS`, exported by the runtime). It says how many controllers this console has, not how many people a game is for. Anything else (0, 9, 1.5, "two") is an error at start-up, not a silent fallback.
+- Where it's read: `createHost({ players })` on any host page; `play.html?players=N` on the dev host; `headless(cart, { players })` and `arcade-run --players N` in Node; `t.reset({ players })` in a check. Every one defaults to 1, so the desktop gets player 2 only when asked (`?players=2`).
+- The cabinet reads it from the cabinet service's config (key `players`, default 1) and passes it to the launcher's host. The cabinet service doesn't exist yet; this is the contract for it. External controllers (D84 option 2) are later: when they come, the cabinet raises `players` and nothing in the runtime changes.
+- Carts see it as `g.players`.
+
+**D111. Input is N players, not P1 and P2.** *(Claude; refines D21's input and test-hook shapes.)*
+- A frame's input is one button mask per controller (an array of length `players`) all the way through: host → frame → machine, and in the test hook. `Arcade.Player` is now `1 | 2 | … | 8` (was `1 | 2`), which is a widening, so every existing cart still type-checks.
+- **Keyboard (dev):** unchanged. P1 is the arrows/ZXCV/Enter and P2 is WASD/1234/5; keys for a player beyond `players` are ignored. Players 3 and up have no keyboard keys; they use gamepads.
+- **Gamepads:** pad *k* is player *k*+1, for pads below `players`; pad 0 is still OR-ed into player 1. Pads beyond `players` are ignored, except that guide is ★ on any pad. The cabinet's mapping for added controllers (D84 option 2: the Picade is P1, so the first pad would be P2) is decided with the external controllers, later.
+- **Input scripts** take `p1` … `p8`. A step for a player beyond the run's `players` is ignored, because that controller doesn't exist, the same as live play. A key past `p8` is an error. This keeps the playtest soak (which always sends `p1` and `p2`) working at `players: 1`. A check that needs two controllers at once calls `t.reset({ players: 2 })` first.
+
+**D112. A cart that asks for a player who isn't there still runs; that player just holds nothing.** *(Claude; the brief left this to the worker.)*
+- `g.btn(b, p)`, `g.btnp` and `g.btnr` for a `p` from 1 to 8 beyond `g.players` return false: nobody is holding that controller. Outside 1–8 still throws, as before.
+- Rejected: mapping a missing player 2 onto controller 1. In a side-by-side game both players' things would then move together, which looks broken, and it would hide the problem from the playtest.
+- **cart.json and the cart API agree like this.** `cart.json` `players` is how many people the game is for (validate_cart accepts 1 or 2 today; up to `MAX_PLAYERS` is allowed by the runtime). A cart for more people than `g.players` must take turns on the controllers it has, and `g.lib.turns` does that with no extra code: on one controller, every player uses controller 1 and a "pass the controls" screen goes between turns. A side-by-side-only cart (players at the same time) still runs on one controller, with player 2 idle; that is a desktop game, and the Studio should prefer turns when the cabinet is the target (D85).
+
+**D113. `g.lib.turns`: take turns, pass the controls, keep one score each.** *(Claude; extends D50.)*
+- A turns object is plain data in the cart's state: `{ count, up, round, rounds, scores, passing, t, pass }`. `up` is whose turn it is, `scores[p - 1]` is each player's score, and `passing` is true while the "pass the controls" screen is up.
+- Per-player lives or saved high scores use one `score.newScore` per player alongside it (D85's "scores and lives").
+- Helpers: `newTurns`, `shared` (fewer controllers than players?), `controller` (which controller a player uses), `btn`/`btnp` (the player who is up, on their controller, and nothing while passing), `next` (end the turn; on to the next player and maybe the next round), `waiting` (run the pass screen; true until the next player presses A or START), `drawPass` (draws "PLAYER 2'S TURN" in the house font), `addScore`, `isOver` (all rounds played) and `winner` (0 for a tie).
+- The pass screen shows when the controls really change hands (`pass: "shared"`, the default), always, or never. It ignores presses for its first 30 frames, like `flow.startPressed`, so a button mashed at the end of a turn doesn't skip it.
+- Single-player games never touch it. It's optional and default games stay one player.
+
+**D114. `host.destroy()` removes every listener it added.** *(Claude; fixes the leak the player worker found.)* The window `blur` and `pointerdown` (capture) listeners were anonymous, so `destroy()` couldn't remove them; a page that made several hosts kept every old host's listeners. They're named now, and a test counts the window's listeners before and after.

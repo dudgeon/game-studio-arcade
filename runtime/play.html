@@ -16,7 +16,7 @@
     <div id="hud"></div>
     <div id="err"></div>
     <script type="module">
-      // play.html?cart=/carts/<name>/game.js[&seed=1][&test=1][&save=<json>][&fps=1]
+      // play.html?cart=/carts/<name>/game.js[&seed=1][&players=1][&test=1][&save=<json>][&fps=1]
       import { createHost } from "./src/host.js";
 
       const q = new URLSearchParams(location.search);
@@ -26,19 +26,27 @@
       if (!cart) {
         hud.textContent = "add ?cart=/carts/<name>/game.js (see /carts/ for the list)";
       } else {
-        const arcade = createHost({
-          container: document.getElementById("stage"),
-          cartUrl: cart,
-          seed: Number(q.get("seed") ?? 1),
-          save: q.has("save") ? JSON.parse(q.get("save")) : undefined,
-          test: q.get("test") === "1",
-          onError: (e) => (err.textContent += `${e.message}\n`),
-          onStar: () => console.log("[arcade] star"),
-        });
-        window.arcade = arcade;
-        arcade.ready.catch((e) => (err.textContent = e.message));
-        if (q.get("fps") === "1") {
-          setInterval(() => (hud.textContent = `${arcade.fps} fps  x${arcade.scale}  ticks ${arcade.ticks}`), 250);
+        let arcade;
+        try {
+          arcade = createHost({
+            container: document.getElementById("stage"),
+            cartUrl: cart,
+            seed: Number(q.get("seed") ?? 1),
+            players: q.has("players") ? Number(q.get("players")) : undefined,
+            save: q.has("save") ? JSON.parse(q.get("save")) : undefined,
+            test: q.get("test") === "1",
+            onError: (e) => (err.textContent += `${e.message}\n`),
+            onStar: () => console.log("[arcade] star"),
+          });
+        } catch (e) {
+          err.textContent = e.message; // e.g. a bad ?players=
+        }
+        if (arcade) {
+          window.arcade = arcade;
+          arcade.ready.catch((e) => (err.textContent = e.message));
+          if (q.get("fps") === "1") {
+            setInterval(() => (hud.textContent = `${arcade.fps} fps  x${arcade.scale}  ${arcade.players}P  ticks ${arcade.ticks}`), 250);
+          }
         }
       }
     </script>

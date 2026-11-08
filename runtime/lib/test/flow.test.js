@@ -16,7 +16,7 @@ test("newFlow, go, tick", () => {
 });
 
 test("startPressed: lockout, buttons, players", () => {
-  const f = fakeG();
+  const f = fakeG({ players: 2 });
   const g = asG(f);
   const fl = flow.newFlow("over");
   f.press("start");
@@ -35,6 +35,17 @@ test("startPressed: lockout, buttons, players", () => {
   fl.t = 0;
   f.press("start");
   assert.equal(flow.startPressed(g, fl, { after: 0 }), 1);
+});
+
+test("startPressed listens to every connected controller, and only those", () => {
+  const one = fakeG();
+  const fl = flow.newFlow("title");
+  fl.t = 30;
+  one.press("start", 2);
+  assert.equal(flow.startPressed(asG(one), fl), 0, "one controller: player 2 isn't asked");
+  const four = fakeG({ players: 4 });
+  four.press("a", 4);
+  assert.equal(flow.startPressed(asG(four), fl), 4);
 });
 
 test("a whole title -> play -> over -> title loop", () => {

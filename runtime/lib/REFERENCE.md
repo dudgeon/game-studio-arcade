@@ -1,13 +1,13 @@
 # Starter library reference
 
-The house starter library gives a cart tested building blocks for collision, grids and rotation, timers, score and lives, and the title → play → game-over flow. A cart never imports it. It's on the console handle as `g.lib` (D50):
+The house starter library gives a cart tested building blocks for collision, grids and rotation, timers, score and lives, the title → play → game-over flow, and taking turns. A cart never imports it. It's on the console handle as `g.lib` (D50):
 
 ```js
-const { grid, timers, score, flow, collide } = g.lib;
+const { grid, timers, score, flow, collide, turns } = g.lib;
 ```
 
 Conventions that hold everywhere:
-- **State is plain data you keep.** Every helper that remembers something (a grid, a piece, a timer, a score, a flow) gives you a plain JSON object to keep in your cart's state `s`. The library itself holds nothing between calls. So `probe()` can return these objects as they are, and `reset()` always starts clean.
+- **State is plain data you keep.** Every helper that remembers something (a grid, a piece, a timer, a score, a flow, turns) gives you a plain JSON object to keep in your cart's state `s`. The library itself holds nothing between calls. So `probe()` can return these objects as they are, and `reset()` always starts clean.
 - **Time is frames.** The clock is 60 frames per second. Tick timers once per `update`. Never use wall time.
 - **`g` comes first** when a helper needs input, the frame count or saves. Everything else is pure.
 - **Mutating helpers say so.** `tryMove`, `tryRotate`, `place`, `clearRows`, `resolve`, `tick` and the score functions change the object you pass them. The others return new values.
@@ -193,4 +193,59 @@ Switches to `mode`, remembers the old one in `prev`, and resets `t` to 0. Going 
 Counts one frame in the current mode and returns the count. Call it once at the top of `update`. Use `flow.t` for timed screens, such as returning to the title after 10 seconds of game over (`if (s.flow.t > timers.seconds(10)) flow.go(s.flow, "title")`) or a "READY?" pause before play starts.
 
 ### `flow.startPressed(g, flow, opts?)`
-Returns which player pressed to start: 1, 2, or 0 for nobody. Presses in the first `after` frames of the mode (default 30, half a second) are ignored, so a kid still mashing buttons when the game ends doesn't skip the game-over screen. `buttons` defaults to START and A, and `players` to both. If both press on the same frame, player 1 wins. Returning the player lets "whoever presses starts" or "press to join" work with no extra code.
+Returns which player pressed to start: 1, 2 and so on, or 0 for nobody. Presses in the first `after` frames of the mode (default 30, half a second) are ignored, so a kid still mashing buttons when the game ends doesn't skip the game-over screen. `buttons` defaults to START and A, and `players` to every controller the console has (`1..g.players`; on the cabinet that is just player 1). If two press on the same frame, the lower number wins. Returning the player lets "whoever presses starts" or "press to join" work with no extra code.
+
+## turns: take turns, pass the controls, one score each
+
+Games are single player unless the spec says otherwise. When it says two or more people play, they usually take turns, because the cabinet has **one controller** (`g.players` is 1; a desktop may have more). These helpers make that work on any number of controllers: when there are fewer controllers than players, everyone plays on controller 1 and a "pass the controls" screen goes up between turns; when each player has a controller, they use their own. A turns object `{ count, up, round, rounds, scores, passing, t, pass }` is plain data you keep in state: `up` is whose turn it is, `scores[p - 1]` is player p's score, `passing` is true while the pass screen is up.
+
+```js
+s.turns = turns.newTurns(2, { rounds: 3 });         // in init / new game
+// update:
+if (turns.waiting(g, s.turns)) return;              // pass screen up: nothing else moves
+if (turns.btnp(g, s.turns, "a")) jump(s);           // the player who is up, on their controller
+if (fellOff) {
+  turns.addScore(s.turns, s.height);
+  turns.next(g, s.turns);
+  if (turns.isOver(s.turns)) flow.go(s.flow, "over");
+}
+// draw:
+if (turns.drawPass(g, s.turns)) return;             // drew the pass screen instead of the game
+g.text(`P${s.turns.up}  ${s.turns.scores[s.turns.up - 1]}`, 4, 4, g.colors.white);
+// game over: const w = turns.winner(s.turns); // 0 is a tie
+```
+
+Read input through `turns.btn`/`turns.btnp` rather than `g.btn(b, 2)`, so the same cart works on the cabinet and on a desktop with two controllers. Expose `up`, `round`, `scores` and `passing` from `probe()` so checks can test "after player 1's turn it's player 2's" and "each player keeps their own score". Checks run on one controller by default; `t.reset({ players: 2 })` tries two.
+
+### `turns.newTurns(count?, opts?)`
+Returns turns for `count` players (default 2, at most 8), with player 1 up, round 1, every score 0 and no pass screen. `opts.rounds` is how many rounds make a game (each player gets that many turns), or 0 (the default) for no limit. `opts.pass` says when the pass screen shows: `"shared"` (default) only when players share controllers, `"always"` (a "PLAYER 2'S TURN" screen even with separate controllers), or `"never"` (you handle hand-overs yourself). Call it in `init` and again at each new game.
+
+### `turns.shared(g, turns)`
+Returns true when there are fewer controllers (`g.players`) than players, so everyone plays on controller 1. Use it to change the words on screen ("pass the controls" vs. "your turn") or skip a hand-over pause.
+
+### `turns.controller(g, turns, p?)`
+Returns the controller player `p` plays on (default: whoever is up): 1 when players share, otherwise `p`. Use it when you need `g.btn` directly, e.g. `grid.stickStep(g, turns.controller(g, s.turns))`.
+
+### `turns.btn(g, turns, b)`
+Returns true while button `b` is held by the player who is up, on their controller. It is always false while the pass screen is up, so a hand-over can't move anything.
+
+### `turns.btnp(g, turns, b)`
+Returns true on the frame button `b` is pressed by the player who is up. False while the pass screen is up.
+
+### `turns.next(g, turns)`
+Ends the current turn: the next player is up, and after the last player the round number goes up. It resets `t` and puts the pass screen up when the controls change hands (per `pass`). After the last round `isOver` is true and further calls change nothing. Returns who is up now. Reset that player's things (position, timer) yourself.
+
+### `turns.waiting(g, turns, opts?)`
+Runs the pass screen. Call it at the top of `update` and return early while it's true. It is true while the pass screen is up, and also on the frame the next player takes over by pressing A or START (`opts.buttons`) on their controller, so that press doesn't also jump or fire. Presses in the first `opts.after` frames (default 30) are ignored, so a button mashed as a turn ends doesn't skip the screen. Returns false (and does nothing) when no pass screen is up.
+
+### `turns.drawPass(g, turns, opts?)`
+If the pass screen is up, draws it over the whole screen and returns true; otherwise draws nothing and returns false. It shows "PLAYER 2" (or `opts.names[1]`, e.g. `["ALINA", "OWEN"]`), "YOUR TURN", "PASS THE CONTROLS" when players share, and a blinking "PRESS A" once presses count. `opts.color` (default yellow) and `opts.bg` (default night) set the colors. Call it at the top of `draw` and return when it's true; draw your own screen instead if the spec describes one.
+
+### `turns.addScore(turns, points, p?)`
+Adds points to player `p`'s score (default: whoever is up) and returns the new score. Points may be negative; a score never goes below 0. Throws for a player who isn't in the game. For lives or a saved high score per player, keep a `score.newScore` per player as well.
+
+### `turns.isOver(turns)`
+Returns true once every round has been played (only when `rounds` was set). Check it after `next` to go to the game-over screen.
+
+### `turns.winner(turns)`
+Returns the player with the highest score, or 0 if two or more share it. Show "PLAYER 2 WINS" or "IT'S A TIE" on the game-over screen.

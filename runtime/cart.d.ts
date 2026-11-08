@@ -15,7 +15,7 @@
 //   };
 //
 // Rules a cart lives by: the screen is 256x192 with 32 fixed colors; input is
-// the cabinet's buttons only; no DOM, no network, no timers, no Math.random
+// the cabinet's buttons only (g.players controllers, 1 on the cabinet); no DOM, no network, no timers, no Math.random
 // (use g.rand); persistence only through g.save()/g.load().
 
 declare namespace Arcade {
@@ -30,8 +30,13 @@ declare namespace Arcade {
   /** The cabinet's buttons per player. The ★ (MAKE) button is reserved for the cabinet and never reaches a cart. */
   type Button = "up" | "down" | "left" | "right" | "a" | "b" | "x" | "y" | "start";
 
-  /** Player number: 1 (left side) or 2 (right side). */
-  type Player = 1 | 2;
+  /**
+   * Player number, 1..8: player p uses controller p. The console has
+   * `g.players` controllers (1 on the cabinet, D110); a player beyond that
+   * has no controller, so its buttons always read as not held (D112). For a
+   * game for more people than controllers, take turns with `g.lib.turns`.
+   */
+  type Player = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
   /** The 32 palette names, mapped to their index. */
   interface Colors {
@@ -112,8 +117,14 @@ declare namespace Arcade {
     readonly palette: readonly string[];
     /** The starter library (D50): pure helpers, shared by every cart. Carts reach it here instead of importing it. */
     readonly lib: typeof import("./lib/index.js");
+    /**
+     * How many controllers this console has, 1..8 (D110). The cabinet has 1.
+     * Games are single player by default; a game for two or more people takes
+     * turns on the controllers there are (`g.lib.turns` hands them over).
+     */
+    readonly players: number;
 
-    // Input. `p` defaults to 1.
+    // Input. `p` defaults to 1. A player beyond `g.players` never holds anything.
     /** Is the button held this frame? */
     btn(b: Button, p?: Player): boolean;
     /** Was the button pressed this frame (up last frame, down now)? */
@@ -184,6 +195,7 @@ declare namespace Arcade {
     type Repeat = import("./lib/timers.js").Repeat;
     type Score = import("./lib/score.js").Score;
     type Flow = import("./lib/flow.js").Flow;
+    type Turns = import("./lib/turns.js").Turns;
   }
 
   /**
