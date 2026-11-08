@@ -1,0 +1,16 @@
+{
+  "name": "@game-studio-arcade/spec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "spec.md template, checkable-rules guide, checks.js format, parser and rule-coverage validation",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts", "default": "./index.js" } },
+  "bin": { "gsa-spec": "bin/gsa-spec.js" },
+  "engines": { "node": ">=22 <23" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run typecheck && node --test \"test/*.test.js\""
+  }
+}
