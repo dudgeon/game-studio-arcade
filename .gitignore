@@ -3,4 +3,9 @@
 !.env.example
 node_modules/
 dist/
+coverage/
+*.tsbuildinfo
 .DS_Store
+# Duo task notes and app state live outside git
+tasks/
+.duo/

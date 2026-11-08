@@ -1,0 +1,13 @@
+{
+  "name": "@game-studio-arcade/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "House runtime: a small JavaScript fantasy console (320x256, 32 colors, 4-voice synth).",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
