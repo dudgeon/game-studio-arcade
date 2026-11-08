@@ -15,6 +15,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 - **House runtime**: our small JavaScript fantasy console (SDK + starter library).
 - **Cabinet service**: the single long-running process on the Pi, with an Arcade side and a Studio side.
 - **Cabinet Manager**: local web app on the Mac mini (simulator, carts, activity, health, updates).
+- **Virtual cabinet**: a second, complete cabinet in an isolated VM on the mini: same OS, script, service, launcher and runtime as the Pi, its own data and API identity ([docs/virtual-cabinet.md](docs/virtual-cabinet.md), D120–D129). Not the Manager's simulator (a quick browser cart player).
 - **Shelf**: the launcher's game list; latest version of each branch.
 - **Tiles**: the four answers to a Studio question: A, B (Claude's options), C "Something else" (mic), D "Make it now".
 - **Publish gate**: the cabinet re-running a cart's playtest before it reaches the shelf.
@@ -23,7 +24,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 ## Locked decisions (HANDOFF §3.1; propose changes explicitly, don't drift)
 
 - Repo/project name `game-studio-arcade`; "Studio" everywhere.
-- **Cabinet independence**: the Pi serves and plays every game locally and works with the Mac mini off. The mini is never in the play path or the cabinet-initiated build path, and the cabinet never uses the mini's resources.
+- **Cabinet independence**: the Pi serves and plays every game locally and works with the Mac mini off. The mini is never in the play path or the cabinet-initiated build path, and the cabinet never uses the mini's resources. The virtual cabinet (D129) leaves this unchanged for the real cabinet: its own independence is logical, since it runs on the mini's hardware.
 - Cabinet-initiated builds run in **Claude Managed Agents** (API, commercial terms). Desktop-initiated builds run in local Claude Code on Geoff's account with Geoff present, not through Managed Agents.
 - Desktop experience: a Claude Code project that knows the runtime, library and conventions; finds and builds on existing carts; iterates spec → build → test, including in a local browser with keyboard as joystick; imports outside assets; publishes to the cabinet.
 - **Cabinet Manager** is a local web app on the mini, not a native Mac app.
@@ -40,7 +41,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 - No approval loop; the activity log is the oversight.
 - Existing home mesh Wi-Fi; no Ethernet.
 - Hardware: prebuilt only if it ships with a Pi 5; otherwise DIY/kit.
-- Cabinet: Pimoroni Picade 10" (1024×768, one player's controls) + Pi 5 8 GB, ordered 2026-11-07 (D80). Screen 256×192 at 4× (D81). Games default to single player, with turns well supported; the controller count is a setting (D85). No physical MAKE button; the Studio starts from the launcher/shelf (D86). The mic is open (D84).
+- Cabinet: Pimoroni Picade 10" (1024×768, one player's controls) + Pi 5 8 GB, ordered 2026-11-07 (D80). Screen 256×192 at 4× (D81). Games default to single player, with turns well supported; the controller count is a setting (D85). No physical MAKE button; the Studio starts from the launcher/shelf (D86). Back to the shelf is ESC/Escape, the guest players' default (D88). The mic is a USB mic, Geoff's pick (D89).
 
 ## Working agreements
 

@@ -256,7 +256,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 **D80. Cabinet hardware: Pimoroni Picade with 10" display, plus a Raspberry Pi 5 8 GB. Both ordered 2026-11-07.** *(Geoff; supersedes D2.)*
 - Picade: Pimoroni PIM469, PiShop US SKU 2009, $349.95, in stock (pishop.us/product/picade-with-10-inch-display). Pi 5 8 GB: PiShop SKU 8GB-9028, $175.00, in stock.
 - What changes from the Max: a 10" 1024×768 (4:3) panel instead of 19" 1280×1024 (5:4). **One player's controls**: one joystick, six player buttons, four utility buttons and a power button, all on a Picade X HAT. A desk-sized cabinet (310 × 260 × 250 mm, H × W × D).
-- Still to get (not ordered, not decided here): a USB-C power supply (Pi 5 wants 5 V/5 A, e.g. the official 27 W supply, $12.95 at PiShop), an Active Cooler (Pimoroni recommends one; $12.95 at PiShop), a microSD card, and a mic (still open, Geoff).
+- Still to get (not ordered, not decided here): a USB-C power supply (Pi 5 wants 5 V/5 A, e.g. the official 27 W supply, $12.95 at PiShop), an Active Cooler (Pimoroni recommends one; $12.95 at PiShop), a microSD card, and a mic (a USB mic, Geoff choosing, D89).
 - The hardware rule (§3.1, kit if not prebuilt with a Pi 5) still holds: this is a kit.
 
 **D81. Screen: 256×192, 4× to the Picade's 1024×768.** *(Claude, following D80; supersedes D3's size. The 32-color palette and the other D3 limits stand.)*
@@ -291,7 +291,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - The power button: tap to start, hold 3 s to shut down. On the Pi 5, power-off from the button works; power-on was reported unreliable in issue #45 (still open). Check it on arrival.
 - An Active Cooler is recommended. One user reported about 85 °C and throttling under the HAT.
 
-**D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)* **Answered 2026-11-08:** players by D85, MAKE by D86. The mic is still open (Geoff is having an XLR jack on the front with an XLR gooseneck researched; see hardware-mic.md).
+**D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)* **Answered 2026-11-08:** players by D85, MAKE by D86. The mic is a USB mic that Geoff is choosing (D89).
 - **Second player.** The cabinet has one player's controls. Options:
   1. One player at the cabinet. Two-player games take turns on the same controls. No hardware. Alina's "can Owen play too" becomes a turns game at the cabinet, and side-by-side games only work at the desktop.
   2. Add a USB gamepad as player 2 (wired through the back panel, or wireless with a dongle). The runtime already reads a second gamepad; the cabinet needs a small input change (the first gamepad becomes P2, since the Picade is P1). Owen gets his own side.
@@ -299,7 +299,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - **MAKE (★).** The plan had one MAKE button per side; now there is one side. Options:
   1. Use one of the existing front utility buttons as ★, with a sticker. No drilling.
   2. Add a dedicated, distinct MAKE button (bigger or lit) on the X HAT's spare button pins or plasma-button connector. Needs a hole in the cabinet.
-- **Mic:** still open (Geoff, 2026-11-07). The case has no USB socket on the outside. A USB mic plugs into a Pi USB port inside the cabinet (the Pi 5 has four; the display's power takes one) and either sits inside or is routed out through the removable back panel. The X HAT uses the I2S pins for its DAC, so an I2S mic is out; USB is the path.
+- **Mic:** still open (Geoff, 2026-11-07); now D89, a USB mic Geoff is choosing. The case has no USB socket on the outside. A USB mic plugs into a Pi USB port inside the cabinet (the Pi 5 has four; the display's power takes one) and either sits inside or is routed out through the removable back panel. The X HAT uses the I2S pins for its DAC, so an I2S mic is out; USB is the path.
 
 ## 2026-11-08 — Players and MAKE (Geoff, answering D84)
 
@@ -311,7 +311,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - External controllers (a USB gamepad and so on) come later. Nothing is bought or wired for them now.
 - The desktop simulator can still be set to more than one controller, for testing and for desktop play.
 
-**D86. No physical MAKE button is assumed; the Studio starts from the launcher/shelf.** *(Geoff; answers D84 "MAKE", changes HANDOFF §1, §4 and §8.1.)* **Questions 1, 2 and 4 below answered by D87; question 3 (back to the shelf) still open.**
+**D86. No physical MAKE button is assumed; the Studio starts from the launcher/shelf.** *(Geoff; answers D84 "MAKE", changes HANDOFF §1, §4 and §8.1.)* **All four questions below are answered: 1, 2 and 4 by D87, 3 by D88.**
 - Geoff: "It is not obvious we need a physical 'make' button; this could be in the launch screen/game shelf."
 - Starting a new game (and forking one) is something the kid picks on screen in the launcher, not a dedicated button. Nothing is drilled or wired for MAKE.
 - ★ stays reserved: the key that never reaches a cart (D21, D82). What it does without MAKE (for example, back to the shelf from a game) is one of the questions below.
@@ -321,7 +321,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   3. **How a kid leaves a game and gets back to the shelf** now that ★ isn't MAKE: (a) a utility button (the ESC one, D82) held for a second, or (b) a pause menu on START.
   4. **Who is making:** the shelf shows the maker's initial, and there's no longer a "side" to hint at it. (a) Ask "Who's making? O or A" when the kid picks Make, or (b) leave it unattributed at the cabinet and tag it later in the Manager.
 
-**D87. Hold to talk, a "Make a new game" tile, and an open list of makers.** *(Geoff; answers D86 questions 1, 2 and 4. Changes HANDOFF §8.1, §8.2 and §9.5. Question 3, how to get back to the shelf from a game, is still open.)*
+**D87. Hold to talk, a "Make a new game" tile, and an open list of makers.** *(Geoff; answers D86 questions 1, 2 and 4. Changes HANDOFF §8.1, §8.2 and §9.5. Question 3, how to get back to the shelf from a game, is answered by D88.)*
 - **Mic: hold a button to talk.** While the "tell me" screen is up, the kid holds a player button, talks, and lets go to send. The same works for the request and for the C "Something else" tile. The mic records only while the button is held. (Claude, implementation: any of the six player buttons counts, so the kid needn't find a particular one; the screen shows a "listening" state and the cabinet mutes its own speaker while the button is down.)
 - **Make is a tile:** a "Make a new game" tile in the game list on the shelf. Forking stays as it was (§8.2): pick a game, then change it.
 - **Who's making:** Geoff: "On launch of the make game, ask who is making; include existing names plus a new name slot (eg when a friend is over)." So the list of makers is open-ended, not just O and A.
@@ -332,6 +332,25 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   - `cart.json` `maker` / `with`, and the `studio_session` and `play` log records, hold the maker's `id`. A guest's sessions and carts are logged under their own id like anyone else's, so the activity log shows who made what.
   - The shelf shows the maker's name, since initials can collide once friends are added.
   - The desktop flow (§8.3) uses the same ids when Geoff and a kid publish.
+
+## 2026-11-08 — Back to the shelf, and the mic (Geoff)
+
+**D88. Back to the shelf: press the Picade's ESC button, which sends Escape.** *(Geoff; answers D86 question 3.)*
+- Geoff asked for the existing default rather than a new mechanism: "What is the default for the os you chose? Don't create an arbitrarily unique mechanism."
+- The basis: Raspberry Pi OS Lite (D4) has no desktop, and it boots straight to our launcher, so the OS has no "back to the shelf" of its own. The convention the cabinet already lives in is Escape. The guest players use it (checked live 2026-11-08), and D21/D82 already make Escape the ★ key that never reaches a house cart. ESC is the utility button wired to `escape` on the X HAT (D82).
+- What Escape does in each player:
+  - **RetroArch:** Escape is "Exit RetroArch" by default, and F1 toggles the menu (docs.libretro.com/guides/input-and-controls). This matches: one press leaves the game.
+  - **TIC-80:** "ESC: Switch console/editor or open menu while in game" (TIC-80 wiki, Hotkeys). It opens TIC-80's game menu rather than leaving at once; leaving is a menu item.
+  - **PICO-8** (manual v0.2.7): "Press escape to stop the program, and once more to enter editing mode." It stops the cart and drops to PICO-8's own command line, which isn't a shelf, and its pause menu is Enter/P. **This one differs:** the launcher must catch PICO-8 stopping (or its exit) and bring the shelf back, so a kid never lands in PICO-8's console. That's launcher work (Phase 1), not a new button.
+  - **House runtime:** Escape goes to the host, never the cart (D21), and the launcher takes it as "back to the shelf".
+- ★ in D21 and D82 now means this: the cabinet's Escape, back to the shelf. D86's "what ★ does" question is closed.
+- Not decided here (implementation; noted for the launcher): whether a stray press mid-game should need a second press, as RetroArch's optional "press quit twice" does. The default is one press, matching RetroArch.
+
+**D89. The mic is a USB mic, and Geoff is choosing it.** *(Geoff, 2026-11-08; updates D84's mic item and hardware-mic.md.)*
+- Geoff: "Leave it open: a usb mic for now, and I'll try to find one that will work."
+- It plugs into one of the Pi's free USB ports inside the case (D80 platform notes; there's no external USB socket). The XLR-jack-and-gooseneck idea is set aside for now.
+- The picks recommended in hardware-mic.md didn't integrate well with the cabinet, so none is the plan of record. No model is recommended here.
+- The rest of the voice plan is unchanged: hold a player button to talk (D87), Groq first and Moonshine on the Pi as backup (§3.1), and in the virtual cabinet the same USB mic is passed through to the VM (D127).
 
 ## 2026-11-08 — Players setting and turns in the runtime (implements D85)
 
