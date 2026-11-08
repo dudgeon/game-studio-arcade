@@ -16,8 +16,8 @@ Run from **this directory**, so the lockfile lands here:
 
 ```sh
 cd studio-kit/managed-agent
-ant apply --dry-run .     # look at the plan
-ant apply .               # create or update; commit claude-lock.json afterwards
+ant --profile game-studio-arcade apply --dry-run .   # look at the plan
+ant --profile game-studio-arcade apply .             # create or update; commit claude-lock.json afterwards
 ```
 
 Re-running with no changes must show nothing to do (idempotent). A file renamed is a new resource; `--prune` archives the old one.
@@ -40,8 +40,8 @@ The skill experiment: `node scripts/pack-kit.js --skill-dir skills-staged` stage
 
 In order, once the director clears it (after task 1's probe):
 
-1. `ant apply --dry-run .`, then `ant apply .`; commit `claude-lock.json`. Run `ant apply .` again and check it plans no changes.
-2. Confirm `ant apply` accepts `./tools/*.json` under `tools`, and `allowed_hosts: []`.
+1. ~~`ant apply --dry-run .`, then `ant apply .`; commit `claude-lock.json`; re-apply plans no changes.~~ Done 2026-11-08: agent `agent_01GCfhH2MUfkwgaEJTbyGZQM` v1, environment `env_01GaCpCjFgzRACKrBmGRjVHv`. The re-apply reported "Everything is up to date, 2 unchanged".
+2. ~~Confirm `ant apply` accepts `./tools/*.json` under `tools`, and `allowed_hosts: []`.~~ Done: the plan expanded all three tools, and the environment config went in as written.
 3. `studio kit --upload` once the kit has its parts. Check the Files API accepts the tarball and the cache in `~/game-studio-data/kit-uploads.json` stops a second upload.
 4. One capped session (`--budget-cents 50`) that extracts the kit and runs the playtest on a context-pack example cart (task 7's accept).
 5. Check what the Files API reports for outputs: is `filename` the bare name (D42 assumes so), and how long do outputs lag behind the final idle?

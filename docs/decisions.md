@@ -168,12 +168,13 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - The kit is one tarball, mounted at `/mnt/session/uploads/studio-kit.tgz`, with a generated `KIT.md` saying what's inside and which commands validate and playtest a cart. The agent reads `KIT.md` rather than having command names in its prompt.
 - Uploads are cached by a content hash of the kit's files (in `~/game-studio-data/kit-uploads.json`), so an unchanged kit is uploaded once.
 - The agent builds in `/workspace/cart/` and writes outputs as flat files: `spec.md` (as soon as the plan is accepted), and at the end `cart.tgz` (the whole cart folder) and `report.json` (`status`, per-rule results, summary). Flat, because the Files API lists only a `filename` for each output, so folder structure isn't guaranteed to survive.
+- Following D19: the agent writes `DONE.json` (`{files: [{name, size}]}`) last. The driver polls `files.list` until it's there and every listed size matches, skips the session's inputs (`studio-kit.tgz`), and still keeps whatever arrived if it gives up (`outputs_complete: false`). The kit mounts at `/mnt/session/uploads/studio-kit.tgz`, and is packed with `--no-xattrs --no-mac-metadata` on macOS.
 
 **D43. The CLI keeps everything and commits only what passes.** *(Claude; implements phase-0 task 8 and D14.)*
 - Every session's downloads, answers and local reports go to `~/game-studio-data/sessions/<session_id>/`, pass or fail.
 - A cart is committed to the dev cart library (`~/game-studio-data/carts/`, its own git repo) only when `validate_cart` passes and every `auto` rule passes the local playtest. `--commit-anyway` overrides this.
 - A new cart never overwrites one: an id that's taken gets a numeric suffix.
-- Log records (§9.5) are appended to `~/game-studio-data/logs/studio_session.jsonl` and `cart_version.jsonl`. List cost is read from the session's `usage.list_cost` (whole cents as a string), per the docs; task 1's probe confirms it.
+- Log records (§9.5) are appended to `~/game-studio-data/logs/studio_session.jsonl` and `cart_version.jsonl`. List cost is read from the session's `usage.list_cost` (whole cents as a string; D19). It rounds to the cent, so each record also logs `active_seconds` and the token counts.
 - Answers replay by position: `--answers <file>` gives the same answers in the same order to every model. If a run asks more questions than were recorded, the replay answers D and the log marks `replay_exhausted`. Every run saves its answers, so a live run can be replayed.
 
 ## 2026-11-07 — Starter library (Phase 0 task 3)

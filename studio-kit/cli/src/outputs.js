@@ -1,36 +1,78 @@
-// Download a session's outputs (D42) before anything else: deleting a session
-// deletes them, and they can lag a few seconds behind the final idle.
+// Download a session's outputs (D42, D19) before anything else: deleting a
+// session deletes them. Outputs keep syncing after the session goes idle, so
+// the agent writes DONE.json (a manifest of names and sizes) last, and we poll
+// files.list until it's there and every listed file has its final size.
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 export const EXPECTED = ["report.json", "cart.tgz"];
+export const MARKER = "DONE.json";
+/** Session inputs also show up in files.list({scope_id}) (D19); never treat them as outputs. */
+export const INPUT_NAMES = ["studio-kit.tgz"];
 
 /**
  * @param {{api: import("./api.js").StudioApi, sessionId: string, dir: string,
- *          tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} o
- * @returns {Promise<{dir: string, files: string[], missing: string[]}>}
+ *          inputNames?: string[], tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} o
+ * @returns {Promise<{dir: string, files: string[], missing: string[], complete: boolean, manifest: any}>}
  */
 export async function downloadOutputs(o) {
-  const tries = o.tries ?? 6;
+  const tries = o.tries ?? 12;
   const waitMs = o.waitMs ?? 5000;
   const sleep = o.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const inputs = new Set(o.inputNames ?? INPUT_NAMES);
   fs.mkdirSync(o.dir, { recursive: true });
-  let list = [];
+
+  /** @type {import("./api.js").OutputFile[]} */
+  let outs = [];
+  /** @type {{files?: {name: string, size: number}[]}|null} */
+  let manifest = null;
+  let missing = [MARKER];
   for (let i = 0; i < tries; i++) {
-    list = await o.api.listOutputs(o.sessionId);
-    if (EXPECTED.every((name) => list.some((f) => f.filename === name))) break;
+    outs = (await o.api.listOutputs(o.sessionId)).filter((f) => !inputs.has(f.filename));
+    const marker = latest(outs, MARKER);
+    if (marker) {
+      try {
+        manifest = JSON.parse((await o.api.download(marker.id)).toString("utf8"));
+      } catch {
+        manifest = null;
+      }
+      missing = unmatched(outs, manifest);
+      if (manifest && !missing.length) break;
+    }
     if (i < tries - 1) await sleep(waitMs);
   }
+
+  // Download everything that isn't an input, oldest first, so the newest copy
+  // of a repeated filename takes the plain name. Never overwrite a download.
   const files = [];
-  for (const f of list) {
+  const ordered = [...outs].sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+  const newest = new Map(ordered.map((f) => [f.filename, f.id]));
+  for (const f of ordered) {
     const name = safeName(f.filename);
-    // Never overwrite a download: a repeated filename gets the file id appended.
-    const dest = fs.existsSync(path.join(o.dir, name)) ? path.join(o.dir, `${name}.${f.id}`) : path.join(o.dir, name);
+    const dest = newest.get(f.filename) === f.id ? path.join(o.dir, name) : path.join(o.dir, `${name}.${f.id}`);
     fs.writeFileSync(dest, await o.api.download(f.id));
     files.push(path.basename(dest));
   }
-  return { dir: o.dir, files, missing: EXPECTED.filter((n) => !files.includes(n)) };
+  if (!manifest) missing = [...new Set([MARKER, ...EXPECTED.filter((n) => !files.includes(n))])];
+  return { dir: o.dir, files, missing, complete: Boolean(manifest) && missing.length === 0, manifest };
+}
+
+function latest(outs, name) {
+  const all = outs.filter((f) => f.filename === name);
+  all.sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+  return all.at(-1);
+}
+
+/** Manifest entries not yet listed at their final size. A bad manifest counts as the marker missing. */
+function unmatched(outs, manifest) {
+  if (!manifest || !Array.isArray(manifest.files)) return [MARKER];
+  return manifest.files
+    .filter((m) => {
+      const f = latest(outs, m.name);
+      return !f || (typeof m.size === "number" && f.size_bytes !== m.size);
+    })
+    .map((m) => m.name);
 }
 
 function safeName(name) {
