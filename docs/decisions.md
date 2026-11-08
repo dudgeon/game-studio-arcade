@@ -353,6 +353,29 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - The picks recommended in hardware-mic.md didn't integrate well with the cabinet, so none is the plan of record. No model is recommended here.
 - The rest of the voice plan is unchanged: hold a player button to talk (D87), Groq first and Moonshine on the Pi as backup (§3.1), and in the virtual cabinet the same USB mic is passed through to the VM (D127).
 
+## 2026-11-07 — Context pack (Phase 0 task 6)
+
+**D100. The context pack is a short read order plus three carts, and points to the library reference rather than copying it.** *(Claude, Phase 0 task 6; implements D12.)*
+- `studio-kit/context-pack/`: `README.md` (read order, cart folder and `cart.json` fields, house conventions, commands), `RECIPES.md` (six recipes, each from a spec rule to code, probe and check) and `carts/{dodge,paddle,collect}/` (`spec.md`, `cart.json`, `game.js`, `checks.js`).
+- The library reference stays in `runtime/lib/REFERENCE.md` (one source, tested against the exports) and the pack points to it. The kit already ships both: `pack-kit.js` lists `studio-kit/context-pack` in `KIT_PARTS`, so no wiring change was needed.
+- The carts are Comet Dodge (free movement, spawner, `collide.resolve`, a safe timer, a speed curve), Wall Ball (one paddle against three walls) and Gem Garden (tile grid, held-stick repeat, a timed round). None uses the falling-blocks parts of `g.lib.grid` (rotation, `place`, `clearRows`); a test enforces that. Recipe 5 points at those functions in REFERENCE.md without showing a falling-blocks game.
+
+**D101. Example carts are one-player and never write the screen size as a number.** *(Claude, following D81 and D85.)*
+- `game.js` lays out from `g.W` and `g.H`; `probe()` returns `W` and `H`, so checks use those too. A test fails on `320`, `256`, `240` or `192` in any cart or recipe code.
+- A test runs every cart's playtest on the installed runtime **and** on a copy patched to the other size (320×256 ↔ 256×192), so the examples pass before and after the D81 runtime change. Text is sized for 42 characters a line.
+- One player only (D85: games default to single player). Wall Ball is a one-paddle wall game rather than a two-player duel for that reason. The README says, in one line each, that a game for 2 or more people takes turns with `g.lib.turns` (D113) and that a check needing two controllers at once calls `t.reset({ players: 2 })` (D111). There's no turns example cart; REFERENCE.md covers the helper.
+- Example `cart.json` files hold only what the agent writes: `id`, `title` and `players` (D31). The CLI adds the provenance fields.
+
+**D102. Pack size: about 15.0k tokens, estimated offline; the ceiling stays 15,000.** *(Claude.)*
+- `npm run size -w @game-studio-arcade/context-pack` counts what a session reads: the pack's docs, the three carts and `runtime/lib/REFERENCE.md`. `runtime/README.md`, which KIT.md also says to read, is outside the count (about 1.9k more).
+- Tokens are estimated as characters / 4 for Markdown and / 3.2 for code and JSON (no API call). The first live session's `usage` should confirm the real number; a test keeps the estimate ≤ 15,000.
+- 2026-11-08: the `g.lib.turns` entries (D113) took REFERENCE.md from about 4.2k to 5.5k and the pack to about 16.1k. Back to 14,987 by trimming the pack's own files, not REFERENCE: recipes now point at the carts instead of repeating their code, the README is tighter, checks drop redundant JSDoc casts, and `cart.json` is the agent's three fields. Headroom is now small, so the next library module will push the estimate over again. At that point, raise the ceiling (to at most ~16.5k) and log it here, rather than trimming the carts further.
+
+**D103. Example checks are small bots, and checks start with `start(t)`.** *(Claude.)*
+- `flow.startPressed` ignores presses for a screen's first 30 frames, so each cart's `checks.js` has a `start(t)` helper that steps 31 frames before pressing START.
+- Checks reach game events by steering from the probe (chase a comet, dodge it, aim the paddle, walk to the nearest gem) in 2-frame steps, with a frame limit, rather than by forcing state. Recipe 6 teaches the pattern.
+- The package tests also run the full `validateCart` (D31) on each example, so the examples can't drift from the validator.
+
 ## 2026-11-08 — Players setting and turns in the runtime (implements D85)
 
 How the runtime and library carry out D85 (Geoff's answer to D84's second-player question).

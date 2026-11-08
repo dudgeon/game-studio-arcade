@@ -1,0 +1,5 @@
+{
+  // The example carts type-check like any cart (runtime/tsconfig.cart.json): no DOM, no Node.
+  "extends": "../../runtime/tsconfig.cart.json",
+  "include": ["../../runtime/cart.d.ts", "../../runtime/test-hook.d.ts", "carts/**/*.js"]
+}
