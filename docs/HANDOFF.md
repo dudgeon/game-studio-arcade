@@ -1,4 +1,4 @@
-> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
+> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions), then for Geoff's player and MAKE answers (D85, D86). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
 
 # game-studio-arcade — Handoff Brief
 
@@ -8,7 +8,7 @@ Written Nov 7, 2026 from two planning sessions (text and voice) between Geoff an
 
 A small arcade cabinet in Geoff's basement that builds its own games. **The Studio makes the games; the Arcade plays them.**
 
-Owen (13) and Alina (10) walk up, hold a MAKE button, say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
+Owen (13) and Alina (10) walk up, pick Make on the game shelf, say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
 
 **Learning goal.** Not teaching the kids to code. Teaching them to work with an agent: state intent, define requirements, check that the agent met them, then change the approach or change the requirement. Kid-editable code (blocks, MakeCode) is explicitly not a goal.
 
@@ -74,9 +74,10 @@ Owen (13) and Alina (10) walk up, hold a MAKE button, say what they want to play
 ### 3.3 Open
 
 - ~~Which cabinet (§13).~~ Picade 10" + Pi 5 8 GB, ordered 2026-11-07 (D80).
-- Second player: the Picade has one player's controls. Turns only, a USB gamepad, or a second set of controls (D84).
-- The MAKE (★) button: an existing utility button, or a new dedicated one (D84).
-- The mic (D84; no external USB on the case).
+- ~~Second player~~: games default to single player, with turns well supported; the controller count is a setting; external controllers later (D85).
+- ~~The MAKE (★) button~~: no physical button assumed; the Studio starts from the launcher/shelf (D86).
+- The mic (D84; no external USB on the case; an XLR jack plus gooseneck is being researched).
+- Opened by D86: what starts and stops the mic, where Make sits on the shelf, how a kid gets back to the shelf from a game, and who is making (D86 lists the options).
 - Speech bake-off results.
 - Default build model and per-build cap.
 - Starter library v1 contents.
@@ -102,7 +103,8 @@ CABINET  (Raspberry Pi 5, basement, mesh Wi-Fi)
     Studio side: session orchestrator, tile relay (ask_player),
                  guardrails, publish gate
   Controls: 1 stick, 6 buttons, 4 utility buttons (X HAT, as a keyboard;
-            D82), a MAKE (★) button, USB mic; player 2 open (D84)
+            D82), mic; controller count is a setting, 1 today (D85);
+            Make is on the shelf, no button (D86)
 
 MAC MINI  (office)
   Cabinet Manager (local web app) -> cabinet Manager API
@@ -174,6 +176,7 @@ carts/sloth-snacks/
 ## Pitch           one or two sentences
 ## Rules           R1..Rn, each checkable by the playtest
 ## Controls        stick + A B X Y per player, START; ★ is reserved for the cabinet
+                   (single player by default; turns when more play, D85)
 ## Look & sound
 ## Assumptions     A1..An: Claude's gap-fills, especially after "make it now"
 ## Changelog       v1, v2…: what changed in the spec and why
@@ -185,7 +188,7 @@ Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by t
 
 ### 8.1 Cabinet-initiated: new game
 
-1. The kid holds ★. The Pi records, sends the audio to Groq, and shows the transcript for confirmation (retry allowed).
+1. The kid picks Make on the shelf (D86) and says what they want; how the mic starts and stops is open (D86). The Pi records, sends the audio to Groq, and shows the transcript for confirmation (retry allowed).
 2. The Studio side screens the request, then creates a Managed Agents session with the kid brief, context pack, studio kit tarball and spending cap.
 3. Claude calls `ask_player`. The tile relay renders A and B plus C and D. Each answer becomes a spec line. Repeat until Claude is satisfied or the kid picks D.
 4. (Proposed) "Here's the plan": the spec's rules in plain words; build, or change a rule.
@@ -252,7 +255,7 @@ The Manager's Activity view joins these: request → session → cart version �
 
 ## 10. Starter library v1 (proposed; confirm)
 
-Collision (overlap, plus who destroys whom); gravity, jump, platforms; grid movement and rotation; tile maps and a scrolling camera; spawners and waves; particles; timers and tweening; score, lives, high scores; title → play → game-over flow; 2-player input and side swap; chip-synth sound effects and jingles; sprite and palette helpers.
+Collision (overlap, plus who destroys whom); gravity, jump, platforms; grid movement and rotation; tile maps and a scrolling camera; spawners and waves; particles; timers and tweening; score, lives, high scores; title → play → game-over flow; turn taking for more than one player, built for any number of controllers (D85); chip-synth sound effects and jingles; sprite and palette helpers.
 
 Context pack: the library reference, short recipes, and 3–4 tiny example carts. Keep it lean. Use the logs to promote helpers Claude keeps rewriting.
 
@@ -280,7 +283,7 @@ The shortlist before the switch, kept for the record:
 1. **Quarterless 24" Wall Arcade — $1,099**, free shipping. Raspberry Pi 5, 128 GB microSD, 24" monitor, 2 players, French cleats or bartop, 23" W × 11.5" D × 24.5" H, 45 lb, 2 external USB ports, built-in speakers, lit marquee. Made to order, ships in 5–7 business days, 1-year parts warranty. Joystick brand not stated; reviews mention bat-top sticks and lit buttons. Ships with a large preloaded library (reviews say Batocera); we flash our own card and keep theirs in the box. A 27" version is $1,295.
 2. **Pimoroni Picade Max kit — $569.95** at PiShop US (in stock), $561 at Pimoroni US. No Pi included. 19" 1280×1024 IPS (5:4), 1–2 players, designed for the Pi 5, bartop only. Add a Pi 5 (PiShop, in stock: 4 GB $110, 8 GB $175) and a microSD card: about $680–$745.
 
-Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add a MAKE button per side and a USB mic. (The Max was chosen first, D2, then replaced by the 10" Picade, D80.)
+Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add a MAKE button per side and a USB mic. (The Max was chosen first, D2, then replaced by the 10" Picade, D80. MAKE buttons were later dropped, D86.)
 
 ## 14. Build plan
 
@@ -296,7 +299,7 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 
 **Phase 1 — cabinet service and Cabinet Manager (2–3 weekends).** Develop the service on the Mac mini or a spare Pi (development there is fine; production play never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. Check Playwright's Chromium on Raspberry Pi OS arm64, or point it at system Chromium, for the publish gate. Run the gate at low priority and defer it while a game is being played.
 
-**Phase 2 — the cabinet (on arrival).** Hardware ordered 2026-11-07 (D80). Assemble the Picade (check the edition, fit the Active Cooler), scripted image on a new card including the Picade overlay and key map (D82, D83), the MAKE button and mic (D84), Manager pairing, day-one library.
+**Phase 2 — the cabinet (on arrival).** Hardware ordered 2026-11-07 (D80). Assemble the Picade (check the edition, fit the Active Cooler), scripted image on a new card including the Picade overlay and key map (D82, D83), the mic (D84), the launcher's Make entry (D86), Manager pairing, day-one library.
 
 **Phase 3 — voice and kid builds (2 weekends).** Groq vs Moonshine bake-off with both kids' recordings; guardrails; first real cabinet-initiated builds and forks.
 

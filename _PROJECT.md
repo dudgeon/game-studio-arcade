@@ -16,20 +16,20 @@ repo: https://github.com/dudgeon/game-studio-arcade
 
 ## Why
 
-Teach Owen (13) and Alina (10) to work with an agent: state what they want, define requirements, check that the agent met them, then change the approach or the requirement. Learning to code isn't the goal. The arcade makes that loop fun and fast: hold MAKE, say the idea, answer a few tile questions, and play your own game on the shelf. Bigger projects happen with Geoff at the Mac mini and publish to the same cabinet.
+Teach Owen (13) and Alina (10) to work with an agent: state what they want, define requirements, check that the agent met them, then change the approach or the requirement. Learning to code isn't the goal. The arcade makes that loop fun and fast: pick Make on the shelf, say the idea, answer a few tile questions, and play your own game on the shelf. Bigger projects happen with Geoff at the Mac mini and publish to the same cabinet.
 
 ## Done when
 
 - [ ] Phase 0: Falling Blocks built by a Managed Agents session from Alina's request, all auto rules passing, playable in a browser; real cost per build measured; Sonnet 5.5 vs Opus 5.5 compared
 - [ ] Phase 1: the cabinet service (launcher, cart library, tile relay, logs, MCP, Manager API) and Cabinet Manager v0 running on the mini
-- [ ] Phase 2: Picade 10" + Pi 5 built (hardware ordered 2026-11-07), provisioned from the script, MAKE button and mic fitted, day-one library on the shelf
+- [ ] Phase 2: Picade 10" + Pi 5 built (hardware ordered 2026-11-07), provisioned from the script, mic fitted, Make entry in the launcher, day-one library on the shelf
 - [ ] Phase 3: speech bake-off (Groq vs Moonshine) with the kids' voices; first real kid builds and forks at the cabinet
 - [ ] Phase 4: `game-studio` plugin and the desktop flow; the first joint game with Owen published to the cabinet
 
 ## Notes
 
 - Brief: docs/HANDOFF.md. Decisions: docs/decisions.md (these win over the brief). Platform facts: docs/platform-notes.md. Current plan: docs/phase-0.md.
-- Hardware: Pimoroni Picade with 10" display (1024×768, one player) + Raspberry Pi 5 8 GB, both ordered 2026-11-07 (D80). Still to sort: power supply, Active Cooler, microSD, mic; player 2 and the MAKE button are Geoff's call (D84).
+- Hardware: Pimoroni Picade with 10" display (1024×768, one player) + Raspberry Pi 5 8 GB, both ordered 2026-11-07 (D80). Still to sort: power supply, Active Cooler, microSD, mic. Single player by default with turns (D85); no physical MAKE button (D86).
 - The cabinet must work with the Mac mini off. Kid builds run in Claude Managed Agents; desktop builds use Geoff's Claude Code.
 - Phase 0 budget: $25 total, $3 cap per build.
 - Alina's Phase 0 request is a stand-in Claude wrote (docs/phase-0.md). Swap in her real words when we have them.
