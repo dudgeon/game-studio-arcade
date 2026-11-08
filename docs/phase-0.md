@@ -14,7 +14,7 @@ Spend ceiling for all of Phase 0: **$25** of API list cost (proposed). Each buil
 
 ## What I need from Geoff
 
-1. **Connect the mini to the Claude API (Workload Identity Federation, D15).** Run `scripts/setup-anthropic-auth.sh`, which walks you through the Console. It creates the `game-studio-arcade` workspace and spend limit, connects the workload, and runs a live test that also checks Managed Agents access. You need the org admin or owner role. Nothing secret is pasted; `.env` gets only IDs.
+1. ~~Connect the mini to the Claude API~~. Done 2026-11-07: the CLI browser login is bound to the `game-studio-arcade` workspace, which has a spend limit (D16). Re-check any time with `scripts/setup-anthropic-auth.sh`.
 2. ~~Alina's request in her own words~~. Claude wrote a stand-in (below). Swap in her real words whenever you have them.
 3. **About 30 minutes for task 10**: answer the tile questions at the terminal (A/B/C/D) for one build, then play the results and rate them. The other builds replay your answers automatically.
 4. **A GitHub remote, if you want one**: should I create a private `dudgeon/game-studio-arcade` and push?
@@ -44,8 +44,8 @@ Recorded tile answers for replays go in `studio-kit/cli/fixtures/` once task 10 
 npm workspaces (`runtime`, `studio-kit/*`, later `cabinet/*` and `manager`), TypeScript, Node 22 pinned (D9), `node:test` for unit tests (no test framework to ship into the offline sandbox), `.gitignore` (`.env`, `node_modules`, build output), `.env.example`, a README pointing at the docs.
 *Accept:* `npm install && npm test` passes on Node 22, and `git status` is clean after a build.
 
-### 1. Probe session (needs D15 auth set up)
-First, auth plumbing: a `scripts/ant` wrapper that mints a fresh identity token file per invocation, and a shared `credentials()` helper for our TypeScript code that mints in-process through the SDK's identity-token provider. Both read `.env`.
+### 1. Probe session (auth done, D16)
+First, auth plumbing (D16): `ant` already uses the `game-studio-arcade` profile. Add a shared `credentials()` helper for our TypeScript code that relies on the SDK's profile resolution. It should fail with a clear message pointing at `scripts/setup-anthropic-auth.sh`, and refuse to run if `ANTHROPIC_API_KEY` is set. Confirm the SDK actually picks up the profile.
 
 In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limited}`, no hosts) and a throwaway agent, applied with `ant apply`, plus one session that reports:
 - Node version, and the **exact Playwright version** and where it lives (global npm path, `require.resolve`)
@@ -54,7 +54,7 @@ In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limit
 - the `/mnt/session/uploads` and `/mnt/session/outputs` round trip, with a tarball mounted, extracted and an output listed and downloaded
 - **where a session's list cost is reported** (session object or usage fields), so we can log real cost
 
-*Accept:* `ant` and the SDK both authenticate through federation (`ant auth status` shows federation), the findings are added to [platform-notes.md](platform-notes.md), the local Playwright is pinned to the sandbox's version in `package.json`, and the probe cost is under $0.50.
+*Accept:* `ant` and the SDK both authenticate through the `game-studio-arcade` profile, the findings are added to [platform-notes.md](platform-notes.md), the local Playwright is pinned to the sandbox's version in `package.json`, and the probe cost is under $0.50.
 
 ### 2. House runtime v0 (`runtime/`)
 - A 320×256 canvas with integer scaling and a fixed 32-color palette (D3).

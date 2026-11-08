@@ -50,7 +50,7 @@ Every rule is still written so it's checkable, by a machine or by a person. The 
 
 **D14. Phase 0 logs and the dev cart library live outside this repo**, in `~/game-studio-data/` (logs as JSONL, the cart library as its own git repo). *(Claude; follows §15.)*
 
-**D15. API auth uses Workload Identity Federation, not API keys.** *(Geoff asked for WIF; Claude designed it.)*
+**D15. API auth uses Workload Identity Federation, not API keys.** *(Geoff asked for WIF; Claude designed it.)* **Superseded for now by D16:** the account can't use WIF.
 
 How it works:
 - Each machine that calls the Claude API (the mini now, the cabinet later) has its own ES256 signing key in `~/.config/game-studio-arcade/identity/<device>.key.pem` (0600, never in the repo).
@@ -72,3 +72,18 @@ Honest trade-off: on home machines the signing key is still a long-lived secret 
 - revoking access means archiving one rule.
 
 Fallback if WIF gets in the way: an API key from a dedicated workspace (one env var).
+
+**D16. For now the mini signs in with the ant CLI's browser login.** *(Geoff chose this after WIF turned out to be unavailable.)*
+
+What happened: Geoff's Console account is an *Individual* org. The Admin API and WIF aren't offered to Individual accounts (admin-api docs: "unavailable for individual accounts"). On 2026-11-07, with an `org:admin` login, the service-account and issuer endpoints returned 404 and the workspace listing returned 403. Nothing was created, and the admin session was logged out.
+
+What we use instead:
+- `ant auth login --profile game-studio-arcade`, bound to workspace `game-studio-arcade` (`wrkspc_01WedcsrdZuSF9AsHKRTJaFJ`).
+- An OAuth token that lasts 8 h and refreshes itself, stored in `~/.config/anthropic/credentials/` (0600).
+- The SDK and CLI pick it up through the active profile. Nothing secret is pasted, and `.env` holds no credentials.
+- Setup or re-check: `scripts/setup-anthropic-auth.sh`.
+- Verified: the Models list, Managed Agents agents list and environments list all succeed.
+
+Still open:
+- Confirm in Phase 0 task 1 that the TypeScript SDK resolves the profile.
+- **Cabinet auth is undecided** (Phase 1–2). Browser login fits a machine with a person present, not an unattended Pi. The options: convert the Console account to an organization (unlocks WIF; `scripts/wif/` is ready), or a workspace-scoped key on the Pi. Ask Geoff when Phase 1 starts.

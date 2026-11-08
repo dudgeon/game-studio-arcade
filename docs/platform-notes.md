@@ -80,3 +80,12 @@ Sources: platform.claude.com/docs/en/manage-claude/{workload-identity-federation
 - **Profiles:** `~/.config/anthropic/configs/<name>.json` with `authentication.type: oidc_federation`. Claude Code and the Agent SDK honor the same profiles.
 - **Debugging:** a denied exchange always returns an opaque 401 "Authentication failed". The reason is in the Console's authentication history: `…/settings/workload-identity-federation?tab=history`.
 - **Interactive alternative for dev machines:** `ant auth login` (browser OAuth, workspace-scoped, stored in `~/.config/anthropic/credentials/`).
+
+**Account limit (verified 2026-11-07):** WIF and the Admin API are unavailable to *Individual* Console accounts. With an `org:admin` OAuth token, `/v1/organizations/service_accounts` and `/federation_issuers` returned 404, and `/workspaces` and `/me` returned 403. Converting the account to an organization (`platform.claude.com/settings/organization`) is the documented path. Its side effects are unverified.
+
+## CLI browser login (what the mini uses)
+
+- `ant auth login --profile <name>` opens a browser. After approval, the page shows a code to paste into the terminal (the `platform.claude.com/oauth/code/callback` redirect). A workspace picker binds the token to one workspace; `--workspace-id` skips the picker.
+- **Default scope:** `user:profile user:inference user:developer`. The token lasts 8 h, refreshes itself, and is stored in `~/.config/anthropic/credentials/<profile>.json` (0600). The first login for a profile makes it the active profile.
+- **Works with Managed Agents:** `ant beta:agents list` and `ant beta:environments list` succeed (checked 2026-11-07).
+- `ant auth status` shows the winning credential source and workspace. The docs say the SDKs, Claude Code and the Agent SDK use the same profile resolution; the TypeScript SDK is still to be verified in Phase 0.
