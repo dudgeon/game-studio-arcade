@@ -1,0 +1,83 @@
+# The whole Studio flow against the recorded Penguin Catch session (D186).
+wait shelf
+shot shelf-first-time
+press a
+wait who
+shot who-nobody-yet
+press a
+wait say typing
+type alina
+shot new-name-typing
+press enter
+wait say idle
+shot tell-me
+say I want a game where a penguin catches fish that fall from the sky, and if you miss three fish you lose, and sometimes a boot falls and you should NOT catch the boot
+down a
+wait say listening
+shot tell-me-listening
+up a
+wait say confirm
+shot tell-me-heard
+press a
+wait question
+shot question-1
+press a
+wait question
+press down
+shot question-2
+press a
+wait question
+press down
+press down
+shot question-3-something-else
+press a
+wait say idle
+shot something-else
+say slides left and right but really slippery like on ice
+hold q 300
+wait say confirm
+shot something-else-heard
+press a
+wait plan
+shot plan-top
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+shot plan-scrolled
+press a
+wait progress
+shot progress-early
+sleep 3000
+shot progress-later
+wait result
+shot your-game-is-ready
+press a
+wait play
+sleep 1500
+shot game-title
+press a
+sleep 1200
+hold left 500
+shot game-playing
+press esc
+wait check
+shot you-check-1
+press a
+press down
+press a
+shot you-check-3
+press down
+press down
+press a
+wait shelf
+shot shelf-with-new-game
+press a
+wait who
+shot who-knows-alina
+press esc
+wait shelf

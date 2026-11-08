@@ -153,8 +153,7 @@ game-studio-arcade/
     plugin/            Claude Code plugin "game-studio": skill build-cart + studio.* tools
     managed-agent/     agent .md, environment.yaml, kit packaging, claude-lock.json
   cabinet/
-    service/           Arcade side + Studio side
-    launcher/          web UI on the cabinet screen
+    service/           Arcade side + Studio side; launcher/ inside it is the cabinet screen's UI (D180, D183)
     image/             reproducible Pi OS Lite build: kiosk, systemd, players
   manager/             Cabinet Manager web app + menu bar launcher
   carts-examples/      Falling Blocks and other seed carts

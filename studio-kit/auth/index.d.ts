@@ -12,6 +12,15 @@ export type CreateClientOptions = Omit<ClientOptions, "apiKey" | "authToken" | "
   profile?: string;
 };
 
+export declare class CabinetAuthError extends Error {
+  constructor(message: string);
+}
+
+export declare function createCabinetClient(options: {
+  configFile: string;
+  sdkOptions?: Omit<ClientOptions, "apiKey" | "authToken" | "credentials" | "config" | "profile">;
+}): Anthropic;
+
 export declare function profileName(options?: { profile?: string }): string;
 export declare function createClient(options?: CreateClientOptions): Anthropic;
 export declare function checkAuth(client?: Anthropic): Promise<{ ok: true; profile: string; firstModel: string | null }>;
