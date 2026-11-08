@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { formatPlan, formatQuestion, parseChoice, planResult, questionResult } from "../src/tiles.js";
-import { liveAnswerer, loadAnswers } from "../src/answers.js";
+import { liveAnswerer, loadAnswers, overlap, replayAnswerer } from "../src/answers.js";
 import { sessionCreateBody } from "../src/api.js";
 import { MANAGED_AGENT_DIR, readAgentDef, readLock, readSkillLock, STUDIO_TOOLSET } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
@@ -207,4 +207,58 @@ test("the fixture spec is in canonical form: format(parse(x)) === x", async () =
   const spec = parseSpec(text);
   assert.deepEqual(spec.errors, []);
   assert.equal(formatSpec(spec), text);
+});
+
+const PENGUIN = JSON.parse(fs.readFileSync(new URL("../fixtures/penguin-catch/answers.json", import.meta.url), "utf8"));
+const q = (question, option_a = "One", option_b = "Two") => ({ question, option_a, option_b });
+
+test("D47: replay finds an answer by its question, in any order and wording", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("Does the penguin slide or hop?", "Slides", "Hops")), { choice: "C", said: "slides left and right but really slippery like on ice" });
+  assert.deepEqual(await a.question(q("How does the game get harder?", "Things fall faster", "Faster and more boots")), { choice: "B" });
+  assert.deepEqual(await a.question(q("What if you catch a boot?", "Lose a life", "Lose 5 points")), { choice: "A" });
+  assert.deepEqual(a.notes?.(), []);
+  assert.equal(a.replayLog?.().length, 3);
+});
+
+test("D47: options that don't say the recorded answer get its words through C", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens if you catch a boot?", "Counts as a miss", "Lose some points")), { choice: "C", said: "You lose a life" });
+});
+
+test("D47: options keep their meaning when they swap places", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens when you touch a boot?", "Lose 5 points", "You lose a life")), { choice: "B" });
+});
+
+test("D47: a question with no recorded answer gets D, and that's logged", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What should the game be called?")), { choice: "D" });
+  assert.deepEqual(a.notes?.(), ["replay_unmatched"]);
+  assert.deepEqual(a.replayLog?.()[0], { asked: "What should the game be called?", option_a: "One", option_b: "Two", matched: null, choice: "D", said: null });
+});
+
+test("D47: a boot question about something else doesn't take the catch answer", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("How often should boots appear?")), { choice: "D" });
+});
+
+test("D47: a follow-up on the same topic reuses the answer", async () => {
+  const a = replayAnswerer(PENGUIN);
+  await a.question(q("What happens if you catch a boot?", "You lose a life", "Lose points"));
+  assert.deepEqual(await a.question(q("And if you touch a boot again?", "You lose a life", "Lose points")), { choice: "A" });
+});
+
+test("D47: without match, recorded questions compare by word overlap", async () => {
+  const a = replayAnswerer({ questions: [{ question: "What color is the frog?", answer: "Bright green" }] });
+  assert.ok(overlap("What color is the frog?", "What color should the frog be?") >= 0.5);
+  assert.deepEqual(await a.question(q("What color should the frog be?", "Bright green", "Dark blue")), { choice: "A" });
+  assert.deepEqual(await a.question(q("How many lives?")), { choice: "D" });
+});
+
+test("a file with no questions still replays by position", async () => {
+  const a = replayAnswerer({ questions: [{ choice: "B" }] });
+  assert.deepEqual(await a.question(q("Anything?")), { choice: "B" });
+  assert.deepEqual(await a.question(q("More?")), { choice: "D" });
+  assert.deepEqual(a.notes?.(), ["replay_exhausted"]);
 });

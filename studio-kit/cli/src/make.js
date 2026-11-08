@@ -31,6 +31,12 @@ import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
  */
 
+/** A turn as a replayable answer (D47): the question and the answer's words, not just a letter. */
+function recordedAnswer(t) {
+  const words = t.choice === "A" ? t.option_a : t.choice === "B" ? t.option_b : t.said;
+  return { question: t.question, option_a: t.option_a, option_b: t.option_b, choice: t.choice, ...(t.said ? { said: t.said } : {}), ...(words ? { answer: words } : {}) };
+}
+
 /** @param {MakeOptions} o */
 export async function makeCart(o) {
   const now = o.now ?? (() => new Date());
@@ -86,7 +92,7 @@ export async function makeCart(o) {
   const answers = {
     request: o.request,
     maker: o.maker,
-    questions: result.turns.filter((t) => !t.auto).map((t) => (t.choice === "C" ? { choice: "C", said: t.said } : { choice: t.choice })),
+    questions: result.turns.filter((t) => !t.auto).map(recordedAnswer),
     plan: result.planTurns.map((p) => (p.choice === "change" ? { choice: "change", said: p.said } : { choice: "build" })),
   };
   writeJson(path.join(sessionDir, "answers.json"), answers);
@@ -133,10 +139,9 @@ export async function makeCart(o) {
     finalSpec: spec,
     capturedChecks: captured["checks.frozen.js"]?.toString("utf8") ?? null,
     capturedSpec: captured["spec.frozen.md"]?.toString("utf8") ?? null,
+    declared: Array.isArray(report?.check_changes) ? report.check_changes : null,
   });
-  if (freeze.checks_changed_after_playtest.unjustified.length) {
-    ui.info(`Checks changed with no spec change: ${freeze.checks_changed_after_playtest.unjustified.join(", ")} (D44)`);
-  }
+  for (const line of buildSummary(freeze.checks_changed_after_playtest)) ui.info(line);
 
   const passed = Boolean(cartDir && validation?.ok && local?.ok);
   const commit = Boolean(cartDir && (passed || o.commitAnyway));
@@ -223,6 +228,7 @@ export async function makeCart(o) {
     missing_outputs: dl.missing,
     errors: result.errors,
     notes: result.notes,
+    replay_log: o.answerer.replayLog?.() ?? null,
   };
   appendLog(o.paths.logs, "studio_session", record);
 
@@ -230,6 +236,22 @@ export async function makeCart(o) {
   else if (cartDir) ui.info(`The game didn't pass its checks, so it wasn't added. Everything is kept in ${sessionDir}`);
   else ui.info(`No game came back (${result.stopReason || "unknown"}). Everything is kept in ${sessionDir}`);
   return { record, sessionDir, committed };
+}
+
+/**
+ * The test changes a person should see at the end of a build (D46).
+ * @param {{rules: any[], helpers_unjustified: boolean, changed: boolean, rules_known: boolean, edit_events: number}} c
+ */
+export function buildSummary(c) {
+  const lines = [];
+  for (const r of c.rules) {
+    if (r.classification === "check_bug") lines.push(`Test fixed, rule unchanged: ${r.rule} "${r.quote}". ${r.what ?? ""}`.trim());
+    if (r.classification === "rule_change") lines.push(`Rule changed: ${r.rule}${r.shown_in_plan ? "" : " (not shown in the plan)"}. ${r.what ?? ""}`.trim());
+    if (r.classification === "unexplained") lines.push(`Test changed with no explanation: ${r.rule}. ${r.what ?? ""}`.trim());
+  }
+  if (c.helpers_unjustified) lines.push("Shared test code changed with no explanation.");
+  if (c.changed && !c.rules_known) lines.push(`Tests were changed (${c.edit_events} edits), but it can't be said which: the starting copy wasn't kept.`);
+  return lines;
 }
 
 function readTextIfExists(file) {

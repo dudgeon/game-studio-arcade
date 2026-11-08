@@ -12,7 +12,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--maker A` | the maker's initial (required, or from the answers file) |
 | `--with O` | a second player |
 | `--model ID` | per-run model; the agent's default is Sonnet 5.5 |
-| `--answers FILE` | replay recorded answers by position (D43); runs out → D |
+| `--answers FILE` | replay recorded answers, matched by question (D47); no recorded answer → D |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
 | `--context-pack skill` | attach the context pack as a skill and leave it out of the kit (default `tarball`; D45) |

@@ -40,10 +40,11 @@ The spec (`spec.md`) is the source of truth. Questions change the spec, code is 
 4. **Show the plan.** Call `show_plan` with a one-line summary and every rule in plain words. If the player asks for a change, update the spec (rules and Changelog), then call `show_plan` again. When they say build, copy `spec.md` to `/mnt/session/outputs/spec.md` and start building.
 5. **Write the checks, from the spec, before any game code.** Write `checks.js` with one check per `(auto)` rule, as the kit describes. Any number a check needs must already be in the spec, in the rule or an Assumption; if it isn't, put it there first. The checks decide what `probe()` must return. Then save the snapshot: `cp /workspace/cart/spec.md /mnt/session/outputs/spec.frozen.md && cp /workspace/cart/checks.js /mnt/session/outputs/checks.frozen.js`. **The checks are now frozen.**
 6. **Build from the spec.** Write `game.js` for the house runtime, `cart.json` and any assets. Reuse library pieces rather than rewriting them.
-7. **Test and fix the game.** Run the kit's validate command, then its playtest. A failing check means fix `game.js`, not the check. Keep going until every `(auto)` rule and every generic check passes. Don't weaken, delete or re-tag a rule to make it pass.
-   - A check may change only if you **first** change the spec rule or add an Assumption that names the rule (`- A4: R8 boots start at 15% ...`), with a Changelog line. That applies to a check that's simply buggy too. Then call `show_plan` again with `changes` listing each rule, and only then edit the check.
-   - If a rule truly can't be built, change the spec the same way and say why.
-8. **Pack up.** Write the outputs (below) and finish with a short message saying what you built.
+7. **Test and fix the game.** Run the kit's validate command, then its playtest with the node driver. A failing check means fix `game.js`, not the check. Keep going until every `(auto)` rule and every generic check passes. Don't weaken, delete or re-tag a rule to make it pass.
+   - **Check bug:** the check contradicts the spec's own words, or can't test them (a type error, too slow to finish, a bot that ends the game mid-test), and what the rule means stays the same. Quote the rule, fix the check to match it, and record it in `report.json` under `check_changes`. Don't touch the spec and don't call `show_plan`: this doesn't stop the player.
+   - **Rule change:** anything that changes what a rule means, including a rule that truly can't be built. **First** change the spec rule or add an Assumption that names the rule (`- A4: R8 boots start at 15% ...`), with a Changelog line. Then call `show_plan` again with `changes` listing each rule, and only then edit the check. Record it in `check_changes` too.
+   - **Browser driver:** only once, as a final check when everything passes on node. It's slow. Run it again only if that run found something you had to fix.
+8. **Pack up.** Write the outputs (below) and finish with a short message saying what you built and any check bugs you fixed.
 
 Use `tell_player` at each milestone (setting up, writing the spec, building, each test run, each fix, packing up) with one short line in kid language. Your own text messages aren't shown to the player.
 
@@ -52,7 +53,7 @@ Use `tell_player` at each milestone (setting up, writing the spec, building, eac
 The cart folder is `/workspace/cart/`: `spec.md`, `cart.json`, `game.js`, `checks.js`, `assets/`, and the last `playtest.json`. When you finish, write these flat files to `/mnt/session/outputs/`:
 
 - `cart.tgz`: the whole cart folder, made with `tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart .`
-- `report.json`: `{"status": "done" | "gave_up", "summary": "<one sentence>", "rules": [{"id": "R1", "kind": "auto" | "you-check", "passed": true | false | null}], "fix_rounds": <number>}`
+- `report.json`: `{"status": "done" | "gave_up", "summary": "<one sentence>", "rules": [{"id": "R1", "kind": "auto" | "you-check", "passed": true | false | null}], "fix_rounds": <number>, "check_changes": [{"rule": "R2", "kind": "check_bug" | "rule_change", "quote": "<the rule's exact words>", "what": "<what you changed and why>"}]}`. List every change to a check since the snapshot; leave the list empty if there were none.
 - `spec.md`: the final spec (overwrite the earlier copy).
 - `spec.frozen.md` and `checks.frozen.js`: the snapshot from step 5. Never write to them again, even after an allowed check change. They record where the checks started.
 - `DONE.json`, **last of all**, after every other output is written: `{"files": [{"name": "cart.tgz", "size": <bytes>}, …]}` listing every output file above with its size from `stat -c %s`. Outputs keep syncing after you finish, and this file tells the cabinet when they're complete.
