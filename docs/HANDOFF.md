@@ -1,4 +1,4 @@
-> **Status (2026-11-07):** saved unchanged from the kickoff. Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
+> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
 
 # game-studio-arcade — Handoff Brief
 
@@ -12,7 +12,7 @@ Owen (13) and Alina (10) walk up, hold a MAKE button, say what they want to play
 
 **Learning goal.** Not teaching the kids to code. Teaching them to work with an agent: state intent, define requirements, check that the agent met them, then change the approach or change the requirement. Kid-editable code (blocks, MakeCode) is explicitly not a goal.
 
-**People and machines.** Geoff (GitHub: `dudgeon`) develops on an always-on Mac mini (Apple silicon, 32 GB) in his office. The cabinet will be a Raspberry Pi 5 machine in the basement on the home mesh Wi-Fi.
+**People and machines.** Geoff (GitHub: `dudgeon`) develops on an always-on Mac mini (Apple silicon, 32 GB) in his office. The cabinet is a Pimoroni Picade (10" display) with a Raspberry Pi 5 8 GB, both ordered 2026-11-07 (D80), in the basement on the home mesh Wi-Fi.
 
 ## 2. Vocabulary
 
@@ -73,7 +73,10 @@ Owen (13) and Alina (10) walk up, hold a MAKE button, say what they want to play
 
 ### 3.3 Open
 
-- Which cabinet (§13).
+- ~~Which cabinet (§13).~~ Picade 10" + Pi 5 8 GB, ordered 2026-11-07 (D80).
+- Second player: the Picade has one player's controls. Turns only, a USB gamepad, or a second set of controls (D84).
+- The MAKE (★) button: an existing utility button, or a new dedicated one (D84).
+- The mic (D84; no external USB on the case).
 - Speech bake-off results.
 - Default build model and per-build cap.
 - Starter library v1 contents.
@@ -98,7 +101,8 @@ CABINET  (Raspberry Pi 5, basement, mesh Wi-Fi)
                  MCP server, Manager API, backup
     Studio side: session orchestrator, tile relay (ask_player),
                  guardrails, publish gate
-  Controls: 2 sticks, buttons, a MAKE (★) button per side, USB mic
+  Controls: 1 stick, 6 buttons, 4 utility buttons (X HAT, as a keyboard;
+            D82), a MAKE (★) button, USB mic; player 2 open (D84)
 
 MAC MINI  (office)
   Cabinet Manager (local web app) -> cabinet Manager API
@@ -175,7 +179,7 @@ carts/sloth-snacks/
 ## Changelog       v1, v2…: what changed in the spec and why
 ```
 
-Runtime limits (proposed), enforced by the SDK so anything that runs in the simulator runs on the cabinet: 256×240, a fixed 16-color palette, the cabinet's buttons only, a 4-voice chip synth, no network, no DOM access, persistence only through `g.save()`.
+Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by the SDK so anything that runs in the simulator runs on the cabinet: 256×240, a fixed 16-color palette, the cabinet's buttons only, a 4-voice chip synth, no network, no DOM access, persistence only through `g.save()`.
 
 ## 8. Flows
 
@@ -266,12 +270,17 @@ Context pack: the library reference, short recipes, and 3–4 tiny example carts
 
 PICO-8 community carts, TIC-80 Surf mode, and freely distributable homebrew under RetroArch. Famous 8-bit games become first build prompts: falling blocks (Alina's), a platformer, an aim-and-shoot, a top-down adventure.
 
-## 13. Hardware shortlist (prices checked live Nov 7, 2026)
+## 13. Hardware (prices checked live Nov 7, 2026)
+
+**Chosen and ordered 2026-11-07 (D80): Pimoroni Picade with 10" display ($349.95, PiShop US) + Raspberry Pi 5 8 GB ($175.00, PiShop US).** 10" 1024×768 IPS (4:3), one player (joystick, 6 player buttons, 4 utility buttons), Picade X HAT for controls, sound and USB-C power, desk-sized (310 × 260 × 250 mm). Still needed: a USB-C supply (5 V/5 A), an Active Cooler, a microSD card and a USB mic. Details in [platform-notes.md](platform-notes.md#picade-10-inch-2025-edition).
+
+The shortlist before the switch, kept for the record:
+
 
 1. **Quarterless 24" Wall Arcade — $1,099**, free shipping. Raspberry Pi 5, 128 GB microSD, 24" monitor, 2 players, French cleats or bartop, 23" W × 11.5" D × 24.5" H, 45 lb, 2 external USB ports, built-in speakers, lit marquee. Made to order, ships in 5–7 business days, 1-year parts warranty. Joystick brand not stated; reviews mention bat-top sticks and lit buttons. Ships with a large preloaded library (reviews say Batocera); we flash our own card and keep theirs in the box. A 27" version is $1,295.
 2. **Pimoroni Picade Max kit — $569.95** at PiShop US (in stock), $561 at Pimoroni US. No Pi included. 19" 1280×1024 IPS (5:4), 1–2 players, designed for the Pi 5, bartop only. Add a Pi 5 (PiShop, in stock: 4 GB $110, 8 GB $175) and a microSD card: about $680–$745.
 
-Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add a MAKE button per side and a USB mic.
+Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add a MAKE button per side and a USB mic. (The Max was chosen first, D2, then replaced by the 10" Picade, D80.)
 
 ## 14. Build plan
 
@@ -287,7 +296,7 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 
 **Phase 1 — cabinet service and Cabinet Manager (2–3 weekends).** Develop the service on the Mac mini or a spare Pi (development there is fine; production play never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. Check Playwright's Chromium on Raspberry Pi OS arm64, or point it at system Chromium, for the publish gate. Run the gate at low priority and defer it while a game is being played.
 
-**Phase 2 — the cabinet (on arrival).** Scripted image on a new card, MAKE buttons and mic, Manager pairing, day-one library.
+**Phase 2 — the cabinet (on arrival).** Hardware ordered 2026-11-07 (D80). Assemble the Picade (check the edition, fit the Active Cooler), scripted image on a new card including the Picade overlay and key map (D82, D83), the MAKE button and mic (D84), Manager pairing, day-one library.
 
 **Phase 3 — voice and kid builds (2 weekends).** Groq vs Moonshine bake-off with both kids' recordings; guardrails; first real cabinet-initiated builds and forks.
 
@@ -325,5 +334,8 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 - TIC-80: https://github.com/nesbox/TIC-80
 - PICO-8 manual: https://www.lexaloffle.com/dl/docs/pico-8_manual.html
 - Quarterless wall arcade: https://quarterless.com/products/black-and-white-wall-arcade
-- Picade Max: https://www.pishop.us/product/picade-max/ and https://shop.pimoroni.com/en-us/products/picade-max
+- Picade 10" (chosen): https://www.pishop.us/product/picade-with-10-inch-display/ and https://shop.pimoroni.com/products/picade
+- Picade X HAT and driver: https://shop.pimoroni.com/products/picade-x-hat-usb-c and https://github.com/pimoroni/picade-hat
+- Picade guides: https://learn.pimoroni.com/article/assembling-your-picade and https://learn.pimoroni.com/article/setting-up-picade
+- Picade Max (replaced): https://www.pishop.us/product/picade-max/ and https://shop.pimoroni.com/en-us/products/picade-max
 - Raspberry Pi 5: https://www.pishop.us/product/raspberry-pi-5-8gb/ and https://www.pishop.us/product/raspberry-pi-5-4gb/

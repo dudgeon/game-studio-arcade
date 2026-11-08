@@ -10,9 +10,9 @@ Newest last. Each entry says who decided, and which HANDOFF section it settles o
 
 Every rule is still written so it's checkable, by a machine or by a person. The kid's answers are logged on the `cart_version` and fed into the next fork. This keeps the learning goal in the loop: the kid checks that the agent met the requirements.
 
-**D2. Cabinet hardware: Pimoroni Picade Max kit plus a Raspberry Pi 5.** *(Geoff; closes §3.3 "which cabinet".)* 1280×1024 screen, bartop. Re-check price and stock live before buying.
+**D2. Cabinet hardware: Pimoroni Picade Max kit plus a Raspberry Pi 5.** *(Geoff; closes §3.3 "which cabinet".)* 1280×1024 screen, bartop. Re-check price and stock live before buying. **Superseded by D80:** Geoff switched to the 10" Picade.
 
-**D3. Screen: 320×256, fixed 32-color palette.** *(Claude, following D2; changes the §7 proposal.)*
+**D3. Screen: 320×256, fixed 32-color palette.** *(Claude, following D2; changes the §7 proposal.)* **Screen size superseded by D81** (256×192, for the Picade's 1024×768). The palette and the other limits below stand.
 - 320×256 is 5:4 and scales exactly 4× to the Picade Max's 1280×1024, with no bars and no blur.
 - 32 colors instead of 16 gives imported pictures (desktop flow) room after quantizing, and still keeps every game in one house look.
 - The other §7 limits stand: the cabinet's buttons only, a 4-voice chip synth, no network, no DOM, persistence only through `g.save()`.
@@ -124,13 +124,13 @@ Still open:
   - the Gamepad API is read on the host;
   - the frame stays a pure function of ticks and input.
 - **Frame loading (refines D13):** the frame is a real page, `runtime/frame.html`, in an iframe with `sandbox="allow-scripts"` and no same-origin. Its CSP is `default-src 'none'; script-src 'self'`, so code loads only from the server that serves the runtime and carts, and there's no fetch, socket, image or frame access. Module scripts from an opaque origin are CORS fetches, so the runtime server sends `Access-Control-Allow-Origin: *`. `runtime/dev-server.js` exports a handler that the player, the Manager and the playtest reuse.
-- **Rendering:** a 320×256 palette-indexed framebuffer, drawn inside the frame. The host sizes the iframe to the largest integer multiple in device pixels (4× on the Picade's 1280×1024).
+- **Rendering:** a 320×256 palette-indexed framebuffer, drawn inside the frame. The host sizes the iframe to the largest integer multiple in device pixels (4× on the Picade Max's 1280×1024). *Size superseded by D81: 256×192, still 4× on the 10" Picade's 1024×768.*
 - **Palette:** our own 32 colors with names (`g.colors.red`); index 0 is black.
 - **Font:** a 5×7 bitmap font in a 6×8 cell, printable ASCII, scalable by whole numbers.
 - **Sprites:** rows of characters, `0`–`9` and `a`–`v` for palette indices 0–31, `.` for transparent.
 - **Sound:** 4 voices (square, pulse, triangle, saw, noise) with `g.tone` and named `g.sfx` presets.
 - **Saves:** `g.save` is one JSON value per cart, at most 4 KB.
-- **Dev keyboard:** P1 is the arrows, Z X C V for A B X Y, and Enter for START. P2 is W A S D, then 1 2 3 4 for A B X Y and 5 for START. Escape stands in for ★ and never reaches the cart. Gamepads use the standard mapping: pad 0 is P1, pad 1 is P2, with face buttons A B X Y = 0 1 2 3, START = 9, the d-pad or left stick (dead zone 0.5), and guide = ★. The Picade's own key map is set in Phase 2.
+- **Dev keyboard:** P1 is the arrows, Z X C V for A B X Y, and Enter for START. P2 is W A S D, then 1 2 3 4 for A B X Y and 5 for START. Escape stands in for ★ and never reaches the cart. Gamepads use the standard mapping: pad 0 is P1, pad 1 is P2, with face buttons A B X Y = 0 1 2 3, START = 9, the d-pad or left stick (dead zone 0.5), and guide = ★. The Picade's own key map is set in Phase 2 (now D82: the cabinet's controls emit these same P1 keys).
 - **Timing and taps:** the host gives `requestAnimationFrame` 4 ms of slack, so a jittery 16.5 ms frame still gets exactly one tick, and it never runs more than 4 ticks per frame. A key pressed and released between two ticks still counts as held for one frame, so quick taps aren't lost.
 - **Checked 2026-11-07 in Chrome on the mini:**
   - the hello cart ran at 60 fps, 60 ticks/s;
@@ -184,3 +184,55 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - Functions that need the console take `g` as their first argument. Everything else is pure.
 - `g.save()` holds one value per cart, so the score helpers read and merge a field of a saved object (`{ best: 1200, ... }`) and never overwrite the cart's other saved fields.
 - The reference is `runtime/lib/REFERENCE.md`: one paragraph per exported function, written for an agent. A test fails if an export is missing from it.
+
+## 2026-11-07 — Switch to the 10" Picade
+
+Specs were checked live on 2026-11-07. Sources and details are in [platform-notes.md](platform-notes.md#picade-10-inch-2025-edition).
+
+**D80. Cabinet hardware: Pimoroni Picade with 10" display, plus a Raspberry Pi 5 8 GB. Both ordered 2026-11-07.** *(Geoff; supersedes D2.)*
+- Picade: Pimoroni PIM469, PiShop US SKU 2009, $349.95, in stock (pishop.us/product/picade-with-10-inch-display). Pi 5 8 GB: PiShop SKU 8GB-9028, $175.00, in stock.
+- What changes from the Max: a 10" 1024×768 (4:3) panel instead of 19" 1280×1024 (5:4). **One player's controls**: one joystick, six player buttons, four utility buttons and a power button, all on a Picade X HAT. A desk-sized cabinet (310 × 260 × 250 mm, H × W × D).
+- Still to get (not ordered, not decided here): a USB-C power supply (Pi 5 wants 5 V/5 A, e.g. the official 27 W supply, $12.95 at PiShop), an Active Cooler (Pimoroni recommends one; $12.95 at PiShop), a microSD card, and a mic (still open, Geoff).
+- The hardware rule (§3.1, kit if not prebuilt with a Pi 5) still holds: this is a kit.
+
+**D81. Screen: 256×192, 4× to the Picade's 1024×768.** *(Claude, following D80; supersedes D3's size. The 32-color palette and the other D3 limits stand.)*
+- 1024×768 divides by whole numbers only at 2, 4 and 8, so the sizes that fill the panel are 512×384, 256×192 and 128×96. 256×192 at 4× fills it with no bars and no blur.
+- It keeps the house look: each game pixel is 4×4 panel pixels, as 320×256 was on the Max, so it stays chunky and sharp. (On the smaller panel a game pixel is about 0.8 mm across instead of 1.2 mm, viewed from closer.) 256 wide is also the §7 kickoff proposal's width.
+- Trade-offs, accepted:
+  - 40% fewer pixels than 320×256 (49,152 vs 81,920). The 6×8 font gives 42 × 24 characters instead of 53 × 32. Small sprites (8×8, 16×16) are unaffected; busy layouts get tighter.
+  - It changes code that is already written: runtime size constants, types, the frame canvas, tests, and any example cart that assumes 320×256 (list in the task report).
+  - Not chosen: keep 320×256 at 3× (960×768, filling the height with 32-pixel bars at each side). That needs no code change, but wastes 6% of the screen and isn't an exact fit. 512×384 at 2× is too fine for the house look and makes imported pictures and agent-drawn sprites much bigger work.
+- The simulator and the dev host keep sizing to the largest whole multiple of the window, so nothing else changes on the mini.
+
+**D82. The Picade's controls are a keyboard that sends the runtime's P1 keys.** *(Claude, following D80; refines D21's dev keyboard.)*
+- The X HAT reads the controls on GPIO, and Pimoroni's `picade` device-tree overlay turns them into a virtual keyboard (Linux keycodes, set per input with `dtparam`). It isn't a USB HID gamepad.
+- The provisioning script (D4) sets the overlay so the cabinet sends exactly the dev keyboard's P1 keys. Then the runtime needs no Picade-specific input code, and the simulator and the cabinet behave the same.
+
+  | Picade input | overlay param | key (code) | runtime |
+  |---|---|---|---|
+  | joystick | up/down/left/right | arrows (103/108/105/106, the overlay's default) | P1 stick |
+  | player buttons 1–4 | button1–4 | Z X C V (44 45 46 47) | A B X Y |
+  | player buttons 5–6 | button5–6 | Q E (16 18) | not given to carts in v0; spare for the launcher or later |
+  | utility 1UP | start | Enter (28) | START |
+  | utility ESC | escape | Escape (1) | ★, provisionally (D84) |
+  | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
+  | power button | (KEY_POWER) | | safe shutdown |
+- Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then.
+- P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides.
+
+**D83. Pi 5 setup facts the provisioning script must handle.** *(Claude, from Pimoroni's setup guide and the picade-hat repo, 2026-11-07.)*
+- Build and install the overlay from `pimoroni/picade-hat` at a pinned commit (Pi 5 support merged July 2025, PR #49), not with the `curl | bash` installer, which isn't reproducible.
+- Add `usb_max_current_enable=1` to `/boot/firmware/config.txt`. Power comes in through the X HAT's USB-C and back-powers the Pi over GPIO, so the Pi can't detect the supply. Without the line the screen flashes, because the display is powered from a Pi USB port.
+- Audio is the X HAT's I2S DAC (mono, 3 W): turn off the Pi's own audio (`dtparam=audio=off`) and HDMI audio (`vc4-kms-v3d,noaudio`) so Chromium's WebAudio reaches the speaker. Check on arrival; one user needed PulseAudio on Bookworm.
+- The power button: tap to start, hold 3 s to shut down. On the Pi 5, power-off from the button works; power-on was reported unreliable in issue #45 (still open). Check it on arrival.
+- An Active Cooler is recommended. One user reported about 85 °C and throttling under the HAT.
+
+**D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)*
+- **Second player.** The cabinet has one player's controls. Options:
+  1. One player at the cabinet. Two-player games take turns on the same controls. No hardware. Alina's "can Owen play too" becomes a turns game at the cabinet, and side-by-side games only work at the desktop.
+  2. Add a USB gamepad as player 2 (wired through the back panel, or wireless with a dongle). The runtime already reads a second gamepad; the cabinet needs a small input change (the first gamepad becomes P2, since the Picade is P1). Owen gets his own side.
+  3. Add a second joystick and buttons to the cabinet. The X HAT has only two spare button inputs, so this needs a USB encoder and new holes in the panel. Most work.
+- **MAKE (★).** The plan had one MAKE button per side; now there is one side. Options:
+  1. Use one of the existing front utility buttons as ★, with a sticker. No drilling.
+  2. Add a dedicated, distinct MAKE button (bigger or lit) on the X HAT's spare button pins or plasma-button connector. Needs a hole in the cabinet.
+- **Mic:** still open (Geoff, 2026-11-07). The case has no USB socket on the outside. A USB mic plugs into a Pi USB port inside the cabinet (the Pi 5 has four; the display's power takes one) and either sits inside or is routed out through the removable back panel. The X HAT uses the I2S pins for its DAC, so an I2S mic is out; USB is the path.

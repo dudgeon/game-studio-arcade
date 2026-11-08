@@ -40,6 +40,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 - No approval loop; the activity log is the oversight.
 - Existing home mesh Wi-Fi; no Ethernet.
 - Hardware: prebuilt only if it ships with a Pi 5; otherwise DIY/kit.
+- Cabinet: Pimoroni Picade 10" (1024×768, one player's controls) + Pi 5 8 GB, ordered 2026-11-07 (D80). Screen 256×192 at 4× (D81). Player 2, the MAKE button and the mic are open for Geoff (D84).
 
 ## Working agreements
 
