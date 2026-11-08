@@ -43,7 +43,9 @@ export function defaultChecker() {
       if (!mod?.playtest) return { ok: false, unavailable: true, failing: ["playtest harness isn't available yet (task 5)"] };
       let report;
       try {
-        report = await mod.playtest(dir);
+        // Key frames are regenerable, so the library never stores them: no PNGs,
+        // and nothing written into the cart folder (make.js writes playtest.json).
+        report = await mod.playtest(dir, { frames: false, out: null });
       } catch (e) {
         // HarnessError: no runtime, no spec, no Playwright. The harness couldn't run.
         return { ok: false, unavailable: true, failing: [`playtest couldn't run: ${e instanceof Error ? e.message : e}`] };

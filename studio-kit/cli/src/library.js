@@ -65,7 +65,8 @@ export function commitNewCart(o) {
   const wanted = /** @type {any} */ (o.cartJson).id || /** @type {any} */ (o.cartJson).title || "cart";
   const id = freeId(o.root, wanted);
   const dest = path.join(o.root, id);
-  fs.cpSync(o.cartDir, dest, { recursive: true });
+  // Key frames are regenerable (D62): the library keeps playtest.json, never the PNGs.
+  fs.cpSync(o.cartDir, dest, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
   fs.writeFileSync(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
   git(o.root, ["add", "--", id]);
   git(o.root, ["commit", "-q", "-m", o.message.replace("{id}", id)]);

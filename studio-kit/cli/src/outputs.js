@@ -14,7 +14,7 @@ export const INPUT_NAMES = ["studio-kit.tgz"];
 /**
  * @param {{api: import("./api.js").StudioApi, sessionId: string, dir: string,
  *          inputNames?: string[], tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} o
- * @returns {Promise<{dir: string, files: string[], missing: string[], complete: boolean, manifest: any}>}
+ * @returns {Promise<{dir: string, files: string[], missing: string[], complete: boolean, manifest: any, polls: number, listing: any[]}>}
  */
 export async function downloadOutputs(o) {
   const tries = o.tries ?? 12;
@@ -28,8 +28,13 @@ export async function downloadOutputs(o) {
   /** @type {{files?: {name: string, size: number}[]}|null} */
   let manifest = null;
   let missing = [MARKER];
+  let polls = 0;
+  /** @type {any[]} */
+  let listing = [];
   for (let i = 0; i < tries; i++) {
-    outs = (await o.api.listOutputs(o.sessionId)).filter((f) => !inputs.has(f.filename));
+    polls++;
+    listing = await o.api.listOutputs(o.sessionId);
+    outs = listing.filter((f) => !inputs.has(f.filename));
     const marker = latest(outs, MARKER);
     if (marker) {
       try {
@@ -55,7 +60,7 @@ export async function downloadOutputs(o) {
     files.push(path.basename(dest));
   }
   if (!manifest) missing = [...new Set([MARKER, ...EXPECTED.filter((n) => !files.includes(n))])];
-  return { dir: o.dir, files, missing, complete: Boolean(manifest) && missing.length === 0, manifest };
+  return { dir: o.dir, files, missing, complete: Boolean(manifest) && missing.length === 0, manifest, polls, listing };
 }
 
 function latest(outs, name) {

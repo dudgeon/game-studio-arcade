@@ -30,6 +30,7 @@ import { progressFor } from "./progress.js";
  * @property {any} usage           session usage (list_cost, tokens, active_seconds)
  * @property {string} startedAt
  * @property {string} endedAt
+ * @property {string} idleAt
  * @property {number} wallSeconds
  * @property {string} lastMessage   the agent's final text
  * @property {any[]} errors
@@ -58,6 +59,7 @@ const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted
  *   session: import("./api.js").CreateSessionParams,
  *   request: string, maker: string, withPlayer?: string|null,
  *   answerer: Answerer, ui: Ui,
+ *   message?: object,
  *   now?: () => Date, maxReconnects?: number,
  * }} o
  * @returns {Promise<SessionResult>}
@@ -206,7 +208,7 @@ export async function runSession(o) {
 
   // Open the stream before sending anything: it only carries later events.
   let stream = await o.api.openStream(sessionId);
-  await o.api.send(sessionId, [requestMessage(o)]);
+  await o.api.send(sessionId, [o.message ?? requestMessage(o)]);
   say("Reading your idea");
 
   const maxReconnects = o.maxReconnects ?? 5;
@@ -246,6 +248,7 @@ export async function runSession(o) {
 
   const ended = now();
   return {
+    idleAt: ended.toISOString(),
     sessionId,
     turns,
     planTurns,
