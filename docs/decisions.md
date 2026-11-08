@@ -184,3 +184,31 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - Functions that need the console take `g` as their first argument. Everything else is pure.
 - `g.save()` holds one value per cart, so the score helpers read and merge a field of a saved object (`{ best: 1200, ... }`) and never overwrite the cart's other saved fields.
 - The reference is `runtime/lib/REFERENCE.md`: one paragraph per exported function, written for an agent. A test fails if an export is missing from it.
+
+**D60. The playtest harness runs every check in its own worker, with two drivers behind one handle.** *(Claude, Phase 0 task 5; implements §8 and D11.)*
+- `playtest(cartDir, opts)` in `studio-kit/playtest/` reads `spec.md` with `rulesOf()`, imports `checks.js`, runs each check and the generic checks, and writes `playtest.json`. The CLI is `gsa-playtest <cart> [--driver node|browser] [--rules R1,R3] [--out dir]`; the plugin's `playtest(path, rules?)` tool wraps it.
+- **Drivers.** `node` (default) uses the runtime's `headless()`; `browser` uses Playwright against the host page's `window.arcade.test` (browser parity, real canvas). Both give the check the same `t` from `runtime/test-hook.d.ts`.
+- **Isolation and hangs.** Each check, and each generic run, gets a fresh `worker_thread` with a freshly imported cart at seed 1, so a module-level variable can't leak between checks. A cart stuck in a `while` loop can't be interrupted in-process, so the main thread enforces limits and terminates the worker: **10 s of wall time** and **18,000 stepped frames** (5 game minutes) per check. Both fail the check with a plain reason.
+- **Crash vs. wrong.** If `t.step()` rejects, the reason says the game crashed (with the frame and message), not that the rule was wrong.
+- The cabinet service should run the CLI as a child process rather than import it, because checks are agent-written code.
+
+**D61. Generic checks: six, all ours.** *(Claude, Phase 0 task 5; implements D11, adds one.)*
+- `loads`: the cart imports, `init` runs, one frame steps and draws, and `probe()` returns JSON.
+- `no-errors`: nothing the cart did threw anywhere in the run (checks and generic runs).
+- `soak`: 600 frames (10 s, as in D8's gate) of seeded random input on both players, START included, from our own PRNG, plus 600 frames with no input. No crash, no hang, and `probe()` stays JSON.
+- `palette`: every captured frame (load, one per 60 soak frames, and the end of each check) holds only palette indices 0–31. The runtime wraps any color number into 0–31 (`colorIndex`), so today this guards against runtime regressions rather than cart bugs; a cart that passes color 40 gets color 8 without a warning.
+- `frame-time`: update+draw time per soak frame. Default budget: **p95 ≤ 4 ms** off the Pi (a quarter of a 60 Hz frame, leaving headroom for a Pi that is several times slower) and ≤ 16.7 ms when `--budget-ms` is set for the Pi gate (D8). Provisional until Phase 2 measures the Pi.
+- **`deterministic` (new):** the no-input run and the soak each run twice from the same seed and input, and the frame hashes (one per 60 frames) must match. The no-input pair still measures this when the soak crashes early. A cart that uses `Math.random` or the clock breaks D10, and every other report from it would be unreproducible.
+
+**D62. `playtest.json` and key frames.** *(Claude, Phase 0 task 5; settles the §7 "last report" shape.)*
+- Written to the cart folder by default (§7), or to `--out`. Fields: `schema: 1`, `cart`, `driver`, `seed`, `ok`, `rules` (every spec rule in spec order, `status` = `pass` | `fail` | `missing` | `you-check` | `skipped`, with `reason`, `frames` stepped, and `passed`: true, false, or null when the playtest doesn't decide), `coverage` (drift errors from `checkCoverage()`), `generic` (`id` and `name`, `status`, `passed`, `reason`), `frameTime` (`frames`, `meanMs`, `p50Ms`, `p95Ms`, `maxMs`, `budgetMs`), `errors` (every crash, with where and frame), `frames` (key frame list), and `env` (Node, Playwright and browser versions, platform, time).
+- `ok` is true only when every auto rule passes, coverage has no errors, and every generic check passes.
+- **Same cart, same report:** everything except `env` and the timing numbers in `frameTime` (and the `frame-time` status) must be identical on the mini and in the sandbox. `comparable(report)` returns that part, and the parity test compares it.
+- **Key frames** are 8-bit indexed PNGs in the house palette, written without dependencies to `<out>/playtest-frames/`: `load.png`, `soak-<frame>.png` every 120 soak frames, and `<rule id>.png` (the screen when each check ended, pass or fail). Whether the cart library commits them is task 8's call.
+- CLI exit code: 0 ok, 1 a rule or generic check failed, 2 the harness couldn't run (no spec, no runtime, no Playwright).
+
+**D63. The harness never installs Playwright, and needs no `node_modules`.** *(Claude, Phase 0 task 5; implements the §5 sandbox constraint and D18.)*
+- The browser driver looks for Playwright in this order: `GSA_PLAYWRIGHT` (a path to the package), the kit's own `node_modules`, the global npm root, then `/opt/npm-tools/node_modules` (where the sandbox has it). It uses whatever browsers `PLAYWRIGHT_BROWSERS_PATH` points at, and falls back from the headless shell to the full Chromium build (`channel: "chromium"`) if only that is present. If nothing works it stops with exit 2 and says so.
+- For development on the mini, `studio-kit/playtest` pins `playwright` **1.56.0** exactly, the sandbox's version (D18; Chromium 141.0.7390.37). The packed kit leaves it out.
+- The harness imports the spec package and the runtime by relative path (`../../spec`, `../../../runtime`), not by package name, because the packed kit has no `node_modules` (D42). Checked by running a packed and extracted kit.
+

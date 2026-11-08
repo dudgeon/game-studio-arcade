@@ -5,8 +5,10 @@
 // Contracts:
 //   @game-studio-arcade/spec      validateRuleCoverage(dir) -> {ok, errors: [{message}], warnings} (D30, on main).
 //                                 A fuller validateCart(dir) is used instead if one is exported later.
-//   @game-studio-arcade/playtest  playtest(dir) -> report (playtest.json shape). Assumed; task 5 not merged yet.
-//     report.rules: [{id, kind, passed, reason}], report.generic: [{name, passed, reason}]
+//   @game-studio-arcade/playtest  playtest(dir) -> report, written to <dir>/playtest.json (D62, task 5).
+//     report.ok, report.rules: [{id, kind, status, reason}] with status pass | fail | missing | you-check | skipped,
+//     report.generic: [{id, status, reason}], report.coverage, report.frameTime, report.errors.
+//     judgeReport also still reads the older {passed, name} shape used by this package's fixtures.
 
 /**
  * @typedef {{ok: boolean, unavailable?: boolean, problems?: string[]}} ValidateResult
@@ -16,13 +18,15 @@
 
 /** Summarise a playtest report: ok only if every auto rule and generic check passed. */
 export function judgeReport(report) {
+  const passed = (x) => (x.status !== undefined ? x.status === "pass" : x.passed === true);
   const failing = [];
   for (const r of report?.rules ?? []) {
-    if ((r.kind ?? "auto") === "auto" && r.passed !== true) failing.push(r.id);
+    if ((r.kind ?? "auto") === "auto" && r.status !== "skipped" && !passed(r)) failing.push(r.id);
   }
-  for (const g of report?.generic ?? []) if (g.passed !== true) failing.push(`generic:${g.name}`);
+  for (const g of report?.generic ?? []) if (!passed(g)) failing.push(`generic:${g.id ?? g.name}`);
+  if ((report?.coverage ?? []).length) failing.push("coverage");
   const anyAuto = (report?.rules ?? []).some((r) => (r.kind ?? "auto") === "auto");
-  return { ok: anyAuto && failing.length === 0, failing };
+  return { ok: anyAuto && failing.length === 0 && report?.ok !== false, failing };
 }
 
 /** @returns {Checker} */
@@ -37,7 +41,13 @@ export function defaultChecker() {
     async playtest(dir) {
       const mod = await tryImport("@game-studio-arcade/playtest");
       if (!mod?.playtest) return { ok: false, unavailable: true, failing: ["playtest harness isn't available yet (task 5)"] };
-      const report = await mod.playtest(dir);
+      let report;
+      try {
+        report = await mod.playtest(dir);
+      } catch (e) {
+        // HarnessError: no runtime, no spec, no Playwright. The harness couldn't run.
+        return { ok: false, unavailable: true, failing: [`playtest couldn't run: ${e instanceof Error ? e.message : e}`] };
+      }
       return { report, ...judgeReport(report) };
     },
   };

@@ -1,0 +1,19 @@
+{
+  "name": "@game-studio-arcade/playtest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playtest harness: runs a cart's checks.js and the generic checks, writes playtest.json and key frames",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts", "default": "./index.js" } },
+  "bin": { "gsa-playtest": "bin/gsa-playtest.js" },
+  "engines": { "node": ">=22 <23" },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run typecheck && node --test \"test/*.test.js\""
+  },
+  "devDependencies": {
+    "playwright": "1.56.0"
+  }
+}
