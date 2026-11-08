@@ -19,7 +19,7 @@ Spend ceiling for all of Phase 0: **$25** of API list cost (proposed). Each buil
 3. **About 30 minutes for task 10**: answer the tile questions at the terminal (A/B/C/D) for one build, then play the results and rate them. The other builds replay your answers automatically.
 4. **A GitHub remote, if you want one**: should I create a private `dudgeon/game-studio-arcade` and push?
 
-Not needed yet: a Groq key (Phase 3). ~~Hardware (Phase 2)~~: done 2026-11-07, Geoff ordered the 10" Picade and a Pi 5 8 GB (D80). Since decided: single player by default, turns well supported, controller count as a setting (D85); Make on the shelf, no button (D86). Still open: the mic (D84), plus the questions D86 lists.
+Not needed yet: a Groq key (Phase 3). ~~Hardware (Phase 2)~~: done 2026-11-07, Geoff ordered the 10" Picade and a Pi 5 8 GB (D80). Since decided: single player by default, turns well supported, controller count as a setting (D85); Make on the shelf, no button (D86). Then hold-to-talk, a "Make a new game" tile, and an open list of makers (D87). Still open: the mic (D84) and how to get back to the shelf from a game (D86).
 
 I'll install these on the mini unless you object: `ant` (`brew install anthropics/tap/ant`) and Node 22 (`brew install node@22`, used through `.nvmrc`).
 
@@ -47,7 +47,7 @@ npm workspaces (`runtime`, `studio-kit/*`, later `cabinet/*` and `manager`), Typ
 ### 1. Probe session (auth done, D16)
 **Done 2026-11-07** (D17–D19): `studio-kit/auth`, `studio-kit/probe`, findings in platform-notes.md. The sandbox has Playwright **1.56.0**.
 
-First, auth plumbing (D16): `ant` already uses the `game-studio-arcade` profile. Add a shared `credentials()` helper for our TypeScript code that relies on the SDK's profile resolution. It should fail with a clear message pointing at `scripts/setup-anthropic-auth.sh`, and refuse to run if `ANTHROPIC_API_KEY` is set. Confirm the SDK actually picks up the profile.
+First, auth plumbing (D16): `ant` already uses the `game-studio-arcade` profile. Add a shared `credentials()` helper for our TypeScript code that relies on the SDK's profile resolution. It should fail with a clear message pointing at `scripts/setup-anthropic-auth.sh`. *(As built, D17: rather than refusing to run when `ANTHROPIC_API_KEY` is set, it ignores the key and passes the profile explicitly.)* Confirm the SDK actually picks up the profile.
 
 In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limited}`, no hosts) and a throwaway agent, applied with `ant apply`, plus one session that reports:
 - Node version, and the **exact Playwright version** and where it lives (global npm path, `require.resolve`)

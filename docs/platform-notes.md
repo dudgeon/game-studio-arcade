@@ -30,7 +30,7 @@ Sources: platform.claude.com/docs/en/managed-agents/{overview, quickstart, agent
 
 **Checked 2026-11-07 for tasks 7–8** (agent-setup, tools, sessions, events-and-streaming, files, budgets, session-observability, environments, skills, reference; cli/apply; SDK 1.6.0 types). Not yet run live:
 
-- **Where list cost is reported:** the session object's `usage.list_cost` is `{amount: "<whole cents>", currency: "USD"}`, alongside token counts, `cache_creation`, `active_seconds` and `server_tool_use`. A `session.usage` event with the same snapshot arrives right before every idle. Task 1's probe should confirm it.
+- **Where list cost is reported:** the session object's `usage.list_cost` is `{amount: "<whole cents>", currency: "USD"}`, alongside token counts, `cache_creation`, `active_seconds` and `server_tool_use`. A `session.usage` event with the same snapshot arrives right before every idle. Confirmed by task 1's probe (D19).
 - **Idle stop reasons** (SDK types): `end_turn`, `requires_action` (with `event_ids`), `budget_reached`, `retries_exhausted`, `refusal`. A `user.custom_tool_result` sent twice is accepted and ignored.
 - **Per-session model:** `agent: {type: "agent_with_overrides", id, version?, model: {id}}`. It never versions the agent, and replaces the whole `model` object, so effort falls back to the model's default.
 - **`ant apply` (≥ 1.30):**
@@ -109,7 +109,7 @@ Sources: platform.claude.com/docs/en/manage-claude/{workload-identity-federation
 - `ant auth login --profile <name>` opens a browser. After approval, the page shows a code to paste into the terminal (the `platform.claude.com/oauth/code/callback` redirect). A workspace picker binds the token to one workspace; `--workspace-id` skips the picker.
 - **Default scope:** `user:profile user:inference user:developer`. The token lasts 8 h, refreshes itself, and is stored in `~/.config/anthropic/credentials/<profile>.json` (0600). The first login for a profile makes it the active profile.
 - **Works with Managed Agents:** `ant beta:agents list` and `ant beta:environments list` succeed (checked 2026-11-07).
-- `ant auth status` shows the winning credential source and workspace. The docs say the SDKs, Claude Code and the Agent SDK use the same profile resolution; the TypeScript SDK is still to be verified in Phase 0.
+- `ant auth status` shows the winning credential source and workspace. The docs say the SDKs, Claude Code and the Agent SDK use the same profile resolution; the TypeScript SDK was confirmed in Phase 0 task 1: `createClient()` passes the profile explicitly (D17).
 
 ## Managed Agents sandbox, as probed (2026-11-07)
 

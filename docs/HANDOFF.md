@@ -1,4 +1,4 @@
-> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions), then for Geoff's player and MAKE answers (D85, D86). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
+> **Status (2026-11-07):** saved from the kickoff, then updated for the switch to the 10" Picade (D80–D84: hardware, screen size, controls, open questions), then for Geoff's player and MAKE answers (D85, D86) and the Make flow details (D87). Later decisions are in [decisions.md](decisions.md) and verified platform facts in [platform-notes.md](platform-notes.md); where they disagree with this brief, they win.
 
 # game-studio-arcade — Handoff Brief
 
@@ -8,7 +8,7 @@ Written Nov 7, 2026 from two planning sessions (text and voice) between Geoff an
 
 A small arcade cabinet in Geoff's basement that builds its own games. **The Studio makes the games; the Arcade plays them.**
 
-Owen (13) and Alina (10) walk up, pick Make on the game shelf, say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
+Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say who's making, hold a button and say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
 
 **Learning goal.** Not teaching the kids to code. Teaching them to work with an agent: state intent, define requirements, check that the agent met them, then change the approach or change the requirement. Kid-editable code (blocks, MakeCode) is explicitly not a goal.
 
@@ -77,7 +77,7 @@ Owen (13) and Alina (10) walk up, pick Make on the game shelf, say what they wan
 - ~~Second player~~: games default to single player, with turns well supported; the controller count is a setting; external controllers later (D85).
 - ~~The MAKE (★) button~~: no physical button assumed; the Studio starts from the launcher/shelf (D86).
 - The mic (D84; no external USB on the case; an XLR jack plus gooseneck is being researched).
-- Opened by D86: what starts and stops the mic, where Make sits on the shelf, how a kid gets back to the shelf from a game, and who is making (D86 lists the options).
+- ~~Opened by D86~~: hold a button to talk, a "Make a new game" tile, and an open list of makers (D87). Still open: how a kid gets back to the shelf from a game (D86).
 - Speech bake-off results.
 - Default build model and per-build cap.
 - Starter library v1 contents.
@@ -188,16 +188,16 @@ Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by t
 
 ### 8.1 Cabinet-initiated: new game
 
-1. The kid picks Make on the shelf (D86) and says what they want; how the mic starts and stops is open (D86). The Pi records, sends the audio to Groq, and shows the transcript for confirmation (retry allowed).
+1. The kid picks the "Make a new game" tile on the shelf and says who's making: a known name, or a new one (D87). On the "tell me" screen they hold a player button, talk, and let go to send (D87). The Pi records only while the button is held, sends the audio to Groq, and shows the transcript for confirmation (retry allowed).
 2. The Studio side screens the request, then creates a Managed Agents session with the kid brief, context pack, studio kit tarball and spending cap.
-3. Claude calls `ask_player`. The tile relay renders A and B plus C and D. Each answer becomes a spec line. Repeat until Claude is satisfied or the kid picks D.
+3. Claude calls `ask_player`. The tile relay renders A and B plus C and D (C: hold a button and talk, D87). Each answer becomes a spec line. Repeat until Claude is satisfied or the kid picks D.
 4. (Proposed) "Here's the plan": the spec's rules in plain words; build, or change a rule.
 5. Claude writes code from the spec. The playtester checks every rule; Claude fixes and retests. The cabinet shows progress in kid language, and the kid can play something else meanwhile.
 6. On pass, the cabinet service downloads the outputs, validates them, commits the cart, and puts it on the shelf with the maker's initial. Play is local from then on.
 
 ### 8.2 Cabinet-initiated: fork
 
-1. The kid selects a cart and presses B.
+1. The kid selects a cart and chooses to change it (D87 keeps "pick a game, then change it"; the exact button is set with the launcher), then says who's making.
 2. A new version is created with maker, parent pointer and originating session. The original is never modified.
 3. The kid states the change. The session gets the parent's spec, code and original conversation, and asks only about what's ambiguous, with the same tiles.
 4. Claude edits the spec first, then the code, reusing library pieces.
@@ -247,7 +247,7 @@ Carts list/pull/push, launch, activity query, health (online, Wi-Fi signal, soft
 
 ### 9.5 Logging schema (minimum)
 
-- `studio_session`: id, origin, maker, with, request transcript, turns `[{question, option_a, option_b, choice, said}]`, ended_by (`answers` or `make_it_now`), spec diff, playtest results, list cost, outcome.
+- `studio_session`: id, origin, maker, with (maker ids from the cabinet's `makers.json`, guests included, D87), request transcript, turns `[{question, option_a, option_b, choice, said}]`, ended_by (`answers` or `make_it_now`), spec diff, playtest results, list cost, outcome.
 - `cart_version`: cart_id, version, parent, session_id, commit sha, created.
 - `play`: cart_version, player side, start, duration, early_quit.
 
