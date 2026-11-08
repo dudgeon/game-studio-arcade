@@ -276,7 +276,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
   | power button | (KEY_POWER) | | safe shutdown |
 - Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then.
-- P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides.
+- P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet.)*
 
 **D83. Pi 5 setup facts the provisioning script must handle.** *(Claude, from Pimoroni's setup guide and the picade-hat repo, 2026-11-07.)*
 - Build and install the overlay from `pimoroni/picade-hat` at a pinned commit (Pi 5 support merged July 2025, PR #49), not with the `curl | bash` installer, which isn't reproducible.
@@ -285,7 +285,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - The power button: tap to start, hold 3 s to shut down. On the Pi 5, power-off from the button works; power-on was reported unreliable in issue #45 (still open). Check it on arrival.
 - An Active Cooler is recommended. One user reported about 85 °C and throttling under the HAT.
 
-**D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)*
+**D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)* **Answered 2026-11-08:** players by D85, MAKE by D86. The mic is still open (Geoff is having an XLR jack on the front with an XLR gooseneck researched; see hardware-mic.md).
 - **Second player.** The cabinet has one player's controls. Options:
   1. One player at the cabinet. Two-player games take turns on the same controls. No hardware. Alina's "can Owen play too" becomes a turns game at the cabinet, and side-by-side games only work at the desktop.
   2. Add a USB gamepad as player 2 (wired through the back panel, or wireless with a dongle). The runtime already reads a second gamepad; the cabinet needs a small input change (the first gamepad becomes P2, since the Picade is P1). Owen gets his own side.
@@ -294,3 +294,24 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   1. Use one of the existing front utility buttons as ★, with a sticker. No drilling.
   2. Add a dedicated, distinct MAKE button (bigger or lit) on the X HAT's spare button pins or plasma-button connector. Needs a hole in the cabinet.
 - **Mic:** still open (Geoff, 2026-11-07). The case has no USB socket on the outside. A USB mic plugs into a Pi USB port inside the cabinet (the Pi 5 has four; the display's power takes one) and either sits inside or is routed out through the removable back panel. The X HAT uses the I2S pins for its DAC, so an I2S mic is out; USB is the path.
+
+## 2026-11-08 — Players and MAKE (Geoff, answering D84)
+
+**D85. Games default to single player; turns are well supported; the number of controllers is a setting.** *(Geoff; answers D84 "second player", changes HANDOFF §4, §7 and §10.)*
+- Geoff: "Default to single player games; optional mechanic well supported in library for turn based games, address ext controllers later. Make number of controllers a configuration setting to anticipate arbitrary numbers of controllers in the future."
+- A new game is single player unless the kid asks for more. When a kid wants someone else to play too, at the cabinet that means **taking turns** on the one set of controls.
+- The starter library gets a well-tested turn-taking helper (whose turn, handing over, per-player scores and lives), so "can Owen play too" doesn't get re-derived each build. The helper ships in the library, not as a rule every cart must follow.
+- **How many controllers there are is a configuration setting**, not a fixed two. The cabinet is set to 1 today. The runtime and carts must not assume exactly one or exactly two, so that adding controllers later is a config change. (Implementation is with the runtime worker, routed by the director.)
+- External controllers (a USB gamepad and so on) come later. Nothing is bought or wired for them now.
+- The desktop simulator can still be set to more than one controller, for testing and for desktop play.
+
+**D86. No physical MAKE button is assumed; the Studio starts from the launcher/shelf.** *(Geoff; answers D84 "MAKE", changes HANDOFF §1, §4 and §8.1.)*
+- Geoff: "It is not obvious we need a physical 'make' button; this could be in the launch screen/game shelf."
+- Starting a new game (and forking one) is something the kid picks on screen in the launcher, not a dedicated button. Nothing is drilled or wired for MAKE.
+- ★ stays reserved: the key that never reaches a cart (D21, D82). What it does without MAKE (for example, back to the shelf from a game) is one of the questions below.
+- Questions this opens, for Geoff (not decided):
+  1. **What starts and stops the mic** when a kid is asked to talk (the request, and the C "Something else" tile)? (a) Hold a button while talking, e.g. any player button while the "tell me" screen is up. Clear and kid-proof, and closest to the original plan. (b) Press once to start, again to stop, with a time limit. Frees both hands, but kids forget to stop. (c) Voice activity: the mic opens when the screen asks and stops after a pause. Hands-free, but it can cut off a kid who pauses to think, and basement echo and the cabinet's own speaker make it less reliable.
+  2. **Where the Studio entry sits on the shelf:** (a) a "Make a new game" tile in the game list, or (b) a menu opened with a utility button. Forking stays "pick a game, then change it" (§8.2).
+  3. **How a kid leaves a game and gets back to the shelf** now that ★ isn't MAKE: (a) a utility button (the ESC one, D82) held for a second, or (b) a pause menu on START.
+  4. **Who is making:** the shelf shows the maker's initial, and there's no longer a "side" to hint at it. (a) Ask "Who's making? O or A" when the kid picks Make, or (b) leave it unattributed at the cabinet and tag it later in the Manager.
+

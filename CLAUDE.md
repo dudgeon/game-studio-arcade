@@ -1,6 +1,6 @@
 # game-studio-arcade
 
-A basement arcade cabinet (Raspberry Pi 5) that builds its own games. **The Studio makes the games; the Arcade plays them.** Owen (13) and Alina (10) hold MAKE, say what they want, answer Claude's questions with the joystick, and a new game lands on the shelf. The learning goal is working with an agent (state intent, define requirements, check them, adjust), not learning to code.
+A basement arcade cabinet (Raspberry Pi 5) that builds its own games. **The Studio makes the games; the Arcade plays them.** Owen (13) and Alina (10) pick Make on the game shelf, say what they want, answer Claude's questions with the joystick, and a new game lands on the shelf. The learning goal is working with an agent (state intent, define requirements, check them, adjust), not learning to code.
 
 Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brief): [docs/decisions.md](docs/decisions.md). Verified platform facts: [docs/platform-notes.md](docs/platform-notes.md). Current phase plan: [docs/phase-0.md](docs/phase-0.md).
 
@@ -40,7 +40,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 - No approval loop; the activity log is the oversight.
 - Existing home mesh Wi-Fi; no Ethernet.
 - Hardware: prebuilt only if it ships with a Pi 5; otherwise DIY/kit.
-- Cabinet: Pimoroni Picade 10" (1024×768, one player's controls) + Pi 5 8 GB, ordered 2026-11-07 (D80). Screen 256×192 at 4× (D81). Player 2, the MAKE button and the mic are open for Geoff (D84).
+- Cabinet: Pimoroni Picade 10" (1024×768, one player's controls) + Pi 5 8 GB, ordered 2026-11-07 (D80). Screen 256×192 at 4× (D81). Games default to single player, with turns well supported; the controller count is a setting (D85). No physical MAKE button; the Studio starts from the launcher/shelf (D86). The mic is open (D84).
 
 ## Working agreements
 
