@@ -67,7 +67,7 @@ Keyboard (dev):
 | P1 | arrows | Z | X | C | V | Enter |
 | P2 | W A S D | 1 | 2 | 3 | 4 | 5 |
 
-Only players up to `?players=N` (default 1) get input, so add `&players=2` to use the P2 keys. Escape stands in for ★ (MAKE) and never reaches the cart. Gamepads use the standard mapping: pad *k* is player *k*+1 (pad 0 is P1), for pads below `players`; guide on any pad is ★. The face buttons are A B X Y (0 1 2 3), START is 9, and the stick is the d-pad or the left stick (dead zone 0.5). Guide is ★.
+Only players up to `?players=N` (default 1) get input, so add `&players=2` to use the P2 keys. Escape is ★, the leave-game key (the Picade's ESC button, D88): it goes to the host as `onStar` and never reaches the cart. Gamepads use the standard mapping: pad *k* is player *k*+1 (pad 0 is P1), for pads below `players`; guide on any pad is ★. The face buttons are A B X Y (0 1 2 3), START is 9, and the stick is the d-pad or the left stick (dead zone 0.5). Guide is ★.
 
 `play.html` parameters:
 
