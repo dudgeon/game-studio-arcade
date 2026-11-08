@@ -43,6 +43,7 @@ test("isPlaytestRun matches running it, not reading about it", () => {
 
 test("parsePlaytestLines and splitChecks", () => {
   assert.deepEqual(parsePlaytestLines("  FAIL      R1: nope\n  PASS      R2\n  PASS      loads\n"), { pass: ["R2"], fail: ["R1"] });
+  assert.deepEqual(parsePlaytestLines("ok  13 rules\ntrue\nR1 pass \nR2 fail too slow\nR3 you-check the player checks\nloads pass\n"), { pass: ["R1"], fail: ["R2"] }, "an agent's own --json summary");
   const s = splitChecks('const h = 1;\nexport default {\n  R1: async (t) => { await t.step(1); },\n  "R2": async (t) => {},\n};\n');
   assert.equal(s.header, "const h = 1; export default {");
   assert.deepEqual(Object.keys(s.rules), ["R1", "R2"]);

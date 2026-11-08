@@ -50,11 +50,15 @@ export function isPlaytestRun(cmd) {
 
 const resultText = (ev) => (Array.isArray(ev.content) ? ev.content.map((b) => b.text ?? "").join("") : String(ev.content ?? ""));
 
-/** The harness's per-rule lines: "  FAIL      R1: reason", "  PASS      R2". */
+/**
+ * Per-rule results in a command's output: the harness's "  FAIL      R1: reason",
+ * or an agent's own summary of --json, such as "R1 pass" or "R1: fail".
+ */
 export function parsePlaytestLines(text) {
   const pass = [];
   const fail = [];
   for (const m of text.matchAll(/^\s*(PASS|FAIL)\s+(R\d+)\b/gm)) (m[1] === "PASS" ? pass : fail).push(m[2]);
+  for (const m of text.matchAll(/^\s*(R\d+):?\s+(pass|fail|missing)\b/gm)) (m[2] === "pass" ? pass : fail).push(m[1]);
   return { pass, fail };
 }
 

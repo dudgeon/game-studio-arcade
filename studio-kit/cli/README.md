@@ -68,6 +68,7 @@ The frog-hop stream is hand-written from the docs. Replace it with a recorded st
   - Committed to the dev cart library. The stream dropped once and the driver reconnected.
   - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
 
+- **2026-11-08, models:** `scripts/compare-models.sh` built the penguin request on Haiku ×2, Sonnet and Opus ×2. See `docs/phase-0-results.md`. `scripts/play-headless.js` plays a cart with a bot and writes a contact sheet.
 - **2026-11-08, D44 and D45:** two more builds of the same request under the frozen-checks brief, tarball and skill. See D45 for the comparison.
 
 ## Still needs a live session
