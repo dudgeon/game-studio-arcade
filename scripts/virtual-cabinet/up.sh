@@ -15,7 +15,9 @@ UTMCTL="$UTM/Contents/MacOS/utmctl"
 NETWORK=Bridged
 [ "${1:-}" = "--network" ] && NETWORK="$2"
 
-if xattr "$UTM" 2>/dev/null | grep -q com.apple.quarantine; then
+# macOS keeps the attribute after approval and sets the 0x40 flag: 0181 is unapproved, 01c1 approved.
+q="$(xattr -p com.apple.quarantine "$UTM" 2>/dev/null || true)"
+if [ -n "$q" ] && [ $(( 0x${q%%;*} & 0x40 )) -eq 0 ]; then
   cat >&2 <<MSG
 UTM hasn't been cleared to run yet: starting it now would raise macOS's first-open dialog (D146).
 Geoff: run "open $UTM", click Open, then quit UTM. Then run this again.

@@ -4,6 +4,11 @@ HOSTNAME_WANTED=arcade-virtual
 hw_early() {
   # The generator grew the partition in the disk's table; this grows the filesystem. Safe to repeat.
   resize2fs /dev/vda2 || true
+  # No EEPROM here. Swap stays as on the Pi, and only needs the module Debian's kernel doesn't build in.
+  systemctl mask rpi-eeprom-update.service
+  printf 'loop\nuinput\n' > /etc/modules-load.d/arcade-virtual.conf
+  modprobe loop
+  modprobe uinput
 }
 
 hw_late() {
@@ -52,7 +57,6 @@ step_firewall() {
 step_keys() {
   install -m 0755 "$SELF_DIR/files/arcade-keyd" /usr/local/bin/arcade-keyd
   install -m 0644 "$SELF_DIR/files/arcade-keyd.service" /etc/systemd/system/arcade-keyd.service
-  echo uinput > /etc/modules-load.d/arcade-uinput.conf
   systemctl daemon-reload
   systemctl enable arcade-keyd
   systemctl restart arcade-keyd

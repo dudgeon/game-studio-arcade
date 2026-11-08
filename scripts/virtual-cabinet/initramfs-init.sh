@@ -6,6 +6,7 @@ PATH=/bin
 mount -t proc proc /proc
 mount -t sysfs sys /sys
 mount -t devtmpfs dev /dev
+# Only a few lines, well under the serial buffer, and only readable with serial.sh.
 exec >/dev/hvc0 2>&1 || true
 echo "[arcade-init] loading modules"
 for m in @MODULES@; do insmod "/mods/$m.ko" || echo "[arcade-init] insmod $m failed"; done
@@ -37,18 +38,20 @@ SYSD=/newroot/etc/systemd/system
 if [ -f "$SEED/seed/arcade-seed.service" ] && [ ! -e /newroot/etc/arcade/provisioned-version ]; then
   echo "[arcade-init] planting first-boot service"
   cp "$SEED/seed/arcade-seed.service" "$SYSD/arcade-seed.service"
+  chmod 0644 "$SYSD/arcade-seed.service"
   ln -sf ../arcade-seed.service "$SYSD/multi-user.target.wants/arcade-seed.service"
   [ -f "$SEED/seed/hostname" ] && cp "$SEED/seed/hostname" /newroot/etc/hostname
   # Pi OS's first-boot user wizard and cloud-init are for a Pi's card; this seed replaces them.
   mkdir -p /newroot/etc/cloud
   : > /newroot/etc/cloud/cloud-init.disabled
   ln -sf /dev/null "$SYSD/userconfig.service"
+  ln -sf /dev/null "$SYSD/rpi-eeprom-update.service" # no EEPROM here
   # modules.dep isn't in the kernel package. Build it before udev needs it.
   cat > "$SYSD/arcade-depmod.service" <<UNIT
 [Unit]
 Description=Index the kernel modules before udev starts
 DefaultDependencies=no
-Before=sysinit.target systemd-udevd.service systemd-modules-load.service
+Before=sysinit.target systemd-udevd.service systemd-modules-load.service nftables.service network-pre.target
 ConditionPathExists=!/usr/lib/modules/@KERNEL_RELEASE@/modules.dep
 
 [Service]
@@ -58,6 +61,9 @@ ExecStart=/usr/sbin/depmod -a @KERNEL_RELEASE@
 [Install]
 WantedBy=sysinit.target
 UNIT
+  # Built into the Pi's kernel, modules in Debian's. Pi OS's swap needs loop; the driver needs uinput.
+  mkdir -p /newroot/etc/modules-load.d
+  printf 'loop\nuinput\n' > /newroot/etc/modules-load.d/arcade-virtual.conf
   mkdir -p "$SYSD/sysinit.target.wants"
   ln -sf ../arcade-depmod.service "$SYSD/sysinit.target.wants/arcade-depmod.service"
 fi

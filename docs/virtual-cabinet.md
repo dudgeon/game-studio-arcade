@@ -36,7 +36,7 @@ How it differs from the Cabinet Manager's simulator (D70's local player, which g
 | Model | Mac mini (Mac18,5), Apple M6, 12 cores (2 Super, 4 Performance, 6 Efficiency) |
 | Memory | 32 GB |
 | macOS | 27.0 (26A428) |
-| Disk | 926 GB data volume, **31 GB free (97% used)**: see question 6 |
+| Disk | 926 GB data volume, about 218 GiB free when V0 was built (2026-11-08); 31 GB free on 2026-11-07 |
 | Network | Wi-Fi (`en1`) in use; Ethernet `en0` inactive |
 | Audio | Built-in speakers only. **No microphone** (only "Mac mini Speakers" in System Information) |
 | VM tools installed | none (no UTM, QEMU, Lima, Tart or Docker) |
@@ -182,7 +182,7 @@ Placed into the build plan (HANDOFF §14). Each step ends with something Geoff c
 3. **Games made on the virtual cabinet:** (a) move to the real cabinet's shelf when it arrives, with their history, or (b) stay on the virtual cabinet as test games. *Lean: (a)*, if the kids make games on it. Nothing is deleted either way.
 4. **After the Picade arrives:** (a) keep the virtual cabinet as a staging cabinet, where updates are tried before the Pi, or (b) archive it (disk kept, VM off). *Lean: (a).*
 5. **The mic:** buy the cabinet's mic now, so the virtual cabinet uses the same device (the mini has no mic at all). It depends on D84: a USB mic, or the USB audio interface if you go with the XLR gooseneck. *Lean: yes, once D84 is settled.* Without one, voice waits.
-6. **Disk space:** the mini has 31 GB free (97% used). The virtual cabinet needs about 8–12 GB now and is capped at 32 GB. (a) Fine as is, (b) free some space first, (c) keep the VM on an external drive. *Lean: (b)*; at 97% the mini itself is close to trouble.
+6. **Disk space:** (now about 218 GiB free, 2026-11-08) the mini had 31 GB free (97% used). The virtual cabinet needs about 8–12 GB now and is capped at 32 GB. (a) Fine as is, (b) free some space first, (c) keep the VM on an external drive. *Lean: (b)*; at 97% the mini itself is close to trouble.
 7. **Who on the home network can see it:** (a) bridged, so it's a device on the home Wi-Fi like the real cabinet (any home device could open its pages, as with the real one), or (b) visible only to the mini. *Lean: (a)*, for fidelity.
 8. **How it's played:** (a) the Mac keyboard (same keys as the Picade), or (b) also a USB arcade stick passed through, for the feel (a purchase; D85 put external controllers off). *Lean: (a)* for now.
 

@@ -165,7 +165,10 @@ Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also
 Read from UTM's v5.0.8 source and docs, or checked on the mini. The VM hasn't booted yet (D146), so nothing here proves how a VM behaves.
 
 - **Installing with `brew install --cask utm` leaves UTM quarantined.** Running anything from the app, even `utmctl --help`, raises Gatekeeper's first-open dialog and hangs until someone answers. `spctl` still calls it accepted: Notarized Developer ID, Turing Software, LLC (WDNLXAD4W8).
+- **Approval shows in the attribute's flags, not its absence:** `xattr -p com.apple.quarantine` read `0181` before Geoff clicked Open and `01c1` after (bit 0x40).
 - **`utm://start`, `stop` and the rest were removed in v4.5.1.** Only `downloadVM` remains. Scripted starts go through `utmctl` (Apple Events) or a hand-made Shortcut. There's no per-VM start-on-launch: `shouldAutoStartVM` applies to a display window already opened. UTM's remote server needs pairing in its GUI.
+- **An unread serial pseudo-terminal can freeze the guest.** With `console=hvc0`, once its buffer fills the kernel spins (D148).
+- **`utmctl start` printed `Error from event … OSStatus error -10004` twice and still started the VM**, exit 0, with no window seen by any script here. Check `utmctl status`, not that text.
 - **`utmctl start --hide`** hides UTM's main window. **A VM with no display device and no built-in-terminal serial device is headless**, with no VM window (docs; unproven here).
 - **Config:** `config.plist` in `<name>.utm/`, `ConfigurationVersion` 4, `Backend` `Apple`, files in `Data/`. Opening a `.utm` package registers it as a shortcut where it is, without copying it (`importUTM(asShortcut: true)`).
 - **UEFI needs UTM's GUI or scripting save:** only that creates `efi_vars.fd`. Direct Linux boot needs just `vmlinux` and `initrd` in `Data/`.

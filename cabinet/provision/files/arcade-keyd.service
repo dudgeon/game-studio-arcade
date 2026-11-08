@@ -1,5 +1,6 @@
 [Unit]
 Description=Arcade driver keyboard (uinput, virtual cabinet only, D144)
+After=systemd-modules-load.service
 Before=arcade-kiosk.service
 
 [Service]

@@ -24,7 +24,7 @@ scripts/virtual-cabinet/verify.sh ~/game-studio-data/vm/verify
 
 If bridging on Wi-Fi fails, rebuild with `node scripts/virtual-cabinet/build.mjs --replace --network Shared`, then `up.sh --network Shared`.
 
-To rebuild from scratch and prove it's reproducible, stop the VM (`cabinet/vm/drive ssh sudo poweroff`) and remove it from UTM, then run `build.mjs --replace` and `up.sh`. **`--replace` destroys that VM's disk, carts and logs (D129).** Only use it on a VM with nothing to keep.
+To rebuild from scratch and prove it's reproducible: `scripts/virtual-cabinet/rebuild.sh --yes-destroy-this-vm`. **That destroys the VM's disk, carts and logs (D129).** Only use it on a VM with nothing to keep.
 
 After a good boot, pin the packages: `cabinet/vm/drive apt-lock`, put the output in `provision/apt.lock`, and commit.
 

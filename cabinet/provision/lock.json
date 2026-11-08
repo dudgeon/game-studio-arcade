@@ -5,6 +5,12 @@
     "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-10-06/2026-10-06-raspios-trixie-arm64-lite.img.xz",
     "sha256": "483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843"
   },
+  "node": {
+    "version": "22.23.4",
+    "name": "node-v22.23.4-linux-arm64.tar.xz",
+    "url": "https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-arm64.tar.xz",
+    "sha256": "6287aa46b6c375d816e63ae66d024fbbfd70404825aabdfdf898a970871d2f4b"
+  },
   "virtual": {
     "kernel_release": "6.12.107+deb13-arm64",
     "kernel_deb": {

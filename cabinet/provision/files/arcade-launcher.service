@@ -5,7 +5,7 @@ After=local-fs.target
 [Service]
 User=arcade
 Environment=GSA_DATA_DIR=/var/lib/arcade
-ExecStart=/usr/bin/node /opt/arcade/current/studio-kit/player/bin/studio-play.js --host 127.0.0.1 --port 8330 --carts /var/lib/arcade/carts --logs /var/lib/arcade/logs --players 1
+ExecStart=/usr/local/bin/node /opt/arcade/current/studio-kit/player/bin/studio-play.js --host 127.0.0.1 --port 8330 --carts /var/lib/arcade/carts --logs /var/lib/arcade/logs --players 1
 Restart=always
 RestartSec=2
 

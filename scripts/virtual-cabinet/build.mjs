@@ -4,6 +4,7 @@
 //
 //   node scripts/virtual-cabinet/build.mjs [--replace] [--network Bridged|Shared] [--bridge en1]
 //
+// --serial-console sends boot messages to the serial device: always run serial.sh with it.
 // Output: ~/game-studio-data/vm/arcade-virtual.utm (never in git). It refuses to
 // overwrite an existing VM unless you pass --replace.
 import { execFileSync, spawn, spawnSync } from "node:child_process";
@@ -27,7 +28,9 @@ const DISK_BYTES = 32 * 2 ** 30;
 // Fixed, so a rebuilt VM is the same machine on the network (locally administered MAC).
 const MAC = "5a:47:41:43:41:42";
 const UUID = "6F0C9A52-3B1E-4D7A-8C24-A1B2C3D4E5F6";
-const CMDLINE = "console=hvc0 root=/dev/vda2 rw";
+// Not console=hvc0 unless debugging: UTM's serial is a pseudo-terminal, and when nobody reads it
+// and its buffer fills, the kernel spins on the console and the whole guest freezes (D148).
+const CMDLINE = process.argv.includes("--serial-console") ? "console=hvc0 root=/dev/vda2 rw" : "root=/dev/vda2 rw";
 const BOOT_MODULES = ["virtio_blk", "ext4", "vfat", "nls_cp437", "nls_ascii", "crc32c_generic"];
 
 const args = process.argv.slice(2);
@@ -163,13 +166,14 @@ function miniAddrs() {
   return [...addrs].sort();
 }
 
-function writeSeed(mount, { modulesTgz, profile }) {
+function writeSeed(mount, { modulesTgz, nodeTarball, profile }) {
   const seed = join(mount, "seed");
   mkdirSync(seed, { recursive: true });
   const provDir = join(REPO, "cabinet/provision");
   run("tar", ["-czf", join(seed, "provision.tar.gz"), "--no-xattrs", "--no-mac-metadata", "-C", provDir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   bundle(join(seed, "bundle.tar.gz"), ["package.json", "runtime", "studio-kit/player", "studio-kit/playtest", "studio-kit/spec", "studio-kit/context-pack/carts", "cabinet/vm/guest"]);
   cpSync(modulesTgz, join(seed, "kernel-modules.tar.gz"));
+  cpSync(nodeTarball, join(seed, lock.node.name));
   cpSync(join(provDir, "files/firstboot.sh"), join(seed, "firstboot.sh"));
   cpSync(join(provDir, "files/arcade-seed.service"), join(seed, "arcade-seed.service"));
   writeFileSync(join(seed, "profile"), `${profile}\n`);
@@ -202,10 +206,12 @@ async function main() {
     if (!flag("--replace")) throw new Error(`${PACKAGE} exists. Pass --replace to rebuild it (this destroys that VM's disk).`);
     say(`replacing ${PACKAGE}`);
     rmSync(PACKAGE, { recursive: true });
+    rmSync(join(VM_ROOT, "ssh/known_hosts"), { force: true }); // a new VM has new host keys
   }
   const image = await fetchPinned(lock.image);
   const kernelDeb = await fetchPinned(lock.virtual.kernel_deb);
   const busyboxDeb = await fetchPinned(lock.virtual.busybox_deb);
+  const nodeTarball = await fetchPinned(lock.node);
   const release = lock.virtual.kernel_release;
 
   const tmp = `${PACKAGE}.tmp`;
@@ -239,7 +245,7 @@ async function main() {
     const p2 = partition(grown, 2);
     say(`partitions: p1 type 0x${p1.type.toString(16)} ${(p1.sizeBytes / 2 ** 20).toFixed(0)} MiB, p2 ${(p2.sizeBytes / 2 ** 30).toFixed(1)} GiB`);
 
-    withBootPartition(disk, (mount) => writeSeed(mount, { modulesTgz, profile: "virtual" }));
+    withBootPartition(disk, (mount) => writeSeed(mount, { modulesTgz, nodeTarball, profile: "virtual" }));
 
     const config = utmConfig({ name: NAME, uuid: UUID, mac: MAC, network, bridgeInterface: bridge, cmdline: CMDLINE });
     const json = join(work, "config.json");

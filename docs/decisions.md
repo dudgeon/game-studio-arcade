@@ -486,11 +486,17 @@ Decided by Claude (the V0 worker) unless marked. **The VM has not booted yet: se
 - Screenshots are the compositor's actual 1024×768 output.
 - Simulating audio in for hold-to-talk later, not built: load `snd-aloop` in the `virtual` profile and play a WAV into the loopback while `drive hold` holds the talk button, so the speech pipeline hears it through ALSA as if from a mic. Testing the pipeline alone can feed the WAV straight to it.
 
-**D145. Node comes from the pinned image's apt sources in V0, and `gsa-playtest` uses its node driver in the VM.** *(Claude; stays inside the installs approved for V0.)*
-- Trixie's Node is 20, while the repo's `engines` says 22. Nothing the player and harness use was found to need 22 in a text search, but that is unproven until the first boot. If it fails, Node 22 needs the director's OK: it isn't on the approved list.
-- Playwright isn't installed in the VM (not on the approved list), so V0's frame-time numbers come from the node driver, labelled `host: "virtual"` by `cabinet/vm/` (D128). The browser-driver gate is V1.
+**D145. Node 22 from nodejs.org, pinned by SHA-256, and `gsa-playtest` uses its node driver in the VM.** *(Director's call, following D9: Node 22 everywhere, matching the sandbox and the Pi.)*
+- The official linux-arm64 tarball, v22.23.4, not trixie's Node 20. The generator seeds it, and the script checks its SHA-256 and installs it under `/opt/arcade/node/`.
+- Playwright isn't installed in the VM yet, so V0's frame-time numbers come from the node driver, labelled `host: "virtual"` by `cabinet/vm/` (D128). The browser-driver gate is V1.
 
 **D146. Starting the VM needs two steps from Geoff, once.** *(Claude; facts checked 2026-11-08. Geoff decides.)*
 - **Gatekeeper:** UTM (notarized, Developer ID Turing Software, WDNLXAD4W8) is still quarantined. Anything that runs from `UTM.app`, even `utmctl --help`, raises the first-open dialog. Removing quarantine by script was OK'd through the director, but Claude Code's permission system refused it, so it stands. Geoff clears it by opening UTM once.
 - **Automation:** the only scripted way to start a VM is `utmctl start`, which uses Apple Events. So the first start should raise one "control UTM" consent prompt. UTM removed `utm://start` in v4.5.1 and has no start-on-launch setting (its `shouldAutoStartVM` only applies to a display window already opened), so no route without Apple Events was found. Its remote server needs pairing through the GUI, and Shortcuts would need a shortcut made by hand.
-- `scripts/virtual-cabinet/up.sh` is the one command for after that. It refuses to run while quarantine is on.
+- Geoff approved UTM's first open on 2026-11-08. macOS keeps the quarantine attribute and sets its 0x40 flag (`0181` became `01c1`).
+- `scripts/virtual-cabinet/up.sh` is the one command for after that. It refuses to run until that flag is set.
+- The 16K-page kernel (it matches the Pi 5) waits until a 4K boot works, so one thing changes at a time.
+
+**D147. Plan A won (D121): the stock Pi OS userland boots on Debian's kernel.** *(Claude, from the first boots, 2026-11-08; D121's checks.)* Boots unattended, apt sees Pi OS's own sources (Chromium comes from Raspberry Pi's archive), and bridged Wi-Fi gives an address and `arcade-virtual.local`. What Debian's kernel changes: `loop` and `uinput` are modules, so the `virtual` profile loads them, which keeps Pi OS's zram-and-file swap working as on the Pi. `rpi-eeprom-update` is masked (no EEPROM).
+
+**D148. The kernel console stays off the serial device.** *(Claude, from a boot that froze for an hour, 2026-11-08.)* UTM's serial device is a pseudo-terminal. With `console=hvc0` and nobody reading it, its buffer fills and the kernel spins on the console: `soft lockup … stuck for 3512s`, with the guest frozen and the mini's CPU at about 190%. The first boot only worked because a reader happened to be attached. So the normal command line has no serial console. `build.mjs --serial-console` turns it back on for debugging, with `serial.sh` reading.

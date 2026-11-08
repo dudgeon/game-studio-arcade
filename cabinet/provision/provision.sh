@@ -81,6 +81,27 @@ CONF
   systemctl enable --now ssh
 }
 
+# D9: Node 22 everywhere, from nodejs.org, pinned by SHA-256 in lock.json.
+lock_value() { sed -n "/\"node\": {/,/}/s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p" "$SELF_DIR/lock.json"; }
+
+step_node() {
+  local version name url sha dest tarball
+  version="$(lock_value version)"; name="$(lock_value name)"; url="$(lock_value url)"; sha="$(lock_value sha256)"
+  dest="$ARCADE_HOME/node/$version"
+  if [ ! -x "$dest/bin/node" ]; then
+    tarball="$PAYLOAD/$name"
+    if [ ! -f "$tarball" ]; then
+      tarball="$(mktemp)"
+      curl -fsSL -o "$tarball" "$url"
+    fi
+    echo "$sha  $tarball" | sha256sum -c -
+    install -d "$dest.tmp"
+    tar -xJf "$tarball" -C "$dest.tmp" --strip-components=1
+    mv "$dest.tmp" "$dest"
+  fi
+  ln -sfn "$dest/bin/node" /usr/local/bin/node
+}
+
 step_bundle() {
   # Each version gets its own folder, and `current` points at the latest (never deleted).
   local version release
@@ -126,7 +147,8 @@ step_services() {
   systemctl set-default multi-user.target >/dev/null
   systemctl enable avahi-daemon arcade-launcher arcade-kiosk
   systemctl restart avahi-daemon arcade-launcher
-  systemctl restart arcade-kiosk
+  # Don't wait on the screen: a kiosk problem must not stop provisioning. verify.sh checks it.
+  systemctl restart --no-block arcade-kiosk
 }
 
 log "profile $PROFILE"
@@ -135,6 +157,7 @@ hw_early
 step_apt
 step_users
 step_ssh
+step_node
 step_bundle
 step_carts
 hw_late
