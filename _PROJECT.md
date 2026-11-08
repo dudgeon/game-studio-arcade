@@ -34,6 +34,10 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - Phase 0 budget: $25 total, $3 cap per build.
 - Alina's Phase 0 request is a stand-in Claude wrote (docs/phase-0.md). Swap in her real words when we have them.
 
+## Director
+
+- **Merge and push checked work:** when a worker's branch passes the director's own checks (tests run by the director, deliverable read), the director may merge it into main and push main to the private GitHub repo without asking each time, and lists each merge in its digest. (Geoff, 2026-11-07)
+
 ## Decisions
 
 - 2026-11-07: spec rules come in two kinds: auto (playtest) and you-check (the kid confirms on first play) (D1)
@@ -42,3 +46,4 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-07: nothing is deleted, including Anthropic-side sessions (D5)
 - 2026-11-07: Geoff decides functional constraints; Claude decides implementation and logs it
 - 2026-11-07: API auth via Workload Identity Federation with per-device signing keys, not API keys (D15)
+- 2026-11-07: director may merge checked worker branches into main and push (standing rule in ## Director)
