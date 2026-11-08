@@ -48,7 +48,7 @@ Run it with `validate-cart <cart-dir>` (or `validateCart(dir)` from this package
 
 **`cart.json`:**
 
-- it must exist and be a JSON object with `id` (lowercase letters, digits and dashes, like `sloth-snacks`), `title` and `players` (1 or 2);
+- it must exist and be a JSON object with `id` (lowercase letters, digits and dashes, like `sloth-snacks`), `title` and `players` (how many people the game is for, 1 to 8, the runtime's `MAX_PLAYERS`; more people than controllers means they take turns, D112);
 - the fields the Studio adds when it files the cart (`version`, `maker`, `with`, `parent` as `cart-id@version` or `null`, `session_id`, `origin` as `cabinet` or `desktop`, `created` as an ISO time) must have that shape if present;
 - an unknown field, or a title that differs from the spec's, is a warning.
 

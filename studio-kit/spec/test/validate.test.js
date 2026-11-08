@@ -6,6 +6,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateCart, lintCartSource, checkCartJson, annotate, formatIssues } from '../index.js';
+import { MAX_PLAYERS } from '../../../runtime/index.js';
 
 const VALID = fileURLToPath(new URL('./fixtures/valid-cart/', import.meta.url));
 const BIN = fileURLToPath(new URL('../bin/validate-cart.js', import.meta.url));
@@ -43,8 +44,19 @@ test('validateCart: a missing or malformed cart.json fails', async () => {
   assert.match(of(missing, 'cart.json')[0].message, /no cart\.json/);
   const broken = await validateCart(variant({ 'cart.json': '{ "id": ' }), { types: false });
   assert.match(of(broken, 'cart.json')[0].message, /isn't valid JSON/);
-  const bad = await validateCart(variant({ 'cart.json': '{"id":"Sloth Snacks","title":"Sloth Snacks","players":4,"origin":"phone"}' }), { types: false });
+  const bad = await validateCart(variant({ 'cart.json': '{"id":"Sloth Snacks","title":"Sloth Snacks","players":9,"origin":"phone"}' }), { types: false });
   assert.deepEqual(of(bad, 'cart.json').map((e) => e.message.match(/"(\w+)"/)?.[1]), ['id', 'players', 'origin']);
+});
+
+test('checkCartJson: players is how many people the game is for, 1..MAX_PLAYERS (D112)', () => {
+  assert.equal(MAX_PLAYERS, 8);
+  const players = (v) => checkCartJson(JSON.stringify({ id: 'party', title: 'Party', players: v })).errors.map((e) => e.message);
+  for (let n = 1; n <= MAX_PLAYERS; n++) assert.deepEqual(players(n), [], `players ${n}`);
+  for (const bad of [0, MAX_PLAYERS + 1, 1.5, -1, '2', null]) {
+    const errs = players(bad);
+    assert.equal(errs.length, 1, `players ${JSON.stringify(bad)}`);
+    assert.match(errs[0], new RegExp(`from 1 to ${MAX_PLAYERS}`));
+  }
 });
 
 test('checkCartJson: the full record the CLI writes is valid; unknown fields and a title mismatch only warn', () => {
