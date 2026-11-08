@@ -1,0 +1,21 @@
+{
+  "request": "I want a game where a penguin catches fish that fall from the sky, and if you miss three fish you lose, and sometimes a boot falls and you should NOT catch the boot",
+  "maker": "A",
+  "questions": [
+    {
+      "choice": "A"
+    },
+    {
+      "choice": "B"
+    },
+    {
+      "choice": "C",
+      "said": "slides left and right but really slippery like on ice"
+    }
+  ],
+  "plan": [
+    {
+      "choice": "build"
+    }
+  ]
+}

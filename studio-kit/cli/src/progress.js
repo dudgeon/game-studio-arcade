@@ -12,8 +12,10 @@ export function progressFor(ev) {
   switch (ev.name) {
     case "bash":
       if (/studio-kit\.tgz/.test(cmd)) return "Unpacking my toolbox";
-      if (/playtest/.test(cmd)) return "Playing your game to test it";
-      if (/validate/.test(cmd)) return "Checking the cart";
+      // Match the commands, not a README that mentions them.
+      if (/gsa-playtest|playtest\.js/.test(cmd)) return "Playing your game to test it";
+      if (/validate-cart/.test(cmd)) return "Checking the cart";
+      if (/^\s*(cd [^;&]+[;&]+\s*)?(cat|ls|head|less)\b/.test(cmd)) return "Reading up";
       if (/cart\.tgz|outputs/.test(cmd)) return "Packing up your game";
       return "Working";
     case "write":
