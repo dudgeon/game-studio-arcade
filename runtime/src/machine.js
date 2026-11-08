@@ -4,7 +4,7 @@
 import * as lib from "../lib/index.js";
 import { Framebuffer, H, W, hashPixels, makeSprite } from "./gfx.js";
 import { textWidth } from "./font.js";
-import { BIT } from "./input.js";
+import { BIT, MAX_PLAYERS, checkPlayers } from "./input.js";
 import { COLORS, PALETTE, colorIndex } from "./palette.js";
 import { createRng } from "./rng.js";
 import { SFX, Voices, toneToSegment } from "./sound.js";
@@ -31,17 +31,20 @@ function utf8Length(s) {
 }
 
 /**
- * @param {{ cart: Arcade.Cart, seed?: number, save?: string | null }} opts
+ * @param {{ cart: Arcade.Cart, seed?: number, save?: string | null, players?: number }} opts
  *   save is the JSON text currently saved for this cart, or null.
+ *   players is the number of controllers, 1..MAX_PLAYERS (default 1, D110).
  */
-export function createMachine({ cart, seed = 1, save = null }) {
+export function createMachine({ cart, seed = 1, save = null, players }) {
   checkCart(cart);
+  const nPlayers = checkPlayers(players);
   const fb = new Framebuffer();
   const rand = createRng(seed);
   const voices = new Voices();
   let frame = 0;
-  let cur = [0, 0];
-  let prev = [0, 0];
+  /** @type {number[]} one mask per controller */
+  let cur = new Array(nPlayers).fill(0);
+  let prev = cur;
   let saved = save ?? null;
   /** @type {AudioOut[]} */
   let audioOut = [];
@@ -68,10 +71,12 @@ export function createMachine({ cart, seed = 1, save = null }) {
     return c;
   };
 
+  // Players 1..MAX_PLAYERS are valid; one beyond g.players has no controller,
+  // so its mask is 0 and nothing reads as held (D112).
   const playerIndex = (p) => {
-    if (p === undefined || p === 1) return 0;
-    if (p === 2) return 1;
-    throw new Error(`player must be 1 or 2, got ${p}`);
+    if (p === undefined) return 0;
+    if (Number.isInteger(p) && p >= 1 && p <= MAX_PLAYERS) return p - 1;
+    throw new Error(`player must be 1 to ${MAX_PLAYERS}, got ${p}`);
   };
   const bit = (b) => {
     const v = BIT[/** @type {Arcade.Button} */ (b)];
@@ -98,16 +103,18 @@ export function createMachine({ cart, seed = 1, save = null }) {
     palette: PALETTE,
     lib,
 
-    btn: (b, p) => (cur[playerIndex(p)] & bit(b)) !== 0,
+    players: nPlayers,
+
+    btn: (b, p) => ((cur[playerIndex(p)] ?? 0) & bit(b)) !== 0,
     btnp: (b, p) => {
       const i = playerIndex(p);
       const m = bit(b);
-      return (cur[i] & m) !== 0 && (prev[i] & m) === 0;
+      return ((cur[i] ?? 0) & m) !== 0 && ((prev[i] ?? 0) & m) === 0;
     },
     btnr: (b, p) => {
       const i = playerIndex(p);
       const m = bit(b);
-      return (cur[i] & m) === 0 && (prev[i] & m) !== 0;
+      return ((cur[i] ?? 0) & m) === 0 && ((prev[i] ?? 0) & m) !== 0;
     },
 
     cls: (c) => fb.cls(col(c, "cls")),
@@ -172,10 +179,13 @@ export function createMachine({ cart, seed = 1, save = null }) {
     get frame() {
       return frame;
     },
-    /** Run one update with this frame's input masks [p1, p2]. */
-    update(masks = [0, 0]) {
+    /** How many controllers this run has (g.players). */
+    players: nPlayers,
+    /** Run one update with this frame's input: one mask per controller (missing ones are 0, extras ignored). */
+    update(/** @type {ArrayLike<number>} */ masks = []) {
       prev = cur;
-      cur = [masks[0] | 0, masks[1] | 0];
+      cur = new Array(nPlayers);
+      for (let i = 0; i < nPlayers; i++) cur[i] = (masks[i] ?? 0) | 0;
       frame++;
       cart.update(g, state);
     },

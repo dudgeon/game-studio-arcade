@@ -1,6 +1,6 @@
 // Runs inside the sandboxed cart frame (D13, D21). The host page drives it:
-//   host -> frame: { type: "boot", cartUrl, seed, save }
-//                  { type: "tick", n, masks }            run n updates, then draw
+//   host -> frame: { type: "boot", cartUrl, seed, save, players }
+//                  { type: "tick", n, masks }            run n updates, then draw (one mask per controller)
 //                  { type: "call", id, method, args }    test handle call
 //   frame -> host: { type: "ready" } | { type: "out", audio, save }
 //                  { type: "error", error } | { type: "result", id, value?, error? }
@@ -44,12 +44,12 @@ function flush() {
   if (audio.length || save !== undefined || warnings.length) post({ type: "out", audio, save, warnings });
 }
 
-async function boot({ cartUrl, seed, save }) {
+async function boot({ cartUrl, seed, save, players }) {
   try {
     const url = new URL(cartUrl, location.href);
     const mod = await import(url.href);
     const cart = checkCart(mod.default);
-    t = createTestHandle(cart, { seed, save });
+    t = createTestHandle(cart, { seed, save, players });
     render();
     flush();
     post({ type: "ready" });
@@ -107,7 +107,7 @@ addEventListener("message", (e) => {
   const msg = e.data;
   if (!msg || typeof msg !== "object") return;
   if (msg.type === "boot") boot(msg);
-  else if (msg.type === "tick") tick(Math.max(1, Math.min(8, msg.n | 0)), msg.masks ?? [0, 0]);
+  else if (msg.type === "tick") tick(Math.max(1, Math.min(8, msg.n | 0)), Array.isArray(msg.masks) ? msg.masks : []);
   else if (msg.type === "call") call(msg.id, msg.method, msg.args);
 });
 

@@ -18,9 +18,10 @@
 // reason shown in playtest.json, so write it for a person. Checks import
 // nothing (no node:assert): they must run the same in Node and in a browser.
 //
-// Every check starts from a fresh cart: seed 1, nothing saved, frame 0, init
-// already run. Time only moves when the check calls step(): the clock is
-// frames, not wall time, so a report reproduces on any machine.
+// Every check starts from a fresh cart: seed 1, nothing saved, frame 0, one
+// controller (g.players === 1, as on the cabinet), init already run. Time
+// only moves when the check calls step(): the clock is frames, not wall time,
+// so a report reproduces on any machine.
 //
 // The same handle is implemented three ways, all with this exact shape:
 //   - headless in Node (runtime/headless.js): no browser, no pixels on screen;
@@ -35,12 +36,22 @@ declare namespace Arcade {
    */
   type Held = readonly Button[] | string;
 
-  /** Hold these buttons for `frames` frames. Players left out hold nothing. */
+  /**
+   * Hold these buttons for `frames` frames. Players left out hold nothing.
+   * A player beyond the run's controller count (1 unless `reset({ players })`
+   * says otherwise, D110) has no controller, so what it holds is ignored.
+   */
   interface InputStep {
     /** How many frames this step lasts, >= 1. */
     frames: number;
     p1?: Held;
     p2?: Held;
+    p3?: Held;
+    p4?: Held;
+    p5?: Held;
+    p6?: Held;
+    p7?: Held;
+    p8?: Held;
   }
 
   /** A queue of input steps, played in order, one frame per stepped frame. */
@@ -63,6 +74,12 @@ declare namespace Arcade {
     seed?: number;
     /** Keep what the cart saved with g.save() (e.g. to test a high score that survives a restart). Default false. */
     keepSave?: boolean;
+    /**
+     * Controllers for the new run, 1..8 (g.players). Default: the run's
+     * starting count, which is 1 (the cabinet) unless the harness says
+     * otherwise. Use `{ players: 2 }` to check a side-by-side game.
+     */
+    players?: number;
   }
 
   /** A sound the cart started, for checks like "a sound plays when a line clears". */

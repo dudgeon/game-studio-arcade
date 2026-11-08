@@ -29,7 +29,8 @@ export default {
   - `g.btnp(b, p)` is true on the frame it's pressed;
   - `g.btnr(b, p)` is true on the frame it's released.
   
-  Buttons are `up down left right a b x y start`, and `p` is 1 or 2 (default 1).
+  Buttons are `up down left right a b x y start`, and `p` is the player, 1 to 8 (default 1).
+- **Players (D110–D113):** `g.players` is how many controllers the console has: **1 on the cabinet**, and 1 by default everywhere else. Games are single player by default. A player with no controller holds nothing (`g.btn("a", 2)` is false at `g.players === 1`), so a game for two people takes turns with `g.lib.turns`, which hands over controller 1 between turns.
 - **Drawing** on 256×192 (`g.W`, `g.H`; use those, never the numbers), with colors 0–31 or by name (`g.colors.red`):
   - shapes: `cls pset pget line rect rectfill circ circfill`;
   - text: `text(s, x, y, c, {scale, align})` and `textWidth`;
@@ -39,14 +40,14 @@ export default {
 - **Sound:** `g.sfx(name)` takes `blip select jump coin pop hit explode powerup lose win`. Also `g.tone({ note: "C5", wave, frames, vol, slide })` and `g.stop()`.
 - **Colors outside 0–31** still draw (wrapped), but each one is reported once as a dev warning (`t.warnings()`, `arcade.warnings`, the browser console), so the playtest's palette check can flag it.
 - **Saves:** `g.save(data)` and `g.load()` hold one JSON value of at most 4 KB, e.g. for a high score.
-- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score` and `g.lib.flow`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
+- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score`, `g.lib.flow` and `g.lib.turns`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
 - **Not allowed:** `document`, `window`, `fetch`, timers, `eval` and imports. The frame's sandbox blocks them anyway, and the type-check flags them.
 
 `checks.js` has one async check per `(auto)` rule id. A check fails by throwing, and the message becomes the reason in the report. See [test-hook.d.ts](test-hook.d.ts) and [examples/hello/checks.js](examples/hello/checks.js).
 
 Commands (package.json `bin`):
 
-- `arcade-run <game.js> [--frames N] [--seed N] [--input JSON] [--checks checks.js]` runs the cart headless and prints `{ ok, frame, hash, probe, sounds, warnings, checks }`. It exits 1 on a cart error or a failed check.
+- `arcade-run <game.js> [--frames N] [--seed N] [--players N] [--input JSON] [--checks checks.js]` runs the cart headless and prints `{ ok, frame, hash, probe, sounds, warnings, checks }`. It exits 1 on a cart error or a failed check.
 - `arcade-dev-server [--port N] [--cart name=dir]` serves carts for a browser (below).
 - Type-check a cart with no DOM: `tsc -p runtime/tsconfig.cart.json`, or copy that config for your cart folder.
 
@@ -66,12 +67,13 @@ Keyboard (dev):
 | P1 | arrows | Z | X | C | V | Enter |
 | P2 | W A S D | 1 | 2 | 3 | 4 | 5 |
 
-Escape stands in for ★ (MAKE) and never reaches the cart. Gamepads use the standard mapping: pad 0 is P1 and pad 1 is P2. The face buttons are A B X Y (0 1 2 3), START is 9, and the stick is the d-pad or the left stick (dead zone 0.5). Guide is ★.
+Only players up to `?players=N` (default 1) get input, so add `&players=2` to use the P2 keys. Escape stands in for ★ (MAKE) and never reaches the cart. Gamepads use the standard mapping: pad *k* is player *k*+1 (pad 0 is P1), for pads below `players`; guide on any pad is ★. The face buttons are A B X Y (0 1 2 3), START is 9, and the stick is the d-pad or the left stick (dead zone 0.5). Guide is ★.
 
 `play.html` parameters:
 
 - `cart`: the URL path of `game.js` on the same server (the frame's CSP is `script-src 'self'`).
 - `seed`: default 1.
+- `players`: how many controllers, 1–8 (default 1, like the cabinet). The cabinet passes its config's `players` to `createHost({ players })`.
 - `test=1`: a paused clock and no live input. Frames only advance through `arcade.test.step()`.
 - `save=<url-encoded JSON>`: the initial `g.load()` value.
 - `fps=1`: show the fps, the scale and the tick count.
@@ -82,7 +84,7 @@ Escape stands in for ★ (MAKE) and never reaches the cart. Gamepads use the sta
 
 ```js
 import { headless } from "@game-studio-arcade/runtime";
-const t = await headless("path/to/game.js", { seed: 1 });
+const t = await headless("path/to/game.js", { seed: 1 }); // { players: 2 } for two controllers
 await t.input([{ frames: 30, p1: "right" }]);
 await t.step(30);
 console.log(await t.probe(), (await t.frame()).hash);

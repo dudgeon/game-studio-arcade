@@ -17,10 +17,11 @@ export async function loadCart(file) {
 
 /**
  * @param {string | URL | Arcade.Cart} cart a game.js path or URL, or a cart object
- * @param {{ seed?: number, save?: unknown }} [opts] save: initial g.load() data
+ * @param {{ seed?: number, save?: unknown, players?: number }} [opts] save: initial g.load() data;
+ *   players: controllers, 1..8, default 1 (D110)
  */
 export async function headless(cart, opts = {}) {
   const c = typeof cart === "string" || cart instanceof URL ? await loadCart(cart) : checkCart(cart);
   const save = opts.save === undefined || opts.save === null ? null : JSON.stringify(opts.save);
-  return createTestHandle(c, { seed: opts.seed, save });
+  return createTestHandle(c, { seed: opts.seed, save, players: opts.players });
 }

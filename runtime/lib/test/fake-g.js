@@ -2,7 +2,7 @@
 // runtime/headless.js lands. Only what the library touches: frame, input and saves.
 
 /**
- * @param {{ frame?: number, save?: unknown }} [opts]
+ * @param {{ frame?: number, save?: unknown, players?: number }} [opts]
  */
 export function fakeG(opts = {}) {
   /** @type {any} */
@@ -13,6 +13,7 @@ export function fakeG(opts = {}) {
   const pressed = new Set();
   const g = {
     frame: opts.frame ?? 0,
+    players: opts.players ?? 1,
     saves: 0,
     /** Hold buttons this frame: press("left", 1), press("start", 2). Each call is a fresh press. */
     press(/** @type {string} */ b, p = 1) {

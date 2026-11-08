@@ -120,11 +120,14 @@ test("sprite errors are readable", async () => {
 
 test("btn, btnp and btnr see edges per player", async () => {
   const log = [];
-  const t = await headless({
-    init: () => ({}),
-    update: (g) => log.push([g.btn("a"), g.btnp("a"), g.btnr("a"), g.btn("a", 2)]),
-    draw() {},
-  });
+  const t = await headless(
+    {
+      init: () => ({}),
+      update: (g) => log.push([g.btn("a"), g.btnp("a"), g.btnr("a"), g.btn("a", 2)]),
+      draw() {},
+    },
+    { players: 2 },
+  );
   await t.input([{ frames: 2, p1: "a" }, { frames: 1, p2: ["a"] }]);
   await t.step(4);
   assert.deepEqual(log, [
@@ -133,6 +136,49 @@ test("btn, btnp and btnr see edges per player", async () => {
     [false, false, true, true],
     [false, false, false, false],
   ]);
+});
+
+test("players: g.players is the setting (default 1); a player with no controller holds nothing (D110-D112)", async () => {
+  /** @type {any[]} */
+  const log = [];
+  /** @type {Arcade.Cart} */
+  const cart = {
+    init: (g) => ({ n: g.players }),
+    update: (g) => log.push([g.players, g.btn("a", 1), g.btn("a", 2), g.btnp("a", 2), g.btnr("a", 2), g.btn("b", 8)]),
+    draw() {},
+  };
+  const t = await headless(cart);
+  await t.input([{ frames: 1, p1: "a", p2: "a", p8: "b" }]); // the playtest soak always sends p2
+  await t.step(2);
+  assert.deepEqual(log, [
+    [1, true, false, false, false, false],
+    [1, false, false, false, false, false],
+  ]);
+
+  log.length = 0;
+  await t.reset({ players: 8 });
+  await t.input([{ frames: 1, p2: "a", p8: "b" }]);
+  await t.step(2);
+  assert.deepEqual(log, [
+    [8, false, true, true, false, true],
+    [8, false, false, false, true, false],
+  ]);
+
+  log.length = 0;
+  await t.reset();
+  await t.step();
+  assert.equal(log[0][0], 1, "reset() goes back to the run's starting count");
+
+  const three = await headless(cart, { players: 3 });
+  await three.reset();
+  log.length = 0;
+  await three.step();
+  assert.equal(log[0][0], 3, "the starting count is the one headless() was given");
+
+  await assert.rejects(t.reset({ players: 0 }), /whole number from 1 to 8, got 0/);
+  await assert.rejects(headless(cart, { players: 9 }), /whole number from 1 to 8, got 9/);
+  const bad = await headless({ init: () => ({}), update: (g) => g.btn("a", /** @type {any} */ (9)), draw() {} });
+  await assert.rejects(bad.step(), /player must be 1 to 8, got 9/);
 });
 
 test("unknown buttons and players throw with the frame", async () => {

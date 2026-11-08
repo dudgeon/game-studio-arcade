@@ -19,6 +19,8 @@ export type Checks = Arcade.Checks;
 export const W: 256;
 export const H: 192;
 export const BUTTONS: readonly Arcade.Button[];
+/** Most controllers a console can have (D110): `Arcade.Player` is 1..MAX_PLAYERS. */
+export const MAX_PLAYERS: 8;
 /** The 32-color house palette as "#rrggbb", index 0..31 (D3). */
 export const PALETTE: readonly string[];
 /** Palette names to indices. */
@@ -29,6 +31,8 @@ export interface HeadlessOptions {
   seed?: number;
   /** Initial g.load() data. Default null. */
   save?: unknown;
+  /** Controllers for this run (D110), 1..8. Default 1, like the cabinet. */
+  players?: number;
 }
 
 /**

@@ -43,8 +43,9 @@ export function tick(flow) {
  * Which player pressed to start: 1, 2, or 0 for nobody. Ignores presses in
  * the first `after` frames of the mode (default 30, half a second), so a
  * button still being mashed when a game ends doesn't skip the game-over
- * screen. `buttons` defaults to START and A; `players` to both. If both
- * players press on the same frame, player 1 wins.
+ * screen. `buttons` defaults to START and A; `players` to every connected
+ * controller (1..g.players). If two players press on the same frame, the
+ * lower number wins.
  * @param {Arcade.G} g
  * @param {Flow} flow
  * @param {{ after?: number, buttons?: readonly Arcade.Button[], players?: readonly Arcade.Player[] }} [opts]
@@ -53,7 +54,8 @@ export function tick(flow) {
 export function startPressed(g, flow, opts = {}) {
   if (flow.t < (opts.after ?? 30)) return 0;
   const buttons = opts.buttons ?? ["start", "a"];
-  for (const p of opts.players ?? [1, 2]) {
+  const players = opts.players ?? Array.from({ length: g.players }, (_, i) => /** @type {Arcade.Player} */ (i + 1));
+  for (const p of players) {
     if (buttons.some((b) => g.btnp(b, p))) return p;
   }
   return 0;
