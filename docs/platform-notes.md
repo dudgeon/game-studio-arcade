@@ -43,7 +43,7 @@ Sources: code.claude.com/docs/en/{plugins-reference, plugins/create, plugins/ins
 
 ## Playwright
 
-- Latest release: **v1.65.0 (2026-11-05)**. The **sandbox version is unknown** until a probe session reads it, and the local harness must be pinned to that version, not to the latest.
+- Latest release: **v1.65.0 (2026-11-05)**. **The Managed Agents sandbox has 1.56.0** (probed 2026-11-07, D18), and the local harness pins to that, not to the latest.
 - Linux arm64 on Debian 12/13 is officially supported (it uses Chrome for Testing builds since v1.63). Raspberry Pi isn't mentioned. Pointing `executablePath` at a system Chromium works "at your own risk". Try the bundled build on the Pi first.
 
 ## Raspberry Pi OS
@@ -89,3 +89,21 @@ Sources: platform.claude.com/docs/en/manage-claude/{workload-identity-federation
 - **Default scope:** `user:profile user:inference user:developer`. The token lasts 8 h, refreshes itself, and is stored in `~/.config/anthropic/credentials/<profile>.json` (0600). The first login for a profile makes it the active profile.
 - **Works with Managed Agents:** `ant beta:agents list` and `ant beta:environments list` succeed (checked 2026-11-07).
 - `ant auth status` shows the winning credential source and workspace. The docs say the SDKs, Claude Code and the Agent SDK use the same profile resolution; the TypeScript SDK is still to be verified in Phase 0.
+
+## Managed Agents sandbox, as probed (2026-11-07)
+
+Session `sesn_01Qbgy4bgLKvukuMevfJDiU5`: environment `gsa-probe-offline` (limited networking, no hosts), agent `gsa-probe` (Haiku 5.5). Raw results are in `studio-kit/probe/results/`. Decisions taken from this: D18, D19.
+
+- **Machine:** Ubuntu 24.04.5 LTS, x86_64, kernel 6.18, **4 vCPU, 16 GB RAM** (the docs say "up to 8 GB"), about 30 GB free disk. It runs as root, and the session mounts are owned by user `claude`.
+- **Node:** `/opt/node22/bin/node` v22.22.0, npm 10.9.4. Global npm root is `/home/claude/.npm-global/lib/node_modules`, with links into `/opt/npm-tools`. Preinstalled globally: typescript 6.0.3, tsx 4.23.12, ts-node, sharp, react 19, marked, pdf-lib and others. Python 3.11.17, git 2.43, GNU tar 1.35, jq 1.7 and ffmpeg 6.1.1 are present too.
+- **Playwright:** 1.56.0 (Node and Python). Browsers are at `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`: `chromium-1194`, `chromium_headless_shell-1194` and `ffmpeg-1011`. A stray 1.56.1 sits in `/opt/node-tools`. `require("playwright")` works with `NODE_PATH="$(npm root -g)"`.
+- **Headless Chromium 141.0.7390.37:**
+  - launches offline in about 5.1 s
+  - a 320×256 canvas scaled to 1280×1024 renders with pixelated scaling (screenshot checked)
+  - `requestAnimationFrame` ran 63 frames in 1 s
+  - `page.keyboard.press` reached `keydown` (`ArrowLeft`, `KeyZ`)
+  - `AudioContext`, `OfflineAudioContext`, `navigator.getGamepads`, `OffscreenCanvas` and WebGL all exist
+  - no page errors
+- **Network is fully blocked:** DNS fails (`getent`, curl "Could not resolve host"), the npm registry is unreachable (ENOTFOUND), and Chromium `page.goto` fails with `net::ERR_NAME_NOT_RESOLVED`.
+- **Files:** a mounted file appears at its absolute `mount_path` under `/mnt/session/uploads/`, read-only. Outputs go in `/mnt/session/outputs/`. Outputs can still be syncing seconds after idle, and the session's file listing includes the uploaded inputs (D19).
+- **Cost and timing:** 80 s wall time, 79.5 s active. Tokens: 6 input, 5,345 cache-write, 4,545 cache-read, 310 output. Reported `list_cost` is `"0"` (rounded to cents); the computed cost is about $0.003. `session.usage` arrived at the end of the turn.

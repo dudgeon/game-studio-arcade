@@ -1,0 +1,8 @@
+# Phase 0 task 1 probe environment: the same networking Studio sessions will use.
+# limited + no allowed_hosts = no outbound network (omitting networking would
+# default to unrestricted). No packages: everything must already be in the image.
+name: gsa-probe-offline
+config:
+  type: cloud
+  networking:
+    type: limited
