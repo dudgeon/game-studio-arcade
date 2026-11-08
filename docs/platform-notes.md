@@ -40,6 +40,11 @@ Sources: platform.claude.com/docs/en/managed-agents/{overview, quickstart, agent
   - `--dry-run` shows the plan; `--yes` is needed without a terminal.
   - It can't adopt resources created elsewhere.
 - **Confirmed live 2026-11-08 (Studio agent apply, ant 2.7.1):** a `./tools/*.json` glob under `tools` expands into the custom tools; `allowed_hosts: []` with both `allow_*: false` is accepted; a second `ant apply` with no edits reports "Everything is up to date". `ant --profile <name> apply` shows `credentials profile <name>` in the plan.
+- **Studio parity session, 2026-11-08** (`sesn_0183yE1n3dd38YdPPA5WBRZU`, Haiku 5.5, 50¢ cap, the applied Studio agent and environment with a harness system prompt). The kit extracted, and `gsa-playtest` passed on `dot-catch` with both drivers (Node 22.22.0; Playwright 1.56.0, Chromium 141.0.7390.37). **`comparable()` matched the mini's run exactly for both `--driver node` and `--driver browser`.**
+  - Output listing: bare filenames as written. The inputs appear under their mount basenames (`studio-kit.tgz`, `parity.tgz`) and are filtered out by name.
+  - Outputs went on syncing after idle: `DONE.json` and every manifest size matched on the 3rd poll, about 6.9 s after `session.status_idle` (2 s between polls).
+  - Cost: `usage.list_cost` read `"0"`. Recomputed from `usage` at list prices it was 0.16¢: tokens 0.086¢ (6 in, 162 out, 5,751 cache writes, 5,578 cache reads) plus 35.5 active seconds of runtime at 0.079¢. That agrees with "0" after rounding to the nearest cent.
+  - Sandbox frame time for the trivial `dot-catch`: node driver p95 0.023 ms, browser driver p95 3.5 ms (max 108.7 ms). The browser figure is close to D61's 4 ms default budget.
 - **Session outputs:** the Files API lists only a `filename` per output, with no path. Folder structure isn't guaranteed, so we ship one `cart.tgz` (D42).
 - **Custom tool names** also can't match a built-in tool name (`bash`, `read`…).
 - **Custom skills** attach as `{type: custom, skill_id, version}`, up to 500 per session. They need the `read` tool.

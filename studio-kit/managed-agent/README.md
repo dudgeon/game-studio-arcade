@@ -42,8 +42,8 @@ In order, once the director clears it (after task 1's probe):
 
 1. ~~`ant apply --dry-run .`, then `ant apply .`; commit `claude-lock.json`; re-apply plans no changes.~~ Done 2026-11-08: agent `agent_01GCfhH2MUfkwgaEJTbyGZQM` v1, environment `env_01GaCpCjFgzRACKrBmGRjVHv`. The re-apply reported "Everything is up to date, 2 unchanged".
 2. ~~Confirm `ant apply` accepts `./tools/*.json` under `tools`, and `allowed_hosts: []`.~~ Done: the plan expanded all three tools, and the environment config went in as written.
-3. `studio kit --upload` once the kit has its parts. Check the Files API accepts the tarball and the cache in `~/game-studio-data/kit-uploads.json` stops a second upload.
-4. One capped session (`--budget-cents 50`) that extracts the kit and runs the playtest on a context-pack example cart (task 7's accept).
-5. Check what the Files API reports for outputs: is `filename` the bare name (D42 assumes so), and how long do outputs lag behind the final idle?
-6. Check `session.usage` arrives before the final idle and that the session object's `usage.list_cost` matches the Console.
+3. ~~Kit upload.~~ Done 2026-11-08: kit `473db290a604` (57 files, without tools and the context pack, which don't exist yet) is `file_0138b8QAHdkVY5er1c44S3ss`, cached in `~/game-studio-data/kit-uploads.json`.
+4. ~~One capped session that extracts the kit and playtests a cart.~~ Done with `parity/run-parity.js` on the playtest's `dot-catch` fixture (`sesn_0183yE1n3dd38YdPPA5WBRZU`, Haiku 5.5, 50¢ cap, 36 s). Both drivers passed and `comparable()` matched the mini exactly. Re-run it on a context-pack example once task 6 lands.
+5. ~~Output filenames and lag.~~ Done: bare names; `DONE.json` complete about 7 s after idle. See platform-notes.
+6. ~~Cost.~~ Done: `usage.list_cost` "0" against a recomputed 0.16¢. Comparing against the Console is still open.
 7. Try the context pack as a skill instead of a tarball; keep whichever builds better (cost, first-try pass), and record it in `docs/decisions.md`.
