@@ -5,7 +5,7 @@
 import { createHost, integerScale } from "../../../runtime/src/host.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { H, W, check } from "./text.js";
-import { CHECK_TILES, Painter, draw, flow, planLines, questionText } from "./screens.js";
+import { CHECK_TILES, LEAVE_TILES, Painter, draw, flow, planLines, questionText } from "./screens.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -26,6 +26,11 @@ let studio = { phase: "idle" };
 let config = { console: "Arcade", players: 1, speech: "stub" };
 /** Follow the Studio's state on screen? Off once ESC has gone to the shelf (D187). */
 let following = false;
+/** Has the make being followed been seen running? Then "idle" means it's gone (D188, D189). */
+let seenRun = false;
+/** The event stream is down. */
+let offlineSince = 0;
+let lastStillHere = 0;
 /** A button down when a screen opened does nothing until it's let go (D182). */
 let armed = true;
 let tick = 0;
@@ -58,7 +63,7 @@ function show(v) {
   armed = ![...held].some((c) => BUTTONS.has(c));
 }
 
-const offline = () => show({ screen: "notice", title: "Hang on", message: "The cabinet is having a think. Try again in a minute.", hint: "ESC: back to the shelf", back: true });
+const offline = () => show({ screen: "notice", title: "Just a moment", message: "The cabinet is restarting.", restarting: true });
 
 async function showShelf() {
   following = false;
@@ -81,7 +86,7 @@ const toCheck = (/** @type {any} */ c) => (c.youCheck?.length && !c.answered ? `
 
 /** The Make tile, or the way back to a game being made (D87, D187). */
 function makeTile() {
-  if (studio.phase === "idle") return { kind: "make", title: "Make a new game", note: "Tell Claude your idea" };
+  if (studio.phase === "idle") return { kind: "make", title: "Make a new game", note: studio.notice?.short ?? "Tell Claude your idea", urgent: !!studio.notice };
   if (studio.phase === "done") return { kind: "back", title: studio.result?.ok ? "Your new game is ready!" : "About your new game", urgent: true, note: "Have a look" };
   const asking = !!studio.pending;
   return { kind: "back", title: "Back to your game", note: asking ? "Claude has a question for you!" : "Still making it...", urgent: asking };
@@ -107,6 +112,11 @@ function showSay(o) {
 /** Where the Studio's state says the screen should be, when following it. */
 function followStudio() {
   if (!following) return;
+  if (studio.phase !== "idle") seenRun = true;
+  else {
+    if (seenRun) showGone();
+    return;
+  }
   const p = studio.pending && !answered.has(studio.pending.id) ? studio.pending : null;
   if (p) {
     if (view.pendingId === p.id) return; // already on it, or in its reader or talk screen
@@ -126,6 +136,22 @@ function followStudio() {
   }
 }
 
+/** The make being followed has gone: a timeout or a restart. Say so, then the shelf (D188, D189). */
+function showGone() {
+  following = false;
+  const n = studio.notice;
+  show({ screen: "result", ok: false, message: n?.message ?? "This game stopped being made. Tell me your idea again!", tiles: ["Back to the shelf"], sel: 0, afterPlay: true, noticeId: n?.id });
+}
+
+/** Leave a message screen for the shelf. @param {any} v */
+function leaveMessage(v) {
+  if (v.noticeId) {
+    post("/api/studio/notice-seen", { id: v.noticeId }).catch(() => {});
+    studio = { phase: studio.phase };
+  }
+  showShelf();
+}
+
 /** @param {string} choice @param {string} [said] */
 async function answer(choice, said) {
   const id = view.pendingId;
@@ -139,6 +165,7 @@ async function answer(choice, said) {
 /** @param {string} maker @param {string} request */
 async function startMake(maker, request) {
   show({ screen: "progress", lines: [], maker: "" });
+  seenRun = false;
   try {
     following = true;
     await post("/api/studio/start", { maker, request });
@@ -149,6 +176,7 @@ async function startMake(maker, request) {
 }
 
 async function acknowledge() {
+  following = false;
   await post("/api/studio/ack").catch(() => {});
   studio = { phase: "idle" }; // so the shelf is right at once; the stream says the same
 }
@@ -256,6 +284,9 @@ function onStick(dir) {
     case "result":
       if (ud) moveSel(v, ud, v.tiles.length);
       break;
+    case "leave":
+      if (ud) moveSel(v, ud, LEAVE_TILES.length);
+      break;
     case "check":
       if (ud) moveSel(v, ud, CHECK_TILES.length);
       else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "You check", flowed: flow(v.rule), top: 0, back: v });
@@ -334,7 +365,7 @@ function onButton() {
       }
       break;
     case "result":
-      if (v.afterPlay) showShelf();
+      if (v.afterPlay) leaveMessage(v);
       else if (v.ok && v.sel === 0) pickUpNewGame(v.cartId);
       else {
         acknowledge().then(showShelf);
@@ -342,6 +373,19 @@ function onButton() {
       break;
     case "check":
       onCheck();
+      break;
+    case "leave":
+      if (v.sel === 0) {
+        view = v.back;
+        armed = false;
+      } else if (v.sel === 1) showShelf(); // D187: the shelf's tile comes back here.
+      else {
+        // D188. The stream brings "idle", but following has stopped by then.
+        following = false;
+        post("/api/studio/stop").catch(() => {});
+        studio = { phase: "idle" };
+        showShelf();
+      }
       break;
   }
 }
@@ -392,18 +436,20 @@ function onBack() {
       break;
     case "question":
     case "plan":
+      show({ screen: "leave", sel: 0, back: v, pendingId: v.pendingId, maker: v.maker }); // D188
+      break;
+    case "leave":
+      view = v.back;
+      break;
     case "progress":
       showShelf(); // D187: the make carries on, and the shelf offers a way back.
       break;
     case "result":
-      if (v.afterPlay) showShelf();
+      if (v.afterPlay) leaveMessage(v);
       else acknowledge().then(showShelf);
       break;
     case "check":
       finishCheck();
-      break;
-    case "notice":
-      if (v.back) showShelf();
       break;
   }
 }
@@ -440,7 +486,17 @@ const anyButtonHeld = () => [...held].some((c) => BUTTONS.has(c));
 
 // ---------- key events ----------
 
+/** Someone's at the cabinet, so a waiting question's clock starts again (D188). */
+function noteActivity() {
+  if (!studio.pending) return;
+  const t = Date.now();
+  if (!studio.pending.warn && t - lastStillHere < 5000) return;
+  lastStillHere = t;
+  post("/api/studio/still-here").catch(() => {});
+}
+
 addEventListener("keydown", (e) => {
+  noteActivity();
   if (view.screen === "play") {
     if (e.code === "Escape" && !e.repeat) endPlay("star");
     else if (playing && !e.repeat && (e.code in STICK || BUTTONS.has(e.code))) playing.sides.add("p1");
@@ -509,6 +565,7 @@ function frame() {
   tick++;
   if (view.screen === "play") return;
   view.tick = tick;
+  view.warn = !!(studio.pending?.warn && view.pendingId === studio.pending.id);
   draw(painter, view);
   for (const f of check(painter.boxes)) faults.add(`${view.screen}: ${f}`);
   const px = painter.fb.pixels;
@@ -535,12 +592,26 @@ studio = await get("/api/studio").catch(() => studio);
 requestAnimationFrame(frame);
 await showShelf();
 
-const stream = new EventSource("/api/studio/events");
-stream.onmessage = (e) => {
-  const was = studio.phase;
-  studio = JSON.parse(e.data);
-  if (studio.phase !== was || view.screen === "shelf") {
+/** Service gone for this long: say so, rather than let keys do nothing (D189). */
+const OFFLINE_NOTICE_MS = 2500;
+
+function connect() {
+  const stream = new EventSource("/api/studio/events");
+  stream.onmessage = (e) => {
+    offlineSince = 0;
+    studio = JSON.parse(e.data);
     if (view.screen === "shelf") showShelf();
-  }
-  followStudio();
-};
+    followStudio();
+    if (view.screen === "notice" && view.restarting) showShelf();
+  };
+  stream.onerror = () => {
+    offlineSince ||= Date.now();
+    // Normally the browser retries by itself; a refused response ends the stream.
+    if (stream.readyState === EventSource.CLOSED) setTimeout(connect, 1000);
+  };
+}
+connect();
+
+setInterval(() => {
+  if (offlineSince && Date.now() - offlineSince >= OFFLINE_NOTICE_MS && view.screen !== "play" && !view.restarting) offline();
+}, 500);

@@ -8,7 +8,7 @@ import { defaultChecker } from "@game-studio-arcade/studio-cli/src/checks.js";
 import { readCart } from "@game-studio-arcade/player/src/library.js";
 import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
-import { createStudio } from "../src/studio.js";
+import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 
 const { values } = parseArgs({
@@ -19,6 +19,7 @@ const { values } = parseArgs({
     config: { type: "string" },
     replay: { type: "string" },
     pace: { type: "string", default: "150" },
+    "question-timeout": { type: "string" },
     examples: { type: "boolean", default: false },
   },
 });
@@ -59,6 +60,8 @@ let api = null;
 const studio = createStudio({
   paths,
   budgetCents: config.budget_cents ?? 300,
+  // Seconds a question or plan waits with no key pressed (D188).
+  questionTimeoutMs: Number(values["question-timeout"] ?? config.question_timeout_s ?? QUESTION_TIMEOUT_MS / 1000) * 1000,
   model: config.model,
   checker: defaultChecker(),
   nameOf: (id) => makers.get(id)?.name ?? id,

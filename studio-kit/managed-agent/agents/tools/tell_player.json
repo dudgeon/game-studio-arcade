@@ -1,7 +1,7 @@
 {
   "type": "custom",
   "name": "tell_player",
-  "description": "Show the player one short progress line while you work, in kid language, for example \"Drawing the candy blocks\" or \"One rule failed the test. Fixing it\". Use it at each milestone: unpacking the kit, writing the spec, writing the game, each playtest run, each fix, packing up. Keep it under about 60 characters, friendly and honest, with no code or file names. It returns {\"ok\":true} at once and never asks the player anything.",
+  "description": "Show the player one short progress line while you work, in kid language, for example \"Drawing the candy blocks\" or \"One rule failed the test. Fixing it\". Use it at each milestone: getting started, writing the spec, writing the game, each playtest run, each fix, packing up. Keep it under about 60 characters, friendly and honest, with no code, file names or words like kit or cart. It returns {\"ok\":true} at once and never asks the player anything.",
   "input_schema": {
     "type": "object",
     "properties": {

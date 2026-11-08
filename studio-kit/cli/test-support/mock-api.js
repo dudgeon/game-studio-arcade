@@ -11,7 +11,7 @@ import { readAgentDef } from "../src/config.js";
 /**
  * @param {{steps: any[]}} script
  * @param {{sessionId?: string, outputs?: Record<string, Buffer|string>, outputLag?: number,
- *          usage?: any, timeoutMs?: number, appliedAgent?: any}} [opts]
+ *          usage?: any, timeoutMs?: number, appliedAgent?: any, archiveRefusals?: number}} [opts]
  */
 export function mockApi(script, opts = {}) {
   const sessionId = opts.sessionId ?? "sesn_mock_01";
@@ -19,6 +19,7 @@ export function mockApi(script, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 2000;
   let pos = 0;
   let lag = opts.outputLag ?? 0;
+  let archiveTries = 0;
   /** @type {any[]} */
   const history = [];
   /** @type {string[]} */
@@ -139,6 +140,11 @@ export function mockApi(script, opts = {}) {
         const name = Object.keys(opts.outputs ?? {})[Number(fileId.split("_").pop())];
         const v = (opts.outputs ?? {})[name];
         return Buffer.isBuffer(v) ? v : Buffer.from(String(v));
+      },
+      async archiveSession() {
+        calls.push("archiveSession");
+        if ((opts.archiveRefusals ?? 0) > archiveTries++) throw new Error("mock: a running session can't be archived");
+        return { id: sessionId, archived_at: "2026-11-08T21:00:00Z" };
       },
       async retrieveAgent(agentId, version) {
         calls.push(`retrieveAgent:${agentId}@${version}`);

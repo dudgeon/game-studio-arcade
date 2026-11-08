@@ -27,6 +27,7 @@ export class Painter {
     this.fb = new Framebuffer();
     /** @type {BoxRecord[]} */
     this.boxes = [];
+    this.warn = false;
   }
 
   begin(bg = C.night) {
@@ -73,7 +74,8 @@ export class Painter {
 
   /** @param {string} text */
   hint(text) {
-    this.box({ id: "hint", text, x: M, y: HINT_Y, w: INNER, h: GLYPH_H, color: C.silver, onCut: "never" });
+    // Near the walk-away timeout, this says so on any screen that's waiting (D188).
+    this.box({ id: "hint", text: this.warn ? "Still there? Move the stick!" : text, x: M, y: HINT_Y, w: INNER, h: GLYPH_H, color: this.warn ? C.yellow : C.silver, onCut: "never" });
   }
 
   /**
@@ -397,8 +399,29 @@ function notice(p, v) {
   if (v.hint) p.hint(v.hint);
 }
 
+const LEAVE_TILES = ["Keep going", "Come back later", "Stop making this game"];
+
+/** @param {Painter} p @param {any} v */
+function leave(p, v) {
+  p.header("Leave this game?");
+  p.box({ id: "leave-message", text: "Claude is waiting for your answer.", x: M, y: BODY_Y + 12, w: INNER, h: heightOf(2), align: "center", onCut: "never" });
+  const tileH = heightOf(1) + TILE_PAD * 2;
+  const ty = HINT_Y - LEAVE_TILES.length * (tileH + TILE_GAP) - 2;
+  LEAVE_TILES.forEach((t, i) => {
+    p.tile({ id: `leave-${i}`, text: t, y: ty + i * (tileH + TILE_GAP), rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : i === 2 ? C.red : C.blue });
+  });
+  p.hint(CHOOSE);
+}
+
 /** @type {Record<string, (p: Painter, v: any) => void>} */
-export const SCREENS = { shelf, who, say, question, reader, plan, progress, result, check, notice };
+export const SCREENS = { shelf, who, say, question, reader, plan, progress, result, check, notice, leave };
+
+/** The most each ask_player field can hold on the question screen. The brief states these (D190); a test holds the two together. */
+export const ASK_LIMITS = {
+  bigQuestion: colsFor(Math.floor(INNER / 2)) * BIG_ROWS,
+  question: colsFor(INNER) * ROWS.question,
+  option: colsFor(M + INNER - TILE_PAD - (M + BADGE_W + 4)) * ROWS.option,
+};
 
 /**
  * Draw one view.
@@ -408,7 +431,8 @@ export function draw(p, view) {
   const fn = SCREENS[view.screen];
   if (!fn) throw new Error(`no screen ${view.screen}`);
   p.begin();
+  p.warn = !!view.warn;
   fn(p, view);
 }
 
-export { CHECK_TILES };
+export { CHECK_TILES, LEAVE_TILES };

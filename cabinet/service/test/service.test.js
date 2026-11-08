@@ -43,13 +43,18 @@ function setup(o = {}) {
     checker: o.checker ?? passing,
     titleOf: () => "Penguin Catch",
     nameOf: () => "Alina",
+    questionTimeoutMs: o.questionTimeoutMs,
+    warningMs: o.warningMs,
   });
   /** @param {(s: any) => boolean} pred */
   const until = (pred) =>
     new Promise((resolve) => {
       if (pred(studio.state())) return resolve(studio.state());
+      // The walk-away timers don't hold a process open, so this has to.
+      const alive = setInterval(() => {}, 20);
       const stop = studio.subscribe((s) => {
         if (pred(s)) {
+          clearInterval(alive);
           stop();
           resolve(s);
         }
@@ -209,6 +214,128 @@ test("no network: logged with the request and turns, and the error isn't on scre
   assert.equal(rec.outcome, "error");
   assert.match(rec.error, /ECONNREFUSED/);
   assert.deepEqual(rec.turns, []);
+});
+
+test("a question nobody answers: a warning, then released, archived and logged; Make is free (D188)", async () => {
+  const replay = replayApi({ dir: FIXTURE });
+  const { studio, until, paths } = setup({ replay, questionTimeoutMs: 120, warningMs: 60 });
+  studio.start({ maker: "alina", request: "a penguin game" });
+  const first = await until((x) => x.pending?.kind === "question");
+  studio.answer({ id: first.pending.id, choice: "A" });
+  const q = await until((x) => x.pending?.question === "How should the game get harder?");
+  assert.equal(q.pending.warn, false);
+  const warned = await until((x) => x.pending?.warn === true);
+  assert.equal(warned.pending.id, q.pending.id);
+  const gone = await until((x) => x.phase === "idle");
+  assert.match(gone.notice.message, /away for a while/);
+  assert.equal(fs.existsSync(path.join(paths.root, "studio-run.json")), false, "the journal has gone");
+  // Make is free straight away, even before the API calls finish.
+  studio.start({ maker: "alina", request: "another" });
+  assert.equal(studio.state().phase, "running");
+  assert.equal(studio.state().notice, undefined);
+  await new Promise((r) => setTimeout(r, 200));
+  const rec = readLog(path.join(paths.logs, "studio_session.jsonl")).find((r) => r.outcome === "abandoned");
+  assert.equal(rec.outcome, "abandoned");
+  assert.equal(rec.ended_by, "timed_out");
+  assert.equal(rec.id, "sesn_replay");
+  assert.equal(rec.request, "a penguin game");
+  assert.deepEqual(rec.turns.map((/** @type {any} */ t) => t.choice), ["A"]);
+  assert.deepEqual(rec.archive, { ok: true });
+  assert.ok(replay.mock.calls.includes("archiveSession"));
+  assert.ok(!replay.mock.calls.some((c) => /delete/i.test(c)), "sessions aren't deleted (D5)");
+  assert.ok(fs.existsSync(path.join(paths.sessions, "sesn_replay", "events.jsonl")), "its events are kept");
+});
+
+test("a key pressed resets the clock and clears the warning (D188)", async () => {
+  const { studio, until } = setup({ questionTimeoutMs: 200, warningMs: 100 });
+  studio.start({ maker: "alina", request: "a penguin game" });
+  await until((x) => x.pending?.kind === "question");
+  await until((x) => x.pending?.warn === true);
+  studio.stillHere();
+  assert.equal(studio.state().pending.warn, false);
+  await new Promise((r) => setTimeout(r, 150));
+  studio.stillHere();
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(studio.state().phase, "running", "past the first deadline, and still waiting");
+  assert.ok(studio.state().pending);
+});
+
+test("the kid chooses to stop: released with no message, and stop needs something waiting (D188)", async () => {
+  const replay = replayApi({ dir: FIXTURE });
+  const { studio, until, paths } = setup({ replay });
+  assert.throws(() => studio.stop(), /nothing is waiting/);
+  studio.start({ maker: "alina", request: "a penguin game" });
+  await until((x) => x.pending?.kind === "question");
+  studio.stop();
+  assert.deepEqual(studio.state(), { phase: "idle" });
+  await new Promise((r) => setTimeout(r, 100));
+  const [rec] = readLog(path.join(paths.logs, "studio_session.jsonl"));
+  assert.equal(rec.outcome, "abandoned");
+  assert.equal(rec.ended_by, "stopped");
+});
+
+test("an archive that's refused interrupts and tries again; one that fails is logged and Make stays free (D188)", async () => {
+  const once = replayApi({ dir: FIXTURE, archiveRefusals: 1 });
+  const a = setup({ replay: once });
+  a.studio.start({ maker: "alina", request: "x" });
+  await a.until((x) => x.pending?.kind === "question");
+  a.studio.stop();
+  await new Promise((r) => setTimeout(r, 200));
+  assert.deepEqual(readLog(path.join(a.paths.logs, "studio_session.jsonl"))[0].archive, { ok: true });
+  assert.ok(once.mock.sent.some((e) => e.type === "user.interrupt"));
+
+  const never = replayApi({ dir: FIXTURE, archiveRefusals: 9 });
+  const b = setup({ replay: never });
+  b.studio.start({ maker: "alina", request: "x" });
+  await b.until((x) => x.pending?.kind === "question");
+  b.studio.stop();
+  assert.equal(b.studio.state().phase, "idle");
+  await new Promise((r) => setTimeout(r, 200));
+  const rec = readLog(path.join(b.paths.logs, "studio_session.jsonl"))[0];
+  assert.equal(rec.archive.ok, false);
+  assert.match(rec.archive.error, /can't be archived/);
+});
+
+test("a restart finds the run that never ended: logged as left running, with a message (D189)", async () => {
+  const a = setup();
+  a.studio.start({ maker: "alina", request: "a penguin game" });
+  const q = await a.until((x) => x.pending?.kind === "question");
+  a.studio.answer({ id: q.pending.id, choice: "B" });
+  await a.until((x) => x.pending?.question === "How should the game get harder?");
+  // The process dies here: nothing runs after this. A new one starts on the same data.
+  const b = createStudio({ paths: a.paths, api: async () => replayApi({ dir: FIXTURE }).api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "f", hash: "h" }), checker: passing });
+  const s = b.state();
+  assert.equal(s.phase, "idle");
+  assert.match(s.notice.message, /restarted/);
+  const [rec] = readLog(path.join(a.paths.logs, "studio_session.jsonl"));
+  assert.equal(rec.outcome, "service_restarted");
+  assert.equal(rec.session_left_running, true);
+  assert.equal(rec.id, "sesn_replay");
+  assert.equal(rec.request, "a penguin game");
+  assert.deepEqual(rec.turns.map((/** @type {any} */ t) => t.choice), ["B"]);
+  assert.equal(fs.existsSync(path.join(a.paths.root, "studio-run.json")), false);
+  b.dismissNotice(s.notice.id + 1);
+  assert.ok(b.state().notice, "another message's id doesn't clear it");
+  b.dismissNotice(s.notice.id);
+  assert.deepEqual(b.state(), { phase: "idle" });
+  a.studio.stop();
+  // And a clean start has nothing to report.
+  const c = createStudio({ paths: dataPaths(tmp()), api: async () => replayApi({ dir: FIXTURE }).api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "f", hash: "h" }), checker: passing });
+  assert.deepEqual(c.state(), { phase: "idle" });
+});
+
+test("a make that ends normally leaves no journal (D189)", async () => {
+  const { studio, until, paths } = setup();
+  const journal = path.join(paths.root, "studio-run.json");
+  studio.start({ maker: "alina", request: "a penguin game" });
+  assert.ok(fs.existsSync(journal));
+  const s = await until((x) => x.pending?.kind === "question");
+  studio.answer({ id: s.pending.id, choice: "D" });
+  const p = await until((x) => x.pending?.kind === "plan");
+  studio.answer({ id: p.pending.id, choice: "build" });
+  await until((x) => x.phase === "done");
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(fs.existsSync(journal), false);
 });
 
 test("budget reached and a refusal get their own words", () => {

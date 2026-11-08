@@ -11,13 +11,13 @@ export function progressFor(ev) {
   const cmd = String(input.command ?? "");
   switch (ev.name) {
     case "bash":
-      if (/studio-kit\.tgz/.test(cmd)) return "Unpacking my toolbox";
+      if (/studio-kit\.tgz/.test(cmd)) return "Getting my tools out";
       // Match the commands, not a README that mentions them.
       if (/gsa-playtest|playtest\.js/.test(cmd)) return "Playing your game to test it";
-      if (/validate-cart/.test(cmd)) return "Checking the cart";
+      if (/validate-cart/.test(cmd)) return "Checking your game";
       if (/^\s*(cd [^;&]+[;&]+\s*)?(cat|ls|head|less)\b/.test(cmd)) return "Reading up";
       if (/cart\.tgz|outputs/.test(cmd)) return "Packing up your game";
-      return "Working";
+      return "Putting it together";
     case "write":
     case "edit":
       if (file.endsWith("spec.md")) return "Writing down the rules";

@@ -24,13 +24,14 @@ try {
   skip = `no headless Chromium: ${String(/** @type {Error} */ (e).message).split("\n")[0]}`;
 }
 
-/** @param {string} replay @param {(c: {page: any, url: string, data: string, problems: string[], run: (s: string) => Promise<any>, faults: () => Promise<string[]>}) => Promise<void>} body */
-async function withCabinet(replay, body) {
+/** @param {string} replay @param {(c: {service: any, page: any, url: string, data: string, problems: string[], run: (s: string) => Promise<any>, faults: () => Promise<string[]>}) => Promise<void>} body */
+async function withCabinet(replay, body, options = {}) {
   const data = tmp();
-  const service = /** @type {any} */ (await startServiceProcess({ replay, data, pace: 10 }));
+  const service = /** @type {any} */ (await startServiceProcess({ replay, data, pace: 10, ...options }));
   const { browser, page, problems } = await openBrowser(service.url);
   try {
     await body({
+      service,
       page,
       url: service.url,
       data,
@@ -161,6 +162,9 @@ test("ESC mid-make goes to the shelf, and the tile goes back to the same questio
       press enter
       wait question
       press esc
+      wait leave
+      press down
+      press a
       wait shelf
       shot shelf-question-waiting
     `);
@@ -209,6 +213,163 @@ test("an answer's response landing after the next question doesn't lose the ques
     const q = await page.evaluate(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "q-question")?.text);
     assert.equal(q, "How should the game get harder?");
     assert.deepEqual(await faults(), []);
+  });
+});
+
+const TO_FIRST_QUESTION = `
+  wait shelf
+  press a
+  wait who
+  press a
+  wait say typing
+  type alina
+  press enter
+  wait say idle
+  press f1
+  wait say typing
+  type a penguin game
+  press enter
+  wait question
+`;
+const boxText = (/** @type {any} */ page, /** @type {string} */ id) => page.evaluate((/** @type {string} */ i) => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === i)?.text, id);
+
+test("walking away: warned, then a message, then the shelf with Make free, and it works again (D188)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(
+    FIXTURE,
+    async ({ page, run, data, faults, problems }) => {
+      await run(TO_FIRST_QUESTION);
+      await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "hint")?.text.startsWith("Still there"), null, { timeout: 10_000 });
+      await run(`
+        wait result
+        shot walked-away
+      `);
+      assert.match(await boxText(page, "result-message"), /away for a while/);
+      await run(`
+        press a
+        wait shelf
+      `);
+      assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+      const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
+      assert.equal(rec.outcome, "abandoned");
+      assert.equal(rec.ended_by, "timed_out");
+      await run(`
+        press a
+        wait who
+        press a
+        wait say idle
+      `);
+      assert.deepEqual(await faults(), []);
+      assert.deepEqual(problems, []);
+    },
+    { questionTimeout: 3 },
+  );
+});
+
+test("the way back: ESC on a question asks; keep going returns; stop frees Make with no message (D188)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
+    await run(TO_FIRST_QUESTION);
+    await run(`
+      press esc
+      wait leave
+      shot leave
+      press a
+      wait question
+      press esc
+      wait leave
+      press esc
+      wait question
+      press esc
+      wait leave
+      press down
+      press down
+      press a
+      wait shelf
+      sleep 200
+    `);
+    assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+    assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea");
+    const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
+    assert.equal(rec.outcome, "abandoned");
+    assert.equal(rec.ended_by, "stopped");
+    assert.deepEqual(await faults(), []);
+  });
+});
+
+test("the service restarts mid-question: a moment's notice, then a message, then the shelf (D189)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ service, url, page, run, data, faults }) => {
+    await run(TO_FIRST_QUESTION);
+    service.kill();
+    await page.waitForFunction(() => /** @type {any} */ (window).launcher.screen() === "notice", null, { timeout: 15_000 });
+    assert.match(await boxText(page, "notice"), /restarting/);
+    const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, port: Number(new URL(url).port) }));
+    try {
+      await run(`
+        wait result
+        shot after-restart
+      `);
+      assert.match(await boxText(page, "result-message"), /restarted/);
+      const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
+      assert.equal(rec.outcome, "service_restarted");
+      assert.equal(rec.session_left_running, true);
+      assert.equal(rec.id, "sesn_replay");
+      await run(`
+        press a
+        wait shelf
+        sleep 200
+      `);
+      assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+      assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea", "read once, gone");
+      // A new make's ids don't collide with those the page has answered.
+      await run(`
+        press a
+        wait who
+        press a
+        wait say idle
+        press f1
+        wait say typing
+        type a penguin game
+        press enter
+        wait question
+      `);
+      assert.deepEqual(await faults(), []);
+    } finally {
+      again.stop();
+    }
+  });
+});
+
+test("a restart with a game being played leaves the game alone; the message waits on the Make tile (D189)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ service, url, page, run, data, faults }) => {
+    const dir = path.join(data, "carts", "hello");
+    fs.cpSync(path.resolve(import.meta.dirname, "../../../runtime/examples/hello"), dir, { recursive: true });
+    await run(TO_FIRST_QUESTION);
+    await run(`
+      press esc
+      wait leave
+      press down
+      press a
+      wait shelf
+      press down
+      press a
+      wait play
+      sleep 300
+    `);
+    service.kill();
+    await page.waitForTimeout(3500);
+    assert.equal(await page.evaluate(() => /** @type {any} */ (window).launcher.screen()), "play", "the game carries on");
+    const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, port: Number(new URL(url).port) }));
+    try {
+      await run(`
+        sleep 3500
+        press esc
+        wait shelf
+      `);
+      assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+      assert.equal(await boxText(page, "shelf-by-0"), "Your last game didn't finish");
+      assert.deepEqual(await faults(), []);
+    } finally {
+      again.stop();
+    }
   });
 });
 

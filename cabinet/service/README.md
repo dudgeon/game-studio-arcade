@@ -15,6 +15,7 @@ node cabinet/service/bin/cabinet-service.js --data /var/lib/arcade --config /etc
 | `--config FILE` | the cabinet's config, mode 0600 (below). Required unless replaying |
 | `--replay DIR` | a fixture with `events.jsonl`, `report.json` and `cart/`, in place of the API |
 | `--pace MS` | replay: wait this long before each tool event; default 150 |
+| `--question-timeout S` | seconds a question or plan waits with no key pressed; default 600, or `question_timeout_s` in the config (D188) |
 | `--data DIR` | carts, logs, sessions, `makers.json`; default `$GSA_DATA_DIR` or `~/game-studio-data` |
 | `--port N`, `--host H` | default 127.0.0.1:8330, which the kiosk opens |
 | `--examples` | also shelve `runtime/examples/*` |
@@ -23,7 +24,7 @@ The config file, created on the cabinet by Geoff, never in git (D131, D185):
 
 ```json
 { "anthropic_api_key": "...", "agent_id": "...", "agent_version": 2, "environment_id": "...",
-  "budget_cents": 300, "players": 1, "console_name": "Quarter Deck", "model": null }
+  "budget_cents": 300, "question_timeout_s": 600, "players": 1, "console_name": "Quarter Deck", "model": null }
 ```
 
 `agent_id` and `environment_id` come from `ant apply` in the **cabinet's own workspace**, because a workspace-scoped key can't reach what `claude-lock.json` names. It won't start with a config others can read, or one missing a key or an agent.
@@ -43,7 +44,7 @@ Verbs: `press KEY [MS]`, `hold KEY MS`, `down KEY`, `up KEY`, `type TEXT`, `say 
 
 ## The controls
 
-Stick moves the highlight, **any** of the six player buttons or START picks it (D182). ESC goes back. On a talk screen: hold any button, talk, let go. F1 types instead (D184). Where words don't fit: stick right opens a reader with all of them (D181).
+Stick moves the highlight, **any** of the six player buttons or START picks it (D182). ESC goes back; on a question or plan it asks first: keep going, come back later, or stop making this game (D188). On a talk screen: hold any button, talk, let go. F1 types instead (D184). Where words don't fit: stick right opens a reader with all of them (D181).
 
 ## Text fitting
 
@@ -55,11 +56,21 @@ All words go through `Painter.box` in `launcher/screens.js`, which uses `launche
 
 `test/screens.test.js` puts every string in `test-support/stress.js` in every slot of every screen, and measures real ink from the framebuffer against each box. Add new screens to `viewsWith` there.
 
+## When a make doesn't finish
+
+| What happens | What the kid sees | What's logged in `studio_session` | The session at Anthropic |
+|---|---|---|---|
+| Nobody answers for 10 minutes (D188) | "Still there? Move the stick!" for the last minute, then a message and the shelf, or a line on the Make tile if they've gone elsewhere | `outcome: "abandoned"`, `ended_by: "timed_out"`, `archive` | Archived, never deleted |
+| The kid picks "Stop making this game" (D188) | The shelf | `outcome: "abandoned"`, `ended_by: "stopped"`, `archive` | Archived, never deleted |
+| The service restarts mid-make (D189) | "The cabinet is restarting", then a message and the shelf, or a line on the Make tile if the page reloaded or they weren't on a Studio screen. A game being played carries on | `outcome: "service_restarted"`, `session_left_running` | Left running, under its budget. Nothing collects its work |
+
+Make is free in every case. `studio-run.json` in the data folder is how a restart finds the make it cut off. It exists only while a make runs.
+
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
-- **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only.
-- **Not built:** request screening (Phase 3), forks, leaving a session (D187), resuming one across a restart (D183), launcher sound, gamepads in the launcher's menus, guest players, MCP, Manager API, publish gate.
+- **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188), whose call is written from the docs and SDK types.
+- **Not built:** request screening (Phase 3), forks, resuming a session across a restart (D189), launcher sound, gamepads in the launcher's menus, guest players, MCP, Manager API, publish gate.
 
 ## Deploying to the virtual cabinet
 
