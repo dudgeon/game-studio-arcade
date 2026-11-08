@@ -87,6 +87,7 @@ Playwright pinned to the sandbox version. It loads a cart headless, runs each ch
 ### 6. Context pack (`studio-kit/context-pack/`)
 The library reference, about six short recipes (e.g. "thing A destroys thing B", "grid piece rotation", "title/play/over flow"), and **three tiny example carts that are not falling-blocks games** (D12): a dodge game, a paddle game and a collect game. Each example passes its own playtest. Target size: small enough to read fully in one go (≤ ~15k tokens).
 *Accept:* all three examples pass, and the token count of the pack is recorded.
+**Done 2026-11-07** (D100–D103): Comet Dodge, Wall Ball and Gem Garden pass on both drivers, and on the node driver at both screen sizes (256×192 by a patched runtime copy); the pack is about 14.7k tokens (estimate).
 
 ### 7. Studio agent (`studio-kit/managed-agent/`)
 - `studio.agent.md`: the kid brief (ages 10 and 13, content rules, plain voice), the spec-first workflow, the `ask_player` tool (§9.1), and the D-meaning ("ask no more questions; record assumptions").

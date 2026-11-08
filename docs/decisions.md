@@ -333,6 +333,27 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   - The shelf shows the maker's name, since initials can collide once friends are added.
   - The desktop flow (§8.3) uses the same ids when Geoff and a kid publish.
 
+## 2026-11-07 — Context pack (Phase 0 task 6)
+
+**D100. The context pack is a short read order plus three carts, and points to the library reference rather than copying it.** *(Claude, Phase 0 task 6; implements D12.)*
+- `studio-kit/context-pack/`: `README.md` (read order, cart folder and `cart.json` fields, house conventions, commands), `RECIPES.md` (six recipes, each from a spec rule to code, probe and check) and `carts/{dodge,paddle,collect}/` (`spec.md`, `cart.json`, `game.js`, `checks.js`).
+- The library reference stays in `runtime/lib/REFERENCE.md` (one source, tested against the exports) and the pack points to it. The kit already ships both: `pack-kit.js` lists `studio-kit/context-pack` in `KIT_PARTS`, so no wiring change was needed.
+- The carts are Comet Dodge (free movement, spawner, `collide.resolve`, a safe timer, a speed curve), Wall Ball (one paddle against three walls) and Gem Garden (tile grid, held-stick repeat, a timed round). None uses the falling-blocks parts of `g.lib.grid` (rotation, `place`, `clearRows`); a test enforces that. Recipe 5 points at those functions in REFERENCE.md without showing a falling-blocks game.
+
+**D101. Example carts are one-player and never write the screen size as a number.** *(Claude, following D81 and D85.)*
+- `game.js` lays out from `g.W` and `g.H`; `probe()` returns `W` and `H`, so checks use those too. A test fails on `320`, `256`, `240` or `192` in any cart or recipe code.
+- A test runs every cart's playtest on the installed runtime **and** on a copy patched to the other size (320×256 ↔ 256×192), so the examples pass before and after the D81 runtime change. Text is sized for 42 characters a line.
+- One player only (D85: games default to single player). Wall Ball is a one-paddle wall game rather than a two-player duel for that reason. Turn-taking examples wait for the D85 library helper.
+
+**D102. Pack size: about 14.7k tokens, estimated offline.** *(Claude.)*
+- `npm run size -w @game-studio-arcade/context-pack` counts what a session reads: the pack's docs, the three carts and `runtime/lib/REFERENCE.md` (about 4.2k of the total). `runtime/README.md`, which KIT.md also says to read, is outside the count (about 1.9k more).
+- Tokens are estimated as characters / 4 for Markdown and / 3.2 for code and JSON (no API call). The first live session's `usage` should confirm the real number; a test keeps the estimate ≤ 15,000.
+
+**D103. Example checks are small bots, and checks start with `start(t)`.** *(Claude.)*
+- `flow.startPressed` ignores presses for a screen's first 30 frames, so each cart's `checks.js` has a `start(t)` helper that steps 31 frames before pressing START.
+- Checks reach game events by steering from the probe (chase a comet, dodge it, aim the paddle, walk to the nearest gem) in 2-frame steps, with a frame limit, rather than by forcing state. Recipe 6 teaches the pattern.
+- The package tests also run the full `validateCart` (D31) on each example, so the examples can't drift from the validator.
+
 ## 2026-11-08 — Players setting and turns in the runtime (implements D85)
 
 How the runtime and library carry out D85 (Geoff's answer to D84's second-player question).
