@@ -13,6 +13,9 @@ import { replayAnswerer } from "../src/answers.js";
 import { dataPaths } from "../src/config.js";
 import { readLog } from "../src/log.js";
 import { reanalyzeSession } from "../src/reanalyze.js";
+import { addYouCheckRules, questionsFor } from "../src/untested.js";
+import { parseSpec, formatSpec, validateRuleCoverage } from "@game-studio-arcade/spec";
+import { readCart } from "../../player/src/library.js";
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/frog-hop");
 const script = JSON.parse(fs.readFileSync(path.join(fixtures, "session.json"), "utf8"));
@@ -273,4 +276,68 @@ test("a run saves its answers with the question and words, so they replay by que
   assert.equal(saved.questions[1].answer, "medium and it gets faster");
   const again = replayAnswerer(saved);
   assert.deepEqual(await again.question({ question: "What does the frog dodge?", option_a: "Logs", option_b: "Cars" }), { choice: "B" });
+});
+
+const SPEC_TEXT = fs.readFileSync(path.join(fixtures, "cart/spec.md"), "utf8");
+
+test("D49: questionsFor asks each lost part, or the whole rule if it doesn't say", () => {
+  const q = questionsFor([
+    { rule: "R1", narrowed: false },
+    { rule: "R2", narrowed: true, untested: [{ words: "up to 3", question: "Do things  stop\nspeeding up?" }, { words: "every 600", question: "" }] },
+    { rule: "R3", narrowed: true, untested: [], rule_text: "Lives start\nat 3." },
+  ]);
+  assert.deepEqual(q, [
+    { from: "R2", words: "up to 3", text: "Do things stop speeding up?" },
+    { from: "R2", words: "every 600", text: 'Play and check this, because the test can\'t: "every 600"' },
+    { from: "R3", words: null, text: "The test for this changed and may not prove all of it, so play and check: Lives start at 3." },
+  ]);
+});
+
+test("D49: addYouCheckRules adds valid rules with new ids, a Changelog line, and canonical form", () => {
+  const { text, added } = addYouCheckRules(SPEC_TEXT, [{ from: "R4", words: "faster", text: "Do the cars get faster?" }]);
+  assert.deepEqual(added, [{ rule: "R6", from: "R4", words: "faster", text: "Do the cars get faster?" }], "R1-R5 are taken");
+  const spec = parseSpec(text);
+  assert.deepEqual(spec.errors, []);
+  assert.equal(spec.rules.at(-1)?.id, "R6");
+  assert.equal(spec.rules.at(-1)?.kind, "you-check");
+  assert.equal(spec.rules.filter((r) => r.kind === "auto").length, 4, "the auto rules are untouched");
+  assert.match(spec.changelog.at(-1)?.text ?? "", /tests for R4 no longer prove all of the rule, so R6 ask/);
+  assert.equal(spec.changelog.at(-1)?.id, "v2");
+  assert.equal(formatSpec(spec), text, "still canonical");
+  assert.deepEqual(addYouCheckRules(SPEC_TEXT, []), { text: SPEC_TEXT, added: [] });
+  assert.deepEqual(addYouCheckRules("no spec here", [{ from: "R1", words: null, text: "x" }]).added, [], "nothing to add it to");
+});
+
+test("D49 end to end: a check that lost a point reaches the local player as a question", async () => {
+  // Frog-hop's final R1 has no list of points; this snapshot's did.
+  const frozen = fs.readFileSync(path.join(fixtures, "cart/checks.js"), "utf8").replace("await t.step(1);", "for (const at of [10, 20]) await t.step(at);");
+  const report = JSON.parse(fs.readFileSync(path.join(fixtures, "report.json"), "utf8"));
+  report.check_changes = [{ rule: "R1", kind: "check_bug", quote: "one lane up", what: "Too slow.", untested: [{ words: "one lane up", question: "Does pressing up move one lane?" }] }];
+  const s = setup({ outputs: outputs({ "checks.frozen.js": Buffer.from(frozen), "spec.frozen.md": Buffer.from(SPEC_TEXT), "report.json": Buffer.from(JSON.stringify(report)) }) });
+  const { record, committed, sessionDir } = await s.make();
+
+  assert.deepEqual(record.you_check_added, [{ rule: "R6", from: "R1", words: "one lane up", text: "Does pressing up move one lane?" }]);
+  const r1 = record.checks_changed_after_playtest.rules.find((r) => r.rule === "R1");
+  assert.equal(r1.classification, "check_bug");
+  assert.equal(r1.narrowed, true);
+  const summary = s.info.join("\n");
+  assert.match(summary, /Test proves less: R1 no longer tests "one lane up"\. You check it on first play: R6\./);
+  assert.ok(committed);
+
+  // The agent's copy is as sent; the cart has the new rule, the checks still line up.
+  assert.doesNotMatch(fs.readFileSync(path.join(sessionDir, "outputs/spec.md"), "utf8"), /Does pressing up/);
+  assert.match(record.spec_diff ?? "", /\+- R6 \(you check\): Does pressing up move one lane\?/);
+  assert.equal((await validateRuleCoverage(committed.dir)).ok, true);
+  const cart = readCart(s.paths.carts, committed.id);
+  assert.ok(cart);
+  assert.deepEqual(cart.youCheck.map((r) => r.id), ["R5", "R6"]);
+  assert.equal(cart.youCheck[1].text, "Does pressing up move one lane?");
+});
+
+test("D49 summary: a narrowed rule that won't say what still gets flagged, and still gets asked", async () => {
+  const lines = buildSummary(
+    { changed: true, rules_known: true, edit_events: 1, helpers_unjustified: false, helpers_narrowed: true, rules: [{ rule: "R7", classification: "unexplained", narrowed: true, untested: [], what: null }] },
+    [{ rule: "R20", from: "R7", words: null }],
+  );
+  assert.deepEqual(lines, ["Test changed with no explanation: R7.", "Test may prove less: R7, and it doesn't say what. You check it on first play: R20.", "Shared test code may prove less. Worth reading."]);
 });
