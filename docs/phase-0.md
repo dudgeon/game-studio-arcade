@@ -89,7 +89,7 @@ Playwright pinned to the sandbox version. It loads a cart headless, runs each ch
 
 The library reference, about six short recipes (e.g. "thing A destroys thing B", "grid piece rotation", "title/play/over flow"), and **three tiny example carts that are not falling-blocks games** (D12): a dodge game, a paddle game and a collect game. Each example passes its own playtest. Target size: small enough to read fully in one go (≤ ~15k tokens).
 *Accept:* all three examples pass, and the token count of the pack is recorded.
-**Done 2026-11-07** (D100–D103): Comet Dodge, Wall Ball and Gem Garden pass validate-cart and the playtest on both drivers at 256×192, and on the node driver at 320×256 (a patched runtime copy); the pack is about 15.0k tokens (estimate, D102).
+**Done 2026-11-07, redesigned 2026-11-08** (D100–D103, then D160–D170): the three example carts above are gone, replaced by a catalog, modules read on demand, four templates (`catch`, `dodge`, `maze`, `paddle`) and a `blank` start. Each template passes validate-cart and the playtest on the node driver, at 256×192 and at 320×256 (a patched runtime copy). Sizes are recorded per piece, not as one pack total, since no build reads it all (D164): catalog 1,239 tokens (budget 2,000), modules at most 1,487 each (1,500), templates 1,720–4,489 each (4,500). A typical catch game reads about 8.8k from `blank` or 8.9k from its template. `pack-size` prints the current figures.
 
 ### 7. Studio agent (`studio-kit/managed-agent/`)
 - `studio.agent.md`: the kid brief (ages 10 and 13, content rules, plain voice), the spec-first workflow, the `ask_player` tool (§9.1), and the D-meaning ("ask no more questions; record assumptions").
