@@ -59,6 +59,8 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "Quote the rule",
     "check_changes",
     "only once, as a final check",
+    "**Say what's untested (D49):**",
+    '"untested": [{"words"',
   ]) {
     assert.ok(body.includes(needle), `prompt mentions ${needle}`);
   }

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { analyzeFreeze, bashWrites, isPlaytestRun, parsePlaytestLines, splitChecks } from "../src/freeze.js";
+import { countAssertions, listedNumbers, narrowingSignals } from "../src/narrowing.js";
 
 const recorded = fs
   .readFileSync(new URL("../fixtures/penguin-catch/events.jsonl", import.meta.url), "utf8")
@@ -227,4 +228,100 @@ test("comments and type annotations aren't changed checks", () => {
   const plain = "export default {\n  // a note\n  R1: async (t) => { let x = await t.step(1); },\n};\n";
   const a = analyzeFreeze([use("a", SNAP), use("b", RUN)], { frozenChecks: plain, frozenSpec: SPEC("x"), finalChecks: annotated, finalSpec: SPEC("x") });
   assert.equal(a.checks_changed_after_playtest.changed, false);
+});
+
+// The shape of the real thing: Fishy Penguin's R7 lost its top-speed point, 2500.
+const CAP_RULE = "At the start of play, items fall 1 pixel per frame. Every 600 frames of play they fall 0.5 pixels per frame faster, up to 3 pixels per frame.";
+const R7_FROZEN = `export default {
+  R1: async (t) => { await t.step(1); },
+  R2: async (t) => {
+    for (const at of [100, 700, 1300, 2500]) {
+      const p = await drive(t, at);
+      expect(p.mode === "play", "the penguin should survive");
+      expect(pairs.length > 0, "no item to measure");
+      expect(moved === speedAt(at), "wrong speed");
+    }
+  },
+  R3: async (t) => { await t.step(3); },
+};
+`;
+const R7_FINAL = `export default {
+  R1: async (t) => { await t.step(1); },
+  R2: async (t) => {
+    await onSomeSeed(t, [1, 2, 3, 4, 5, 6, 7, 8], 700, async (t) => {
+      for (const at of [100, 700, 1300]) {
+        const p = await drive(t, at);
+        if (pairs.length === 0) return { reached, err: null };
+        expect(moved === speedAt(at), "wrong speed");
+      }
+    });
+  },
+  R3: async (t) => { await t.step(3); },
+};
+`;
+const capped = (declared) =>
+  analyzeFreeze(EDIT, { frozenChecks: R7_FROZEN, frozenSpec: SPEC(CAP_RULE), finalChecks: R7_FINAL, finalSpec: SPEC(CAP_RULE), declared }).checks_changed_after_playtest;
+const BUG = { rule: "R2", kind: "check_bug", quote: "up to 3 pixels per frame", what: "No bot survives that long." };
+
+test("narrowing signals: a dropped point or fewer assertions, not a reshuffle", () => {
+  assert.deepEqual([...listedNumbers("for (const at of [100, 700]) x([1.5, 2]); y[0]; z([3]);")], [100, 700, 1.5, 2]);
+  assert.equal(countAssertions('expect(a); if (b) throw new Error("x"); expected(c);'), 2);
+  const s = narrowingSignals(R7_FROZEN, R7_FINAL);
+  assert.equal(s.narrowed, true);
+  assert.deepEqual(s.dropped_points, [2500]);
+  assert.equal(s.any_seed, true);
+  assert.equal(narrowingSignals("expect(a); [1, 2]", "expect(b); [2, 1, 9]").narrowed, false);
+  assert.equal(narrowingSignals("expect(a); expect(b);", "expect(a);").narrowed, true);
+});
+
+test("D49: Fishy Penguin's R7, a dropped cap with no word on it, is unexplained", () => {
+  const c = capped([BUG]);
+  const r = c.rules.find((x) => x.rule === "R2");
+  assert.equal(r.classification, "unexplained");
+  assert.equal(r.narrowed, true);
+  assert.equal(r.untested_missing, true);
+  assert.deepEqual(r.signals.dropped_points, [2500]);
+  assert.deepEqual(c.unjustified, ["R2"]);
+  assert.deepEqual(c.narrowed, ["R2"]);
+});
+
+test("D49: naming the rule's lost words makes it a check bug, still flagged as narrowed", () => {
+  const c = capped([{ ...BUG, untested: [{ words: "up to  3 PIXELS per frame", question: "Do things stop speeding up?" }] }]);
+  const r = c.rules.find((x) => x.rule === "R2");
+  assert.equal(r.classification, "check_bug");
+  assert.equal(r.narrowed, true);
+  assert.equal(r.untested_missing, false);
+  assert.equal(r.untested.length, 1);
+  assert.deepEqual(c.check_bugs, ["R2"]);
+  assert.deepEqual(c.narrowed, ["R2"]);
+});
+
+test("D49: an empty list, or words that aren't in the rule, don't count", () => {
+  assert.equal(capped([{ ...BUG, untested: [] }]).rules[0].classification, "unexplained");
+  const made = capped([{ ...BUG, untested: [{ words: "never speeds up at all", question: "?" }] }]).rules[0];
+  assert.equal(made.classification, "unexplained");
+  assert.deepEqual(made.untested_invalid, ["never speeds up at all"]);
+  assert.deepEqual(made.untested, []);
+});
+
+test("D49: a check bug that doesn't narrow needs no list; an honest declaration still counts", () => {
+  const plain = edited([{ rule: "R2", kind: "check_bug", quote: "Hit costs a life.", what: "Too slow." }]);
+  assert.equal(plain.rules[0].classification, "check_bug");
+  assert.equal(plain.rules[0].narrowed, false);
+  const honest = edited([{ rule: "R2", kind: "check_bug", quote: "Hit costs a life.", what: "x", untested: [{ words: "a life", question: "Did you lose one?" }] }]);
+  assert.equal(honest.rules[0].narrowed, true, "the detector missed it, but the agent said so");
+  assert.equal(honest.rules[0].classification, "check_bug");
+});
+
+test("D49: a change of meaning through the spec owes no list and no question", () => {
+  const a = analyzeFreeze(EDIT, { frozenChecks: R7_FROZEN, frozenSpec: SPEC(CAP_RULE), finalChecks: R7_FINAL, finalSpec: SPEC("Items speed up to 2 pixels per frame."), declared: [] }).checks_changed_after_playtest;
+  assert.equal(a.rules[0].classification, "rule_change");
+  assert.equal(a.rules[0].narrowed, false);
+});
+
+test("D49: helpers that lost an assertion are flagged", () => {
+  const base = "const h = () => { expect(a); expect(b); };\n" + CHECKS("t.step(2)");
+  const less = "const h = () => { expect(a); };\n" + CHECKS("t.step(2)");
+  const c = analyzeFreeze(EDIT, { frozenChecks: base, frozenSpec: SPEC("x"), finalChecks: less, finalSpec: SPEC("x"), declared: [] }).checks_changed_after_playtest;
+  assert.equal(c.helpers_narrowed, true);
 });

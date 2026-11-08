@@ -31,7 +31,7 @@ Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes 
 5. Reconnects if the stream drops, replaying missed events from the history without repeats. Answers any tool call the stream missed when the session reports `requires_action`.
 6. Polls the session's files until `DONE.json` is there and every size in it matches (D19), skipping the session's inputs. Then it downloads every output into `~/game-studio-data/sessions/<id>/` and extracts `cart.tgz`.
 7. Runs `validate_cart` and the local playtest. Commits the cart to `~/game-studio-data/carts/` only if both pass.
-8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`. Also the frozen-checks record (D44): `first_playtest`, `edits_after_first_playtest` and `checks_changed_after_playtest`.
+8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`. Also the frozen-checks record (D44, D46, D49): `first_playtest`, `edits_after_first_playtest`, `checks_changed_after_playtest` and `you_check_added`. A rule whose check now tests less gets a new `(you check)` rule in the cart's `spec.md`, so the player asks it on first play.
 
 Set `GSA_DATA_DIR` to use another data folder.
 

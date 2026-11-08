@@ -3,6 +3,7 @@
 // it never blocks. The agent does most of its editing through bash (heredocs,
 // python, sed), so edits are recognised from commands as well as file tools.
 import { parseSpec } from "@game-studio-arcade/spec";
+import { narrowingSignals } from "./narrowing.js";
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -133,12 +134,14 @@ export function analyzeFreeze(events, files) {
 
   let rules = [];
   let helpersChanged = false;
+  let helpersNarrowed = false;
   let assumptionsAdded = [];
   const known = baseline !== "none";
   if (known) {
     const a = splitChecks(/** @type {string} */ (baseChecks));
     const b = splitChecks(/** @type {string} */ (files.finalChecks));
     helpersChanged = a.header !== b.header;
+    helpersNarrowed = narrowingSignals(a.header, b.header).narrowed;
     const ids = [...new Set([...Object.keys(a.rules), ...Object.keys(b.rules)])];
     const changed = ids.filter((id) => a.rules[id] !== b.rules[id]);
     const specA = baseSpec ? parseSpec(baseSpec) : null;
@@ -157,7 +160,17 @@ export function analyzeFreeze(events, files) {
       const quote = typeof said?.quote === "string" ? said.quote : null;
       const inSpec = (text) => Boolean(quote && text && squash(text).includes(squash(quote)));
       const quoteMatches = inSpec(ruleText(specB ?? specA, id));
-      const classification = specChanged ? "rule_change" : said?.kind === "check_bug" && quoteMatches ? "check_bug" : "unexplained";
+      // D49: a check that tests less must say which of the rule's words it lost.
+      const sig = narrowingSignals(a.rules[id] ?? "", b.rules[id] ?? "");
+      const listed = Array.isArray(said?.untested) ? said.untested.filter((u) => typeof u?.words === "string") : [];
+      const inRule = (u) => {
+        const text = ruleText(specB ?? specA, id);
+        return Boolean(text && squash(text).includes(squash(u.words)));
+      };
+      const untested = listed.filter(inRule);
+      const narrowed = !specChanged && (sig.narrowed || listed.length > 0);
+      const untestedMissing = narrowed && untested.length === 0;
+      const classification = specChanged ? "rule_change" : said?.kind === "check_bug" && quoteMatches && !untestedMissing ? "check_bug" : "unexplained";
       return {
         rule: id,
         classification,
@@ -169,6 +182,12 @@ export function analyzeFreeze(events, files) {
         quote,
         quote_matches_rule: quoteMatches,
         what: typeof said?.what === "string" ? said.what : null,
+        rule_text: ruleText(specB ?? specA, id),
+        narrowed,
+        signals: { dropped_points: sig.dropped_points, assertions: sig.assertions, any_seed: sig.any_seed },
+        untested,
+        untested_invalid: listed.filter((u) => !inRule(u)).map((u) => u.words),
+        untested_missing: untestedMissing,
       };
     });
   }
@@ -189,6 +208,8 @@ export function analyzeFreeze(events, files) {
       plan_changes: [...shownIds],
       snapshot_overwritten: snapshotOverwritten,
       assumptions_added: assumptionsAdded,
+      helpers_narrowed: helpersNarrowed,
+      narrowed: rules.filter((r) => r.narrowed).map((r) => r.rule),
       check_bugs: rules.filter((r) => r.classification === "check_bug").map((r) => r.rule),
       rule_changes: rules.filter((r) => r.classification === "rule_change").map((r) => r.rule),
       unjustified: rules.filter((r) => r.classification === "unexplained").map((r) => r.rule),

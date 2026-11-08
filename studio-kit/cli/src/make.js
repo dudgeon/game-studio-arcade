@@ -6,6 +6,7 @@ import { downloadOutputs, extractCart, readJsonIfExists } from "./outputs.js";
 import { commitNewCart, specTitle } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
 import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
+import { addYouCheckRules, questionsFor } from "./untested.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -120,6 +121,29 @@ export async function makeCart(o) {
     spec = fs.readFileSync(path.join(dl.dir, "spec.md"), "utf8");
   }
 
+  const freeze = analyzeFreeze(events, {
+    frozenChecks: readTextIfExists(path.join(dl.dir, "checks.frozen.js")),
+    frozenSpec: readTextIfExists(path.join(dl.dir, "spec.frozen.md")),
+    finalChecks: cartDir ? readTextIfExists(path.join(cartDir, "checks.js")) : null,
+    finalSpec: spec,
+    capturedChecks: captured["checks.frozen.js"]?.toString("utf8") ?? null,
+    capturedSpec: captured["spec.frozen.md"]?.toString("utf8") ?? null,
+    declared: Array.isArray(report?.check_changes) ? report.check_changes : null,
+  });
+  // D49: what the test can't prove, the kid checks. This goes in the cart's spec,
+  // so it's validated and committed like any other rule. outputs/spec.md stays as sent.
+  /** @type {{rule: string, from: string, words: string|null, text: string}[]} */
+  let youCheckAdded = [];
+  if (cartDir && spec != null) {
+    const amended = addYouCheckRules(spec, questionsFor(freeze.checks_changed_after_playtest.rules));
+    youCheckAdded = amended.added;
+    if (youCheckAdded.length) {
+      spec = amended.text;
+      fs.writeFileSync(path.join(cartDir, "spec.md"), spec);
+    }
+  }
+  for (const line of buildSummary(freeze.checks_changed_after_playtest, youCheckAdded)) ui.info(line);
+
   /** @type {any} */
   let validation = null;
   /** @type {any} */
@@ -132,16 +156,6 @@ export async function makeCart(o) {
     writeJson(path.join(sessionDir, "local-checks.json"), { validation, playtest: local });
   }
 
-  const freeze = analyzeFreeze(events, {
-    frozenChecks: readTextIfExists(path.join(dl.dir, "checks.frozen.js")),
-    frozenSpec: readTextIfExists(path.join(dl.dir, "spec.frozen.md")),
-    finalChecks: cartDir ? readTextIfExists(path.join(cartDir, "checks.js")) : null,
-    finalSpec: spec,
-    capturedChecks: captured["checks.frozen.js"]?.toString("utf8") ?? null,
-    capturedSpec: captured["spec.frozen.md"]?.toString("utf8") ?? null,
-    declared: Array.isArray(report?.check_changes) ? report.check_changes : null,
-  });
-  for (const line of buildSummary(freeze.checks_changed_after_playtest)) ui.info(line);
 
   const passed = Boolean(cartDir && validation?.ok && local?.ok);
   const commit = Boolean(cartDir && (passed || o.commitAnyway));
@@ -197,6 +211,7 @@ export async function makeCart(o) {
     playtest_runs: freeze.playtest_runs,
     edits_after_first_playtest: freeze.edits_after_first_playtest,
     checks_changed_after_playtest: freeze.checks_changed_after_playtest,
+    you_check_added: youCheckAdded,
     playtest: {
       sandbox: report ? { status: report.status ?? null, rules: report.rules ?? [], fix_rounds: report.fix_rounds ?? null } : null,
       local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [] } : null,
@@ -240,15 +255,23 @@ export async function makeCart(o) {
 
 /**
  * The test changes a person should see at the end of a build (D46).
- * @param {{rules: any[], helpers_unjustified: boolean, changed: boolean, rules_known: boolean, edit_events: number}} c
+ * @param {{rules: any[], helpers_unjustified: boolean, changed: boolean, rules_known: boolean, edit_events: number, helpers_narrowed?: boolean}} c
+ * @param {{rule: string, from: string, words: string|null}[]} [added] the you-check rules added for it (D49)
  */
-export function buildSummary(c) {
+export function buildSummary(c, added = []) {
   const lines = [];
   for (const r of c.rules) {
     if (r.classification === "check_bug") lines.push(`Test fixed, rule unchanged: ${r.rule} "${r.quote}". ${r.what ?? ""}`.trim());
     if (r.classification === "rule_change") lines.push(`Rule changed: ${r.rule}${r.shown_in_plan ? "" : " (not shown in the plan)"}. ${r.what ?? ""}`.trim());
     if (r.classification === "unexplained") lines.push(`Test changed with no explanation: ${r.rule}. ${r.what ?? ""}`.trim());
+    if (r.narrowed) {
+      const said = (r.untested ?? []).map((u) => `"${u.words}"`).join(", ");
+      const asked = added.filter((a) => a.from === r.rule).map((a) => a.rule).join(", ");
+      const then = asked ? ` You check it on first play: ${asked}.` : "";
+      lines.push(said ? `Test proves less: ${r.rule} no longer tests ${said}.${then}` : `Test may prove less: ${r.rule}, and it doesn't say what.${then}`);
+    }
   }
+  if (c.helpers_narrowed) lines.push("Shared test code may prove less. Worth reading.");
   if (c.helpers_unjustified) lines.push("Shared test code changed with no explanation.");
   if (c.changed && !c.rules_known) lines.push(`Tests were changed (${c.edit_events} edits), but it can't be said which: the starting copy wasn't kept.`);
   return lines;

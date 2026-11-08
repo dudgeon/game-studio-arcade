@@ -93,7 +93,7 @@ The D46 route worked as designed: every check change was declared, every quote w
 - **Penguin Fish Catch (Sonnet), R8:** dropped two of eight points on the speed curve, but kept the start and the cap. Fine.
 - **The others:** no weakening that I can see. Fish Catch's R8 changed from per-frame to per-batch with the same arithmetic. Flipper Catch's R9 got stronger.
 
-So the log is honest, but "check bug" can still hide a test that proves less. Geoff or the director may want the agent to state which words of the rule are no longer tested, which would make this visible.
+So the log was honest, but "check bug" could still hide a test that proves less. Geoff has since decided this (D49): the agent must state which words a fixed check no longer tests, and those become you-check questions on first play. These five carts predate it and have no added questions.
 
 ## Replay by question (D47): how equal were these runs?
 
