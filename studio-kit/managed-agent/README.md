@@ -16,9 +16,11 @@ Run from **this directory**, so the lockfile lands here:
 
 ```sh
 cd studio-kit/managed-agent
-ant --profile game-studio-arcade apply --dry-run .   # look at the plan
-ant --profile game-studio-arcade apply .             # create or update; commit claude-lock.json afterwards
+ant --profile game-studio-arcade apply --dry-run   # look at the plan
+ant --profile game-studio-arcade apply             # update what the lockfile tracks; commit claude-lock.json afterwards
 ```
+
+Use bare `apply`, not `apply .`: `.` also walks the folder for new resources (D173). `studio check-brief` says whether the applied agent matches the files here, and `studio make` won't run if it doesn't.
 
 Re-running with no changes must show nothing to do (idempotent). A file renamed is a new resource; `--prune` archives the old one.
 
@@ -47,4 +49,4 @@ In order, once the director clears it (after task 1's probe):
 5. ~~Output filenames and lag.~~ Done: bare names; `DONE.json` complete about 7 s after idle. See platform-notes.
 6. ~~Cost.~~ Done: `usage.list_cost` "0" against a recomputed 0.16¢. Comparing against the Console is still open.
 7. ~~Try the context pack as a skill instead of a tarball.~~ Done 2026-11-08: tarball stays the default (D45).
-8. `ant --profile game-studio-arcade apply .` from this directory, to make the D44 brief agent v2, and commit `claude-lock.json`. Waiting on the `ant` startup hang. Until then, run `studio make --brief-from-file`, or sessions get the old v1 brief.
+8. ~~Apply the current brief as agent v2 and commit `claude-lock.json`.~~ Done 2026-11-08; the re-apply reported "Everything is up to date, 2 unchanged". See D173.

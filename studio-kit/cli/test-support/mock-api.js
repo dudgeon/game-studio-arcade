@@ -6,11 +6,12 @@
 //   {"disconnect": true}                          end the current stream (the driver must reconnect)
 // Outputs are {filename: Buffer|string}; `outputLag` empty listings come first.
 import fs from "node:fs";
+import { readAgentDef } from "../src/config.js";
 
 /**
  * @param {{steps: any[]}} script
  * @param {{sessionId?: string, outputs?: Record<string, Buffer|string>, outputLag?: number,
- *          usage?: any, timeoutMs?: number}} [opts]
+ *          usage?: any, timeoutMs?: number, appliedAgent?: any}} [opts]
  */
 export function mockApi(script, opts = {}) {
   const sessionId = opts.sessionId ?? "sesn_mock_01";
@@ -138,6 +139,12 @@ export function mockApi(script, opts = {}) {
         const name = Object.keys(opts.outputs ?? {})[Number(fileId.split("_").pop())];
         const v = (opts.outputs ?? {})[name];
         return Buffer.isBuffer(v) ? v : Buffer.from(String(v));
+      },
+      async retrieveAgent(agentId, version) {
+        calls.push(`retrieveAgent:${agentId}@${version}`);
+        if (opts.appliedAgent instanceof Error) throw opts.appliedAgent;
+        const def = readAgentDef();
+        return opts.appliedAgent ?? { id: agentId, version, system: def.system, tools: def.tools };
       },
       async uploadFile(path, filename) {
         calls.push(`upload:${filename}`);
