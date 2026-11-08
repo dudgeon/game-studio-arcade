@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arcade player</title>
+    <link rel="stylesheet" href="/player/player.css" />
+  </head>
+  <body>
+    <main id="list" class="view" hidden>
+      <header>
+        <h1>Arcade</h1>
+        <p class="sub" id="list-sub"></p>
+      </header>
+      <ol id="carts"></ol>
+      <p id="empty" hidden>
+        No games yet. Games land here when <code>studio make</code> commits one to the cart library
+        (<code>~/game-studio-data/carts</code>). Start the player with <code>--examples</code> to try the runtime's examples.
+      </p>
+      <footer class="keys">
+        <span><b>↑ ↓</b> choose</span><span><b>A</b> play</span><span><b>X</b> check rules</span>
+        <span class="dim">keyboard: arrows, Z = A, C = X · Esc = ★</span>
+      </footer>
+    </main>
+
+    <section id="play" class="view" hidden>
+      <div id="stage"></div>
+      <div id="play-hint">★ / Esc: back to the list</div>
+      <div id="play-error" hidden>
+        <p id="play-error-text"></p>
+        <button type="button" id="play-back">Back to the list</button>
+      </div>
+    </section>
+
+    <section id="check" class="view" hidden>
+      <div class="card">
+        <p class="sub" id="check-step"></p>
+        <h2 id="check-title"></h2>
+        <p class="ask">Is this true when you play it?</p>
+        <blockquote id="check-rule"></blockquote>
+        <div class="answers">
+          <button type="button" data-answer="yes">Yes</button>
+          <button type="button" data-answer="no">No</button>
+          <button type="button" data-answer="not_sure">Not sure</button>
+        </div>
+        <label class="note">Note (optional) <textarea id="check-note" rows="2" maxlength="1000"></textarea></label>
+        <button type="button" id="check-later" class="quiet">Later</button>
+      </div>
+    </section>
+
+    <div id="toast" role="status" hidden></div>
+    <script type="module" src="/player/player.js"></script>
+  </body>
+</html>

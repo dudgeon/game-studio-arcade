@@ -13,7 +13,7 @@ Start with the docs:
 ## Layout
 
 - `runtime/`: the house runtime (a small JavaScript fantasy console). See [runtime/README.md](runtime/README.md).
-- `studio-kit/*`: the studio kit (spec format, playtest harness, context pack, managed agent, CLI). Each folder is its own npm workspace.
+- `studio-kit/*`: the studio kit (spec format, playtest harness, context pack, managed agent, CLI, local player). Each folder is its own npm workspace.
 - `scripts/`: setup scripts (API auth, D16).
 
 ## Develop
