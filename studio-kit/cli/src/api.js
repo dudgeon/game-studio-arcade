@@ -19,6 +19,7 @@
  * @property {string} id
  * @property {string} filename
  * @property {number} [size_bytes]
+ * @property {string} [created_at]
  *
  * @typedef {object} StudioApi
  * @property {(p: CreateSessionParams) => Promise<{id: string}>} createSession
@@ -32,7 +33,8 @@
  */
 
 export const BETA = "managed-agents-2026-04-01";
-export const KIT_MOUNT = "/studio-kit.tgz"; // lands at /mnt/session/uploads/studio-kit.tgz
+/** Absolute mount paths under /mnt/session/uploads/ (D19). */
+export const KIT_MOUNT = "/mnt/session/uploads/studio-kit.tgz";
 
 /**
  * Build the sessions.create body. Kept separate so tests can check it.

@@ -116,16 +116,25 @@ export function mockApi(script, opts = {}) {
         calls.push("retrieveSession");
         return { id: sessionId, status: "idle", usage: opts.usage ?? null };
       },
+      // Like the real thing (D19): the session's input kit is listed too, and
+      // during the lag files are still short and DONE.json isn't there yet.
       async listOutputs() {
         calls.push("listOutputs");
-        if (lag > 0) {
-          lag--;
-          return [];
-        }
-        return Object.keys(opts.outputs ?? {}).map((filename, i) => ({ id: `file_out_${i}`, filename }));
+        const names = Object.keys(opts.outputs ?? {});
+        const syncing = lag > 0;
+        if (lag > 0) lag--;
+        const size = (n) => {
+          const v = (opts.outputs ?? {})[n];
+          return (Buffer.isBuffer(v) ? v : Buffer.from(String(v))).length;
+        };
+        const listed = names
+          .map((filename, i) => ({ id: `file_out_${i}`, filename, size_bytes: syncing ? Math.max(0, size(filename) - 1) : size(filename), created_at: `2026-11-07T21:00:0${i % 10}Z` }))
+          .filter((f) => !(syncing && f.filename === "DONE.json"));
+        return [{ id: "file_input_kit", filename: "studio-kit.tgz", size_bytes: 1234, created_at: "2026-11-07T20:59:00Z" }, ...listed];
       },
       async download(fileId) {
         calls.push(`download:${fileId}`);
+        if (fileId === "file_input_kit") throw new Error("mock: the input kit must never be downloaded");
         const name = Object.keys(opts.outputs ?? {})[Number(fileId.split("_").pop())];
         const v = (opts.outputs ?? {})[name];
         return Buffer.isBuffer(v) ? v : Buffer.from(String(v));

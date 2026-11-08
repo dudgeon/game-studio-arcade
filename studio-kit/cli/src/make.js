@@ -146,8 +146,19 @@ export async function makeCart(o) {
       local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [] } : null,
       validate: validation,
     },
+    // list_cost is rounded to whole cents, so a cheap session reads "0" (D19):
+    // the raw token counts and active seconds are logged so cost can be recomputed.
     list_cost: result.usage?.list_cost ?? null,
     list_cost_usd: listCostUsd(result.usage),
+    active_seconds: result.usage?.active_seconds ?? null,
+    tokens: result.usage
+      ? {
+          input: result.usage.input_tokens ?? null,
+          output: result.usage.output_tokens ?? null,
+          cache_read: result.usage.cache_read_input_tokens ?? null,
+          cache_creation: result.usage.cache_creation ?? null,
+        }
+      : null,
     usage: result.usage,
     wall_seconds: result.wallSeconds,
     started_at: result.startedAt,
@@ -157,6 +168,7 @@ export async function makeCart(o) {
     cart_id: committed?.id ?? null,
     cart_version: committed ? 1 : null,
     commit: committed?.commit ?? null,
+    outputs_complete: dl.complete,
     missing_outputs: dl.missing,
     errors: result.errors,
     notes: result.notes,

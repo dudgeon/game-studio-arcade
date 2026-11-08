@@ -127,7 +127,7 @@ export function renderKitMd(info) {
     "## Where things go",
     "",
     "- Build the cart in `/workspace/cart/`.",
-    "- Final outputs go flat in `/mnt/session/outputs/`: `cart.tgz`, `report.json`, `spec.md`.",
+    "- Final outputs go flat in `/mnt/session/outputs/`: `cart.tgz`, `report.json`, `spec.md`, then `DONE.json` last.",
     "",
   );
   return lines.join("\n");
@@ -154,7 +154,9 @@ export function buildKit(opts) {
     fs.writeFileSync(path.join(stage, "KIT.md"), kitMd);
     fs.writeFileSync(path.join(stage, "kit.json"), JSON.stringify({ hash, files: files.map((f) => f.kitPath) }, null, 2) + "\n");
     fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true });
-    execFileSync("tar", ["-czf", path.resolve(opts.out), "-C", stage, "."], {
+    // D19: no macOS extended attributes or AppleDouble files in the kit.
+    const macFlags = process.platform === "darwin" ? ["--no-xattrs", "--no-mac-metadata"] : [];
+    execFileSync("tar", [...macFlags, "-czf", path.resolve(opts.out), "-C", stage, "."], {
       env: { ...process.env, COPYFILE_DISABLE: "1" },
     });
   } finally {

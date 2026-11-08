@@ -18,7 +18,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--commit-anyway` | commit even if validate or the playtest fails |
 | `-v` | show the agent's own messages and debug lines |
 
-Auth (D16): the SDK uses the `ant` login profile `game-studio-arcade`. The CLI refuses to start if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set.
+Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes the `ant` login profile (`game-studio-arcade`, or `$GSA_PROFILE`) explicitly, so a stray `ANTHROPIC_API_KEY` is ignored.
 
 ## What a run does
 
@@ -27,9 +27,9 @@ Auth (D16): the SDK uses the `ant` login profile `game-studio-arcade`. The CLI r
 3. Opens the event stream, **then** sends the request.
 4. Relays `ask_player` as A/B/C/D (C takes typed text), `show_plan` as build/change, and `tell_player` plus tool activity as one-line progress. After D, any further question is answered D automatically.
 5. Reconnects if the stream drops, replaying missed events from the history without repeats. Answers any tool call the stream missed when the session reports `requires_action`.
-6. Downloads every output into `~/game-studio-data/sessions/<id>/`, waiting out output lag, then extracts `cart.tgz`.
+6. Polls the session's files until `DONE.json` is there and every size in it matches (D19), skipping the session's inputs. Then it downloads every output into `~/game-studio-data/sessions/<id>/` and extracts `cart.tgz`.
 7. Runs `validate_cart` and the local playtest. Commits the cart to `~/game-studio-data/carts/` only if both pass.
-8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost`, wall time, question count and `ended_by`.
+8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`.
 
 Set `GSA_DATA_DIR` to use another data folder.
 

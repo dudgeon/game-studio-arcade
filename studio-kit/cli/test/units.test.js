@@ -11,7 +11,7 @@ import { readLock } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
 import { progressFor } from "../src/progress.js";
 import { judgeReport } from "../src/checks.js";
-import { extractCart } from "../src/outputs.js";
+import { downloadOutputs, extractCart } from "../src/outputs.js";
 import { createClient } from "../src/client.js";
 import { ensureKitUploaded } from "../src/kit.js";
 import { mockApi } from "../test-support/mock-api.js";
@@ -54,7 +54,7 @@ test("session body: pinned agent, model override, kit mount, budget as cents str
   const base = { agentId: "agent_1", environmentId: "env_1", kitFileId: "file_k", budgetCents: 300 };
   const pinned = sessionCreateBody({ ...base, agentVersion: 4 });
   assert.deepEqual(pinned.agent, { type: "agent", id: "agent_1", version: 4 });
-  assert.deepEqual(pinned.resources, [{ type: "file", file_id: "file_k", mount_path: "/studio-kit.tgz" }]);
+  assert.deepEqual(pinned.resources, [{ type: "file", file_id: "file_k", mount_path: "/mnt/session/uploads/studio-kit.tgz" }]);
   assert.deepEqual(pinned.budget, { type: "limit", max_list_cost: { amount: "300", currency: "USD" } });
   const over = sessionCreateBody({ ...base, agentVersion: 4, model: "claude-opus-5-5" });
   assert.deepEqual(over.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-opus-5-5" }, version: 4 });
@@ -112,8 +112,9 @@ test("extractCart refuses paths that escape the folder", () => {
   assert.throws(() => extractCart(bad, path.join(d, "out")), /unsafe path/);
 });
 
-test("createClient refuses an API key in the environment (D16)", async () => {
-  await assert.rejects(createClient({ env: { ANTHROPIC_API_KEY: "" } }), /ANTHROPIC_API_KEY is set/);
+test("createClient comes from @game-studio-arcade/auth with the profile explicit (D17)", async () => {
+  const client = await createClient({ profile: "gsa-test-profile" });
+  assert.equal(typeof client.beta.sessions.create, "function");
 });
 
 test("the kit uploads once per content hash", async () => {
@@ -143,4 +144,27 @@ test("the real spec package validates the fixture cart, and catches a missing ch
   assert.equal(bad.ok, false);
   const problems = bad.problems ?? [];
   assert.ok(problems.some((p) => p.includes("R2")), problems.join("; "));
+});
+
+test("outputs: waits for DONE.json and final sizes; gives up as incomplete", async () => {
+  const body = Buffer.from("cart bytes");
+  const done = Buffer.from(JSON.stringify({ files: [{ name: "cart.tgz", size: body.length }] }));
+  const m = mockApi({ steps: [] }, { outputs: { "cart.tgz": body, "DONE.json": done }, outputLag: 3 });
+  const waits = [];
+  const ok = await downloadOutputs({ api: m.api, sessionId: "s", dir: tmp(), sleep: async (ms) => void waits.push(ms), waitMs: 7 });
+  assert.equal(ok.complete, true);
+  assert.deepEqual(waits, [7, 7, 7], "polled through the lag");
+  assert.deepEqual(ok.files.sort(), ["DONE.json", "cart.tgz"]);
+  assert.equal(fs.readFileSync(path.join(ok.dir, "cart.tgz"), "utf8"), "cart bytes");
+
+  const lying = Buffer.from(JSON.stringify({ files: [{ name: "cart.tgz", size: 999 }, { name: "report.json", size: 5 }] }));
+  const m2 = mockApi({ steps: [] }, { outputs: { "cart.tgz": body, "DONE.json": lying } });
+  const bad = await downloadOutputs({ api: m2.api, sessionId: "s", dir: tmp(), sleep: async () => {}, tries: 3 });
+  assert.equal(bad.complete, false);
+  assert.deepEqual(bad.missing, ["cart.tgz", "report.json"]);
+  assert.ok(bad.files.includes("cart.tgz"), "what's there is still kept");
+
+  const m3 = mockApi({ steps: [] }, { outputs: { "cart.tgz": body } });
+  const none = await downloadOutputs({ api: m3.api, sessionId: "s", dir: tmp(), sleep: async () => {}, tries: 2 });
+  assert.deepEqual([none.complete, none.missing], [false, ["DONE.json", "report.json"]]);
 });

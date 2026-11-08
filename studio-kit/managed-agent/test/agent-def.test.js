@@ -25,6 +25,7 @@ test("agent frontmatter: name, default model, web tools off, custom tools insert
     assert.match(yaml, new RegExp(`- name: ${t}\\n\\s+enabled: false`), `${t} disabled`);
   }
   assert.match(yaml, /- \.\/tools\/\*\.json/);
+  assert.match(yaml, /permission_policy:\n\s+type: always_allow/, "unattended runs never wait on a confirmation (D19)");
   assert.doesNotMatch(yaml, /^system:/m, "the system prompt is the body, not a frontmatter field");
   assert.ok(body.trim().length > 500, "body holds the system prompt");
 });
@@ -46,6 +47,7 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "cart.tgz",
     "report.json",
     "gave_up",
+    "DONE.json",
   ]) {
     assert.ok(body.includes(needle), `prompt mentions ${needle}`);
   }

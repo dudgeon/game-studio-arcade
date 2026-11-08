@@ -23,13 +23,19 @@ function cartTgz() {
   return fs.readFileSync(out);
 }
 
-function outputs(extra = {}) {
-  return {
+/** Outputs as the agent leaves them, with DONE.json listing names and sizes (D19). */
+/** @param {Record<string, Buffer>} [extra] @param {{omit?: string[]}} [opts] */
+function outputs(extra = {}, { omit = [] } = {}) {
+  /** @type {Record<string, Buffer>} */
+  const files = {
     "spec.md": fs.readFileSync(path.join(fixtures, "cart/spec.md")),
     "report.json": fs.readFileSync(path.join(fixtures, "report.json")),
     "cart.tgz": cartTgz(),
     ...extra,
   };
+  for (const n of omit) delete files[n];
+  const manifest = { files: Object.entries(files).map(([name, b]) => ({ name, size: b.length })) };
+  return { ...files, "DONE.json": Buffer.from(JSON.stringify(manifest)) };
 }
 
 const passing = {
@@ -44,7 +50,7 @@ const passing = {
 function setup(opts = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-data-"));
   const paths = dataPaths(root);
-  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5 }, sessionId: opts.sessionId });
+  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5, input_tokens: 41000, output_tokens: 9800, cache_read_input_tokens: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } }, sessionId: opts.sessionId });
   const info = [];
   let t = Date.parse("2026-11-07T21:00:00Z");
   const make = (extra = {}) =>
@@ -115,10 +121,14 @@ test("a passing build is committed with complete log records", async () => {
   assert.equal(session.playtest.local.ok, true);
   assert.equal(session.cart_id, "frog-hop");
   assert.deepEqual(session.missing_outputs, []);
+  assert.equal(session.outputs_complete, true);
+  assert.equal(session.active_seconds, 312.5);
+  assert.deepEqual(session.tokens, { input: 41000, output: 9800, cache_read: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } });
   assert.deepEqual({ type: "studio_session", ...rec }, session);
 
   // Everything kept, and the answers replay.
-  for (const f of ["answers.json", "session.json", "local-checks.json", "outputs/cart.tgz", "outputs/report.json", "outputs/spec.md", "cart/spec.md"]) {
+  assert.ok(!fs.existsSync(path.join(sessionDir, "outputs/studio-kit.tgz")), "the input kit isn't treated as an output");
+  for (const f of ["answers.json", "session.json", "local-checks.json", "outputs/cart.tgz", "outputs/report.json", "outputs/spec.md", "outputs/DONE.json", "cart/spec.md"]) {
     assert.ok(fs.existsSync(path.join(sessionDir, f)), `kept ${f}`);
   }
   const saved = JSON.parse(fs.readFileSync(record, "utf8"));
@@ -176,13 +186,11 @@ test("--commit-anyway commits a failing cart and says so", async () => {
 });
 
 test("no cart.tgz: the spec is still logged and kept", async () => {
-  /** @type {Record<string, Buffer>} */
-  const o = outputs();
-  delete o["cart.tgz"];
-  const s = setup({ outputs: o });
+  const s = setup({ outputs: outputs({}, { omit: ["cart.tgz"] }) });
   const { record, sessionDir } = await s.make();
   assert.equal(record.outcome, "no_cart");
-  assert.deepEqual(record.missing_outputs, ["cart.tgz"]);
+  assert.deepEqual(record.missing_outputs, []);
+  assert.equal(record.outputs_complete, true, "the manifest didn't promise a cart");
   assert.match(record.spec_diff ?? "", /\+# Frog Hop/);
   assert.ok(fs.existsSync(path.join(sessionDir, "outputs/spec.md")));
 });
