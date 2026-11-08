@@ -115,7 +115,7 @@ Session `sesn_01Qbgy4bgLKvukuMevfJDiU5`: environment `gsa-probe-offline` (limite
 - **Playwright:** 1.56.0 (Node and Python). Browsers are at `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`: `chromium-1194`, `chromium_headless_shell-1194` and `ffmpeg-1011`. A stray 1.56.1 sits in `/opt/node-tools`. `require("playwright")` works with `NODE_PATH="$(npm root -g)"`.
 - **Headless Chromium 141.0.7390.37:**
   - launches offline in about 5.1 s
-  - a 320×256 canvas scaled to 1280×1024 renders with pixelated scaling (screenshot checked)
+  - a 320×256 canvas scaled to 1280×1024 renders with pixelated scaling (screenshot checked) (the Max's size at the time; D81 now targets 256×192 at 4× = 1024×768)
   - `requestAnimationFrame` ran 63 frames in 1 s
   - `page.keyboard.press` reached `keydown` (`ArrowLeft`, `KeyZ`)
   - `AudioContext`, `OfflineAudioContext`, `navigator.getGamepads`, `OffscreenCanvas` and WebGL all exist
@@ -123,3 +123,28 @@ Session `sesn_01Qbgy4bgLKvukuMevfJDiU5`: environment `gsa-probe-offline` (limite
 - **Network is fully blocked:** DNS fails (`getent`, curl "Could not resolve host"), the npm registry is unreachable (ENOTFOUND), and Chromium `page.goto` fails with `net::ERR_NAME_NOT_RESOLVED`.
 - **Files:** a mounted file appears at its absolute `mount_path` under `/mnt/session/uploads/`, read-only. Outputs go in `/mnt/session/outputs/`. Outputs can still be syncing seconds after idle, and the session's file listing includes the uploaded inputs (D19).
 - **Cost and timing:** 80 s wall time, 79.5 s active. Tokens: 6 input, 5,345 cache-write, 4,545 cache-read, 310 output. Reported `list_cost` is `"0"` (rounded to cents); the computed cost is about $0.003. `session.usage` arrived at the end of the turn.
+
+## Picade, 10-inch (2025 edition)
+
+Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also served at /product/picade/), shop.pimoroni.com/products/picade (product JSON), shop.pimoroni.com/products/picade-x-hat-usb-c, learn.pimoroni.com/article/assembling-your-picade and /setting-up-picade, github.com/pimoroni/picade-hat (`picade.dts`, `picade.txt`, issue #45, PR #49), pishop.us product pages for the Pi 5 8 GB, the Active Cooler and the 27 W supply. Decisions taken from this: D80–D84.
+
+**Buying (what Geoff ordered, 2026-11-07):** Picade with 10" display, Pimoroni PIM469, PiShop SKU 2009, **$349.95**, in stock. Raspberry Pi 5 8 GB, PiShop SKU 8GB-9028, **$175.00**, in stock. Not included in the kit: the Pi, a USB-C supply, a microSD card. Pimoroni also recommends an Active Cooler for the Pi 5. PiShop prices: Active Cooler (SC1148) $12.95; official 27 W USB-C supply (SC1158, 5.1 V/5 A) $12.95; both in stock. PiShop lists the 10-button illuminated "Picade Plasma Kit" ($64.95) as an extra; it isn't in the kit.
+
+**Edition check on arrival.** Pimoroni's page describes the 2025 edition, "Designed for Raspberry Pi 5". PiShop's page, same SKU, still carries older copy (recommends a Pi 4, and notes that a 2020 edition has a square PICO-8 sticker and a different assembly tutorial). Check which edition arrives before assembly; Pi 5 fit and cooling are only promised for the 2025 edition.
+
+**Display:** 10" IPS, **1024×768, 4:3**, wide viewing angles. Pimoroni's HDMI driver board with an on-screen-display keypad (mounted inside on the left of the side panel). Video comes from the Pi's micro-HDMI port 0 (HDMI-0; the guide warns to use that one) with the included micro-HDMI cable. The board is powered by a micro-USB cable from one of the Pi's USB ports. Check on arrival that the Pi picks 1024×768 from EDID.
+
+**Controls:** one 4-way digital joystick (black ball top), **six player buttons**, **four utility buttons** (two on the front, two on the sides; wired to the HAT's ENT, ESC, 1UP and COIN headers), and an illuminated power button. **One player.** Everything connects to the Picade X HAT with Dupont connectors.
+
+**How the Pi reads them:** the X HAT is GPIO, not USB. The `picade` device-tree overlay binds the 14 inputs to a virtual keyboard (Pimoroni: "emulated keyboard presses", so emulators report "No gamepad detected"). Default keycodes in `picade.dts`: arrows for the joystick; buttons 1–6 = Left Ctrl, Left Alt, Space, Left Shift, Z, X; Enter, Escape, I (coin), O (start); power = KEY_POWER. Every key can be changed with `dtparam=<input>=<keycode>` (`dtoverlay` lines are limited to 80 characters). D82 sets them to the runtime's P1 keys. The X HAT also has breakout pins for two more buttons and a plasma-button connector.
+
+**Pi 5:** the cabinet fits a Pi 5 with Active Cooler, plus a single NVMe Base (7 mm standoffs) but not the NVMe Base Duo. The X HAT sits on a booster header and 17 mm standoffs. Pi 5 support in the overlay was merged on 2025-07-17 (PR #49). Issue #45 (open) records: controls and audio work with the Pi 5 overlay; the screen flashed until `usb_max_current_enable=1`; the power button powers off but power-on was unreliable for one user; one user saw about 85 °C under the HAT. Install: build `picade.dtbo` from the repo (`make`, `sudo make install`, needs `device-tree-compiler`) and add `dtoverlay=picade` to `/boot/firmware/config.txt`. Pimoroni's guide targets Raspberry Pi OS Lite 64-bit but doesn't name a Debian release, so check on trixie.
+
+**Power:** USB-C into the X HAT, which back-powers the Pi through the GPIO header ("no need for a separate power supply"). Tap the power button (or the HAT's "switch" button) to start; hold 3 s to shut down safely and cut power. Because the Pi can't see the supply, add `usb_max_current_enable=1`.
+
+**Audio:** a 3" speaker (5 W, 4 Ω) on the X HAT's I2S DAC with a 3 W mono amplifier (both channels mixed to mono). Default volume is 100%, "a bit much". If sound fails: `dtparam=audio=off` and `dtoverlay=vc4-kms-v3d,noaudio`. One Bookworm user needed PulseAudio for I2S.
+
+**Ports and the mic:** no external ports are documented; the back panel is removable for access, and the USB-C power cable reaches the HAT inside. The Pi 5 has four USB ports; the display's power takes one, leaving three inside the case for a mic, a gamepad or storage. The HAT uses the I2S pins (18, 19, 21) for its DAC, so a USB mic is the path, not I2S.
+
+**Cabinet and assembly:** powder-coated MDF, acrylic screen cover, marquee and console; 310 × 260 × 250 mm (H × W × D) assembled. About 2–3 hours with a cross-head and a small flat-blade screwdriver. Guide warnings: make sure screw terminals grip the bare wire; seat the ribbon cable under its grey clip, not on top ("it _won't_ work"); if only one joystick direction works when mapping, recheck the joystick wiring. Includes a PICO-8 licence (Geoff's copy for the guest player, see Guest players).
+
