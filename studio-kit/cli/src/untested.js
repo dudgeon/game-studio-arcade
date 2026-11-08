@@ -18,10 +18,10 @@ export function questionsFor(rules) {
     if (!r.narrowed) continue;
     if (r.untested?.length) {
       for (const u of r.untested) {
-        out.push({ from: r.rule, words: u.words, text: oneLine(u.question || `Play and check this, because the test can't: "${u.words}"`) });
+        out.push({ from: r.rule, words: u.words, text: oneLine(u.question || `Play and check: ${u.words}`) });
       }
     } else {
-      out.push({ from: r.rule, words: null, text: oneLine(`The test for this changed and may not prove all of it, so play and check: ${r.rule_text ?? r.rule}`) });
+      out.push({ from: r.rule, words: null, text: oneLine(`Play and check: ${r.rule_text ?? r.rule}`) });
     }
   }
   return out;
