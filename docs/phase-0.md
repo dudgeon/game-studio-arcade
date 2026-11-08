@@ -45,6 +45,8 @@ npm workspaces (`runtime`, `studio-kit/*`, later `cabinet/*` and `manager`), Typ
 *Accept:* `npm install && npm test` passes on Node 22, and `git status` is clean after a build.
 
 ### 1. Probe session (auth done, D16)
+**Done 2026-11-07** (D17–D19): `studio-kit/auth`, `studio-kit/probe`, findings in platform-notes.md. The sandbox has Playwright **1.56.0**.
+
 First, auth plumbing (D16): `ant` already uses the `game-studio-arcade` profile. Add a shared `credentials()` helper for our TypeScript code that relies on the SDK's profile resolution. It should fail with a clear message pointing at `scripts/setup-anthropic-auth.sh`, and refuse to run if `ANTHROPIC_API_KEY` is set. Confirm the SDK actually picks up the profile.
 
 In `studio-kit/managed-agent/`: a minimal environment (`networking: {type: limited}`, no hosts) and a throwaway agent, applied with `ant apply`, plus one session that reports:

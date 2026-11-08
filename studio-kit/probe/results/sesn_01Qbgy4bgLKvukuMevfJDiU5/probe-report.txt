@@ -1,0 +1,212 @@
+
+===== identity =====
+$ date -u +%FT%TZ; whoami; id
+2026-11-08T02:07:15Z
+root
+uid=0(root) gid=0(root) groups=0(root)
+[exit 0]
+$ uname -a; cat /etc/os-release | head -4
+Linux vm 6.18.44-fc-v310 #1 SMP @0 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+[exit 0]
+$ nproc; free -m; df -h / /tmp /mnt/session 2>/dev/null
+4
+               total        used        free      shared  buff/cache   available
+Mem:           16086         213       15958          16          69       15872
+Swap:              0           0           0
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda        252G   11G   30G  27% /
+/dev/vda        252G   11G   30G  27% /
+/dev/vda        252G   11G   30G  27% /
+[exit 0]
+
+===== mounts and kit =====
+$ echo "kit extracted to: /tmp/kit"; echo "kit tarball: ${GSA_KIT_TARBALL:-unknown}"
+kit extracted to: /tmp/kit
+kit tarball: /mnt/session/uploads/gsa-probe-kit.tgz
+[exit 0]
+$ ls -la /mnt/session /mnt/session/uploads 2>&1; find /mnt/session/uploads -maxdepth 3 2>/dev/null | head -20
+/mnt/session:
+total 8
+drwxr-xr-x 4 root   root   4096 Nov  8 02:07 .
+drwxr-xr-x 6 root   root   4096 Nov  8 02:07 ..
+drwxr-xr-x 1 claude ubuntu    0 Nov  8 02:07 outputs
+drwxr-xr-x 1 claude ubuntu    0 Nov  8 02:07 uploads
+
+/mnt/session/uploads:
+total 8
+drwxr-xr-x 1 claude ubuntu    0 Nov  8 02:07 .
+drwxr-xr-x 4 root   root   4096 Nov  8 02:07 ..
+-rw-r--r-- 1 claude ubuntu 3033 Nov  8 02:07 gsa-probe-kit.tgz
+/mnt/session/uploads
+/mnt/session/uploads/gsa-probe-kit.tgz
+[exit 0]
+$ touch /mnt/session/uploads/write-test 2>&1 && echo "uploads WRITABLE" || echo "uploads read-only (expected)"
+touch: cannot touch '/mnt/session/uploads/write-test': Read-only file system
+uploads read-only (expected)
+[exit 0]
+$ ls -la /mnt/session/outputs
+total 8
+drwxr-xr-x 1 claude ubuntu    0 Nov  8 02:07 .
+drwxr-xr-x 4 root   root   4096 Nov  8 02:07 ..
+-rw-r--r-- 1 claude ubuntu 1837 Nov  8 02:07 probe-report.txt
+[exit 0]
+
+===== node =====
+$ which -a node; node -v; npm -v; npx -v
+/opt/node22/bin/node
+/opt/node22/bin/node
+/usr/local/bin/node
+v22.22.0
+10.9.4
+10.9.4
+[exit 0]
+$ ls -d /usr/local/n/versions/node/* /opt/nodejs* /usr/local/lib/nodejs* ~/.nvm/versions/node/* 2>/dev/null; update-alternatives --list node 2>/dev/null
+[exit 2]
+$ npm root -g; npm ls -g --depth=0 2>/dev/null
+/home/claude/.npm-global/lib/node_modules
+/home/claude/.npm-global/lib
++-- @mermaid-js/mermaid-cli@11.16.0 -> ./../../../../opt/npm-tools/node_modules/@mermaid-js/mermaid-cli
++-- docx@9.8.1 -> ./../../../../opt/npm-tools/node_modules/docx
++-- markdown-pdf@11.0.0 -> ./../../../../opt/npm-tools/node_modules/markdown-pdf
++-- markdown-toc@1.2.0 -> ./../../../../opt/npm-tools/node_modules/markdown-toc
++-- markdownlint-cli@0.49.0 -> ./../../../../opt/npm-tools/node_modules/markdownlint-cli
++-- markdownlint-cli2@0.23.2 -> ./../../../../opt/npm-tools/node_modules/markdownlint-cli2
++-- marked@18.0.10 -> ./../../../../opt/npm-tools/node_modules/marked
++-- pdf-lib@1.17.1 -> ./../../../../opt/npm-tools/node_modules/pdf-lib
++-- pdfjs-dist@6.2.108 -> ./../../../../opt/npm-tools/node_modules/pdfjs-dist
++-- playwright@1.56.0 -> ./../../../../opt/npm-tools/node_modules/playwright
++-- pptxgenjs@4.0.1 -> ./../../../../opt/npm-tools/node_modules/pptxgenjs
++-- react-dom@19.2.8 -> ./../../../../opt/npm-tools/node_modules/react-dom
++-- react-icons@5.7.0 -> ./../../../../opt/npm-tools/node_modules/react-icons
++-- react@19.2.8 -> ./../../../../opt/npm-tools/node_modules/react
++-- remark-cli@12.0.1 -> ./../../../../opt/npm-tools/node_modules/remark-cli
++-- remark-preset-lint-recommended@7.0.1 -> ./../../../../opt/npm-tools/node_modules/remark-preset-lint-recommended
++-- sharp@0.35.4 -> ./../../../../opt/npm-tools/node_modules/sharp
++-- ts-node@10.9.2 -> ./../../../../opt/npm-tools/node_modules/ts-node
++-- tsx@4.23.12 -> ./../../../../opt/npm-tools/node_modules/tsx
+`-- typescript@6.0.3 -> ./../../../../opt/npm-tools/node_modules/typescript
+
+[exit 0]
+
+===== playwright (node) =====
+$ echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"; ls -la "${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+total 24
+drwxr-xr-x  6 root root 4096 Oct 22 22:03 .
+drwxr-xr-x 19 root root 4096 Nov  8 02:07 ..
+drwxr-xr-x  2 root root 4096 Oct 22 22:00 .links
+lrwxrwxrwx  1 root root   50 Oct 22 22:00 chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+drwxr-xr-x  3 root root 4096 Oct 22 22:00 chromium-1194
+drwxr-xr-x  3 root root 4096 Oct 22 22:00 chromium_headless_shell-1194
+drwxr-xr-x  2 root root 4096 Oct 22 22:00 ffmpeg-1011
+[exit 0]
+$ find / \( -path /proc -o -path /sys \) -prune -o -path "*/node_modules/playwright/package.json" -print 2>/dev/null | head -10
+/opt/npm-tools/node_modules/playwright/package.json
+/opt/node-tools/node_modules/playwright/package.json
+[exit 0]
+$ find / \( -path /proc -o -path /sys \) -prune -o -path "*/node_modules/playwright-core/package.json" -print 2>/dev/null | head -10
+/opt/npm-tools/node_modules/playwright-core/package.json
+/opt/node-tools/node_modules/playwright-core/package.json
+[exit 0]
+$ for f in $(find / \( -path /proc -o -path /sys \) -prune -o \( -path "*/node_modules/playwright/package.json" -o -path "*/node_modules/playwright-core/package.json" -o -path "*/node_modules/@playwright/test/package.json" \) -print 2>/dev/null); do printf "%s  " "$f"; node -p "require(\"$f\").version"; done
+/opt/npm-tools/node_modules/playwright/package.json  1.56.0
+/opt/npm-tools/node_modules/playwright-core/package.json  1.56.0
+/opt/node-tools/node_modules/playwright/package.json  1.56.1
+/opt/node-tools/node_modules/playwright-core/package.json  1.56.1
+[exit 0]
+$ cd /tmp && npx --no-install playwright --version
+Version 1.56.0
+[exit 0]
+$ NODE_PATH="$(npm root -g)" node -e "console.log(require.resolve(\"playwright\"))"
+/opt/npm-tools/node_modules/playwright/index.js
+[exit 0]
+
+===== playwright (python) =====
+$ python3 --version; python3 -c "import importlib.metadata as m; print(\"playwright\", m.version(\"playwright\"))"
+Python 3.11.17
+playwright 1.56.0
+[exit 0]
+
+===== chromium headless (offline) =====
+$ NODE_PATH="$(npm root -g)" node "/tmp/kit/chromium-test.cjs"
+{
+  "ok": true,
+  "steps": [],
+  "playwright": {
+    "resolved": "/opt/npm-tools/node_modules/playwright/index.js",
+    "version": "1.56.0"
+  },
+  "chromium": {
+    "version": "141.0.7390.37",
+    "launch_ms": 5128
+  },
+  "raf_frames_in_1s": 63,
+  "keys_received": [
+    "ArrowLeft",
+    "KeyZ"
+  ],
+  "capabilities": {
+    "AudioContext": "function",
+    "OfflineAudioContext": "function",
+    "getGamepads": "function",
+    "OffscreenCanvas": "function",
+    "webgl": true
+  },
+  "page_errors": [],
+  "page_network": "blocked: Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://example.com/"
+}
+[exit 0]
+
+===== network (expected: blocked) =====
+$ getent hosts example.com || echo "DNS lookup failed"
+DNS lookup failed
+[exit 0]
+$ curl -sS -m 8 -o /dev/null -w "http %{http_code}\n" https://example.com || echo "curl failed"
+curl: (6) Could not resolve host: example.com
+http 000
+curl failed
+[exit 0]
+$ npm view left-pad version --fetch-timeout=8000 --fetch-retries=0 || echo "npm registry unreachable"
+npm error code ENOTFOUND
+npm error syscall getaddrinfo
+npm error errno ENOTFOUND
+npm error network request to https://registry.npmjs.org/left-pad failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org
+npm error network This is a problem related to network connectivity.
+npm error network In most cases you are behind a proxy or have bad network settings.
+npm error network
+npm error network If you are behind a proxy, please make sure that the
+npm error network 'proxy' config is set properly.  See: 'npm help config'
+npm error A complete log of this run can be found in: /home/claude/.npm/_logs/2026-11-08T02_08_27_106Z-debug-0.log
+npm registry unreachable
+[exit 0]
+
+===== other tools =====
+$ git --version; python3 -m pip --version; tar --version | head -1; jq --version; ffmpeg -version 2>/dev/null | head -1
+git version 2.43.0
+pip 24.0 from /usr/lib/python3/dist-packages/pip (python 3.11)
+tar (GNU tar) 1.35
+jq-1.7
+ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+[exit 0]
+$ env | grep -E "^(PLAYWRIGHT|NODE|NPM|PATH|HOME|LANG)" | sort
+HOME=/root
+NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+NODE_PATH=/usr/local/lib/node_modules_global
+NPM_CONFIG_USERCONFIG=/root/.npmrc
+PATH=/opt/ruby-3.3.6/bin:/opt/rbenv/shims:/opt/rbenv/bin:/opt/node22/bin:/opt/maven/bin:/usr/lib/jvm/java-21-openjdk-amd64/bin:/opt/gradle/bin:/root/.bun/bin:/home/claude/.npm-global/bin:/root/.local/bin:/root/.cargo/bin:/usr/local/go/bin:/opt/node22/bin:/opt/maven/bin:/opt/gradle/bin:/opt/rbenv/bin:/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+[exit 0]
+
+===== done =====
+$ ls -la /mnt/session/outputs
+total 28
+drwxr-xr-x 1 claude ubuntu    0 Nov  8 02:08 .
+drwxr-xr-x 4 root   root   4096 Nov  8 02:07 ..
+-rw-r--r-- 1 claude ubuntu 6026 Nov  8 02:08 chromium-probe.png
+-rw-r--r-- 1 claude ubuntu  600 Nov  8 02:08 chromium.json
+-rw-r--r-- 1 claude ubuntu 8943 Nov  8 02:08 probe-report.txt
+[exit 0]

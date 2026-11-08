@@ -88,6 +88,26 @@ Still open:
 - Confirm in Phase 0 task 1 that the TypeScript SDK resolves the profile.
 - **Cabinet auth is undecided** (Phase 1–2). Browser login fits a machine with a person present, not an unattended Pi. The options: convert the Console account to an organization (unlocks WIF; `scripts/wif/` is ready), or a workspace-scoped key on the Pi. Ask Geoff when Phase 1 starts.
 
+**D17. One way to get a Claude API client: `@game-studio-arcade/auth`.** *(Claude, Phase 0 task 1; implements D16.)*
+- `createClient()` returns an SDK client (`@anthropic-ai/sdk` pinned at 1.6.0) and passes the profile **explicitly**: `GSA_PROFILE` if set, otherwise `game-studio-arcade`. An explicit profile outranks `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so a stray key in a shell is ignored rather than refused (verified live with a bogus key). This replaces the task wording "refuse to run if ANTHROPIC_API_KEY is set": ignoring the key is safer and never blocks.
+- `createClient()` rejects `apiKey`, `authToken`, `credentials` and `config` options.
+- `checkAuth()` makes one free `GET /v1/models` and turns auth failures into an `AuthSetupError` that points at `scripts/setup-anthropic-auth.sh`.
+- `npm run check -w @game-studio-arcade/auth` is the live check. Every Studio-side Node tool (CLI driver, cabinet service, Manager) gets its client from here, never from `new Anthropic()` directly. The cabinet will get its own profile through `GSA_PROFILE` once its auth is decided (D16).
+
+**D18. Sandbox toolchain pins, from the probe** (session `sesn_01Qbgy4bgLKvukuMevfJDiU5`, 2026-11-07). *(Claude, Phase 0 task 1.)*
+- **Playwright 1.56.0, exactly.** It's what `npm root -g`, `npx playwright` and Python resolve to (`/opt/npm-tools/node_modules/playwright`), and its browsers are in `/opt/pw-browsers` (`chromium-1194`, Chromium 141.0.7390.37). A second copy, 1.56.1 in `/opt/node-tools`, is not on any default path: ignore it.
+- **The local playtest harness pins `playwright` at `1.56.0`** (no caret). The task 5 worker owns that package.json.
+- In the sandbox the harness must load Playwright with `NODE_PATH="$(npm root -g)"`. The sandbox's default `NODE_PATH` points elsewhere (`/usr/local/lib/node_modules_global`). It must never `npm install`: the network is blocked anyway.
+- Node is 22.22.0 in the sandbox and 22.23.x on the mini; the same major is enough. TypeScript 6.0.3 is installed globally in the sandbox, matching D20, so agents can run `tsc --checkJs` offline.
+- Re-probe (`npm run probe -w @game-studio-arcade/probe`) when the docs announce a new sandbox image, or if a playtest that passes locally fails in the sandbox.
+
+**D19. How drivers handle session files and cost.** *(Claude, Phase 0 task 1; from the probe.)*
+- **Outputs keep syncing after idle.** `probe-report.txt` was downloaded at 6,244 bytes; the finished file, 9,241 bytes, showed up about 4 s after `session.status_idle`. The agent must write a marker file (`/mnt/session/outputs/DONE.json`, with a manifest) **last**. The driver polls `files.list({scope_id})` until the marker is there and the sizes match the manifest, then downloads.
+- `files.list({scope_id: session})` also returns the session's **uploaded inputs** (the kit tarball), so filter by name or path.
+- Mount files at absolute paths under `/mnt/session/uploads/`. They're read-only (confirmed), and tarballs extract fine with GNU tar 1.35. On macOS, pack kits with `tar --no-xattrs --no-mac-metadata`.
+- **Cost:** read `usage.list_cost` from the session object (authoritative), or the `session.usage` event, which arrived at the end of the turn, not only at a budget stop. It's rounded to the cent, so cheap sessions read `"0"`: log the raw `usage` token counts and `active_seconds` alongside it. The probe cost about 0.3¢ (tokens about 0.09¢, runtime 79.5 s ≈ 0.18¢).
+- Agents for unattended runs use `permission_policy: always_allow` inside the offline sandbox. Nothing there can reach the network.
+
 **D20. TypeScript 6 (pure JS) for type-checking; no bundler.** *(Claude, scaffolding+runtime worker; implements Phase 0 task 0.)*
 - The repo is plain ES modules on Node 22. TypeScript only type-checks JS (`tsc --checkJs`, `noEmit`) against hand-written `.d.ts` files. Nothing is compiled, so `npm run build` leaves `git status` clean.
 - Pinned to `typescript@6.0.3`, not 7.x. TypeScript 7 is the native compiler and installs one platform binary, so a kit packed on the mini (darwin-arm64) wouldn't run in the x86 sandbox or on the Pi. 6.x is pure JS and runs anywhere offline.

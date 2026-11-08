@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["run-probe.js"],
+  "exclude": ["node_modules", "kit", "results"]
+}
