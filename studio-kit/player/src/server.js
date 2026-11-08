@@ -12,6 +12,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createHandler } from "@game-studio-arcade/runtime/dev-server";
+import { checkPlayers } from "@game-studio-arcade/runtime/input.js";
 import { listCarts, dataDir } from "./library.js";
 import { appendLog, readLog } from "./log.js";
 
@@ -24,7 +25,6 @@ export const EARLY_QUIT_S = 30;
 const MAX_BODY = 16 * 1024;
 const ANSWERS = new Set(["yes", "no", "not_sure"]);
 const ENDED = new Set(["star", "back", "left_page"]);
-const SIDES = new Set(["p1", "p2"]);
 const PLAY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 const TYPES = {
@@ -39,12 +39,15 @@ const TYPES = {
  *   logsDir?: string,
  *   examples?: boolean,
  *   checker?: string | null,
+ *   players?: number,
  *   now?: () => Date,
  * }} PlayerOptions
  *   libraryDir: the dev cart library (default <data>/carts).
  *   logsDir: where JSONL logs go (default <data>/logs).
  *   examples: also list runtime/examples/* (the library wins on a clash).
  *   checker: who answers you-check rules, as an initial (default "G").
+ *   players: controllers the player gives each cart, 1..MAX_PLAYERS (default 1,
+ *     like the cabinet; D110). Passed to the runtime's createHost.
  */
 
 class HttpError extends Error {
@@ -86,6 +89,8 @@ export function createPlayerHandler(opts = {}) {
   const libraryDir = path.resolve(opts.libraryDir ?? path.join(data, "carts"));
   const logsDir = path.resolve(opts.logsDir ?? path.join(data, "logs"));
   const checker = opts.checker === undefined ? "G" : opts.checker;
+  // Fails at start-up on a bad value, like the runtime (D110).
+  const players = checkPlayers(opts.players);
   const now = opts.now ?? (() => new Date());
 
   /** @type {{ root: string, source: "library" | "example" }[]} */
@@ -121,7 +126,8 @@ export function createPlayerHandler(opts = {}) {
     if (!started || Number.isNaN(Date.parse(started))) throw new HttpError(400, "started_at must be an ISO time");
     const duration = Number(b.duration_s);
     if (!Number.isFinite(duration) || duration < 0) throw new HttpError(400, "duration_s must be a number >= 0");
-    const sides = Array.isArray(b.sides) ? [...new Set(b.sides)].filter((s) => SIDES.has(s)).sort() : [];
+    // Only sides that exist at this controller count (D111): p1 … p<players>.
+    const sides = Array.isArray(b.sides) ? [...new Set(b.sides)].filter((s) => /^p[1-8]$/.test(s) && Number(s.slice(1)) <= players).sort() : [];
     const ended = ENDED.has(b.ended) ? b.ended : "back";
     return {
       id,
@@ -185,7 +191,7 @@ export function createPlayerHandler(opts = {}) {
 
   /** @param {http.IncomingMessage} req @param {http.ServerResponse} res */
   const api = async (req, res, pathname) => {
-    if (req.method === "GET" && pathname === "/api/carts") return json(res, 200, { carts: cartList(), checker });
+    if (req.method === "GET" && pathname === "/api/carts") return json(res, 200, { carts: cartList(), checker, players });
     if (req.method !== "POST") throw new HttpError(405, "method not allowed");
     // Only this page may write logs: a browser always sends Origin on a
     // cross-site POST (and "null" from the sandboxed cart frame).

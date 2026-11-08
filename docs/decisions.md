@@ -238,6 +238,7 @@ Decided by Claude (the task 9 worker). The player is `studio-kit/player/`; it gr
 - It binds to 127.0.0.1 by default and never opens a browser window itself; it prints the URL.
 - The page takes the screen size and scale from the runtime's host (it never names 320×256), so a new screen size needs no player change.
 - Menus work with the keyboard and a gamepad through the runtime's own input map: stick up/down to move, A or START to pick, B or ★ (Escape, guide) to go back. ★ during play leaves the game.
+- *(Follows D110.)* `--players N` (1–8, default 1 like the cabinet) is passed to the runtime's `createHost` for every cart; a bad value stops start-up. A play's `sides` only counts controllers that exist at that setting.
 
 **D71. You-check questions come after the first play of each cart version.** *(Claude; implements D1 for Phase 0.)*
 - When a play of a cart version ends and nobody has answered that version's `you check` rules yet, the player asks them one at a time, each with the rule in the spec's words and three answers: **Yes**, **No**, **Not sure**, plus an optional typed note. "Later" skips; "Check rules" on the cart list asks again any time.
