@@ -63,8 +63,10 @@ This is one build of a simple game, so treat the shares as a first reading rathe
 
 ```sh
 node studio-kit/cli/scripts/cost-attribution.js studio-kit/cli/fixtures/penguin-catch/events.jsonl
-# What-ifs: same tokens on another model, without the cache expiry, without given requests
+# A session that ran on another model, priced as recorded
 node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> --model haiku
+# What-ifs: same tokens on another model, without the cache expiry, without given requests
+node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> --what-if --model haiku
 node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> --no-expiry --drop 16,17,18
 ```
 
