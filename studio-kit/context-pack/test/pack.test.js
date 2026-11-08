@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 // Relative imports, not package names: the packed kit has no node_modules (D63).
-import { parseSpec, validateRuleCoverage } from "../../spec/index.js";
+import { parseSpec, validateRuleCoverage, validateCart, formatIssues } from "../../spec/index.js";
 import { playtest } from "../../playtest/index.js";
 import { KIT_PARTS, collectKit } from "../../managed-agent/scripts/pack-kit.js";
 import { packSize, PACK_DIR, LIMIT } from "../bin/pack-size.js";
@@ -42,6 +42,13 @@ for (const c of CARTS) {
     for (const k of ["id", "title", "maker", "with", "parent", "session_id", "origin", "players", "created"]) assert.ok(k in j, `missing ${k}`);
     assert.equal(j.title, parseSpec(read(path.join(cartDir(c), "spec.md"))).title);
     assert.equal(j.players, 1);
+  });
+
+  test(`${c}: passes the full validator (validate_cart, D31) with no warnings`, async () => {
+    const r = await validateCart(cartDir(c));
+    assert.deepEqual(formatIssues(r), []);
+    assert.equal(r.ok, true);
+    assert.equal(r.skipped?.types, undefined, "the type-check pass should run, not be skipped");
   });
 
   test(`${c}: passes its playtest (node driver)`, async () => {

@@ -18,7 +18,7 @@ Everything you need to build a cart on the house runtime, small enough to read i
 - `spec.md`: the source of truth. Format: `studio-kit/spec/template.md` and `writing-rules.md`.
 - `game.js`: one ES module, imports nothing, default export `{ init, update, draw, probe }`.
 - `checks.js`: one async check per `(auto)` rule id. Format: `studio-kit/spec/checks-format.md`; the handle `t` is in `runtime/test-hook.d.ts`.
-- `cart.json`: `{ id, title, maker, with, parent, session_id, origin, players, created }`. `id` is the folder name in kebab case; `parent` is `"cart@version"` or null; `origin` is `"cabinet"` or `"desktop"`.
+- `cart.json`: you write `{ "id": "comet-dodge", "title": "Comet Dodge", "players": 1 }` (`id` in kebab case, `title` as in the spec). The CLI adds `maker`, `with`, `parent`, `session_id`, `origin` and `created` (an ISO 8601 time) when it files the cart. `validate-cart` checks every field present.
 - `assets/`: optional.
 
 ## House conventions
