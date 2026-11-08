@@ -41,11 +41,11 @@ const keyOf = (name) => {
 
 /**
  * Start the real service in its own process, replaying. Resolves once it's listening.
- * @param {{ replay: string, data: string, pace?: number }} o
+ * @param {{ replay: string, data: string, pace?: number, port?: number, questionTimeout?: number }} o
  */
 export function startServiceProcess(o) {
   const bin = path.join(HERE, "../bin/cabinet-service.js");
-  const child = spawn(process.execPath, [bin, "--port", "0", "--data", o.data, "--replay", o.replay, "--pace", String(o.pace ?? 150)], { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, [bin, "--port", String(o.port ?? 0), "--data", o.data, "--replay", o.replay, "--pace", String(o.pace ?? 150), ...(o.questionTimeout ? ["--question-timeout", String(o.questionTimeout)] : [])], { stdio: ["ignore", "pipe", "pipe"] });
   let err = "";
   child.stderr.on("data", (d) => (err += d));
   return new Promise((resolve, reject) => {
@@ -54,7 +54,7 @@ export function startServiceProcess(o) {
     child.stdout.on("data", (d) => {
       out += d;
       const m = /cabinet service on (http:\S+),/.exec(out);
-      if (m) resolve({ url: m[1], stop: () => child.kill("SIGTERM"), stderr: () => err });
+      if (m) resolve({ url: m[1], stop: () => child.kill("SIGTERM"), kill: () => child.kill("SIGKILL"), stderr: () => err });
     });
   });
 }

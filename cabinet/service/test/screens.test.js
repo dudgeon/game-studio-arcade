@@ -2,8 +2,9 @@
 // fixed grid, so this is arithmetic, plus real ink measured from the framebuffer.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { Framebuffer } from "../../../runtime/src/gfx.js";
-import { Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
+import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
 
@@ -42,6 +43,8 @@ function viewsWith(s) {
     "result failed": { screen: "result", ok: false, message: s, tiles: ["Back to the shelf"], sel: 0 },
     "check": { screen: "check", title: s, rule: s, i: 0, n: 3, sel: 0 },
     "notice": { screen: "notice", title: s, message: s, hint: "ESC: back to the shelf" },
+    "leave": { screen: "leave", sel: 2 },
+    "question, near the timeout": { screen: "question", ...q, maker: s, sel: 0, warn: true },
   };
 }
 
@@ -137,6 +140,33 @@ test("the plan holds every rule in full, with you-check marked", () => {
   assert.ok(all.includes("Looks like a penguin. (you check)"));
   assert.equal(lines.filter((l) => l.text.startsWith("1.")).length, 1, "numbers, not spec ids");
   assert.ok(lines.every((l) => widthOf(l.text) <= W - 12 - 8), "room for the scroll bar");
+});
+
+test("what the brief tells Claude about ask_player is what the screen holds (D190)", () => {
+  const tool = JSON.parse(fs.readFileSync(new URL("../../../studio-kit/managed-agent/agents/tools/ask_player.json", import.meta.url), "utf8"));
+  const f = tool.input_schema.properties;
+  assert.deepEqual(ASK_LIMITS, { bigQuestion: 60, question: 240, option: 111 });
+  assert.match(f.question.description, new RegExp(`about ${ASK_LIMITS.bigQuestion} characters`));
+  assert.match(f.question.description, new RegExp(`${ASK_LIMITS.question} characters`));
+  assert.match(f.option_a.description, new RegExp(`${ASK_LIMITS.option} characters`));
+  assert.match(f.option_b.description, new RegExp(`${ASK_LIMITS.option} characters`));
+  assert.match(tool.description, /plain ASCII/);
+  const p = new Painter();
+  const words = (/** @type {number} */ n) => "x".repeat(n);
+  draw(p, { screen: "question", question: words(ASK_LIMITS.bigQuestion), option_a: words(ASK_LIMITS.option), option_b: words(ASK_LIMITS.option), sel: 0 });
+  assert.equal(p.boxes.find((b) => b.id === "q-question")?.lines[0].scale, 2, "the most at double size is still double size");
+  assert.ok(p.boxes.filter((b) => b.cut).length === 0, "at their limits, nothing is cut");
+  draw(p, { screen: "question", question: words(ASK_LIMITS.question), option_a: words(ASK_LIMITS.option + 1), option_b: "y", sel: 0 });
+  assert.equal(p.boxes.find((b) => b.id === "q-question")?.cut, false, "the most at single size fits");
+  assert.equal(p.boxes.find((b) => b.id === "q-a")?.cut, true, "one over the limit is cut");
+});
+
+test("near the timeout, the hint says so; it's never cut (D188)", () => {
+  const p = new Painter();
+  draw(p, { screen: "question", question: "q", option_a: "a", option_b: "b", sel: 0, warn: true });
+  assert.equal(p.boxes.find((b) => b.id === "hint")?.lines[0].text, "Still there? Move the stick!");
+  draw(p, { screen: "question", question: "q", option_a: "a", option_b: "b", sel: 0 });
+  assert.notEqual(p.boxes.find((b) => b.id === "hint")?.lines[0].text, "Still there? Move the stick!");
 });
 
 test("clean leaves only what the font can draw", () => {

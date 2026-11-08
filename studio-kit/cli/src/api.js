@@ -35,6 +35,7 @@
  * @property {(path: string, filename: string) => Promise<{id: string}>} uploadFile
  * @property {(zipPath: string, filename: string) => Promise<{id: string, latest_version_id: string}>} [createSkill]
  * @property {(agentId: string, version?: number) => Promise<any>} [retrieveAgent]
+ * @property {(sessionId: string) => Promise<any>} [archiveSession]   keeps its history; never deletes (D5, D188)
  */
 
 export const BETA = "managed-agents-2026-04-01";
@@ -103,6 +104,9 @@ export function sdkApi(client) {
     async download(fileId) {
       const res = await client.files.download(fileId);
       return Buffer.from(await res.arrayBuffer());
+    },
+    async archiveSession(sessionId) {
+      return client.beta.sessions.archive(sessionId);
     },
     async retrieveAgent(agentId, version) {
       return client.beta.agents.retrieve(agentId, version ? { version } : undefined);

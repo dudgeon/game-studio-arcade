@@ -32,7 +32,7 @@ export function outputsFrom(dir) {
 }
 
 /**
- * @param {{ dir?: string, script?: {steps: any[]}, outputs?: Record<string, Buffer>, paceMs?: number, usage?: any, appliedAgent?: any }} o
+ * @param {{ dir?: string, script?: {steps: any[]}, outputs?: Record<string, Buffer>, paceMs?: number, usage?: any, appliedAgent?: any, archiveRefusals?: number }} o
  *   dir: a fixture folder with events.jsonl, report.json and cart/.
  *   paceMs: wait this long before each tool event or message, so a person or a
  *     screenshot can see each progress line. Thinking and spans don't count.
@@ -46,6 +46,7 @@ export function replayApi(o) {
     usage: o.usage ?? { list_cost: { amount: "0", currency: "USD" }, active_seconds: 0 },
     timeoutMs: 24 * 3600 * 1000, // a kid can think as long as they like
     appliedAgent: o.appliedAgent ?? { version: 1, system: def.system, tools: def.tools },
+    archiveRefusals: o.archiveRefusals,
   });
   const pace = o.paceMs ?? 0;
   const api = {

@@ -1,13 +1,13 @@
 {
   "type": "custom",
   "name": "ask_player",
-  "description": "Ask the player one short multiple-choice question about their game, then wait for the answer. Give exactly two options, A and B. The cabinet adds C \"Something else\" (the player says their own answer) and D \"Make it now\". Ask only about things that change how the game plays or looks and that the request leaves open. Never ask for the player's name, age, school or anything else about them. One question per call. The result is JSON text: {\"choice\":\"A\"}, {\"choice\":\"B\"}, {\"choice\":\"C\",\"said\":\"<what the player said>\"} or {\"choice\":\"D\"}. D means: ask no more questions in this build. Fill the gaps yourself, record each one as an Assumption in the spec, and build.",
+  "description": "Ask the player one short multiple-choice question about their game, then wait for the answer. Give exactly two options, A and B. The cabinet adds C \"Something else\" (the player says their own answer) and D \"Make it now\". Ask only about things that change how the game plays or looks and that the request leaves open. Never ask for the player's name, age, school or anything else about them. One question per call. Use plain ASCII: the cabinet's font has no emoji, curly quotes or accents. The result is JSON text: {\"choice\":\"A\"}, {\"choice\":\"B\"}, {\"choice\":\"C\",\"said\":\"<what the player said>\"} or {\"choice\":\"D\"}. D means: ask no more questions in this build. Fill the gaps yourself, record each one as an Assumption in the spec, and build.",
   "input_schema": {
     "type": "object",
     "properties": {
-      "question": { "type": "string", "description": "Short and kid-friendly; fits one screen line (about 50 characters)." },
-      "option_a": { "type": "string", "description": "First answer, a few words." },
-      "option_b": { "type": "string", "description": "Second answer, a few words, clearly different from A." }
+      "question": { "type": "string", "description": "Short and kid-friendly. Under about 60 characters shows double size, which is easiest to read. At most 240 characters fit on screen, and word wrap takes some of that; a longer question is cut and the player has to open it to read the rest." },
+      "option_a": { "type": "string", "description": "First answer, a few words. At most 111 characters fit, and word wrap takes some of that." },
+      "option_b": { "type": "string", "description": "Second answer, a few words, clearly different from A. At most 111 characters fit, and word wrap takes some of that." }
     },
     "required": ["question", "option_a", "option_b"]
   }
