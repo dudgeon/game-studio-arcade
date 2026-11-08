@@ -63,3 +63,4 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: build a virtual cabinet on the mini, as faithful as practical and logically isolated from the mini, for use until the Picade arrives (Geoff)
 - 2026-11-08: back to the shelf: press ESC (the Escape key), the guest players' own default, not an invented mechanism (Geoff)
 - 2026-11-08: mic: a USB mic for now; Geoff will find one that fits the cabinet (the researched picks didn't integrate well with the hardware)
+- 2026-11-08: virtual cabinet users: Geoff with a kid; cabinets (virtual and Picade) sign in with a workspace-scoped API key each, stored only on the cabinet (Geoff)
