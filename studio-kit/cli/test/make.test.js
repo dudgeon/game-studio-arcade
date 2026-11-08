@@ -93,6 +93,7 @@ test("a passing build is committed with complete log records", async () => {
   assert.equal(cart.version, 1);
   assert.equal(cart.origin, "cabinet");
   assert.ok(fs.existsSync(path.join(lib, "frog-hop/playtest.json")), "the local playtest report is in the cart");
+  assert.ok(!fs.existsSync(path.join(lib, "frog-hop/playtest-frames")), "key frames stay out of the library");
   const head = execFileSync("git", ["log", "-1", "--format=%H %an %s"], { cwd: lib, encoding: "utf8" }).trim();
   assert.equal(head, `${committed.commit} Studio make frog-hop v1 (sesn_mock_01)`);
   assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: lib, encoding: "utf8" }), "");

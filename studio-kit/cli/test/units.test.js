@@ -59,6 +59,9 @@ test("session body: pinned agent, model override, kit mount, budget as cents str
   const over = sessionCreateBody({ ...base, agentVersion: 4, model: "claude-opus-5-5" });
   assert.deepEqual(over.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-opus-5-5" }, version: 4 });
   assert.equal(sessionCreateBody(base).agent, "agent_1");
+  const sys = sessionCreateBody({ ...base, system: "harness", extraFiles: [{ fileId: "file_p", mountPath: "/mnt/session/uploads/parity.tgz" }] });
+  assert.deepEqual(sys.agent, { type: "agent_with_overrides", id: "agent_1", system: "harness" });
+  assert.deepEqual(sys.resources[1], { type: "file", file_id: "file_p", mount_path: "/mnt/session/uploads/parity.tgz" });
   assert.throws(() => sessionCreateBody({ ...base, budgetCents: 2.5 }), /whole number/);
 });
 
@@ -154,6 +157,7 @@ test("outputs: waits for DONE.json and final sizes; gives up as incomplete", asy
   const ok = await downloadOutputs({ api: m.api, sessionId: "s", dir: tmp(), sleep: async (ms) => void waits.push(ms), waitMs: 7 });
   assert.equal(ok.complete, true);
   assert.deepEqual(waits, [7, 7, 7], "polled through the lag");
+  assert.equal(ok.polls, 4);
   assert.deepEqual(ok.files.sort(), ["DONE.json", "cart.tgz"]);
   assert.equal(fs.readFileSync(path.join(ok.dir, "cart.tgz"), "utf8"), "cart bytes");
 
