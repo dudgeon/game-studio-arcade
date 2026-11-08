@@ -95,7 +95,7 @@ test("no example is a falling-blocks game (D12)", () => {
   }
 });
 
-test(`the pack fits in about ${LIMIT} tokens`, () => {
+test(`the pack stays under the ${LIMIT}-token ceiling`, () => {
   const r = packSize();
   assert.ok(r.tokens <= LIMIT, `pack is ~${r.tokens} tokens`);
 });
