@@ -45,6 +45,16 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: [tasks/phase-0-task-3-starter-library-falling-blocks-subset.md](tasks/phase-0-task-3-starter-library-falling-blocks-subset.md): starter library as g.lib (collide, grid, timers, score, flow) with an agent-facing reference
 - 2026-11-08: [tasks/phase-0-task-5-playtest-harness.md](tasks/phase-0-task-5-playtest-harness.md): playtest harness with node and browser drivers; sandbox parity matched exactly
 - 2026-11-08: [tasks/full-validate-cart.md](tasks/full-validate-cart.md): validate_cart covering rule coverage, cart.json, the D13 lint and a cart type check
+- 2026-11-08: [tasks/phase-0-task-4-spec-format-and-parser.md](tasks/phase-0-task-4-spec-format-and-parser.md): spec template, checkable-rules guide, parser with byte-exact round-trip
+- 2026-11-08: [tasks/phase-0-tasks-7-8-studio-agent-definition-and-cli-driver.md](tasks/phase-0-tasks-7-8-studio-agent-definition-and-cli-driver.md): Studio agent v2 live, `studio make` end to end, frozen checks (D44/D46/D49), stale-brief check, model comparison (Sonnet looks like the default)
+- 2026-11-08: [tasks/token-breakdown-of-the-penguin-catch-build.md](tasks/token-breakdown-of-the-penguin-catch-build.md): where a 68c build's money goes, plus a re-measuring script
+- 2026-11-08: [tasks/redesign-the-library-catalog-fetch-on-demand-templates.md](tasks/redesign-the-library-catalog-fetch-on-demand-templates.md): catalog, modules on demand, four templates plus blank; 57c down to 40c, or 29c from a template
+- 2026-11-08: [tasks/phase-0-task-6-context-pack-and-example-carts.md](tasks/phase-0-task-6-context-pack-and-example-carts.md): the context pack, later restructured by the library redesign
+- 2026-11-08: [tasks/players-setting-and-turn-based-helpers-in-the-runtime.md](tasks/players-setting-and-turn-based-helpers-in-the-runtime.md): controller count as a setting (1-8), g.lib.turns
+- 2026-11-08: [tasks/switch-cabinet-to-picade-10-inch-check-specs-and-update-the.md](tasks/switch-cabinet-to-picade-10-inch-check-specs-and-update-the.md): plan moved to the Picade 10"; screen 256x192 at 4x; launcher decisions D85-D88
+- 2026-11-08: [tasks/fix-flaky-playtest-parity-test.md](tasks/fix-flaky-playtest-parity-test.md): parity test made reliable (D65)
+- 2026-11-08: [tasks/docs-tidy-from-the-completeness-audit.md](tasks/docs-tidy-from-the-completeness-audit.md): stale doc lines fixed
+- 2026-11-08: [tasks/get-established-as-director-and-split-phase-0-work.md](tasks/get-established-as-director-and-split-phase-0-work.md): director set up, Phase 0 split across workers
 
 ## Decisions
 
