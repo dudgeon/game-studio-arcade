@@ -226,6 +226,20 @@ test("D47: options that don't say the recorded answer get its words through C", 
   assert.deepEqual(await a.question(q("What happens if you catch a boot?", "Counts as a miss", "Lose some points")), { choice: "C", said: "You lose a life" });
 });
 
+test("D171: a tile that only partly says the recorded answer doesn't take it", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("How does it get harder?", "Fish fall faster", "More fish and more boots")), { choice: "C", said: "Faster and more boots" });
+  const b = replayAnswerer(PENGUIN);
+  assert.deepEqual(await b.question(q("What happens if you catch a boot?", "Lose a life too", "Lose points")), { choice: "C", said: "You lose a life" });
+});
+
+test("D171: a tile that says the same in other small words still takes it", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens if you catch a boot?", "Lose points", "Lose a life")), { choice: "B" });
+  const b = replayAnswerer(PENGUIN);
+  assert.deepEqual(await b.question(q("How does it get harder?", "Fish fall faster", "More boots and faster!")), { choice: "B" });
+});
+
 test("D47: options keep their meaning when they swap places", async () => {
   const a = replayAnswerer(PENGUIN);
   assert.deepEqual(await a.question(q("What happens when you touch a boot?", "Lose 5 points", "You lose a life")), { choice: "B" });

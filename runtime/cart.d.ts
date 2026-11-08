@@ -196,6 +196,7 @@ declare namespace Arcade {
     type Score = import("./lib/score.js").Score;
     type Flow = import("./lib/flow.js").Flow;
     type Turns = import("./lib/turns.js").Turns;
+    type Pop = import("./lib/fx.js").Pop;
   }
 
   /**

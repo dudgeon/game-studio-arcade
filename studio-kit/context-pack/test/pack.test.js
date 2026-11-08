@@ -80,8 +80,8 @@ const BROKEN = [
   { rule: "R8", was: "fallMax: 2.5,", now: "fallMax: 2," },
   { rule: "R9", was: "badEvery: 5,", now: "badEvery: 6," },
   { rule: "R7", was: "lives: 3,", now: "lives: 4," },
-  { rule: "R4", was: "if (t.kind === GOOD) {\n        g.sfx(\"pop\");\n        hurt(g, s);\n      }", now: "" },
-  { rule: "R5", was: "g.sfx(\"hit\");\n        hurt(g, s);", now: "g.sfx(\"hit\");" },
+  { rule: "R4", was: "        hurt(g, s);\n      }\n    }\n    s.things =", now: "      }\n    }\n    s.things =" },
+  { rule: "R5", was: "c.red);\n        hurt(g, s);", now: "c.red);" },
   { rule: "R6", was: "if (t.kind === GOOD) {\n        g.sfx(\"pop\");", now: "{\n        g.sfx(\"pop\");" },
   { rule: "R10", was: "g.lib.score.commit(g, s.sc);", now: "" },
 ];
@@ -126,6 +126,21 @@ test("every template passes at another screen size too", async (t) => {
 
 test("no screen-size literals in the templates", () => {
   for (const c of TEMPLATES) for (const f of ["game.js", "checks.js"]) assert.doesNotMatch(read(path.join(dirOf(c), f)), /\b(320|256|240|192)\b/, `${c}/${f}`);
+});
+
+test("every lives game shows hearts, not the word, and every template uses the shared title (D170)", () => {
+  for (const c of ["catch", "dodge", "paddle"]) {
+    const src = read(path.join(dirOf(c), "game.js"));
+    assert.match(src, /fx\.lives\(/, c);
+    assert.doesNotMatch(src, /LIVES/, c);
+    assert.match(src, /fx\.pop\(/, c);
+  }
+  assert.match(read(path.join(dirOf("maze"), "game.js")), /fx\.pop\(/);
+  for (const c of TEMPLATES) {
+    const src = read(path.join(dirOf(c), "game.js"));
+    assert.match(src, /const art = fx\.title\(/, c);
+    assert.match(src, /fx\.banner\(/, c);
+  }
 });
 
 test("no template is a falling-blocks game (D12)", () => {

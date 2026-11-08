@@ -62,6 +62,6 @@ test("carts reach the starter library as g.lib (D50)", async () => {
     update() {},
     draw() {},
   });
-  assert.deepEqual(seen.lib, ["collide", "flow", "grid", "score", "timers", "turns"]);
+  assert.deepEqual(seen.lib, ["collide", "flow", "fx", "grid", "score", "timers", "turns"]);
   assert.equal(seen.grid, 6);
 });

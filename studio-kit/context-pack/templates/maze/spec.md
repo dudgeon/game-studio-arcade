@@ -25,7 +25,7 @@ Walk through the hedges and grab as many gems as you can before time runs out.
 
 ## Look & sound
 
-Dark green floor, teal hedges, a peach walker, pink and aqua gems that twinkle. A "coin" for each gem, a "win" when time runs out.
+Dark green floor, teal hedges, a little walker, pink and aqua gems that twinkle. A "coin" and a "+10" for each gem; a "win" and a panel when time runs out.
 
 ## Assumptions
 

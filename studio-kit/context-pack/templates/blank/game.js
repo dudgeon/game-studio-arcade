@@ -46,18 +46,17 @@ export default {
   },
 
   draw(g, s) {
+    const { fx } = g.lib;
     const c = g.colors;
     g.cls(c.night);
-    const mid = g.W / 2;
     if (s.flow.mode === "title") {
-      g.text("BLANK", mid, g.H / 3, c.sky, { scale: 2, align: "center" });
-      if (g.frame % 60 < 30) g.text("PRESS START", mid, g.H / 2, c.white, { align: "center" });
-      g.text(`BEST ${s.sc.best}`, mid, g.H / 2 + 20, c.gold, { align: "center" });
+      const art = fx.title(g, "BLANK", s.sc.best, { color: c.sky }); // draw title art at art.cx, art.cy
+      g.circfill(art.cx, art.cy, 12, c.sky);
       return;
     }
     g.rectfill(s.x, s.y, CFG.size, CFG.size, c.sky);
     g.text(`SCORE ${s.sc.score}  BEST ${s.sc.best}`, 2, 1, c.white);
-    if (s.flow.mode === "over") g.text("GAME OVER", mid, g.H / 2 - 8, c.red, { scale: 2, align: "center" });
+    if (s.flow.mode === "over") fx.banner(g, "GAME OVER", s.sc.newBest ? "NEW BEST!" : `SCORE ${s.sc.score}`);
   },
 
   probe(g, s) {

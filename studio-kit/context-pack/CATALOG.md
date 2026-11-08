@@ -11,9 +11,9 @@ Copy one into the cart folder, then change it in small edits; don't rewrite what
 - `dodge/`: free movement; things fly at you; lives, safe time, speed-up.
 - `maze/`: tile-by-tile walking, walls from a text map, pickups, a timed round.
 - `paddle/`: a ball off the walls, a paddle, serves.
-- `blank/`: title, play, game over, best score, a dot. Use it when none of the others is close.
+- `blank/`: title, play, game over, best score, a dot. Use it when the idea fits none of the others.
 
-Choose only after you've finished asking, and take the closest. Its rules and numbers are defaults: the player's answers override them. Read only its files.
+Choose only after you've finished asking: the one the player's idea fits, otherwise `blank`. Its rules and numbers are defaults that the player's answers override. Read only its files.
 <!-- /templates -->
 <!-- no-templates
 ### Starting point
@@ -25,6 +25,7 @@ no-templates -->
 
 - `collide`: box overlap; "who destroys whom" rules over a list of things.
 - `flow`: title, play, game-over screens.
+- `fx`: pop-ups, life hearts, a title screen with space for art, a game-over panel. The templates use it.
 - `grid`: boards and tiles, walking a stick step, pieces, rotation, full rows.
 - `score`: points, lives, saved high score.
 - `timers`: frame timers, spawners, held-button repeat.

@@ -4,6 +4,7 @@ The house starter library: tested building blocks a cart reaches as `g.lib` (D50
 
 - [collide](ref/collide.md): overlap, and who destroys whom.
 - [flow](ref/flow.md): title → play → game over.
+- [fx](ref/fx.md): pop-ups, life hearts, title screen, game-over panel.
 - [grid](ref/grid.md): boards, tiles, pieces, rotation, full rows.
 - [score](ref/score.md): points, lives, saved high score.
 - [timers](ref/timers.md): frame counts, repeats.

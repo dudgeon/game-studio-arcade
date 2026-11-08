@@ -1,11 +1,12 @@
 // @ts-check
 /** @typedef {{ x: number, y: number, w: number, h: number, vx: number, vy: number }} Ball */
-/** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, pad: Arcade.Lib.Box, ball: Ball | null, serve: Arcade.Lib.Timer }} State */
+/** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, pad: Arcade.Lib.Box, ball: Ball | null, serve: Arcade.Lib.Timer, pops: Arcade.Lib.Pop[], art: Arcade.Sprite }} State */
 
 // Paddle template: a ball off the walls, swat it back. Change CFG and draw.
 const CFG = { lives: 3, padSpeed: 3, padH: 24, ballX: 1.5, ballUp: 0.25, ballMax: 4, tilt: 1.5, points: 1, serveFrames: 30, reserveFrames: 60 };
 const TOP = 10; // the HUD band above the court
-const B = 4; // ball size
+const B = 6; // ball size
+const BALL = ["..55..", ".5555.", "555555", "555555", ".5555.", "..55.."];
 
 /** @param {Arcade.G} g @param {State} s */
 function newGame(g, s) {
@@ -22,13 +23,16 @@ const serveBall = (/** @type {Arcade.G} */ g) => ({ x: g.W / 2, y: (g.H + TOP) /
 export default {
   init(g) {
     const s = /** @type {State} */ ({ flow: g.lib.flow.newFlow() });
+    s.pops = [];
+    s.art = g.sprite(BALL);
     newGame(g, s);
     return s;
   },
 
   update(g, s) {
-    const { flow, timers, collide, score } = g.lib;
+    const { flow, timers, collide, score, fx } = g.lib;
     flow.tick(s.flow);
+    fx.tick(s.pops);
     if (s.flow.mode !== "play") {
       if (flow.startPressed(g, s.flow)) {
         if (s.flow.mode === "title") newGame(g, s);
@@ -58,8 +62,10 @@ export default {
       b.vy = ((b.y + B / 2 - (p.y + p.h / 2)) / (p.h / 2)) * CFG.tilt || 0.5; // tilt by where it hit (A3)
       score.addPoints(s.sc, CFG.points);
       g.sfx("blip");
+      fx.pop(s.pops, `+${CFG.points}`, p.x + 14, b.y - 6, g.colors.gold);
     }
     if (b.x < -B) {
+      fx.pop(s.pops, "MISS", 16, b.y - 6, g.colors.coral);
       s.ball = null;
       g.sfx("lose");
       timers.restart(s.serve, CFG.reserveFrames);
@@ -71,21 +77,24 @@ export default {
   },
 
   draw(g, s) {
+    const { fx } = g.lib;
     const c = g.colors;
     g.cls(c.navy);
-    const mid = g.W / 2;
     if (s.flow.mode === "title") {
-      g.text("WALL BALL", mid, g.H / 3, c.gold, { scale: 2, align: "center" });
-      if (g.frame % 60 < 30) g.text("PRESS START", mid, g.H / 2, c.white, { align: "center" });
-      g.text(`BEST ${s.sc.best}`, mid, g.H / 2 + 20, c.gold, { align: "center" });
+      const art = fx.title(g, "WALL BALL", s.sc.best, { color: c.gold });
+      g.spr(s.art, art.cx - 18, art.cy - 18, { scale: 6 });
       return;
     }
     g.rectfill(0, TOP - 2, g.W, 2, c.white);
     g.rectfill(g.W - 2, TOP, 2, g.H - TOP, c.white);
     g.rectfill(s.pad.x, s.pad.y, s.pad.w, s.pad.h, c.gold);
-    if (s.ball) g.rectfill(s.ball.x, s.ball.y, B, B, c.white);
-    g.text(`SCORE ${s.sc.score}  LIVES ${s.sc.lives}  BEST ${s.sc.best}`, 2, 0, c.white);
-    if (s.flow.mode === "over") g.text("GAME OVER", mid, g.H / 2 - 8, c.red, { scale: 2, align: "center" });
+    g.rectfill(s.pad.x, s.pad.y, 1, s.pad.h, c.yellow);
+    g.rectfill(s.pad.x + s.pad.w - 1, s.pad.y, 1, s.pad.h, c.orange);
+    if (s.ball) g.spr(s.art, s.ball.x, s.ball.y);
+    g.text(`SCORE ${s.sc.score}  BEST ${s.sc.best}`, 2, 0, c.white);
+    fx.lives(g, s.sc.lives, g.W - 2, 0);
+    fx.draw(g, s.pops);
+    if (s.flow.mode === "over") fx.banner(g, "GAME OVER", s.sc.newBest ? "NEW BEST!" : `SCORE ${s.sc.score}`);
   },
 
   probe(g, s) {

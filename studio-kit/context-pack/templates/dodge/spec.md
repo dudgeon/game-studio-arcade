@@ -24,7 +24,7 @@ You fly a little ship. Comets zoom in from the right. Don't get hit, and stay al
 
 ## Look & sound
 
-Dark night sky with drifting star dots. A sky-blue ship, orange comets. A "hit" sound when a comet gets you, a "lose" sound at game over.
+Dark night sky with drifting star dots. A sky-blue ship, orange comets with tails, hearts for lives. "OUCH" pops up with a "hit" sound when a comet gets you, and a game-over panel with a "lose" sound.
 
 ## Assumptions
 
