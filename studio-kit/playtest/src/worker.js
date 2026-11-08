@@ -9,6 +9,8 @@
 //   { type: "done", result }                       finished (pass or fail)
 import { parentPort, workerData } from "node:worker_threads";
 import { soakScript } from "./soak.js";
+// A relative path, not the package name: the packed kit has no node_modules (D63).
+import { withBot } from "../../../runtime/lib/bot.js";
 
 /**
  * @typedef {{ kind: "load" } | { kind: "check", id: string } | { kind: "soak", name: string, frames: number, inputSeed: number | null, sampleEvery: number, keyEvery: number, keyframes: boolean }} Job
@@ -57,6 +59,7 @@ async function open() {
       step: (n) => rpc("step", [n]),
       input: (s) => rpc("input", [s]),
       probe: () => rpc("probe", []),
+      poke: (o) => rpc("poke", [o]),
       frame: () => rpc("frame", []),
       sounds: () => rpc("sounds", []),
       warnings: () => rpc("warnings", []),
@@ -91,8 +94,8 @@ function wrap(base) {
   const handle = {
     stepped: () => total,
     gameFrame: () => gameFrame,
-    /** @type {Arcade.TestHandle} */
-    t: {
+    /** @type {Arcade.CheckHandle} */
+    t: withBot({
       async step(n = 1) {
         if (!Number.isInteger(n) || n < 1) throw new Error(`t.step(n) needs a whole number of frames >= 1, got ${n}`);
         if (total + n > data.maxFrames) throw new LimitError(`the check stepped more than ${data.maxFrames} frames (${data.maxFrames / 60} s of game time) and was stopped`);
@@ -110,13 +113,14 @@ function wrap(base) {
       },
       input: (s) => base.input(s),
       probe: () => base.probe(),
+      poke: (o) => base.poke(o),
       frame: () => base.frame(),
       sounds: () => base.sounds(),
       async reset(o) {
         gameFrame = 0;
         await base.reset(o);
       },
-    },
+    }),
   };
   return handle;
 }

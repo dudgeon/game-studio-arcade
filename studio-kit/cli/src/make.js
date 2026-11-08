@@ -24,7 +24,7 @@ import { addYouCheckRules, questionsFor } from "./untested.js";
  * @property {() => Promise<{fileId: string, hash: string}>} kit
  * @property {"cabinet"|"desktop"} [origin]
  * @property {boolean} [commitAnyway]
- * @property {"tarball"|"skill"} [contextPack]   how this run got the context pack (D45)
+ * @property {"tarball"|"no-templates"|"skill"} [contextPack]   how this run got the library (D45, D166)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
  * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
  * @property {string} [recordFile]     also write the answers here

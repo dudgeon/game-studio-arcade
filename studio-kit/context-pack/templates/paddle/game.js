@@ -2,19 +2,21 @@
 /** @typedef {{ x: number, y: number, w: number, h: number, vx: number, vy: number }} Ball */
 /** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, pad: Arcade.Lib.Box, ball: Ball | null, serve: Arcade.Lib.Timer }} State */
 
+// Paddle template: a ball off the walls, swat it back. Change CFG and draw.
+const CFG = { lives: 3, padSpeed: 3, padH: 24, ballX: 1.5, ballUp: 0.25, ballMax: 4, tilt: 1.5, points: 1, serveFrames: 30, reserveFrames: 60 };
 const TOP = 10; // the HUD band above the court
 const B = 4; // ball size
 
 /** @param {Arcade.G} g @param {State} s */
 function newGame(g, s) {
-  s.sc = g.lib.score.newScore(g, { lives: 3 });
-  s.pad = { x: 6, y: (g.H - 24) / 2, w: 4, h: 24 };
+  s.sc = g.lib.score.newScore(g, { lives: CFG.lives });
+  s.pad = { x: 6, y: (g.H - CFG.padH) / 2, w: 4, h: CFG.padH };
   s.ball = null;
-  s.serve = g.lib.timers.timer(30);
+  s.serve = g.lib.timers.timer(CFG.serveFrames);
 }
 
 /** A new ball from the middle, heading for the right wall. */
-const serveBall = (/** @type {Arcade.G} */ g) => ({ x: g.W / 2, y: (g.H + TOP) / 2, w: B, h: B, vx: 1.5, vy: g.pick([-1, -0.5, 0.5, 1]) });
+const serveBall = (/** @type {Arcade.G} */ g) => ({ x: g.W / 2, y: (g.H + TOP) / 2, w: B, h: B, vx: CFG.ballX, vy: g.pick([-1, -0.5, 0.5, 1]) });
 
 /** @type {Arcade.Cart<State>} */
 export default {
@@ -36,8 +38,8 @@ export default {
     }
 
     const p = s.pad;
-    if (g.btn("up")) p.y -= 3;
-    if (g.btn("down")) p.y += 3;
+    if (g.btn("up")) p.y -= CFG.padSpeed;
+    if (g.btn("down")) p.y += CFG.padSpeed;
     p.y = Math.max(TOP, Math.min(g.H - p.h, p.y));
 
     if (!s.ball) {
@@ -52,15 +54,15 @@ export default {
     if (b.x > g.W - B) { b.x = g.W - B; b.vx = -b.vx; }
     if (b.vx < 0 && collide.overlap(b, p)) {
       b.x = p.x + p.w;
-      b.vx = Math.min(4, -b.vx + 0.25);
-      b.vy = ((b.y + B / 2 - (p.y + p.h / 2)) / (p.h / 2)) * 1.5 || 0.5; // tilt by where it hit (A3)
-      score.addPoints(s.sc, 1);
+      b.vx = Math.min(CFG.ballMax, -b.vx + CFG.ballUp);
+      b.vy = ((b.y + B / 2 - (p.y + p.h / 2)) / (p.h / 2)) * CFG.tilt || 0.5; // tilt by where it hit (A3)
+      score.addPoints(s.sc, CFG.points);
       g.sfx("blip");
     }
     if (b.x < -B) {
       s.ball = null;
       g.sfx("lose");
-      timers.restart(s.serve, 60);
+      timers.restart(s.serve, CFG.reserveFrames);
       if (score.loseLife(s.sc) === 0) {
         score.commit(g, s.sc);
         flow.go(s.flow, "over");
@@ -88,5 +90,9 @@ export default {
 
   probe(g, s) {
     return { W: g.W, H: g.H, top: TOP, mode: s.flow.mode, pad: { y: s.pad.y, h: s.pad.h }, ball: s.ball && { x: s.ball.x, y: s.ball.y, vx: s.ball.vx, vy: s.ball.vy }, score: s.sc.score, lives: s.sc.lives, best: s.sc.best };
+  },
+
+  poke(g, s, o) {
+    if (o.lives !== undefined) s.sc.lives = o.lives;
   },
 };

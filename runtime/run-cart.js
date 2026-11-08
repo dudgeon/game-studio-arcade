@@ -9,6 +9,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { headless, loadCart } from "./src/headless.js";
+import { withBot } from "./lib/bot.js";
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -43,7 +44,7 @@ try {
     const checks = mod.default ?? {};
     out.checks = {};
     for (const [id, check] of Object.entries(checks)) {
-      const ct = await headless(cart, { seed: 1, players });
+      const ct = withBot(await headless(cart, { seed: 1, players }));
       try {
         await check(ct);
         out.checks[id] = { pass: true };

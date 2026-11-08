@@ -107,6 +107,11 @@ declare namespace Arcade {
     input(script: InputScript): Promise<void>;
     /** The cart's `probe(g, s)` result right now (JSON-cloned), or null if it has none. */
     probe(): Promise<any>;
+    /**
+     * Set up a situation (D163): calls the cart's optional `poke(g, s, o)` export, e.g. `{ lives: 99 }`
+     * so the player survives long enough to read the late game. Never poke the thing the rule is about.
+     */
+    poke(o: unknown): Promise<void>;
     /** Capture the current screen. */
     frame(): Promise<Frame>;
     /** Sounds started since the last reset, oldest first. */
@@ -121,6 +126,11 @@ declare namespace Arcade {
     reset(opts?: ResetOptions): Promise<void>;
   }
 
+  /** The handle a check gets: `t` plus the tested bot helper `t.bot` (D162). */
+  interface CheckHandle extends TestHandle {
+    bot: import("./lib/bot.js").Bot;
+  }
+
   /** A cart's checks.js default export: one check per auto rule id ("R1", "R3"...). */
-  type Checks = Record<string, (t: TestHandle) => Promise<void> | void>;
+  type Checks = Record<string, (t: CheckHandle) => Promise<void> | void>;
 }

@@ -15,7 +15,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--answers FILE` | replay recorded answers, matched by question (D47); no recorded answer → D |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
-| `--context-pack skill` | attach the context pack as a skill and leave it out of the kit (default `tarball`; D45) |
+| `--context-pack V` | `tarball` (default): the library in the kit, with its templates. `no-templates`: the same with only the blank start (D166). `skill`: attach the context pack as a skill and leave it out of the kit (D45) |
 | `--brief-from-file` | run the brief in `agents/studio.md` as a session override, when the applied agent is behind the file |
 | `--commit-anyway` | commit even if validate or the playtest fails |
 | `-v` | show the agent's own messages and debug lines |

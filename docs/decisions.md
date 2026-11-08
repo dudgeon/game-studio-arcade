@@ -517,3 +517,39 @@ Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full
 - The mini is unchanged: it keeps the `ant` CLI login (D16) and must never have `ANTHROPIC_API_KEY` set. The cabinet service reads its key from its config file and hands it to the SDK directly, not through a shell environment variable on the mini. So the two rules don't meet: the mini has no key, and a cabinet has only its own.
 - Code follows (not done here): the auth helper (D17) gets a cabinet path that reads the key file, while the mini path stays profile-only.
 - Why not the alternatives: WIF needs the account converted to an organization (D15, D16); browser login needs a person present, which fits an unattended cabinet badly.
+
+## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
+
+Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).
+
+**D160. The library is a short catalog plus modules fetched on demand.** *(Geoff's direction; design by Claude, library worker. Replaces D100's "read it all"; refines D45.)*
+- The agent always sees one file, the kit's `KIT.md`: conventions, one line per module and template, and the commands. Its source is `studio-kit/context-pack/CATALOG.md`. Budget: 2,000 tokens, enforced by a test.
+- Everything else is read only when the game needs it. Library modules are one file each beside the code, `runtime/lib/ref/<module>.md`, tested against the exports; these stay the one source (D100), and `runtime/lib/REFERENCE.md` becomes an index. Kit-level modules (`cart-api`, `checks`, `sprites`, `spec`) are in `studio-kit/context-pack/modules/`.
+- The modules are written for token efficiency: signatures and what a cart needs to know, not paragraphs. `RECIPES.md` is folded into the modules and templates.
+- **How it grows:** a new capability (for example a pseudo-3D raycasting or isometric module, which is what "three dimensional space" means on a 256×192 console) adds one code file, one `ref/` file and one catalog line. The catalog grows by a line and a build that doesn't use it pays only for that line. A test fails if a catalog line points to nothing or a module has no line.
+- Files read with bash, not a skill. A token costs the same either way, so what matters is reading less (D45, cost breakdown). A skill adds a second versioned resource for no saving.
+
+**D161. Four tested templates and one blank start.** *(Geoff's direction; choice of templates by Claude.)*
+- `studio-kit/context-pack/templates/`: `catch` (things fall, catch the good, avoid the bad), `dodge` (free movement, things fly at you), `maze` (tile-by-tile walking with walls and pickups), `paddle` (a ball off walls) and `blank` (title, play, game over, nothing else).
+- Each is a complete passing cart (`spec.md`, `cart.json`, `game.js`, `checks.js`), with the numbers an agent would change in one `CFG` block. They replace the three example carts of D100.
+- **None is a falling-blocks game (D12);** the test from D100 stays and covers them, so the model comparison still measures building Falling Blocks rather than copying it.
+- The agent copies one and edits it in small steps rather than rewriting. Order stays spec first (D44): spec, then checks, then freeze, then `game.js`.
+- The trade Geoff named: most token-efficient, less expressive. A game that doesn't fit starts from `blank`, and the agent says which it chose. Forks still start from the parent, not a template.
+
+**D162. Checks get a tested bot helper, `t.bot`.** *(Claude.)* Measured: `checks.js` cost more than twice `game.js`, and almost every first-playtest failure was the agent's own test bot.
+- `runtime/lib/bot.js`, with its own tests: `start`, `hold`, `press`, `wait`, `delta`, `play` and `reach`; steering helpers `toward`, `away`, `nearest`; assertions `ok`, `eq`, `near`.
+- `checks.js` still imports nothing (D21, D30): the handle carries it, so it works unchanged on both drivers. It isn't in `g.lib`, because carts have no use for it.
+- `reach` fails with a message that says what it wanted and where the game stopped, and says plainly that a bot lost, so a dead bot can't be mistaken for a game bug. Steered loops stop at 3,000 frames by default, to stay inside the browser limit.
+- D11 and D44 are unchanged: checks still come from the spec, before code, and freeze.
+
+**D163. Checks may set up state with `t.poke`, a cart's optional test hook.** *(Claude; refines D103; additive to D21.)*
+- A cart may export `poke(g, s, o)`, called only by `t.poke(o)`, e.g. `{ lives: 99 }`. A cart without it gets a clear error if a check asks.
+- It exists because "the bot died before frame 3,000" was the commonest failure and the reason some checks were weakened (phase-0-results: Fishy Penguin R5–R8, R12). With `poke`, a check reads the real speed at frame 3,000 by keeping the player alive, and no bot has to be good at the game.
+- **Limit:** poke sets up the situation; it never stands in for the thing a rule is about. A rule about losing lives can't poke lives, and a rule about score can't poke score. `checks.md` says so and a reader can see it in `checks.js`. D103's steering stays the default for anything that can be reached by playing.
+
+**D164. Pack size uses a calibrated ratio.** *(Claude; replaces D102's estimate and ceiling.)*
+- Measured from the Penguin Catch reads: Markdown 2.58 characters per token, code 2.35. `pack-size.js` uses those, and the fixture's measured reads are in a test, so the ratio can't drift from the evidence silently.
+- Budgets: catalog 2,000; any one module 1,500; any one template's files 4,500. A template costs about a third as much to read as to write, so it can be bigger than a module. There's no more single pack total, since no build reads it all. `pack-size` also prints what a typical build reads.
+- Keep prompts well under 100k: Haiku's price jumps about 5× past it. The first builds under this design are the check.
+
+**D165. Ask before reading more.** *(Claude; from the cost breakdown's "ask questions before reading the kit".)* The brief reads only the catalog before asking, which is enough to ask good questions. Modules and templates come after the questions, so a kid's long think (over 5 minutes expires the cache) rewrites about 10k tokens rather than 37k.

@@ -1,24 +1,26 @@
 // @ts-check
 /** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, ship: Arcade.Lib.Thing, things: Arcade.Lib.Thing[], spawn: Arcade.Lib.Timer, safe: Arcade.Lib.Timer, tick: Arcade.Lib.Timer, played: number }} State */
 
+// Dodge template: free movement, things fly at you, stay alive. Change CFG and draw.
+const CFG = { lives: 3, speed: 2, spawnEvery: 40, safeFrames: 90, comet: 1, cometStep: 0.5, cometEvery: 600, cometMax: 3 };
 const SIZE = 8; // ship and comet size in pixels
 const TOP = 10; // the HUD band; nothing flies there
 
 /** @param {Arcade.G} g @param {State} s */
 function newGame(g, s) {
   const { score, timers } = g.lib;
-  s.sc = score.newScore(g, { lives: 3 });
+  s.sc = score.newScore(g, { lives: CFG.lives });
   s.ship = { kind: "ship", x: 16, y: (g.H - SIZE) / 2, w: SIZE, h: SIZE };
   s.things = [];
-  s.spawn = timers.timer(40, true);
+  s.spawn = timers.timer(CFG.spawnEvery, true);
   s.tick = timers.timer(60, true);
-  s.safe = timers.timer(90);
+  s.safe = timers.timer(CFG.safeFrames);
   s.safe.done = true; // not safe at the start
   s.played = 0;
 }
 
 /** Comet speed after `played` frames of play (R5). */
-const speedAt = (/** @type {number} */ played) => Math.min(3, 1 + 0.5 * Math.floor(played / 600));
+const speedAt = (/** @type {number} */ played) => Math.min(CFG.cometMax, CFG.comet + CFG.cometStep * Math.floor(played / CFG.cometEvery));
 
 /** @type {Arcade.Cart<State>} */
 export default {
@@ -40,10 +42,10 @@ export default {
     }
 
     const sh = s.ship;
-    if (g.btn("left")) sh.x -= 2;
-    if (g.btn("right")) sh.x += 2;
-    if (g.btn("up")) sh.y -= 2;
-    if (g.btn("down")) sh.y += 2;
+    if (g.btn("left")) sh.x -= CFG.speed;
+    if (g.btn("right")) sh.x += CFG.speed;
+    if (g.btn("up")) sh.y -= CFG.speed;
+    if (g.btn("down")) sh.y += CFG.speed;
     sh.x = Math.max(0, Math.min(g.W - SIZE, sh.x));
     sh.y = Math.max(TOP, Math.min(g.H - SIZE, sh.y));
 
@@ -88,5 +90,9 @@ export default {
   probe(g, s) {
     const comets = s.things.map((t) => ({ x: t.x, y: t.y }));
     return { W: g.W, H: g.H, mode: s.flow.mode, ship: { x: s.ship.x, y: s.ship.y }, comets, score: s.sc.score, lives: s.sc.lives, safe: !s.safe.done, speed: speedAt(s.played), played: s.played };
+  },
+
+  poke(g, s, o) {
+    if (o.lives !== undefined) s.sc.lives = o.lives;
   },
 };

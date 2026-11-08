@@ -33,4 +33,4 @@ Dark night sky with drifting star dots. A sky-blue ship, orange comets. A "hit" 
 
 ## Changelog
 
-- v1: First version, an example cart for the context pack.
+- v1: First version, a template.
