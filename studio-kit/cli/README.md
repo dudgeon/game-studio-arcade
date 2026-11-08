@@ -57,9 +57,16 @@ If either package can't run, local checks report "unavailable" and nothing is co
 
 The frog-hop stream is hand-written from the docs. Replace it with a recorded stream after the first live session.
 
+## Live runs
+
+- **2026-11-08, task 8's accept:** `penguin-catch`, made by `sesn_01UBPbematoWWGK1foPSzfo2` (Sonnet 5.5, 300¢ cap).
+  - 3 questions (A, B, and a typed C), then the plan (14 rules, 11 auto) accepted.
+  - List cost 68¢, which matches a recomputation from `usage` ($0.680). 271.6 active seconds; 923.5 s wall, most of it waiting on the person answering.
+  - The first playtest failed 5 auto rules. After 3 fix rounds every auto rule passed, and validate-cart and both playtest drivers pass locally.
+  - Committed to the dev cart library. The stream dropped once and the driver reconnected.
+  - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
+
 ## Still needs a live session
 
-- One end-to-end `studio make` of an example-style game (task 8's accept): a playable cart, a passing report, a complete log record.
 - Confirm the SDK calls in `src/api.js` (`beta.sessions.*`, `beta.files.list({scope_id, betas})`, `files.download`, `files.upload`) behave as the docs and SDK 1.6.0 types say. Also confirm the SDK resolves the `game-studio-arcade` profile (task 1).
-- Record a real event stream as a fixture, and the first live run's answers under `fixtures/` for the task 10 replays.
 - `studio fork` (task 11, stretch) isn't built.

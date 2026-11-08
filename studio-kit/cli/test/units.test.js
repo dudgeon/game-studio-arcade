@@ -98,6 +98,8 @@ test("progress lines are kid language", () => {
   assert.equal(progressFor({ name: "write", input: { file_path: "/workspace/cart/game.js" } }), "Writing the game");
   assert.equal(progressFor({ name: "edit", input: { file_path: "/workspace/cart/game.js" } }), "Fixing the game");
   assert.equal(progressFor({ name: "mystery" }), null);
+  assert.equal(progressFor({ name: "bash", input: { command: "cd /workspace/kit; cat studio-kit/playtest/README.md" } }), "Reading up");
+  assert.equal(progressFor({ name: "bash", input: { command: "node /workspace/kit/studio-kit/spec/bin/validate-cart.js /workspace/cart" } }), "Checking the cart");
 });
 
 test("judgeReport: every auto rule and generic check must pass", () => {

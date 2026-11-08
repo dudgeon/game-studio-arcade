@@ -35,6 +35,7 @@ import { progressFor } from "./progress.js";
  * @property {string} lastMessage   the agent's final text
  * @property {any[]} errors
  * @property {string[]} notes
+ * @property {SessionEvent[]} events   every event received, in order, once each (for fixtures)
  */
 
 /**
@@ -80,6 +81,8 @@ export async function runSession(o) {
   const errors = [];
   const notes = new Set();
   const seen = new Set(); // event ids already handled (dedupe across reconnects)
+  /** @type {SessionEvent[]} */
+  const events = [];
   const answered = new Set(); // custom_tool_use ids we've replied to
   const pendingTools = new Map(); // id -> event, for requires_action recovery
   let madeItNow = false;
@@ -138,6 +141,7 @@ export async function runSession(o) {
       if (seen.has(ev.id)) return false;
       seen.add(ev.id);
     }
+    events.push(ev);
     switch (ev.type) {
       case "agent.custom_tool_use":
         pendingTools.set(ev.id, ev);
@@ -261,6 +265,7 @@ export async function runSession(o) {
     lastMessage,
     errors,
     notes: [...notes],
+    events,
   };
 }
 
