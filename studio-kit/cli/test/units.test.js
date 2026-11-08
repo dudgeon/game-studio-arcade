@@ -128,3 +128,19 @@ test("the kit uploads once per content hash", async () => {
   assert.deepEqual([a.uploaded, b.uploaded, b.fileId], [true, false, "file_kit_01"]);
   assert.equal(m.calls.filter((c) => c.startsWith("upload:")).length, 1);
 });
+
+test("the real spec package validates the fixture cart, and catches a missing check", async () => {
+  const { defaultChecker } = await import("../src/checks.js");
+  const fixtureCart = new URL("../fixtures/frog-hop/cart/", import.meta.url).pathname;
+  const good = await defaultChecker().validate(fixtureCart);
+  assert.deepEqual(good.problems, []);
+  assert.equal(good.ok, true);
+
+  const d = tmp();
+  fs.cpSync(fixtureCart, d, { recursive: true });
+  fs.writeFileSync(path.join(d, "checks.js"), "export default { R1: async (t) => {} };\n");
+  const bad = await defaultChecker().validate(d);
+  assert.equal(bad.ok, false);
+  const problems = bad.problems ?? [];
+  assert.ok(problems.some((p) => p.includes("R2")), problems.join("; "));
+});

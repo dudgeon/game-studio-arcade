@@ -2,9 +2,10 @@
 // playtest harness (task 5) belong to other packages; this adapter is the only
 // place that knows how to reach them.
 //
-// Assumed contract (to confirm with those packages):
-//   @game-studio-arcade/spec      export async function validateCart(dir) -> {ok, problems: string[]}
-//   @game-studio-arcade/playtest  export async function playtest(dir)     -> report (playtest.json shape)
+// Contracts:
+//   @game-studio-arcade/spec      validateRuleCoverage(dir) -> {ok, errors: [{message}], warnings} (D30, on main).
+//                                 A fuller validateCart(dir) is used instead if one is exported later.
+//   @game-studio-arcade/playtest  playtest(dir) -> report (playtest.json shape). Assumed; task 5 not merged yet.
 //     report.rules: [{id, kind, passed, reason}], report.generic: [{name, passed, reason}]
 
 /**
@@ -29,8 +30,9 @@ export function defaultChecker() {
   return {
     async validate(dir) {
       const mod = await tryImport("@game-studio-arcade/spec");
-      if (!mod?.validateCart) return { ok: false, unavailable: true, problems: ["validate_cart isn't available yet (task 4)"] };
-      return mod.validateCart(dir);
+      if (mod?.validateCart) return mod.validateCart(dir);
+      if (!mod?.validateRuleCoverage) return { ok: false, unavailable: true, problems: ["validate_cart isn't available"] };
+      return coverageResult(await mod.validateRuleCoverage(dir));
     },
     async playtest(dir) {
       const mod = await tryImport("@game-studio-arcade/playtest");
@@ -39,6 +41,12 @@ export function defaultChecker() {
       return { report, ...judgeReport(report) };
     },
   };
+}
+
+/** Map the spec package's coverage report to a ValidateResult. */
+export function coverageResult(report) {
+  const fmt = (i) => `${i.rule ? `${i.rule}: ` : ""}${i.message}`;
+  return { ok: Boolean(report?.ok), problems: (report?.errors ?? []).map(fmt), warnings: (report?.warnings ?? []).map(fmt) };
 }
 
 async function tryImport(name) {

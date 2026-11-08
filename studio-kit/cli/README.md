@@ -35,10 +35,10 @@ Set `GSA_DATA_DIR` to use another data folder.
 
 ## Contracts with other packages
 
-- **validate_cart** (task 4): expected as `validateCart(dir) → {ok, problems}`, exported from `@game-studio-arcade/spec`.
+- **validate_cart** (task 4): uses `validateRuleCoverage(dir)` from `@game-studio-arcade/spec` (D30, merged). If that package later exports a fuller `validateCart(dir) → {ok, problems}`, the CLI uses it instead. A test runs the real coverage check on the fixture cart.
 - **playtest** (task 5): expected as `playtest(dir) → report`, exported from `@game-studio-arcade/playtest`. The report has `rules: [{id, kind, passed, reason}]` and `generic: [{name, passed, reason}]`.
 
-Until those exist, local checks report "unavailable" and nothing is committed without `--commit-anyway`. The adapter is `src/checks.js`, the only file to change if the real names differ.
+Until the playtest exists, local checks report "unavailable" and nothing is committed without `--commit-anyway`. The adapter is `src/checks.js`, the only file to change if the real names differ.
 
 ## Tests
 
