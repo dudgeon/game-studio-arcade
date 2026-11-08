@@ -22,6 +22,45 @@ export function dataPaths(root) {
   };
 }
 
+/** The toolset entry in agents/studio.md's frontmatter; a test keeps the two in step. */
+export const STUDIO_TOOLSET = {
+  type: "agent_toolset_20260401",
+  default_config: { enabled: true, permission_policy: { type: "always_allow" } },
+  configs: [
+    { name: "web_fetch", enabled: false },
+    { name: "web_search", enabled: false },
+  ],
+};
+
+/**
+ * The Studio brief as it stands in the repo, for a session-level override when
+ * the applied agent is behind the file (`--brief-from-file`).
+ * @param {string} [dir]
+ * @returns {{system: string, tools: object[]}}
+ */
+export function readAgentDef(dir = MANAGED_AGENT_DIR) {
+  const md = fs.readFileSync(path.join(dir, "agents/studio.md"), "utf8");
+  const m = md.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  if (!m) throw new Error("agents/studio.md has no frontmatter");
+  const toolsDir = path.join(dir, "agents/tools");
+  const custom = fs.readdirSync(toolsDir).filter((f) => f.endsWith(".json")).sort().map((f) => JSON.parse(fs.readFileSync(path.join(toolsDir, f), "utf8")));
+  return { system: m[1].trim(), tools: [STUDIO_TOOLSET, ...custom] };
+}
+
+/**
+ * The context-pack skill's id and version from its lockfile (D45).
+ * @param {string} [lockFile]
+ * @returns {{type: "custom", skill_id: string, version?: string}}
+ */
+export function readSkillLock(lockFile = path.join(MANAGED_AGENT_DIR, "claude-lock.skill.json")) {
+  if (!fs.existsSync(lockFile)) throw new Error(`no ${path.relative(REPO_ROOT, lockFile)} yet: stage and apply the context-pack skill first (see studio-kit/managed-agent/README.md)`);
+  const lock = JSON.parse(fs.readFileSync(lockFile, "utf8"));
+  const entry = Object.values(lock.resources ?? {}).find((r) => /** @type {any} */ (r).kind === "skill");
+  if (!entry) throw new Error("the skill lockfile has no skill in it");
+  const { id, version } = /** @type {any} */ (entry);
+  return { type: "custom", skill_id: id, ...(version ? { version: String(version) } : {}) };
+}
+
 /**
  * Read the Studio agent and environment ids from the committed claude-lock.json.
  * @param {string} [lockFile]

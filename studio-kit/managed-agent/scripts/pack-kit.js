@@ -30,6 +30,12 @@ export const KIT_PARTS = [
   { dir: "studio-kit/context-pack", what: "Library reference, recipes and three tiny example carts. Read it before designing." },
 ];
 
+/** The kit for a session that gets the context pack as a skill instead (D45). */
+export const SKILL_KIT = {
+  parts: KIT_PARTS.filter((p) => p.dir !== "studio-kit/context-pack"),
+  notes: ["The context pack isn't in this kit. It's attached to this session as the skill `studio-context-pack`: read it all before designing. Its paths such as `runtime/README.md` and `studio-kit/spec/template.md` are under `/workspace/kit/`."],
+};
+
 const SKIP_NAMES = new Set(["node_modules", ".git", ".DS_Store", "test", "dist", "coverage"]);
 const isSkipped = (name) => SKIP_NAMES.has(name) || name.endsWith(".test.js") || name.startsWith("._");
 
@@ -95,7 +101,7 @@ function readJson(file) {
  * Generate KIT.md: what's in the kit, each part's README, and its commands.
  * Commands come from each part's package.json `bin` and `scripts`, so the parts'
  * owners define them and this file never goes stale.
- * @param {{repoRoot?: string, present: {dir: string, what: string}[], missing: string[]}} info
+ * @param {{repoRoot?: string, present: {dir: string, what: string}[], missing: string[], notes?: string[]}} info
  */
 export function renderKitMd(info) {
   const repoRoot = info.repoRoot ?? REPO_ROOT;
@@ -105,6 +111,7 @@ export function renderKitMd(info) {
     "Extracted at `/workspace/kit/`. Paths below are relative to it. There is no network: use what's here.",
     "",
   ];
+  for (const note of info.notes ?? []) lines.push(note, "");
   for (const part of info.present) {
     lines.push(`## ${part.dir}/`, "", part.what, "");
     const readme = path.join(repoRoot, part.dir, "README.md");
@@ -136,13 +143,13 @@ export function renderKitMd(info) {
 /**
  * Build the tarball. Files are staged in a temp dir so the archive holds exactly
  * the kit, with no macOS metadata.
- * @param {{out: string, repoRoot?: string, parts?: {dir: string, what: string}[]}} opts
+ * @param {{out: string, repoRoot?: string, parts?: {dir: string, what: string}[], notes?: string[]}} opts
  * @returns {{out: string, hash: string, fileCount: number, missing: string[], bytes: number}}
  */
 export function buildKit(opts) {
   const repoRoot = opts.repoRoot ?? REPO_ROOT;
   const { files, present, missing } = collectKit({ repoRoot, parts: opts.parts });
-  const kitMd = renderKitMd({ repoRoot, present, missing });
+  const kitMd = renderKitMd({ repoRoot, present, missing, notes: opts.notes });
   const hash = kitHash(files, kitMd);
   const stage = fs.mkdtempSync(path.join(os.tmpdir(), "studio-kit-"));
   try {
@@ -180,6 +187,8 @@ export function stageContextPackSkill(opts) {
   const copied = [];
   walk(src, (abs) => {
     const rel = path.relative(src, abs);
+    // The agent needs the reading and the example carts, not the pack's own tooling.
+    if (!rel.endsWith(".md") && !rel.startsWith("carts" + path.sep)) return;
     fs.mkdirSync(path.dirname(path.join(dest, rel)), { recursive: true });
     fs.copyFileSync(abs, path.join(dest, rel));
     copied.push(rel.split(path.sep).join("/"));
@@ -195,7 +204,7 @@ export function stageContextPackSkill(opts) {
       "",
       "# Studio context pack",
       "",
-      "Read the library reference before writing a cart, then the recipe that matches what you're building. The example carts show complete, passing carts.",
+      "Read all of it before designing a cart, starting with `README.md`. The example carts in `carts/` are complete and passing: copy their shape, not their games. Paths such as `runtime/README.md` and `studio-kit/spec/template.md` are in the studio kit, under `/workspace/kit/`.",
       "",
       ...index,
       "",

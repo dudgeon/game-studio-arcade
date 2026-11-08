@@ -12,6 +12,7 @@ import { makeCart } from "../src/make.js";
 import { replayAnswerer } from "../src/answers.js";
 import { dataPaths } from "../src/config.js";
 import { readLog } from "../src/log.js";
+import { reanalyzeSession } from "../src/reanalyze.js";
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/frog-hop");
 const script = JSON.parse(fs.readFileSync(path.join(fixtures, "session.json"), "utf8"));
@@ -123,6 +124,11 @@ test("a passing build is committed with complete log records", async () => {
   assert.equal(session.cart_id, "frog-hop");
   assert.deepEqual(session.missing_outputs, []);
   assert.equal(session.outputs_complete, true);
+  assert.equal(session.context_pack, "tarball");
+  assert.deepEqual(session.edits_after_first_playtest, { game_js: 1, checks_js: 0, spec_md: 0 });
+  assert.equal(session.playtest_runs, 1);
+  assert.equal(session.checks_changed_after_playtest.changed, false);
+  assert.equal(session.checks_changed_after_playtest.baseline, "none", "that fixture has no snapshot");
   assert.equal(session.active_seconds, 312.5);
   assert.deepEqual(session.tokens, { input: 41000, output: 9800, cache_read: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } });
   assert.deepEqual({ type: "studio_session", ...rec }, session);
@@ -196,4 +202,42 @@ test("no cart.tgz: the spec is still logged and kept", async () => {
   assert.equal(record.outputs_complete, true, "the manifest didn't promise a cart");
   assert.match(record.spec_diff ?? "", /\+# Frog Hop/);
   assert.ok(fs.existsSync(path.join(sessionDir, "outputs/spec.md")));
+});
+
+test("the frozen snapshot is fetched when the first playtest starts, so overwriting it later changes nothing", async () => {
+  const frozen = Buffer.from("export default {\n  R1: async (t) => { await t.step(1); },\n};\n");
+  const base = outputs({ "checks.frozen.js": frozen, "spec.frozen.md": fs.readFileSync(path.join(fixtures, "cart/spec.md")) });
+  const s = setup({ outputs: base });
+  const { record, sessionDir } = await s.make();
+  assert.equal(fs.readFileSync(path.join(sessionDir, "frozen/checks.frozen.js"), "utf8"), frozen.toString());
+  const c = record.checks_changed_after_playtest;
+  assert.equal(c.baseline, "captured");
+  assert.ok(c.rules.some((r) => r.rule === "R1"), "the final checks differ from what was captured");
+});
+
+test("a failed capture doesn't stop the build", async () => {
+  const s = setup();
+  const real = s.m.api.listOutputs;
+  let calls = 0;
+  s.m.api.listOutputs = async (id) => {
+    if (calls++ === 0) throw new Error("network blip");
+    return real(id);
+  };
+  const { record } = await s.make();
+  assert.equal(record.outcome, "committed");
+});
+
+test("reanalyze appends a correction and leaves the original record", async () => {
+  const s = setup();
+  const { sessionDir, record } = await s.make();
+  const file = path.join(s.paths.logs, "studio_session.jsonl");
+  const before = fs.readFileSync(file, "utf8");
+  const fixed = reanalyzeSession({ paths: s.paths, session: record.id, why: "detector bug" });
+  assert.equal(fs.readFileSync(file, "utf8"), before, "the original log is untouched");
+  const [c] = readLog(path.join(s.paths.logs, "studio_session_correction.jsonl"));
+  assert.equal(c.corrects, record.id);
+  assert.equal(c.why, "detector bug");
+  assert.deepEqual(c.edits_after_first_playtest, fixed.edits_after_first_playtest);
+  assert.ok(fs.existsSync(sessionDir));
+  assert.throws(() => reanalyzeSession({ paths: s.paths, session: "sesn_nope", why: "x" }), /no session folder/);
 });

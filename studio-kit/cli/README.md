@@ -15,6 +15,8 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--answers FILE` | replay recorded answers by position (D43); runs out → D |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
+| `--context-pack skill` | attach the context pack as a skill and leave it out of the kit (default `tarball`; D45) |
+| `--brief-from-file` | run the brief in `agents/studio.md` as a session override, when the applied agent is behind the file |
 | `--commit-anyway` | commit even if validate or the playtest fails |
 | `-v` | show the agent's own messages and debug lines |
 
@@ -29,7 +31,7 @@ Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes 
 5. Reconnects if the stream drops, replaying missed events from the history without repeats. Answers any tool call the stream missed when the session reports `requires_action`.
 6. Polls the session's files until `DONE.json` is there and every size in it matches (D19), skipping the session's inputs. Then it downloads every output into `~/game-studio-data/sessions/<id>/` and extracts `cart.tgz`.
 7. Runs `validate_cart` and the local playtest. Commits the cart to `~/game-studio-data/carts/` only if both pass.
-8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`.
+8. Appends `studio_session` and `cart_version` records to `~/game-studio-data/logs/`, with list cost from the session's `usage.list_cost` (rounded to the cent), `active_seconds`, token counts, wall time, question count and `ended_by`. Also the frozen-checks record (D44): `first_playtest`, `edits_after_first_playtest` and `checks_changed_after_playtest`.
 
 Set `GSA_DATA_DIR` to use another data folder.
 
@@ -65,6 +67,8 @@ The frog-hop stream is hand-written from the docs. Replace it with a recorded st
   - The first playtest failed 5 auto rules. After 3 fix rounds every auto rule passed, and validate-cart and both playtest drivers pass locally.
   - Committed to the dev cart library. The stream dropped once and the driver reconnected.
   - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
+
+- **2026-11-08, D44 and D45:** two more builds of the same request under the frozen-checks brief, tarball and skill. See D45 for the comparison.
 
 ## Still needs a live session
 

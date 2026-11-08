@@ -5,6 +5,7 @@ import { runSession, listCostUsd } from "./driver.js";
 import { downloadOutputs, extractCart, readJsonIfExists } from "./outputs.js";
 import { commitNewCart, specTitle } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
+import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -22,6 +23,9 @@ import { appendLog, newSpecDiff } from "./log.js";
  * @property {() => Promise<{fileId: string, hash: string}>} kit
  * @property {"cabinet"|"desktop"} [origin]
  * @property {boolean} [commitAnyway]
+ * @property {"tarball"|"skill"} [contextPack]   how this run got the context pack (D45)
+ * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
+ * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
  * @property {string} [recordFile]     also write the answers here
  * @property {() => Date} [now]
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
@@ -33,6 +37,26 @@ export async function makeCart(o) {
   const ui = o.ui;
   const kit = await o.kit();
 
+  // D44: fetch the frozen snapshot as the first playtest starts, so nothing the
+  // agent writes later can change the baseline. It's written well before then.
+  /** @type {Record<string, Buffer>} */
+  const captured = {};
+  let captureTries = 0;
+  const captureSnapshot = async (ev, sessionId) => {
+    if (ev.type !== "agent.tool_use" || ev.name !== "bash" || !isPlaytestRun(String(ev.input?.command ?? ""))) return;
+    if (SNAPSHOT_NAMES.every((n) => captured[n]) || captureTries >= 3) return;
+    captureTries++;
+    try {
+      const files = await o.api.listOutputs(sessionId);
+      for (const name of SNAPSHOT_NAMES) {
+        const f = files.filter((x) => x.filename === name).at(-1);
+        if (f && !captured[name]) captured[name] = await o.api.download(f.id);
+      }
+    } catch {
+      // The stream matters more than the capture; analyzeFreeze falls back without it.
+    }
+  };
+
   const result = await runSession({
     api: o.api,
     session: {
@@ -41,6 +65,8 @@ export async function makeCart(o) {
       environmentId: o.lock.environmentId,
       model: o.model,
       kitFileId: kit.fileId,
+      skills: o.skills,
+      ...(o.brief ? { system: o.brief.system, tools: o.brief.tools } : {}),
       budgetCents: o.budgetCents,
       title: `make: ${o.request.slice(0, 60)}`,
       metadata: { maker: o.maker, origin: o.origin ?? "cabinet", via: "studio-cli" },
@@ -51,6 +77,7 @@ export async function makeCart(o) {
     answerer: o.answerer,
     ui,
     now,
+    onEvent: captureSnapshot,
   });
 
   // Keep everything first (D43): answers and the raw session result.
@@ -66,6 +93,10 @@ export async function makeCart(o) {
   if (o.recordFile) writeJson(o.recordFile, answers);
   const { events, ...rest } = result;
   writeJson(path.join(sessionDir, "session.json"), rest);
+  for (const [name, body] of Object.entries(captured)) {
+    fs.mkdirSync(path.join(sessionDir, "frozen"), { recursive: true });
+    fs.writeFileSync(path.join(sessionDir, "frozen", name), body);
+  }
   fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
 
   ui.progress("Bringing your game home");
@@ -93,6 +124,18 @@ export async function makeCart(o) {
     local = await o.checker.playtest(cartDir);
     if (local.report) writeJson(path.join(cartDir, "playtest.json"), local.report);
     writeJson(path.join(sessionDir, "local-checks.json"), { validation, playtest: local });
+  }
+
+  const freeze = analyzeFreeze(events, {
+    frozenChecks: readTextIfExists(path.join(dl.dir, "checks.frozen.js")),
+    frozenSpec: readTextIfExists(path.join(dl.dir, "spec.frozen.md")),
+    finalChecks: cartDir ? readTextIfExists(path.join(cartDir, "checks.js")) : null,
+    finalSpec: spec,
+    capturedChecks: captured["checks.frozen.js"]?.toString("utf8") ?? null,
+    capturedSpec: captured["spec.frozen.md"]?.toString("utf8") ?? null,
+  });
+  if (freeze.checks_changed_after_playtest.unjustified.length) {
+    ui.info(`Checks changed with no spec change: ${freeze.checks_changed_after_playtest.unjustified.join(", ")} (D44)`);
   }
 
   const passed = Boolean(cartDir && validation?.ok && local?.ok);
@@ -143,6 +186,12 @@ export async function makeCart(o) {
     questions: result.turns.filter((t) => !t.auto).length,
     ended_by: result.endedBy,
     spec_diff: newSpecDiff(spec),
+    context_pack: o.contextPack ?? "tarball",
+    brief: o.brief ? "file-override" : "applied-agent",
+    first_playtest: freeze.first_playtest,
+    playtest_runs: freeze.playtest_runs,
+    edits_after_first_playtest: freeze.edits_after_first_playtest,
+    checks_changed_after_playtest: freeze.checks_changed_after_playtest,
     playtest: {
       sandbox: report ? { status: report.status ?? null, rules: report.rules ?? [], fix_rounds: report.fix_rounds ?? null } : null,
       local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [] } : null,
@@ -181,6 +230,10 @@ export async function makeCart(o) {
   else if (cartDir) ui.info(`The game didn't pass its checks, so it wasn't added. Everything is kept in ${sessionDir}`);
   else ui.info(`No game came back (${result.stopReason || "unknown"}). Everything is kept in ${sessionDir}`);
   return { record, sessionDir, committed };
+}
+
+function readTextIfExists(file) {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
 }
 
 function writeJson(file, data) {

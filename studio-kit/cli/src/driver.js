@@ -24,7 +24,7 @@ import { progressFor } from "./progress.js";
  * @typedef {object} SessionResult
  * @property {string} sessionId
  * @property {Turn[]} turns
- * @property {{summary: string, rules: any[], choice: string, said: string|null}[]} planTurns
+ * @property {{summary: string, rules: any[], changes?: any[], choice: string, said: string|null}[]} planTurns
  * @property {"answers"|"make_it_now"} endedBy
  * @property {string} stopReason   end_turn | budget_reached | retries_exhausted | refusal | terminated | stream_lost
  * @property {any} usage           session usage (list_cost, tokens, active_seconds)
@@ -61,6 +61,7 @@ const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted
  *   request: string, maker: string, withPlayer?: string|null,
  *   answerer: Answerer, ui: Ui,
  *   message?: object,
+ *   onEvent?: (ev: SessionEvent, sessionId: string) => Promise<void>,
  *   now?: () => Date, maxReconnects?: number,
  * }} o
  * @returns {Promise<SessionResult>}
@@ -122,7 +123,7 @@ export async function runSession(o) {
       return reply(ev, questionResult(a));
     }
     if (ev.name === "show_plan") {
-      const p = { summary: String(input.summary ?? ""), rules: Array.isArray(input.rules) ? input.rules : [] };
+      const p = { summary: String(input.summary ?? ""), rules: Array.isArray(input.rules) ? input.rules : [], ...(Array.isArray(input.changes) && input.changes.length ? { changes: input.changes } : {}) };
       const a = await o.answerer.plan(p);
       planTurns.push({ ...p, choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
       return reply(ev, planResult(a));
@@ -142,6 +143,7 @@ export async function runSession(o) {
       seen.add(ev.id);
     }
     events.push(ev);
+    if (o.onEvent) await o.onEvent(ev, sessionId);
     switch (ev.type) {
       case "agent.custom_tool_use":
         pendingTools.set(ev.id, ev);
