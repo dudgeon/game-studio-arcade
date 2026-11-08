@@ -1,0 +1,12 @@
+{
+  "status": "done",
+  "summary": "Frog Hop: dodge cars across the road, three lives, cars speed up each crossing.",
+  "rules": [
+    { "id": "R1", "kind": "auto", "passed": true },
+    { "id": "R2", "kind": "auto", "passed": true },
+    { "id": "R3", "kind": "auto", "passed": true },
+    { "id": "R4", "kind": "auto", "passed": true },
+    { "id": "R5", "kind": "you-check", "passed": null }
+  ],
+  "fix_rounds": 1
+}

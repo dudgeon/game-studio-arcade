@@ -1,0 +1,46 @@
+{
+  "about": "Hand-written event stream for one Studio build, shaped like the Managed Agents docs (2026-11-07). Replace with a recorded stream after the first live session.",
+  "steps": [
+    { "await_message": true },
+    { "emit": { "id": "ev_01", "type": "session.status_running" } },
+    { "emit": { "id": "ctu_01", "type": "agent.custom_tool_use", "name": "tell_player", "input": { "message": "Unpacking my toolbox", "stage": "setup" } } },
+    { "await_result": "ctu_01", "expect": { "ok": true } },
+    { "emit": { "id": "tu_01", "type": "agent.tool_use", "name": "bash", "input": { "command": "mkdir -p /workspace/kit && tar -xzf /mnt/session/uploads/studio-kit.tgz -C /workspace/kit" } } },
+    { "emit": { "id": "tu_02", "type": "agent.tool_use", "name": "read", "input": { "file_path": "/workspace/kit/KIT.md" } } },
+    { "emit": { "id": "ctu_02", "type": "agent.custom_tool_use", "name": "ask_player", "input": { "question": "What does the frog dodge?", "option_a": "Cars", "option_b": "Logs in a river" } } },
+    { "emit": { "id": "ev_02", "type": "session.status_idle", "stop_reason": { "type": "requires_action", "event_ids": ["ctu_02"] } } },
+    { "await_result": "ctu_02", "expect": { "choice": "A" } },
+    { "emit": { "id": "ev_03", "type": "session.status_running" } },
+    { "emit": { "id": "ctu_03", "type": "agent.custom_tool_use", "name": "ask_player", "input": { "question": "How fast are the cars?", "option_a": "Slow, then faster", "option_b": "Fast from the start" } } },
+    { "await_result": "ctu_03", "expect": { "choice": "C", "said": "medium and it gets faster" } },
+    { "emit": { "id": "tu_03", "type": "agent.tool_use", "name": "write", "input": { "file_path": "/workspace/cart/spec.md", "content": "…" } } },
+    { "emit": { "id": "ctu_04", "type": "agent.custom_tool_use", "name": "show_plan", "input": { "summary": "Hop a frog across a busy road without getting squished.", "rules": [
+      { "id": "R1", "kind": "auto", "text": "Pushing up moves the frog one lane up." },
+      { "id": "R2", "kind": "auto", "text": "If a car touches the frog, the game is over." },
+      { "id": "R3", "kind": "auto", "text": "Cars get faster each time you reach the top." },
+      { "id": "R4", "kind": "you-check", "text": "The frog looks happy at the top." }
+    ] } } },
+    { "await_result": "ctu_04", "expect": { "choice": "change", "said": "the frog should have three lives" } },
+    { "emit": { "id": "tu_04", "type": "agent.tool_use", "name": "edit", "input": { "file_path": "/workspace/cart/spec.md" } } },
+    { "emit": { "id": "ctu_05", "type": "agent.custom_tool_use", "name": "show_plan", "input": { "summary": "Hop a frog across a busy road without getting squished.", "rules": [
+      { "id": "R1", "kind": "auto", "text": "Pushing up moves the frog one lane up." },
+      { "id": "R2", "kind": "auto", "text": "A car touching the frog costs one life." },
+      { "id": "R3", "kind": "auto", "text": "You have three lives. At zero, the game is over." },
+      { "id": "R4", "kind": "auto", "text": "Cars get faster each time you reach the top." },
+      { "id": "R5", "kind": "you-check", "text": "The frog looks happy at the top." }
+    ] } } },
+    { "await_result": "ctu_05", "expect": { "choice": "build" } },
+    { "emit": { "id": "tu_05", "type": "agent.tool_use", "name": "bash", "input": { "command": "cp /workspace/cart/spec.md /mnt/session/outputs/spec.md" } } },
+    { "emit": { "id": "tu_06", "type": "agent.tool_use", "name": "write", "input": { "file_path": "/workspace/cart/game.js" } } },
+    { "emit": { "id": "tu_07", "type": "agent.tool_use", "name": "write", "input": { "file_path": "/workspace/cart/checks.js" } } },
+    { "emit": { "id": "ev_04", "type": "agent.thinking" } },
+    { "emit": { "id": "ctu_06", "type": "agent.custom_tool_use", "name": "tell_player", "input": { "message": "Testing the game", "stage": "testing" } } },
+    { "await_result": "ctu_06", "expect": { "ok": true } },
+    { "emit": { "id": "tu_08", "type": "agent.tool_use", "name": "bash", "input": { "command": "node /workspace/kit/studio-kit/playtest/bin/playtest.js /workspace/cart" } } },
+    { "emit": { "id": "tu_09", "type": "agent.tool_use", "name": "edit", "input": { "file_path": "/workspace/cart/game.js" } } },
+    { "emit": { "id": "tu_10", "type": "agent.tool_use", "name": "bash", "input": { "command": "tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart ." } } },
+    { "emit": { "id": "ev_05", "type": "agent.message", "content": [{ "type": "text", "text": "Built Frog Hop. All four auto rules pass after one fix." }] } },
+    { "emit": { "id": "ev_06", "type": "session.usage", "usage": { "input_tokens": 41000, "output_tokens": 9800, "list_cost": { "amount": "142", "currency": "USD" }, "active_seconds": 311.2 } } },
+    { "emit": { "id": "ev_07", "type": "session.status_idle", "stop_reason": { "type": "end_turn" } } }
+  ]
+}
