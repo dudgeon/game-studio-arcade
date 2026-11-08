@@ -59,6 +59,17 @@ The recomputed bill matches the logged `list_cost` of 68¢:
 
 This is one build of a simple game, so treat the shares as a first reading rather than an average.
 
+**To re-run it:** `studio-kit/cli/scripts/cost-attribution.js` works on any recorded session and makes no API calls. It prints the per-request table, the billing lines and the total. `studio-kit/cli/test/cost-attribution.test.js` runs it on this fixture and checks the 68.00¢ total and the main figures here.
+
+```sh
+node studio-kit/cli/scripts/cost-attribution.js studio-kit/cli/fixtures/penguin-catch/events.jsonl
+# What-ifs: same tokens on another model, without the cache expiry, without given requests
+node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> --model haiku
+node studio-kit/cli/scripts/cost-attribution.js <events.jsonl> --no-expiry --drop 16,17,18
+```
+
+Prices live in a table at the top of the script, so check them again before relying on a new run. Grouping requests into steps, per-file splits and the kit-size what-ifs were done by hand from its output.
+
 ## Every request
 
 *Prefix* is everything sent on that request. *Written* and *re-read* are the cache lines. *Returned* is the tool output that came back afterwards. Times are UTC.
@@ -246,7 +257,7 @@ Savings are against the 68¢ actual, shown as with and without the cache expiry 
 | 3 | **Ask questions before reading the kit** | 7.5 with an expiry, 0.8 without | Solid. Leaves only about 8.6k in the prefix during questions. The agent could ask weaker questions without knowing the kit, so it might need a line or two about what the runtime can do. |
 | 4 | **Lower effort** (thinking down 25–50%) | 4–8 | Uncertain: how much thinking falls isn't known, and it might raise fix rounds. Settable per agent or session with `model.effort`. |
 | 5 | **Fewer sprite redraws** (a row-width checker or sprite guide) | 3–6 | Moderate. This was one session's pattern, and all three redraws would need to go for the full 5.8. |
-| 6 | **First-try pass on checks** | 5.2 | Moderate, and the saving needs better check-writing rather than a rule. See the frozen-checks note. |
+| 6 | **First-try pass on checks** | 5.2 | Moderate. It needs checks that are right the first time, and D44 doesn't remove the need for fix rounds. See the frozen-checks section. |
 | 7 | **Smaller `checks.js`** (tested bot helpers, table-driven number checks) | 2.6–4.6 | Moderate. Assumes 2,000–3,500 fewer output tokens. Would probably also help #6. |
 | 8 | **Tidier ending** (a pack script, a one-line finish, no screenshots) | 2.1 | Solid, though the screenshots may be worth keeping for about 1¢ (that request's cost, mostly re-reading the prefix). |
 | 9 | **`game.js` template** | ~1.4 per 1,000 tokens saved | Moderate. `flow`, `score` and `collide` already reduce this. |
@@ -267,7 +278,7 @@ Getting to about 16–20k tokens might look like this:
 
 The rest stays: the dodge cart, recipes, rule guides and checks format, about 8,000 tokens.
 
-**A skill alone won't save this.** Skills load on demand, but a token read from a skill costs the same as one read with bash. The saving comes from reading less, so it needs the instructions and the files to change, whatever the packaging. Attaching the pack as a skill (the D40 experiment) would only matter if the agent then reads less.
+**A skill alone won't save this.** Skills load on demand, but a token read from a skill costs the same as one read with bash. The saving comes from reading less, so it needs the instructions and the files to change, whatever the packaging. Attaching the pack as a skill (the D40 experiment, now `studio make --context-pack skill` on the tasks 7+8 branch) would only matter if the agent then reads less.
 
 ### What's achievable
 
@@ -283,11 +294,15 @@ Lower effort might bring combined Sonnet down to about 35¢. Sonnet's real floor
 
 ## Frozen checks
 
-The brief refers to frozen checks as D44. As of `25b62c5` the decision is on line 67 of `_PROJECT.md` and isn't yet in `docs/decisions.md`, which stops at D43 in that series.
+D44 (commit `0dafe2e` on the tasks 7+8 branch, not yet on main) freezes checks: they're written from the spec before any game code, and a failing check means fix the game. A check, even a simply buggy one, may change only after the agent changes the spec rule or adds an Assumption naming it, then calls `show_plan` again. Changes are logged, not blocked. This session ran before D44, so none of this was in force.
 
-Freezing checks doesn't by itself produce a first-try pass, and this session suggests it needs one addition. The rule says a failing check means fix the game, and a check changes only after the spec does. Here the spec and game were right, and the frozen checks were wrong. Under that rule, the agent's options on R8 and R9 would be to break a correct game, change a correct spec to match bad arithmetic, or give up.
+**Freezing doesn't by itself produce a first-try pass.** All five failures here were check bugs, and D44 still lets those be fixed, so the fix rounds would remain. D44 adds to their cost:
+- **Each re-plan is another request.** At this point that's roughly 1¢: about 0.7¢ to re-read the prefix, plus the spec edit and `show_plan` output. This is an estimate.
+- **Each re-plan can wait on the player.** Waiting over 5 minutes at this size would cost about 16¢ in cache rewrites.
 
-**So the rule needs a route for "this check contradicts the spec".** One option is to allow a check fix when the check's expected value disagrees with the spec's own numbers, logged and visible. The rule's aim, stopping checks being bent to fit the game, stays intact because the spec remains the judge. Geoff's reason for the rule still stands: from outside, those edits looked exactly like bending. This is one session and is flagged here for a decision, not decided.
+The first-try saving of 5.2¢ therefore has to come from checks being right the first time, which is what writing checks before the game is meant to test. The next build's `first_playtest` and `checks_changed_after_playtest` records will show whether it helps.
+
+All five bugs fit D44's route awkwardly. On R8 and R9 the spec's numbers were already right and the check's arithmetic was wrong, and on R1, R4 and R7 the bug was in the test's setup or bot, so no spec rule needs changing. The likely result is an Assumption added to justify a test fix, shown to a kid. That's worth watching in the logs rather than changing now.
 
 ## Suggested order
 
