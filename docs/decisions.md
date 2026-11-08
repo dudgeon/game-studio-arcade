@@ -85,7 +85,7 @@ What we use instead:
 - Verified: the Models list, Managed Agents agents list and environments list all succeed.
 
 Still open:
-- Confirm in Phase 0 task 1 that the TypeScript SDK resolves the profile.
+- ~~Confirm in Phase 0 task 1 that the TypeScript SDK resolves the profile.~~ Closed by D17: `createClient()` passes the profile explicitly and the live check passes.
 - **Cabinet auth is undecided** (Phase 1–2). Browser login fits a machine with a person present, not an unattended Pi. The options: convert the Console account to an organization (unlocks WIF; `scripts/wif/` is ready), or a workspace-scoped key on the Pi. Ask Geoff when Phase 1 starts.
 
 **D17. One way to get a Claude API client: `@game-studio-arcade/auth`.** *(Claude, Phase 0 task 1; implements D16.)*
@@ -311,7 +311,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 - External controllers (a USB gamepad and so on) come later. Nothing is bought or wired for them now.
 - The desktop simulator can still be set to more than one controller, for testing and for desktop play.
 
-**D86. No physical MAKE button is assumed; the Studio starts from the launcher/shelf.** *(Geoff; answers D84 "MAKE", changes HANDOFF §1, §4 and §8.1.)*
+**D86. No physical MAKE button is assumed; the Studio starts from the launcher/shelf.** *(Geoff; answers D84 "MAKE", changes HANDOFF §1, §4 and §8.1.)* **Questions 1, 2 and 4 below answered by D87; question 3 (back to the shelf) still open.**
 - Geoff: "It is not obvious we need a physical 'make' button; this could be in the launch screen/game shelf."
 - Starting a new game (and forking one) is something the kid picks on screen in the launcher, not a dedicated button. Nothing is drilled or wired for MAKE.
 - ★ stays reserved: the key that never reaches a cart (D21, D82). What it does without MAKE (for example, back to the shelf from a game) is one of the questions below.
@@ -320,4 +320,16 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   2. **Where the Studio entry sits on the shelf:** (a) a "Make a new game" tile in the game list, or (b) a menu opened with a utility button. Forking stays "pick a game, then change it" (§8.2).
   3. **How a kid leaves a game and gets back to the shelf** now that ★ isn't MAKE: (a) a utility button (the ESC one, D82) held for a second, or (b) a pause menu on START.
   4. **Who is making:** the shelf shows the maker's initial, and there's no longer a "side" to hint at it. (a) Ask "Who's making? O or A" when the kid picks Make, or (b) leave it unattributed at the cabinet and tag it later in the Manager.
+
+**D87. Hold to talk, a "Make a new game" tile, and an open list of makers.** *(Geoff; answers D86 questions 1, 2 and 4. Changes HANDOFF §8.1, §8.2 and §9.5. Question 3, how to get back to the shelf from a game, is still open.)*
+- **Mic: hold a button to talk.** While the "tell me" screen is up, the kid holds a player button, talks, and lets go to send. The same works for the request and for the C "Something else" tile. The mic records only while the button is held. (Claude, implementation: any of the six player buttons counts, so the kid needn't find a particular one; the screen shows a "listening" state and the cabinet mutes its own speaker while the button is down.)
+- **Make is a tile:** a "Make a new game" tile in the game list on the shelf. Forking stays as it was (§8.2): pick a game, then change it.
+- **Who's making:** Geoff: "On launch of the make game, ask who is making; include existing names plus a new name slot (eg when a friend is over)." So the list of makers is open-ended, not just O and A.
+- Cabinet-side detail (Claude):
+  - The question comes right after the kid picks Make (or picks a game to change), before the mic. It lists the known makers, most recent first, then a "Someone new" slot.
+  - A new name is given the same way as everything else: hold a button and say it, then confirm the transcript on screen (retry allowed). First names only.
+  - **Where names are kept:** in the cabinet's data, next to its cart library, as a `makers.json` list: `{id, name, added, guest}`. `id` is a stable slug; `guest: true` marks a name added through the new-name slot. It's never in this repo (§15) and is backed up with the cart library. Names are never deleted (D5); a maker can be hidden from the list in the Manager.
+  - `cart.json` `maker` / `with`, and the `studio_session` and `play` log records, hold the maker's `id`. A guest's sessions and carts are logged under their own id like anyone else's, so the activity log shows who made what.
+  - The shelf shows the maker's name, since initials can collide once friends are added.
+  - The desktop flow (§8.3) uses the same ids when Geoff and a kid publish.
 
