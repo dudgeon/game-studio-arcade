@@ -16,6 +16,7 @@ node studio-kit/player/bin/studio-play.js --examples # also list runtime/example
 | `--logs DIR` | where logs go; default `~/game-studio-data/logs` |
 | `--examples` | add `runtime/examples/*`; the library wins on a name clash |
 | `--checker X` | who answers you-check rules, as an initial; default `G` |
+| `--players N` | controllers each cart gets, 1–8; default 1, like the cabinet (D110). Use `--players 2` for P2's keys (WASD, 1–5) and a second pad |
 
 It prints the URL and never opens a window. `/?cart=<id>` starts a cart straight away.
 

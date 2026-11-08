@@ -25,8 +25,9 @@ const postJson = (p, body, headers = {}) =>
   fetch(`${s.url}${p}`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
 
 test("lists the library with you-check rules, version, commit and status", async () => {
-  const { carts, checker } = await getCarts();
+  const { carts, checker, players } = await getCarts();
   assert.equal(checker, "G");
+  assert.equal(players, 1, "one controller by default, like the cabinet (D110)");
   assert.deepEqual(
     carts.map((c) => c.id),
     ["smile", "bare", "broken"],
@@ -109,7 +110,7 @@ test("a play is logged with the library's version and commit (D72)", async () =>
     commit: git(data.carts, ["rev-parse", "HEAD"]),
     session_id: "sesn_fixture_01",
     origin: "desktop",
-    sides: ["p1", "p2"],
+    sides: ["p1"], // p2 doesn't exist with one controller (D111)
     started_at: "2026-11-07T21:00:00.000Z",
     duration_s: 5,
     ticks: 300,
@@ -215,5 +216,27 @@ test("--examples adds the runtime's examples; the library wins a clash", async (
   } finally {
     await s2.close();
     d.cleanup();
+  }
+});
+
+test("--players sets the controller count; bad values fail at start-up (D110)", async () => {
+  const d = makeData();
+  const s2 = await startPlayer({ port: 0, libraryDir: d.carts, logsDir: d.logs, players: 3 });
+  try {
+    const body = /** @type {any} */ (await (await fetch(`${s2.url}/api/carts`)).json());
+    assert.equal(body.players, 3);
+    const r = await fetch(`${s2.url}/api/plays`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cart_id: "bare", play_id: "pl_3", started_at: "2026-11-08T10:00:00Z", duration_s: 40, sides: ["p3", "p1", "p4", "p9"] }),
+    });
+    assert.equal(r.status, 200);
+    assert.deepEqual(readRecords(d.logs, "play")[0].sides, ["p1", "p3"]);
+  } finally {
+    await s2.close();
+    d.cleanup();
+  }
+  for (const bad of [0, 9, 1.5, Number.NaN, /** @type {any} */ ("two")]) {
+    assert.throws(() => startPlayer({ port: 0, players: bad }), /players .* must be a whole number from 1 to 8/, String(bad));
   }
 });

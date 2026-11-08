@@ -83,7 +83,8 @@ test("keyboard: play a cart, leave with ★, answer its you-check rules, and it'
   await page.keyboard.down("ArrowRight");
   await page.waitForFunction(() => /** @type {any} */ (window).player.host.ticks > 30);
   await page.keyboard.up("ArrowRight");
-  await page.keyboard.press("Digit1"); // P2's A
+  await page.keyboard.press("Digit1"); // P2's A: ignored with one controller (D111)
+  assert.equal(await page.evaluate(() => /** @type {any} */ (window).player.host.players), 1);
   await page.keyboard.press("Escape"); // ★
   await page.waitForFunction(() => /** @type {any} */ (window).player.view === "check");
 
@@ -101,7 +102,7 @@ test("keyboard: play a cart, leave with ★, answer its you-check rules, and it'
   const [play] = plays;
   assert.equal(play.cart_id, "smile");
   assert.equal(play.ended, "star");
-  assert.deepEqual(play.sides, ["p1", "p2"]);
+  assert.deepEqual(play.sides, ["p1"]);
   assert.ok(play.ticks > 30, `ticks ${play.ticks}`);
   assert.equal(play.early_quit, true);
   assert.equal(play.errors, 0);
@@ -170,4 +171,27 @@ test("gamepad: stick and A in the menu, guide leaves the game, and the pad's sid
   assert.equal(last.ended, "star");
   assert.deepEqual(last.sides, ["p1"]);
   await ctx.close();
+});
+
+test("--players 2 gives the cart a second controller, and P2's keys count (D110)", { skip: skip || false }, async () => {
+  const d = makeData();
+  const s2 = await startPlayer({ port: 0, libraryDir: d.carts, logsDir: d.logs, players: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  try {
+    const page = await ctx.newPage();
+    await page.goto(`${s2.url}/?cart=bare`);
+    await page.waitForFunction(() => /** @type {any} */ (window).player?.host?.state === "ready");
+    assert.equal(await page.evaluate(() => /** @type {any} */ (window).player.host.players), 2);
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Digit1");
+    await page.waitForFunction(() => /** @type {any} */ (window).player.host.ticks > 10);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => /** @type {any} */ (window).player.view === "list");
+    assert.match(await page.textContent("#list-sub"), /2 controllers/);
+    assert.deepEqual(readRecords(d.logs, "play")[0].sides, ["p1", "p2"]);
+  } finally {
+    await ctx.close();
+    await s2.close();
+    d.cleanup();
+  }
 });

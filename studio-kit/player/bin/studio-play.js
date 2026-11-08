@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // studio-play: the local player (phase-0 task 9, D70). Prints a URL; never opens a window.
 //
-//   studio-play [--port 8330] [--host 127.0.0.1] [--carts DIR] [--logs DIR] [--examples] [--checker G]
+//   studio-play [--port 8330] [--host 127.0.0.1] [--carts DIR] [--logs DIR] [--examples] [--checker G] [--players 1]
 import { startPlayer } from "../src/server.js";
 
-const USAGE = "usage: studio-play [--port 8330] [--host 127.0.0.1] [--carts DIR] [--logs DIR] [--examples] [--checker G]";
+const USAGE = "usage: studio-play [--port 8330] [--host 127.0.0.1] [--carts DIR] [--logs DIR] [--examples] [--checker G] [--players 1]";
 
 const args = process.argv.slice(2);
 /** @type {import("../src/server.js").PlayerOptions & { port?: number, host?: string }} */
@@ -25,6 +25,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--logs") opts.logsDir = val();
   else if (a === "--examples") opts.examples = true;
   else if (a === "--checker") opts.checker = val();
+  else if (a === "--players") opts.players = Number(val());
   else if (a === "-h" || a === "--help") {
     console.log(USAGE);
     process.exit(0);
@@ -34,5 +35,11 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const s = await startPlayer(opts);
+let s;
+try {
+  s = await startPlayer(opts);
+} catch (e) {
+  console.error(`studio-play: ${/** @type {Error} */ (e).message}`);
+  process.exit(2);
+}
 console.log(`player at ${s.url}/`);

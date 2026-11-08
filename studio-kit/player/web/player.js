@@ -27,6 +27,8 @@ const views = { list: $("list"), play: $("play"), check: $("check") };
 /** @type {Cart[]} */
 let carts = [];
 let selected = 0;
+/** Controllers each cart gets (the server's --players, D110). */
+let controllers = 1;
 /** @type {"list" | "play" | "check"} */
 let view = "list";
 /** @type {Playing | null} */
@@ -40,6 +42,7 @@ async function loadCarts() {
   const r = await fetch("/api/carts");
   const body = await r.json();
   carts = body.carts;
+  controllers = body.players ?? 1;
   return body;
 }
 
@@ -75,7 +78,7 @@ function toast(text) {
 async function showList() {
   try {
     const body = await loadCarts();
-    $("list-sub").textContent = `${carts.length} game${carts.length === 1 ? "" : "s"} · checking as ${body.checker ?? "nobody"}`;
+    $("list-sub").textContent = `${carts.length} game${carts.length === 1 ? "" : "s"} · ${controllers} controller${controllers === 1 ? "" : "s"} · checking as ${body.checker ?? "nobody"}`;
   } catch (e) {
     $("list-sub").textContent = `Couldn't load the games: ${/** @type {Error} */ (e).message}`;
   }
@@ -134,6 +137,7 @@ function startPlay(cart) {
   const host = hostMod.createHost({
     container: stage,
     cartUrl: cart.url,
+    players: controllers,
     // Live play: a fresh seed each time (tests use the runtime's fixed seed).
     seed: 1 + Math.floor(Math.random() * 0x7ffffffe),
     onStar: () => endPlay("star"),
@@ -194,7 +198,8 @@ addEventListener("pagehide", () => {
 /** @param {string} code */
 function noteKey(code) {
   const m = DEFAULT_KEYMAP[code];
-  if (playing && m && m[1] !== "star") playing.sides.add(`p${m[0]}`);
+  // Keys for a player beyond the controller count don't reach the cart (D111).
+  if (playing && m && m[1] !== "star" && m[0] <= controllers) playing.sides.add(`p${m[0]}`);
 }
 addEventListener("message", (e) => {
   if (playing && e.source === playing.host.iframe.contentWindow && e.data?.type === "key" && e.data.down) noteKey(e.data.code);
@@ -303,9 +308,10 @@ function readPads() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   let mask = 0;
   let star = false;
-  for (let i = 0; i < 2; i++) {
+  // Menus listen to every pad; a play only counts pads the cart gets (D111).
+  for (let i = 0; i < (pads?.length ?? 0); i++) {
     const r = gamepadToMask(pads[i]);
-    if (r.mask && playing) playing.sides.add(`p${i + 1}`);
+    if (r.mask && playing && i < controllers) playing.sides.add(`p${i + 1}`);
     mask |= r.mask;
     star ||= r.star;
   }
