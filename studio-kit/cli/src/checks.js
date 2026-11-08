@@ -3,8 +3,9 @@
 // place that knows how to reach them.
 //
 // Contracts:
-//   @game-studio-arcade/spec      validateRuleCoverage(dir) -> {ok, errors: [{message}], warnings} (D30, on main).
-//                                 A fuller validateCart(dir) is used instead if one is exported later.
+//   @game-studio-arcade/spec      validateCart(dir) -> {ok, errors, warnings}, each issue {file, line, check, rule?, message}
+//                                 (D31: cart.json, rule coverage, the D13 lint, tsc). Falls back to
+//                                 validateRuleCoverage(dir) (D30) on an older spec package.
 //   @game-studio-arcade/playtest  playtest(dir) -> report, written to <dir>/playtest.json (D62, task 5).
 //     report.ok, report.rules: [{id, kind, status, reason}] with status pass | fail | missing | you-check | skipped,
 //     report.generic: [{id, status, reason}], report.coverage, report.frameTime, report.errors.
@@ -34,7 +35,7 @@ export function defaultChecker() {
   return {
     async validate(dir) {
       const mod = await tryImport("@game-studio-arcade/spec");
-      if (mod?.validateCart) return mod.validateCart(dir);
+      if (mod?.validateCart) return coverageResult(await mod.validateCart(dir));
       if (!mod?.validateRuleCoverage) return { ok: false, unavailable: true, problems: ["validate_cart isn't available"] };
       return coverageResult(await mod.validateRuleCoverage(dir));
     },
@@ -53,9 +54,11 @@ export function defaultChecker() {
   };
 }
 
-/** Map the spec package's coverage report to a ValidateResult. */
+/** Map the spec package's validateCart (or coverage) report to a ValidateResult. */
 export function coverageResult(report) {
-  const fmt = (i) => `${i.rule ? `${i.rule}: ` : ""}${i.message}`;
+  // Messages already name their file; add the line where there is one.
+  const where = (i) => (i.file && i.line ? `${i.file}:${i.line}: ` : "");
+  const fmt = (i) => `${where(i)}${i.rule ? `${i.rule}: ` : ""}${i.message}`;
   return { ok: Boolean(report?.ok), problems: (report?.errors ?? []).map(fmt), warnings: (report?.warnings ?? []).map(fmt) };
 }
 
