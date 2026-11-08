@@ -85,6 +85,8 @@ Playwright pinned to the sandbox version. It loads a cart headless, runs each ch
 *Accept:* a deliberately broken cart fails the right rules with readable reasons, and the same cart gives the same report on the mini and in a sandbox session.
 
 ### 6. Context pack (`studio-kit/context-pack/`)
+*Since redesigned as a catalog, modules on demand and templates: D160–D166.*
+
 The library reference, about six short recipes (e.g. "thing A destroys thing B", "grid piece rotation", "title/play/over flow"), and **three tiny example carts that are not falling-blocks games** (D12): a dodge game, a paddle game and a collect game. Each example passes its own playtest. Target size: small enough to read fully in one go (≤ ~15k tokens).
 *Accept:* all three examples pass, and the token count of the pack is recorded.
 **Done 2026-11-07** (D100–D103): Comet Dodge, Wall Ball and Gem Garden pass validate-cart and the playtest on both drivers at 256×192, and on the node driver at 320×256 (a patched runtime copy); the pack is about 15.0k tokens (estimate, D102).

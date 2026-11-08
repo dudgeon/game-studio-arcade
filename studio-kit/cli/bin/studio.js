@@ -13,11 +13,11 @@ import { liveAnswerer, loadAnswers, replayAnswerer } from "../src/answers.js";
 import { defaultChecker } from "../src/checks.js";
 import { makeCart } from "../src/make.js";
 import { reanalyzeSession } from "../src/reanalyze.js";
-import { buildKit, SKILL_KIT, stageContextPackSkill } from "../../managed-agent/scripts/pack-kit.js";
+import { buildKit, NO_TEMPLATES_KIT, SKILL_KIT, stageContextPackSkill } from "../../managed-agent/scripts/pack-kit.js";
 
 const USAGE = `usage:
   studio make "<request>" --maker A [--with O] [--model ID] [--answers FILE] [--record FILE]
-                          [--budget-cents 300] [--context-pack tarball|skill] [--brief-from-file]
+                          [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--brief-from-file]
                           [--commit-anyway] [--verbose]
   studio kit [--upload]            build the studio kit tarball (and upload it once)
   studio skill --upload            create the context-pack skill through the API
@@ -65,11 +65,12 @@ async function make(args) {
     return 2;
   }
   const budgetCents = Number(values["budget-cents"]);
-  const contextPack = /** @type {"tarball"|"skill"} */ (values["context-pack"]);
-  if (contextPack !== "tarball" && contextPack !== "skill") {
-    console.error("--context-pack must be tarball or skill");
+  const contextPack = /** @type {"tarball"|"no-templates"|"skill"} */ (values["context-pack"]);
+  if (contextPack !== "tarball" && contextPack !== "no-templates" && contextPack !== "skill") {
+    console.error("--context-pack must be tarball, no-templates or skill");
     return 2;
   }
+  const kitVariant = contextPack === "skill" ? SKILL_KIT : contextPack === "no-templates" ? NO_TEMPLATES_KIT : null;
   const skills = contextPack === "skill" ? [readSkillLock()] : undefined;
   const paths = dataPaths(dataDir());
   const lock = readLock();
@@ -96,8 +97,8 @@ async function make(args) {
         ensureKitUploaded({
           api,
           cacheFile: paths.kitUploads,
-          out: path.join(MANAGED_AGENT_DIR, contextPack === "skill" ? "dist/studio-kit-skill.tgz" : "dist/studio-kit.tgz"),
-          build: contextPack === "skill" ? (o) => buildKit({ ...o, ...SKILL_KIT }) : undefined,
+          out: path.join(MANAGED_AGENT_DIR, contextPack === "tarball" ? "dist/studio-kit.tgz" : `dist/studio-kit-${contextPack}.tgz`),
+          build: kitVariant ? (o) => buildKit({ ...o, ...kitVariant }) : undefined,
           log: values.verbose ? print : undefined,
         }),
       commitAnyway: values["commit-anyway"],

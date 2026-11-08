@@ -36,4 +36,4 @@ Navy court, white walls, a gold paddle and a white ball. A "blip" on each swat, 
 
 ## Changelog
 
-- v1: First version, an example cart for the context pack.
+- v1: First version, a template.

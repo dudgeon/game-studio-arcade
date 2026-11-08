@@ -82,7 +82,7 @@ function tick(n, masks) {
   flush();
 }
 
-const METHODS = new Set(["step", "input", "probe", "frame", "sounds", "warnings", "reset"]);
+const METHODS = new Set(["step", "input", "probe", "poke", "frame", "sounds", "warnings", "reset"]);
 
 async function call(id, method, args) {
   try {

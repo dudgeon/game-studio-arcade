@@ -1,6 +1,6 @@
 // @ts-check
 // The house starter library (D50). Carts reach it as `g.lib`, e.g.
-// `g.lib.grid.tryRotate(...)`; they never import it. Reference: REFERENCE.md.
+// `g.lib.grid.tryRotate(...)`; they never import it. Reference: REFERENCE.md, ref/<module>.md.
 export * as collide from "./collide.js";
 export * as grid from "./grid.js";
 export * as timers from "./timers.js";

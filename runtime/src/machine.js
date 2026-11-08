@@ -23,6 +23,7 @@ export function checkCart(cart) {
     if (typeof cart[fn] !== "function") throw new Error(`game.js default export has no ${fn}(g, s) function`);
   }
   if (cart.probe !== undefined && typeof cart.probe !== "function") throw new Error("game.js probe must be a function if present");
+  if (cart.poke !== undefined && typeof cart.poke !== "function") throw new Error("game.js poke must be a function if present");
   return /** @type {Arcade.Cart} */ (cart);
 }
 
@@ -197,6 +198,11 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       if (!cart.probe) return null;
       const p = cart.probe(g, state);
       return p === undefined ? null : JSON.parse(JSON.stringify(p));
+    },
+    /** A check's setup (D163): only t.poke calls this. @param {unknown} o */
+    poke(o) {
+      if (!cart.poke) throw new Error("this cart has no poke(g, s, o) export, so a check can't set it up");
+      cart.poke(g, state, o);
     },
     /** @returns {Arcade.Frame & { pixels: Uint8Array }} */
     capture() {

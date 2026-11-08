@@ -24,7 +24,7 @@ import { addYouCheckRules, questionsFor } from "./untested.js";
  * @property {() => Promise<{fileId: string, hash: string}>} kit
  * @property {"cabinet"|"desktop"} [origin]
  * @property {boolean} [commitAnyway]
- * @property {"tarball"|"skill"} [contextPack]   how this run got the context pack (D45)
+ * @property {"tarball"|"no-templates"|"skill"} [contextPack]   how this run got the library (D45, D166)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
  * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
  * @property {string} [recordFile]     also write the answers here
@@ -206,6 +206,7 @@ export async function makeCart(o) {
     ended_by: result.endedBy,
     spec_diff: newSpecDiff(spec),
     context_pack: o.contextPack ?? "tarball",
+    started_from: typeof report?.started_from === "string" ? report.started_from : null,
     brief: o.brief ? "file-override" : "applied-agent",
     first_playtest: freeze.first_playtest,
     playtest_runs: freeze.playtest_runs,

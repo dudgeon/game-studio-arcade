@@ -27,7 +27,7 @@ export default {
 ```
 
 - **Pass or fail:** a check passes if it finishes and fails if it throws. The error message becomes the reason in `playtest.json`, so make it say what was expected and what happened.
-- **The handle `t`:** `await t.step(n)` runs n frames, `await t.input(script)` queues button presses, `await t.probe()` returns what the cart's `probe(g, s)` export returns, `await t.frame()` captures the current frame, `await t.sounds()` lists the sounds started, and `await t.reset(opts)` starts the cart again. The exact types are in `runtime/test-hook.d.ts`, which is the source of truth for the input script and frame formats.
+- **The handle `t`:** `await t.step(n)` runs n frames, `await t.input(script)` queues button presses, `await t.probe()` returns what the cart's `probe(g, s)` export returns, `await t.frame()` captures the current frame, `await t.sounds()` lists the sounds started, and `await t.reset(opts)` starts the cart again. The exact types are in `runtime/test-hook.d.ts`, which is the source of truth for the input script and frame formats. `t.bot` is the tested check bot and `t.poke` sets up a situation (D162, D163): see `studio-kit/context-pack/modules/checks.md`.
 - **Fresh game per check:** each check starts from a freshly loaded cart with the same seed, so checks don't depend on each other's order.
 - **What a cart should expose:** give the cart's `probe(g, s)` export the state your rules talk about (positions, score, lives, the current screen). If a rule can't be checked from the probe, add what's missing to the probe rather than checking pixels.
 

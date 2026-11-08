@@ -44,8 +44,8 @@ test("exports are functions or frozen constants", () => {
   }
 });
 
-test("every export has a reference entry in REFERENCE.md", () => {
-  const ref = readFileSync(join(libDir, "REFERENCE.md"), "utf8");
+test("every export has a reference entry in its ref/<module>.md", () => {
+  const ref = readdirSync(join(libDir, "ref")).map((f) => readFileSync(join(libDir, "ref", f), "utf8")).join("\n");
   const headings = new Set([...ref.matchAll(/^### `([\w.]+)\(?/gm)].map((m) => m[1]));
   const missing = [];
   for (const [ns, mod] of Object.entries(lib)) {

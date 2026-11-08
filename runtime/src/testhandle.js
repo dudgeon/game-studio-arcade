@@ -60,6 +60,14 @@ export function createTestHandle(cart, opts = {}) {
         throw cartError(e, "probe", m.frame);
       }
     },
+    async poke(o) {
+      if (!cart.poke) return m.poke(o); // its own clear error, not a cart error
+      try {
+        m.poke(o);
+      } catch (e) {
+        throw cartError(e, "poke", m.frame);
+      }
+    },
     async frame() {
       return m.capture();
     },

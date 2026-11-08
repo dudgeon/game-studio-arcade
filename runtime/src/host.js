@@ -119,6 +119,7 @@ export function createHost(opts) {
     step: (n) => call("step", [n]),
     input: (script) => call("input", [script]),
     probe: () => call("probe", []),
+    poke: (o) => call("poke", [o]),
     frame: () => call("frame", []),
     sounds: () => call("sounds", []),
     warnings: () => call("warnings", []),

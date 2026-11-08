@@ -4,7 +4,7 @@
 
 ## Summary
 
-**Recommendation so far: Sonnet 5.5 as the default model.**
+**Recommendation so far: Sonnet 5.5 as the default model,** now with the library fetched on demand (40¢ against about 57¢ for the same request; see [The library redesign](#the-library-redesign-d160d166)).
 
 - It's the best value in these builds: 57¢ for a game close to the Opus ones in polish. It also holds up across all four Sonnet builds so far (57–80¢).
 - Opus 5.5 made the most polished games, and passed every auto rule on its first playtest, at 2.3–3.5 times the cost.
@@ -12,6 +12,54 @@
 - Every build finished, passed its checks and stayed under the $3 cap. The highest was $1.98 (Opus).
 
 Two builds per model is not enough to rank anything finely. It's enough to show the size of the differences.
+
+## The library redesign (D160–D166)
+
+Same penguin request, Sonnet 5.5, $3 cap, the D46 brief through `--brief-from-file`, recorded answers matched by question (D47). (a) and the skill run already existed; (b) and (c) are the two new builds, one each.
+
+| | (a) Up-front bundle | Pack as skill (older run) | (b) Catalog + fetch, blank start | (c) Catalog + fetch + template |
+|---|---|---|---|---|
+| Session | `sesn_014bRzmzmgf22rcR87o2e2Uz` | `sesn_01Mt89MxLgQtq7L6Ezeqf3Jh` | `sesn_012FMNoz656cpCAHhELyyaWp` | `sesn_01Farh4Te3TDARPgbQVEGdKu` |
+| Game | Penguin Fish Catch | Penguin Fish Catch | Penguin Catch | Penguin Fish Catch |
+| **List cost (computed)** | **56.9¢** | **59.5¢** | **40.4¢** | **13.7¢** |
+| Output / writes / reads / runtime, ¢ | 31.1 / 17.3 / 7.8 / 0.8 | 32.1 / 17.5 / 9.2 / 0.7 | 24.7 / 11.1 / 4.1 / 0.5 | 7.3 / 4.1 / 2.1 / 0.2 |
+| Active time | 364 s | 296 s | 218 s | 94 s |
+| Model requests | 18 | 19 | 17 | 12 |
+| Prompt at the first question | 35,267 | 41,293 | 10,200 | 15,559 |
+| **Peak prompt** (the 100k line) | 69,091 | 74,727 | 44,256 | 24,996 |
+| Output tokens | 31,066 | 32,118 | 24,746 | 7,272 |
+| Questions, ended by | 2, answers | 3, answers | 3, answers | 2, make it now (see below) |
+| Recorded answers actually used | boot, harder | by position (older replay) | **move, boot, harder** | boot only |
+| Rules (auto) | 13 (11) | 13 (11) | 15 (13) | 11 (10) |
+| **Auto rules passing, first playtest** | 9 of 11 | 10 of 11 | 12 of 13 | **10 of 10** |
+| Fix rounds (agent's report) | 2 | 1 | 1 | 0 |
+| `game.js` edits after first playtest | 0 | 0 | 0 | 0 |
+| Check bugs / rule changes / unexplained | 2 / 0 / 0 | 0 / 1 / 0 | 1 / 0 / 0 | 0 / 0 / 0 |
+| Browser-driver runs | 2 | 1 | 1 | 1 |
+| Validate, downloaded cart | ok | ok | ok | ok |
+| Playtest, node, downloaded cart | all pass | all pass | all pass | all pass |
+| `game.js` size | 7.2 KB | 10.4 KB | 8.2 KB | 5.5 KB |
+| **`checks.js` size** | **13.3 KB** | **13.6 KB** | **10.0 KB** | **4.3 KB** |
+| Library read before building | everything | everything | catalog, blank, 4 modules, guides | catalog, `catch`, `sprites`, part of `cart-api` |
+
+The skill run is from before D46 and D47, under a brief that said to read everything, so it isn't a fair third design: it shows only that packaging alone saves nothing (D45). No skill was run under the fetch brief, because a token read from a skill costs what a token read with bash does.
+
+**What the numbers say:**
+- **Fetching on demand works.** With the same three-question depth and a bigger game than (a), (b) cost 29% less, and its peak prompt fell by a third. Before the first question its prompt was 10k rather than 35k, so a kid's long think now costs about 2.5¢ in cache rewrites rather than 9¢.
+- **The bot helps, but one build can't prove how much.** (b) had one first-try failure and (c) none, against two in (a), and `checks.js` shrank by about a quarter in (b) and two-thirds in (c). (b)'s one failure was a real gap in the helper's docs: `t.bot.start()` has already run one frame of play. It's now documented.
+- **No check was weakened.** (b)'s one check bug tests the same thing as before, and no `untested` words were needed. Both agents used `t.poke`; (b) also added its own `spawn` option to drop a thing above the penguin, while the catching itself is still real collision and R5 also chases fish for real.
+- **Nobody came near the 100k line.**
+
+**What the numbers hide: (c) built a simpler game, and that's a large part of its price.**
+- **It's a reskin.** Its spec is the `catch` template with apples turned to fish and rocks to boots, and it says so. Its numbers are the template's.
+- **It used only one of the player's three recorded answers.** Its second question, "How do the fish fall?", has no recorded answer, so the replay said D (D47), which stops the questions. So the penguin isn't slippery and boots don't get more common. (b) built both. A kid would have picked a tile and the questions would have gone on, so this is partly a replay effect, and a real (c) build would cost more than 13.7¢. How much more is unmeasured.
+- **It also read the template before asking,** against the brief's "ask before reading anything more" (D165). Its questions may have been narrowed by what the template already did. One build can't show that.
+- **It looks plainer** (contact sheets in `~/game-studio-data/library-comparison-2026-11-08/`). (c) has a clear penguin, fish and boot on a pale sky, text for lives, and things frozen in the air at game over. (b) has "+10", "MISS" and "OUCH" pop-ups, penguin icons for lives, and "NEW BEST!". (b)'s fish and boots are small against a dark sky, as in (a). These are readings from still frames; nobody has played them.
+- **This is a best case for templates:** the request is exactly what `catch` does. A request no template fits would look like (b).
+
+**Recommendation (D166):** use the catalog and fetch on demand for every build; the 29% and the smaller prompt come with no visible loss. Keep the templates, but don't take 13.7¢ as the price of a build until a template build has been shown to honour the kid's answers. Before relying on them, tighten the brief so the agent asks first and treats a template's rules as defaults, then re-run (c) with a recording that answers its questions. That's one more session of about 15–40¢, and it needs a go-ahead.
+
+One build each, and the games differ, so these are the size of the differences rather than exact prices. Sonnet builds of this request have ranged 57–80¢ under the old pack.
 
 ## The builds
 
@@ -119,4 +167,4 @@ $3 hasn't been reached. The highest so far is $1.98 (Opus); Sonnet's highest is 
 
 ## Spend so far
 
-From the sessions recorded by the tasks 7+8 worker: these five came to $4.41. Adding Step 5 (68¢), the skill trial (80¢ and 60¢) and the parity check (under 1¢) makes about **$6.49**. The probe (about 0.3¢) and any other sessions are logged elsewhere. The Phase 0 ceiling is $25.
+From the sessions recorded by the tasks 7+8 worker: these five came to $4.41. Adding Step 5 (68¢), the skill trial (80¢ and 60¢), the parity check (under 1¢) and the two library builds (54¢) makes about **$7.03**. The probe (about 0.3¢) and any other sessions are logged elsewhere. The Phase 0 ceiling is $25.

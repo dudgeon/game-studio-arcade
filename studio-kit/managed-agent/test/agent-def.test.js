@@ -43,6 +43,10 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "tell_player",
     "/mnt/session/uploads/studio-kit.tgz",
     "KIT.md",
+    "and nothing else yet",
+    "Fetch the rest as you need it",
+    "t.bot",
+    "started_from",
     "/mnt/session/outputs/",
     "cart.tgz",
     "report.json",
@@ -93,6 +97,13 @@ test("show_plan can carry the changes a frozen check needs (D44)", () => {
   const t = JSON.parse(read("agents/tools/show_plan.json"));
   assert.deepEqual(t.input_schema.required, ["summary", "rules"], "changes stays optional");
   assert.deepEqual(t.input_schema.properties.changes.items.required, ["id", "text"]);
+});
+
+test("the prompt asks before reading more, and starts from a template before the spec (D161, D165)", () => {
+  const { body } = frontmatter(read("agents/studio.md"));
+  const at = (s) => body.indexOf(s);
+  assert.ok(at("Ask, before reading anything more") < at("Pick a starting point"));
+  assert.ok(at("Pick a starting point") < at("Write the checks, from the spec"));
 });
 
 test("the prompt puts checks before game code and the snapshot before the build", () => {
