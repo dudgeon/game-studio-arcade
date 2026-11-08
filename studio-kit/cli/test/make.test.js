@@ -288,8 +288,8 @@ test("D49: questionsFor asks each lost part, or the whole rule if it doesn't say
   ]);
   assert.deepEqual(q, [
     { from: "R2", words: "up to 3", text: "Do things stop speeding up?" },
-    { from: "R2", words: "every 600", text: 'Play and check this, because the test can\'t: "every 600"' },
-    { from: "R3", words: null, text: "The test for this changed and may not prove all of it, so play and check: Lives start at 3." },
+    { from: "R2", words: "every 600", text: "Play and check: every 600" },
+    { from: "R3", words: null, text: "Play and check: Lives start at 3." },
   ]);
 });
 
