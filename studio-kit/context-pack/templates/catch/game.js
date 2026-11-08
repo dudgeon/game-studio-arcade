@@ -1,11 +1,15 @@
 // @ts-check
-// Catch template: things fall; catch the good, avoid the bad. Change CFG, the kinds and draw.
+// Catch template: things fall; catch the good, avoid the bad. Change CFG and ART.
 /** @typedef {Arcade.Lib.Thing & { id: number }} Faller */
-/** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, player: Arcade.Lib.Thing, things: Faller[], spawn: Arcade.Lib.Timer, played: number, kinds: string[], caught: Record<string, number>, landed: Record<string, number> }} State */
+/** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, player: Arcade.Lib.Thing, things: Faller[], spawn: Arcade.Lib.Timer, played: number, kinds: string[], caught: Record<string, number>, landed: Record<string, number>, pops: Arcade.Lib.Pop[], art: Record<string, Arcade.Sprite> }} State */
 
-const CFG = { lives: 3, speed: 3, spawnEvery: 50, fall: 1, fallStep: 0.25, fallEvery: 600, fallMax: 2.5, badEvery: 5, points: 10, ground: 8, top: 10, size: 8, playerW: 16, playerH: 12 };
+const CFG = { lives: 3, speed: 3, spawnEvery: 50, fall: 1, fallStep: 0.25, fallEvery: 600, fallMax: 2.5, badEvery: 5, points: 10, ground: 8, top: 10, size: 10, playerW: 16, playerH: 6 };
 const GOOD = "apple";
 const BAD = "rock";
+const ART = {
+  player: ["aaaaaaaaaaaaaaaa", "acccccccccccccca", ".acacacacacacac.", ".accccccccccccc.", ".acacacacacacac.", "..aaaaaaaaaaaa.."],
+  [GOOD]: [".....a.hh.", "..77a777h.", ".78777777.", "7887777777", "7877777777", "7777777777", "7777777777", ".77777777.", ".77777777.", "..777777.."],
+};
 
 /** @param {Arcade.G} g @param {State} s */
 function newGame(g, s) {
@@ -21,11 +25,12 @@ function newGame(g, s) {
 
 const fallAt = (/** @type {number} */ played) => Math.min(CFG.fallMax, CFG.fall + CFG.fallStep * Math.floor(played / CFG.fallEvery));
 
-/** One life gone; at the last one, game over. @param {Arcade.G} g @param {State} s */
+/** @param {Arcade.G} g @param {State} s */
 function hurt(g, s) {
   if (g.lib.score.loseLife(s.sc) > 0) return;
   g.lib.score.commit(g, s.sc);
   g.sfx("lose");
+  s.things = [];
   g.lib.flow.go(s.flow, "over");
 }
 
@@ -33,13 +38,17 @@ function hurt(g, s) {
 export default {
   init(g) {
     const s = /** @type {State} */ ({ flow: g.lib.flow.newFlow() });
+    s.pops = [];
+    s.art = { player: g.sprite(ART.player), [GOOD]: g.sprite(ART[GOOD]) };
     newGame(g, s);
     return s;
   },
 
   update(g, s) {
-    const { flow, timers, collide, score } = g.lib;
+    const { flow, timers, collide, score, fx } = g.lib;
+    const c = g.colors;
     flow.tick(s.flow);
+    fx.tick(s.pops);
     if (s.flow.mode !== "play") {
       if (flow.startPressed(g, s.flow)) {
         if (s.flow.mode === "title") newGame(g, s);
@@ -71,8 +80,10 @@ export default {
       if (h.a.kind === GOOD) {
         score.addPoints(s.sc, CFG.points);
         g.sfx("coin");
+        fx.pop(s.pops, `+${CFG.points}`, me.x + 8, me.y - 8, c.white);
       } else {
         g.sfx("hit");
+        fx.pop(s.pops, "OUCH", me.x + 8, me.y - 8, c.red);
         hurt(g, s);
       }
     }
@@ -82,6 +93,7 @@ export default {
       s.landed[t.kind] += 1;
       if (t.kind === GOOD) {
         g.sfx("pop");
+        fx.pop(s.pops, "MISS", t.x + 6, t.y - 4, c.maroon);
         hurt(g, s);
       }
     }
@@ -89,28 +101,28 @@ export default {
   },
 
   draw(g, s) {
+    const { fx } = g.lib;
     const c = g.colors;
     g.cls(c.sky);
-    const mid = g.W / 2;
+    g.rectfill(0, g.H - CFG.ground, g.W, CFG.ground, c.green);
     if (s.flow.mode === "title") {
-      g.text("APPLE CATCH", mid, g.H / 3, c.red, { scale: 2, align: "center" });
-      if (g.frame % 60 < 30) g.text("PRESS START", mid, g.H / 2, c.white, { align: "center" });
-      g.text(`BEST ${s.sc.best}`, mid, g.H / 2 + 20, c.night, { align: "center" });
+      const art = fx.title(g, "APPLE CATCH", s.sc.best, { color: c.red, ink: c.night });
+      g.spr(s.art[GOOD], art.cx - 18, art.cy - 18, { scale: 3 });
       return;
     }
-    g.rectfill(0, g.H - CFG.ground, g.W, CFG.ground, c.green);
     for (const t of s.things) {
-      if (t.kind === GOOD) g.circfill(t.x + 4, t.y + 4, 4, c.red);
-      else g.rectfill(t.x, t.y, CFG.size, CFG.size, c.slate);
+      if (t.kind === GOOD) g.spr(s.art[GOOD], t.x, t.y);
+      else g.circfill(t.x + 5, t.y + 5, 5, c.slate);
     }
-    g.rectfill(s.player.x, s.player.y, s.player.w, s.player.h, c.brown);
-    g.text(`SCORE ${s.sc.score}  LIVES ${s.sc.lives}  BEST ${s.sc.best}`, 2, 1, c.night);
-    if (s.flow.mode === "over") g.text("GAME OVER", mid, g.H / 2 - 8, c.red, { scale: 2, align: "center" });
+    g.spr(s.art.player, s.player.x, s.player.y);
+    g.text(`SCORE ${s.sc.score}  BEST ${s.sc.best}`, 2, 1, c.night);
+    fx.lives(g, s.sc.lives, g.W - 2, 1);
+    fx.draw(g, s.pops);
+    if (s.flow.mode === "over") fx.banner(g, "GAME OVER", s.sc.newBest ? "NEW BEST!" : `SCORE ${s.sc.score}`);
   },
 
   probe(g, s) {
-    const things = s.things.map((t) => ({ id: t.id, kind: t.kind, x: t.x, y: t.y, w: t.w, h: t.h }));
-    return { W: g.W, H: g.H, mode: s.flow.mode, player: { x: s.player.x, y: s.player.y, w: s.player.w, h: s.player.h }, things, score: s.sc.score, lives: s.sc.lives, best: s.sc.best, played: s.played, kinds: s.kinds, caught: s.caught, landed: s.landed };
+    return { W: g.W, H: g.H, mode: s.flow.mode, player: s.player, things: s.things, score: s.sc.score, lives: s.sc.lives, best: s.sc.best, played: s.played, kinds: s.kinds, caught: s.caught, landed: s.landed };
   },
 
   poke(g, s, o) {

@@ -1,7 +1,7 @@
 // @ts-check
 /** Move the paddle to meet the ball, or keep away from it. */
-const aim = (t) => (p) => (p.ball ? t.bot.toward({ x: 0, y: p.pad.y + p.pad.h / 2 }, { x: 0, y: p.ball.y + 2 }, { axis: "y", dead: 3 }) : "");
-const flee = (p) => (!p.ball ? "" : p.ball.y + 2 > p.pad.y + p.pad.h / 2 ? "up" : "down");
+const aim = (t) => (p) => (p.ball ? t.bot.toward({ x: 0, y: p.pad.y + p.pad.h / 2 }, { x: 0, y: p.ball.y + 3 }, { axis: "y", dead: 3 }) : "");
+const flee = (p) => (!p.ball ? "" : p.ball.y + 3 > p.pad.y + p.pad.h / 2 ? "up" : "down");
 
 /** @type {Arcade.Checks} */
 export default {
@@ -24,9 +24,9 @@ export default {
       const p = await t.bot.hold("up", 1); // parked at the top, out of the way
       const b = p.ball;
       if (b) {
-        t.bot.ok(b.y >= p.top && b.y <= p.H - 4 && b.x <= p.W - 4, `the ball went through a wall: (${b.x}, ${b.y})`);
+        t.bot.ok(b.y >= p.top && b.y <= p.H - 6 && b.x <= p.W - 6, `the ball went through a wall: (${b.x}, ${b.y})`);
         if (last?.vy < 0 && b.vy > 0 && b.y === p.top) seen.top = true;
-        if (last?.vy > 0 && b.vy < 0 && b.y === p.H - 4) seen.bottom = true;
+        if (last?.vy > 0 && b.vy < 0 && b.y === p.H - 6) seen.bottom = true;
         if (last?.vx > 0 && b.vx < 0) seen.right = true;
       }
       last = b;

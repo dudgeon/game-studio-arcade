@@ -26,7 +26,7 @@ Keep the ball bouncing! It flies off the walls, and you swat it back with your p
 
 ## Look & sound
 
-Navy court, white walls, a gold paddle and a white ball. A "blip" on each swat, a "lose" when the ball gets past.
+Navy court, white walls, a gold paddle, a round white ball, hearts for lives. A "blip" and a "+1" on each swat; a "lose" and "MISS" when the ball gets past; a game-over panel.
 
 ## Assumptions
 

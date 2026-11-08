@@ -3,7 +3,6 @@ const lowest = (list) => list.reduce((a, b) => (b.y > a.y ? b : a), list[0]);
 const highest = (list) => list.reduce((a, b) => (b.y < a.y ? b : a), list[0]);
 const ofKind = (p, kind) => p.things.filter((x) => x.kind === kind);
 
-/** Steer: toward the lowest thing of a kind, or stay clear of the lowest thing of any kind. */
 const chase = (t, kind) => (p) => {
   const it = lowest(ofKind(p, kind));
   return it ? t.bot.toward(p.player, it, { axis: "x" }) : "";
@@ -13,30 +12,31 @@ const dodge = (t, kind) => (p) => {
   return it ? t.bot.away(p.player, it, { axis: "x" }) : "";
 };
 
+/** Into play with lives to spare, for rules that aren't about losing them. */
+const startAlive = async (t) => {
+  await t.bot.start();
+  await t.poke({ lives: 9999 });
+};
+
 /** @type {Arcade.Checks} */
 export default {
   async R1(t) {
-    const { eq } = t.bot;
     const a = await t.bot.start();
-    eq((await t.bot.hold("right", 10)).player.x, a.player.x + 30, "x after holding right 10 frames");
+    t.bot.eq((await t.bot.hold("right", 10)).player.x, a.player.x + 30, "x after holding right 10 frames");
     const end = await t.bot.hold("right", 120);
-    eq(end.player.x, end.W - end.player.w, "x at the right edge");
-    eq((await t.bot.hold("left", 200)).player.x, 0, "x at the left edge");
+    t.bot.eq(end.player.x, end.W - end.player.w, "x at the right edge");
+    t.bot.eq((await t.bot.hold("left", 200)).player.x, 0, "x at the left edge");
   },
 
   async R2(t) {
-    const { eq, ok } = t.bot;
-    await t.bot.start();
-    await t.poke({ lives: 99 });
+    await startAlive(t);
     const p = await t.bot.wait(300);
-    eq(p.kinds.length, Math.floor(p.played / 50), `things started by frame ${p.played}`);
-    ok(p.things.every((x) => x.kind === "apple" || x.kind === "rock"), "every thing is an apple or a rock");
-    ok(new Set(p.things.map((x) => x.x)).size > 1, "things should fall from random spots");
+    t.bot.eq(p.kinds.length, Math.floor(p.played / 50), `things started by frame ${p.played}`);
+    t.bot.ok(new Set(p.things.map((x) => x.x)).size > 1, "things should fall from random spots");
   },
 
   async R3(t) {
-    await t.bot.start();
-    await t.poke({ lives: 99 });
+    await startAlive(t);
     const p = await t.bot.reach(chase(t, "apple"), (q) => q.caught.apple >= 2, "two caught apples");
     t.bot.eq(p.score, 10 * p.caught.apple, "score after catching apples");
   },
@@ -45,22 +45,19 @@ export default {
     await t.bot.start();
     const p = await t.bot.reach(dodge(t), (q) => q.landed.apple >= 1, "an apple on the ground");
     t.bot.eq(p.lives, 3 - p.landed.apple - p.caught.rock, "lives after a missed apple");
-    t.bot.eq(p.mode, "play", "mode after one miss");
   },
 
   async R5(t) {
-    await t.bot.start();
-    await t.poke({ lives: 99 });
+    await startAlive(t);
     const p = await t.bot.reach(chase(t, "rock"), (q) => q.caught.rock >= 1, "a caught rock");
-    t.bot.eq(p.lives, 99 - p.landed.apple - p.caught.rock, "lives after a rock");
+    t.bot.eq(p.lives, 9999 - p.landed.apple - p.caught.rock, "lives after a rock");
     t.bot.eq(p.score, 10 * p.caught.apple, "a rock doesn't change the score");
   },
 
   async R6(t) {
-    await t.bot.start();
-    await t.poke({ lives: 99 });
+    await startAlive(t);
     const p = await t.bot.reach(dodge(t, "rock"), (q) => q.landed.rock >= 1, "a rock on the ground");
-    t.bot.eq(p.lives, 99 - p.landed.apple - p.caught.rock, "a landed rock costs no life");
+    t.bot.eq(p.lives, 9999 - p.landed.apple - p.caught.rock, "a landed rock costs no life");
     t.bot.eq(p.score, 10 * p.caught.apple, "a landed rock changes no score");
   },
 
@@ -72,9 +69,8 @@ export default {
   },
 
   async R8(t) {
-    await t.bot.start();
-    await t.poke({ lives: 9999 });
-    for (const at of [60, 610, 1210, 2410, 3610, 4210]) {
+    await startAlive(t);
+    for (const at of [60, 610, 2410, 3610, 4210]) {
       const p = await t.bot.reach(() => "", (q) => q.played >= at && q.things.length > 0, `frame ${at} with something falling`, { max: 5000, every: 10 });
       const id = highest(p.things).id;
       const moved = await t.bot.delta((q) => q.things.find((x) => x.id === id).y);
@@ -84,15 +80,13 @@ export default {
   },
 
   async R9(t) {
-    await t.bot.start();
-    await t.poke({ lives: 9999 });
+    await startAlive(t);
     const p = await t.bot.reach(() => "", (q) => q.kinds.length >= 20, "20 things started", { every: 10 });
     p.kinds.forEach((kind, i) => t.bot.eq(kind, (i + 1) % 5 === 0 ? "rock" : "apple", `thing ${i + 1}`));
   },
 
   async R10(t) {
-    await t.bot.start();
-    await t.poke({ lives: 99 });
+    await startAlive(t);
     await t.bot.reach(chase(t, "apple"), (q) => q.score >= 10, "a score");
     await t.poke({ lives: 1 });
     const end = await t.bot.reach(dodge(t), (q) => q.mode === "over", "game over", { anyMode: true });

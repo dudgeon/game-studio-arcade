@@ -62,6 +62,13 @@ export function overlap(a, b) {
   return shared / new Set([...x, ...y]).size;
 }
 
+/** Do these say the same thing: the same content words, both ways? (D171) */
+function sameWords(a, b) {
+  const x = words(a);
+  const y = words(b);
+  return x.size > 0 && x.size === y.size && [...x].every((w) => y.has(w));
+}
+
 /** Does this recorded answer apply to the question asked? */
 function applies(rec, question) {
   if (Array.isArray(rec.match)) return rec.match.every((re) => new RegExp(re, "i").test(question));
@@ -69,18 +76,16 @@ function applies(rec, question) {
 }
 
 /**
- * Say a recorded answer on this question's tiles (D47): by meaning, because the
- * options differ from run to run.
+ * Say a recorded answer on this question's tiles (D47, D171). A tile only if it
+ * says the same thing; otherwise its own words through C, so nothing is lost to
+ * a tile that merely shares most of its words.
  * @returns {QuestionAnswer}
  */
 function replyFor(rec, q) {
   const said = rec.answer ?? rec.said;
   if (!said) return { choice: rec.choice, ...(rec.said ? { said: rec.said } : {}) };
-  // Words the player typed stay as said, unless an option now says the same thing.
-  const a = overlap(said, q.option_a);
-  const b = overlap(said, q.option_b);
-  if (a >= 0.5 && a > b) return { choice: "A" };
-  if (b >= 0.5 && b > a) return { choice: "B" };
+  if (sameWords(said, q.option_a)) return { choice: "A" };
+  if (sameWords(said, q.option_b)) return { choice: "B" };
   return { choice: "C", said };
 }
 

@@ -28,12 +28,12 @@ Apples fall from the tree: slide your basket to catch them. Miss three and you l
 
 ## Look & sound
 
-Blue sky, green ground, a brown basket, red apples and gray rocks. A "coin" for an apple, a "hit" for a rock, a "pop" for a miss, a "lose" at game over.
+Blue sky, green ground, a woven basket, red apples, gray rocks, hearts for lives. "+10" and a "coin" for an apple, "OUCH" and a "hit" for a rock, "MISS" and a "pop" for a miss.
 
 ## Assumptions
 
 - A1: Three lives, because the request didn't say.
-- A2: Rocks come in a fixed pattern rather than by luck, so the playtest can prove it. Where things fall from is random.
+- A2: Rocks come in a fixed pattern rather than by luck, so the playtest can prove it.
 
 ## Changelog
 

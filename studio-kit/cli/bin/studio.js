@@ -17,7 +17,7 @@ import { buildKit, NO_TEMPLATES_KIT, SKILL_KIT, stageContextPackSkill } from "..
 
 const USAGE = `usage:
   studio make "<request>" --maker A [--with O] [--model ID] [--answers FILE] [--record FILE]
-                          [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--brief-from-file]
+                          [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--applied-brief]
                           [--replay-unmatched D|A]
                           [--commit-anyway] [--verbose]
   studio kit [--upload]            build the studio kit tarball (and upload it once)
@@ -54,6 +54,7 @@ async function make(args) {
       "budget-cents": { type: "string", default: "300" },
       "context-pack": { type: "string", default: "tarball" },
       "brief-from-file": { type: "boolean", default: false },
+      "applied-brief": { type: "boolean", default: false },
       "replay-unmatched": { type: "string", default: "D" },
       "commit-anyway": { type: "boolean", default: false },
       verbose: { type: "boolean", short: "v", default: false },
@@ -99,7 +100,7 @@ async function make(args) {
       lock,
       contextPack,
       skills,
-      brief: values["brief-from-file"] ? readAgentDef() : undefined,
+      brief: values["applied-brief"] ? undefined : readAgentDef(), // D172: the repo's brief unless asked
       kit: () =>
         ensureKitUploaded({
           api,

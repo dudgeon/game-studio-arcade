@@ -15,7 +15,7 @@ export default {
 };
 ```
 
-Types for JSDoc: `Arcade.Lib.Grid Shape Piece Box Thing Rule Hit Timer Repeat Score Flow Turns`. The type-check catches a misspelled button or sound.
+Types for JSDoc: `Arcade.Lib.Grid Shape Piece Box Thing Rule Hit Timer Repeat Score Flow Turns Pop`. The type-check catches a misspelled button or sound.
 
 **Clock:** 60 Hz; `update` then `draw`. `g.frame` counts frames but doesn't restart with a new game, so count play frames in `s`.
 
