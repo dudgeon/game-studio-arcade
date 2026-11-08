@@ -46,5 +46,8 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-07: cabinet software is stock Pi OS Lite (trixie) + a provisioning script, not a custom image (D4)
 - 2026-11-07: nothing is deleted, including Anthropic-side sessions (D5)
 - 2026-11-07: Geoff decides functional constraints; Claude decides implementation and logs it
-- 2026-11-07: API auth via Workload Identity Federation with per-device signing keys, not API keys (D15)
+- 2026-11-07: API auth via Workload Identity Federation with per-device signing keys, not API keys (D15). Superseded: WIF is unavailable on an Individual org, so the mini uses the ant CLI login (D16, Geoff)
 - 2026-11-07: director may merge checked worker branches into main and push (standing rule in ## Director)
+- 2026-11-08: players: games default to single player; the starter library supports turn-based play well as an optional mechanic; the number of controllers is a configuration setting, ready for any number later; external controllers come later (Geoff, answering D84)
+- 2026-11-08: MAKE: a physical MAKE button isn't assumed; starting a Studio session can live in the launcher / game shelf (Geoff, answering D84)
+- 2026-11-08: mic: not chosen; research an XLR jack on the front with an XLR gooseneck mic (Geoff)
