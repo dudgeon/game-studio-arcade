@@ -129,7 +129,9 @@ test("a passing build is committed with complete log records", async () => {
 
   // Everything kept, and the answers replay.
   assert.ok(!fs.existsSync(path.join(sessionDir, "outputs/studio-kit.tgz")), "the input kit isn't treated as an output");
-  for (const f of ["answers.json", "session.json", "local-checks.json", "outputs/cart.tgz", "outputs/report.json", "outputs/spec.md", "outputs/DONE.json", "cart/spec.md"]) {
+  const events = fs.readFileSync(path.join(sessionDir, "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(events.length, script.steps.filter((s) => s.emit).length, "every streamed event is recorded once");
+  for (const f of ["answers.json", "session.json", "events.jsonl", "local-checks.json", "outputs/cart.tgz", "outputs/report.json", "outputs/spec.md", "outputs/DONE.json", "cart/spec.md"]) {
     assert.ok(fs.existsSync(path.join(sessionDir, f)), `kept ${f}`);
   }
   const saved = JSON.parse(fs.readFileSync(record, "utf8"));

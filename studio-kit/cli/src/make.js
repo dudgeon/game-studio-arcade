@@ -64,7 +64,9 @@ export async function makeCart(o) {
   };
   writeJson(path.join(sessionDir, "answers.json"), answers);
   if (o.recordFile) writeJson(o.recordFile, answers);
-  writeJson(path.join(sessionDir, "session.json"), result);
+  const { events, ...rest } = result;
+  writeJson(path.join(sessionDir, "session.json"), rest);
+  fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
 
   ui.progress("Bringing your game home");
   const dl = await downloadOutputs({ api: o.api, sessionId: result.sessionId, dir: path.join(sessionDir, "outputs"), ...o.outputs });
