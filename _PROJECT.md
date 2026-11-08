@@ -6,8 +6,8 @@ aliases:
   - Quarter Deck
 status: active
 goal: A basement arcade cabinet where Owen and Alina describe a game out loud, answer Claude's questions with the joystick, and play the new game minutes later
-health: on-track — auth works (ant CLI login, D16); runtime, library, spec, validator, playtest, player and offline CLI on main; context pack being fixed; Picade 10" ordered
-next: Land the context pack, then a first live `studio make` and task 10 (Falling Blocks with Geoff); design the virtual cabinet on the mini
+health: on-track — Phase 0 stack built and measured (agent v2 live; fetch on demand, templates, frozen checks); virtual cabinet booting; Studio screens in progress; Picade 10" ordered
+next: Finish the launcher Studio screens and virtual cabinet V0, then run a full build driven through the cabinet UI; task 10 (Falling Blocks with Geoff) after that
 created: 2026-11-07
 repo: https://github.com/dudgeon/game-studio-arcade
 ---
