@@ -64,7 +64,7 @@ declare namespace Arcade {
   }
 
   interface TextOptions {
-    /** Integer scale, 1..8. Default 1 (each glyph is 5x7 in a 6x8 cell). */
+    /** Integer scale, 1..8. Default 1: glyphs are 5x7 (plus a descender row), 6 pixels apart, lines 9 apart. */
     scale?: number;
     /** Where `x` sits relative to the text. Default "left". */
     align?: "left" | "center" | "right";
@@ -110,6 +110,8 @@ declare namespace Arcade {
     readonly colors: Readonly<Colors>;
     /** The palette as "#rrggbb" strings, index 0..31. */
     readonly palette: readonly string[];
+    /** The starter library (D50): pure helpers, shared by every cart. Carts reach it here instead of importing it. */
+    readonly lib: typeof import("./lib/index.js");
 
     // Input. `p` defaults to 1.
     /** Is the button held this frame? */
@@ -167,6 +169,21 @@ declare namespace Arcade {
     save(data: unknown): void;
     /** The last saved data, or null if nothing has been saved. */
     load(): any;
+  }
+
+  /** Starter library types (D50), so carts can annotate state without import paths, e.g. `Arcade.Lib.Grid`. */
+  namespace Lib {
+    type Grid = import("./lib/grid.js").Grid;
+    type Shape = import("./lib/grid.js").Shape;
+    type Piece = import("./lib/grid.js").Piece;
+    type Box = import("./lib/collide.js").Box;
+    type Thing = import("./lib/collide.js").Thing;
+    type Rule = import("./lib/collide.js").Rule;
+    type Hit = import("./lib/collide.js").Hit;
+    type Timer = import("./lib/timers.js").Timer;
+    type Repeat = import("./lib/timers.js").Repeat;
+    type Score = import("./lib/score.js").Score;
+    type Flow = import("./lib/flow.js").Flow;
   }
 
   /**
