@@ -1,6 +1,6 @@
 ## The library: read only what this game needs
 
-Paths are under `/workspace/kit/`. Everything here is tested, so use it instead of writing your own. Each file costs tokens to read, so don't read one you won't use; a module's name below usually tells you enough to ask questions and plan.
+Paths are under `/workspace/kit/`. Everything here is tested, so use it instead of writing your own. Each file costs tokens to read, so don't read one you won't use; this page is enough to ask your questions.
 
 <!-- templates -->
 ### Starting points
@@ -13,7 +13,7 @@ Copy one into the cart folder, then change it in small edits; don't rewrite what
 - `paddle/`: a ball off the walls, a paddle, serves.
 - `blank/`: title, play, game over, best score, a dot. Use it when none of the others is close.
 
-Take the closest if most of its rules survive. Read only its files.
+Choose only after you've finished asking, and take the closest. Its rules and numbers are defaults: the player's answers override them. Read only its files.
 <!-- /templates -->
 <!-- no-templates
 ### Starting point

@@ -564,3 +564,9 @@ Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like
 - **The template build isn't a like-for-like saving.** It reskinned `catch`, and used one of three recorded answers: the slippery penguin and "more boots" weren't built. Part of that is the replay (an unmatched question gets D, D47), and part may be that it read the template before asking.
 - **Condition before relying on templates:** the brief should make the agent ask first and treat a template's rules as defaults, then one more build should show a template honouring the kid's answers. Not done here: the task allowed two sessions, and the brief as measured is the brief on this branch.
 - `studio make --context-pack no-templates` builds the blank-only kit for this comparison. The `skill` route is untouched and unused.
+
+**D167. A starting point's rules are defaults; the player's answers override them.** *(Director's instruction after D166; Claude, library worker. Tightens D161, D165.)*
+- The brief says not to open a template or module until the questions are done, and to ask as if there were no template, including how the player moves.
+- After asking, every answer must show up in the spec as a rule or an Assumption, and `CFG` and the code change to match, however much of the template that replaces.
+
+**D168. A replay can answer an unmatched question with A instead of D.** *(Director's instruction; Claude, library worker. Option on D47.)* `studio make --replay-unmatched A`. D ends the questioning (D166's template build stopped early that way), so a comparison that needs the whole conversation answers A, logs `replay_fallback` in the session's notes, and marks that question `fallback: true` in `replay_log`. The default stays D.

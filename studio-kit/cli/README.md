@@ -13,6 +13,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--with O` | a second player |
 | `--model ID` | per-run model; the agent's default is Sonnet 5.5 |
 | `--answers FILE` | replay recorded answers, matched by question (D47); no recorded answer → D |
+| `--replay-unmatched A` | on a replay, answer an unmatched question A rather than D, so the questions don't end early; logged as `replay_fallback` (D168) |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
 | `--context-pack V` | `tarball` (default): the library in the kit, with its templates. `no-templates`: the same with only the blank start (D166). `skill`: attach the context pack as a skill and leave it out of the kit (D45) |

@@ -256,6 +256,17 @@ test("D47: without match, recorded questions compare by word overlap", async () 
   assert.deepEqual(await a.question(q("How many lives?")), { choice: "D" });
 });
 
+test("D168: unmatched: A answers A, keeps asking, and logs the fallback", async () => {
+  const a = replayAnswerer(PENGUIN, { unmatched: "A" });
+  assert.deepEqual(await a.question({ question: "What should the game be called?", option_a: "One", option_b: "Two" }), { choice: "A" });
+  assert.deepEqual(a.notes?.(), ["replay_fallback"]);
+  assert.equal(a.replayLog?.()[0].fallback, true);
+  assert.equal(a.replayLog?.()[0].matched, null);
+  const b = await a.question({ question: "How should the game get harder?", option_a: "Bigger", option_b: "Faster and more boots" });
+  assert.notEqual(b.choice, "D", "a recorded answer still applies after a fallback");
+  assert.equal(a.replayLog?.()[1].fallback, undefined);
+});
+
 test("a file with no questions still replays by position", async () => {
   const a = replayAnswerer({ questions: [{ choice: "B" }] });
   assert.deepEqual(await a.question(q("Anything?")), { choice: "B" });
