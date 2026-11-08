@@ -38,7 +38,9 @@ export async function playtest(cartDir, opts = {}) {
   const driver = opts.driver ?? "node";
   const seed = opts.seed ?? 1;
   const soakFrames = opts.soakFrames ?? 600;
-  const budgetMs = opts.budgetMs ?? 4;
+  // D64: the browser's per-frame time includes the page round trip and, in the
+  // sandbox, cloud-VM noise, so it gets a whole 60 Hz frame; node keeps 4 ms.
+  const budgetMs = opts.budgetMs ?? (driver === "browser" ? 16.7 : 4);
   const maxFrames = opts.maxFrames ?? 18000;
   const slow = driver === "browser" ? 3 : 1;
   const checkTimeoutMs = (opts.timeoutMs ?? 10000) * slow;
@@ -242,9 +244,25 @@ export async function playtest(cartDir, opts = {}) {
   g("soak", soakFail === null, soakFail);
 
   /** @type {{ frame: number, value: number, count: number }[]} */
+  // Dev warnings from the runtime, once per message, in job order.
+  /** @type {Report["warnings"]} */
+  const warnings = [];
+  for (const j of jobs) {
+    for (const w of results.get(j.name).warnings ?? []) {
+      if (!warnings.some((x) => x.message === w.message)) warnings.push({ where: j.name, frame: w.frame ?? null, message: w.message });
+    }
+  }
+  const colorWarnings = warnings.filter((w) => /colou?r/i.test(w.message));
   const bad = jobs.flatMap((j) => results.get(j.name).paletteBad ?? []);
   const b0 = bad[0];
-  g("palette", bad.length === 0, b0 && `frame ${b0.frame} has ${b0.count} pixel${b0.count === 1 ? "" : "s"} of color ${b0.value}, which isn't in the 32-color palette (0-31)${bad.length > 1 ? `; ${bad.length - 1} more like it` : ""}`);
+  const w0 = colorWarnings[0];
+  g(
+    "palette",
+    bad.length === 0 && colorWarnings.length === 0,
+    w0
+      ? `the game drew with a color outside the palette (${w0.where}, frame ${w0.frame}): ${w0.message}${colorWarnings.length > 1 ? `; ${colorWarnings.length - 1} more` : ""}`
+      : b0 && `frame ${b0.frame} has ${b0.count} pixel${b0.count === 1 ? "" : "s"} of color ${b0.value}, which isn't in the 32-color palette (0-31)${bad.length > 1 ? `; ${bad.length - 1} more like it` : ""}`,
+  );
 
   const times = [soakA, soakB, idleA, idleB].flatMap((r) => r.times ?? []);
   const frameTime = frameStats(times, budgetMs);
@@ -280,6 +298,7 @@ export async function playtest(cartDir, opts = {}) {
     generic,
     frameTime,
     errors: errorList,
+    warnings,
     frames,
     env: {
       node: process.versions.node,

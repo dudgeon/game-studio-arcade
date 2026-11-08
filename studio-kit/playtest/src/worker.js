@@ -59,6 +59,7 @@ async function open() {
       probe: () => rpc("probe", []),
       frame: () => rpc("frame", []),
       sounds: () => rpc("sounds", []),
+      warnings: () => rpc("warnings", []),
       reset: (o) => rpc("reset", [o]),
     };
     await rpc("open", []);
@@ -159,6 +160,7 @@ async function run() {
     port.postMessage({ type: "crash", where, frame: 0, message: `loading the game: ${messageOf(e)}` });
     return { status: "fail", reason: `the game didn't load: ${messageOf(e)}`, frames: 0, loadFailed: true };
   }
+  handle = opened.base;
   const h = wrap(opened.base);
   const { t } = h;
 
@@ -243,7 +245,19 @@ async function run() {
   return { ...result, frames: h.stepped(), paletteBad };
 }
 
+/** @type {Arcade.TestHandle | null} */
+let handle = null;
+
+/** Dev warnings the runtime collected since the last reset (e.g. colors outside 0..31). */
+async function collectWarnings() {
+  try {
+    return (await handle?.warnings?.()) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 run().then(
-  (result) => port.postMessage({ type: "done", result }),
+  async (result) => port.postMessage({ type: "done", result: { ...result, warnings: await collectWarnings() } }),
   (e) => port.postMessage({ type: "done", result: { status: "fail", reason: `harness error: ${messageOf(e)}`, frames: 0 } }),
 );
