@@ -11,6 +11,7 @@
  * @property {string} [model]          per-run model override (D40)
  * @property {string} [system]         per-session system prompt override (toolchain checks only)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   skills attached through agent overrides
+ * @property {object[]} [tools]        per-session tools override (with `system`, runs the brief from the repo)
  * @property {string} kitFileId        Files API id of the studio kit tarball
  * @property {{fileId: string, mountPath: string}[]} [extraFiles]
  * @property {number} budgetCents      hard list-cost cap for the session
@@ -32,6 +33,7 @@
  * @property {(sessionId: string) => Promise<OutputFile[]>} listOutputs
  * @property {(fileId: string) => Promise<Buffer>} download
  * @property {(path: string, filename: string) => Promise<{id: string}>} uploadFile
+ * @property {(zipPath: string, filename: string) => Promise<{id: string, latest_version_id: string}>} [createSkill]
  */
 
 export const BETA = "managed-agents-2026-04-01";
@@ -45,12 +47,13 @@ export const KIT_MOUNT = "/mnt/session/uploads/studio-kit.tgz";
 export function sessionCreateBody(p) {
   /** @type {any} */
   let agent = p.agentVersion ? { type: "agent", id: p.agentId, version: p.agentVersion } : p.agentId;
-  if (p.model || p.system || p.skills?.length) {
+  if (p.model || p.system || p.skills?.length || p.tools?.length) {
     agent = { type: "agent_with_overrides", id: p.agentId };
     if (p.agentVersion) agent.version = p.agentVersion;
     if (p.model) agent.model = { id: p.model };
     if (p.system) agent.system = p.system;
     if (p.skills?.length) agent.skills = p.skills;
+    if (p.tools?.length) agent.tools = p.tools;
   }
   if (!Number.isInteger(p.budgetCents) || p.budgetCents <= 0) throw new Error("budgetCents must be a positive whole number");
   return {
@@ -99,6 +102,11 @@ export function sdkApi(client) {
     async download(fileId) {
       const res = await client.files.download(fileId);
       return Buffer.from(await res.arrayBuffer());
+    },
+    async createSkill(zipPath, filename) {
+      const { toFile } = await import("@anthropic-ai/sdk");
+      const fs = await import("node:fs");
+      return client.skills.create({ files: [await toFile(fs.createReadStream(zipPath), filename, { type: "application/zip" })] });
     },
     async uploadFile(filePath, filename) {
       const { toFile } = await import("@anthropic-ai/sdk");

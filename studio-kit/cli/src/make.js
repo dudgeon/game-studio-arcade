@@ -25,6 +25,7 @@ import { analyzeFreeze } from "./freeze.js";
  * @property {boolean} [commitAnyway]
  * @property {"tarball"|"skill"} [contextPack]   how this run got the context pack (D45)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
+ * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
  * @property {string} [recordFile]     also write the answers here
  * @property {() => Date} [now]
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
@@ -45,6 +46,7 @@ export async function makeCart(o) {
       model: o.model,
       kitFileId: kit.fileId,
       skills: o.skills,
+      ...(o.brief ? { system: o.brief.system, tools: o.brief.tools } : {}),
       budgetCents: o.budgetCents,
       title: `make: ${o.request.slice(0, 60)}`,
       metadata: { maker: o.maker, origin: o.origin ?? "cabinet", via: "studio-cli" },
@@ -158,6 +160,7 @@ export async function makeCart(o) {
     ended_by: result.endedBy,
     spec_diff: newSpecDiff(spec),
     context_pack: o.contextPack ?? "tarball",
+    brief: o.brief ? "file-override" : "applied-agent",
     first_playtest: freeze.first_playtest,
     playtest_runs: freeze.playtest_runs,
     edits_after_first_playtest: freeze.edits_after_first_playtest,

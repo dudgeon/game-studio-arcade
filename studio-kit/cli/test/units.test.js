@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { formatPlan, formatQuestion, parseChoice, planResult, questionResult } from "../src/tiles.js";
 import { liveAnswerer, loadAnswers } from "../src/answers.js";
 import { sessionCreateBody } from "../src/api.js";
-import { readLock, readSkillLock } from "../src/config.js";
+import { MANAGED_AGENT_DIR, readAgentDef, readLock, readSkillLock, STUDIO_TOOLSET } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
 import { progressFor } from "../src/progress.js";
 import { judgeReport } from "../src/checks.js";
@@ -64,6 +64,8 @@ test("session body: pinned agent, model override, kit mount, budget as cents str
   assert.equal(sessionCreateBody(base).agent, "agent_1");
   const sk = sessionCreateBody({ ...base, model: "claude-sonnet-5-5", skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
   assert.deepEqual(sk.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-sonnet-5-5" }, skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
+  const brief = sessionCreateBody({ ...base, agentVersion: 1, system: "brief", tools: [{ type: "agent_toolset_20260401" }] });
+  assert.deepEqual(brief.agent, { type: "agent_with_overrides", id: "agent_1", version: 1, system: "brief", tools: [{ type: "agent_toolset_20260401" }] });
   const sys = sessionCreateBody({ ...base, system: "harness", extraFiles: [{ fileId: "file_p", mountPath: "/mnt/session/uploads/parity.tgz" }] });
   assert.deepEqual(sys.agent, { type: "agent_with_overrides", id: "agent_1", system: "harness" });
   assert.deepEqual(sys.resources[1], { type: "file", file_id: "file_p", mount_path: "/mnt/session/uploads/parity.tgz" });
@@ -84,6 +86,18 @@ test("readLock finds the agent and environment by path", () => {
     }),
   );
   assert.deepEqual(readLock(f), { agentId: "agent_9", agentVersion: 3, environmentId: "env_9" });
+});
+
+test("readAgentDef gives the repo's brief, and its toolset matches the agent file", () => {
+  const def = readAgentDef();
+  assert.match(def.system, /^You are the Studio/);
+  assert.match(def.system, /The checks are now frozen/);
+  assert.doesNotMatch(def.system, /^---/);
+  assert.deepEqual(def.tools.map((t) => /** @type {any} */ (t).name ?? /** @type {any} */ (t).type), ["agent_toolset_20260401", "ask_player", "show_plan", "tell_player"]);
+  const yaml = fs.readFileSync(path.join(MANAGED_AGENT_DIR, "agents/studio.md"), "utf8");
+  for (const c of STUDIO_TOOLSET.configs) assert.match(yaml, new RegExp(`- name: ${c.name}\\n\\s+enabled: false`));
+  assert.match(yaml, /default_config:\n\s+enabled: true\n\s+permission_policy:\n\s+type: always_allow/);
+  assert.match(yaml, /- type: agent_toolset_20260401/);
 });
 
 test("readSkillLock finds the skill's id and version", () => {
