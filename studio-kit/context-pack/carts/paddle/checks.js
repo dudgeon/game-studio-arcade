@@ -1,10 +1,9 @@
 // @ts-check
-// Checks for Wall Ball.
-const expect = (/** @type {boolean} */ ok, /** @type {string} */ why) => {
+const expect = (ok, why) => {
   if (!ok) throw new Error(why);
 };
 
-async function start(/** @type {Arcade.TestHandle} */ t) {
+async function start(t) {
   await t.step(31); // START is ignored for the title's first 30 frames
   await t.input([{ frames: 1, p1: "start" }]);
   await t.step(2);
@@ -12,7 +11,7 @@ async function start(/** @type {Arcade.TestHandle} */ t) {
 }
 
 /** Move the paddle toward the ball (aim) or away from it, 2 frames at a time, until done(p) or max frames. */
-async function play(/** @type {Arcade.TestHandle} */ t, /** @type {boolean} */ aim, /** @type {number} */ max, /** @type {(p: any) => boolean} */ done) {
+async function play(t, aim, max, done) {
   for (let n = 0; n < max; n += 2) {
     const p = await t.probe();
     if (done(p)) return p;

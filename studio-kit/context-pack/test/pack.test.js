@@ -37,9 +37,10 @@ for (const c of CARTS) {
     assert.ok(cov.ok, JSON.stringify(cov.errors));
   });
 
-  test(`${c}: cart.json has the cart-format fields`, () => {
+  // cart.json is what the agent writes (D31): id, title, players. The CLI adds provenance.
+  test(`${c}: cart.json is the agent's part: id, title (as in the spec) and one player`, () => {
     const j = JSON.parse(read(path.join(cartDir(c), "cart.json")));
-    for (const k of ["id", "title", "maker", "with", "parent", "session_id", "origin", "players", "created"]) assert.ok(k in j, `missing ${k}`);
+    assert.deepEqual(Object.keys(j), ["id", "title", "players"]);
     assert.equal(j.title, parseSpec(read(path.join(cartDir(c), "spec.md"))).title);
     assert.equal(j.players, 1);
   });

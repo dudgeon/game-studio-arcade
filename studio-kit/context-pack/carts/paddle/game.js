@@ -1,7 +1,4 @@
 // @ts-check
-// Wall Ball: one paddle, three walls. Shows ball velocity and bounces,
-// collide.overlap, a serve delay timer, lives and a saved best score.
-
 /** @typedef {{ x: number, y: number, w: number, h: number, vx: number, vy: number }} Ball */
 /** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, pad: Arcade.Lib.Box, ball: Ball | null, serve: Arcade.Lib.Timer }} State */
 

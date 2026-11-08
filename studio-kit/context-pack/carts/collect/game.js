@@ -1,7 +1,4 @@
 // @ts-check
-// Gem Garden: walk tile to tile collecting gems in a 30-second round. Shows a
-// grid board, grid.stickStep with timers.repeat, a round timer and a saved best.
-
 /** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, board: Arcade.Lib.Grid, x: number, y: number, rep: Arcade.Lib.Repeat, round: Arcade.Lib.Timer }} State */
 
 const T = 16; // tile size in pixels

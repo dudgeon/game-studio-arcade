@@ -1,11 +1,11 @@
 // @ts-check
-// Checks for Comet Dodge. Helpers live here because checks.js imports nothing.
-const expect = (/** @type {boolean} */ ok, /** @type {string} */ why) => {
+// Helpers live here: checks.js imports nothing.
+const expect = (ok, why) => {
   if (!ok) throw new Error(why);
 };
 
 /** From the title, press START and land in play. START is ignored for the title's first 30 frames. */
-async function start(/** @type {Arcade.TestHandle} */ t) {
+async function start(t) {
   await t.step(31);
   await t.input([{ frames: 1, p1: "start" }]);
   await t.step(2);
@@ -13,14 +13,14 @@ async function start(/** @type {Arcade.TestHandle} */ t) {
 }
 
 /** Steer the ship up or down, `frames` frames at a time, until `done(p)` or `max` frames. away=true dodges, false chases. */
-async function fly(/** @type {Arcade.TestHandle} */ t, /** @type {boolean} */ away, /** @type {number} */ max, /** @type {(p: any) => boolean} */ done) {
+async function fly(t, away, max, done) {
   for (let n = 0; n < max; n += 2) {
     const p = await t.probe();
     if (done(p)) return p;
-    const ahead = p.comets.filter((/** @type {any} */ c) => c.x > p.ship.x - 8 && c.x < p.ship.x + 48);
+    const ahead = p.comets.filter((c) => c.x > p.ship.x - 8 && c.x < p.ship.x + 48);
     let dir = "";
     if (away) {
-      const near = ahead.find((/** @type {any} */ c) => Math.abs(c.y - p.ship.y) < 14);
+      const near = ahead.find((c) => Math.abs(c.y - p.ship.y) < 14);
       if (near) dir = near.y > p.ship.y ? (p.ship.y > 20 ? "up" : "down") : p.ship.y < p.H - 20 ? "down" : "up";
     } else if (ahead.length) {
       dir = ahead[0].y > p.ship.y ? "down" : ahead[0].y < p.ship.y ? "up" : "";
@@ -85,7 +85,7 @@ export default {
       expect(p.mode === "play", `the dodge helper lost every life before frame ${at} of play`);
       await t.step(1);
       const q = await t.probe();
-      const c = q.comets.find((/** @type {any} */ c) => c.y === p.comets[0].y);
+      const c = q.comets.find((c) => c.y === p.comets[0].y);
       const want = Math.min(3, 1 + 0.5 * Math.floor(q.played / 600));
       expect(c && p.comets[0].x - c.x === want, `after ${q.played} frames of play comets should move ${want} pixels per frame, moved ${c ? p.comets[0].x - c.x : "?"}`);
     }

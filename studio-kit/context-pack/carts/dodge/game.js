@@ -1,7 +1,4 @@
 // @ts-check
-// Comet Dodge: move the ship, dodge comets from the right. Shows flow, score,
-// collide.resolve, a one-shot "safe" timer and a speed-up curve.
-
 /** @typedef {{ flow: Arcade.Lib.Flow, sc: Arcade.Lib.Score, ship: Arcade.Lib.Thing, things: Arcade.Lib.Thing[], spawn: Arcade.Lib.Timer, safe: Arcade.Lib.Timer, tick: Arcade.Lib.Timer, played: number }} State */
 
 const SIZE = 8; // ship and comet size in pixels

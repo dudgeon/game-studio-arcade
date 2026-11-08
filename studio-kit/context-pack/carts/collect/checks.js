@@ -1,10 +1,9 @@
 // @ts-check
-// Checks for Gem Garden.
-const expect = (/** @type {boolean} */ ok, /** @type {string} */ why) => {
+const expect = (ok, why) => {
   if (!ok) throw new Error(why);
 };
 
-async function start(/** @type {Arcade.TestHandle} */ t) {
+async function start(t) {
   await t.step(31); // START is ignored for the title's first 30 frames
   await t.input([{ frames: 1, p1: "start" }]);
   await t.step(2);
@@ -12,20 +11,20 @@ async function start(/** @type {Arcade.TestHandle} */ t) {
 }
 
 /** Hold `dir` for `frames` frames, then let go for a frame. */
-async function hold(/** @type {Arcade.TestHandle} */ t, /** @type {string} */ dir, /** @type {number} */ frames) {
+async function hold(t, dir, frames) {
   await t.input([{ frames, p1: dir }, { frames: 1 }]);
   await t.step(frames + 1);
   return t.probe();
 }
 
 /** Tap toward the nearest gem until the score changes. */
-async function grabGem(/** @type {Arcade.TestHandle} */ t) {
+async function grabGem(t) {
   const start = (await t.probe()).score;
   for (let n = 0; n < 100; n++) {
     const p = await t.probe();
     if (p.score !== start) return p;
-    const d = (/** @type {any} */ q) => Math.abs(q.x - p.x) + Math.abs(q.y - p.y);
-    const gem = p.gems.reduce((/** @type {any} */ a, /** @type {any} */ b) => (d(b) < d(a) ? b : a));
+    const d = (q) => Math.abs(q.x - p.x) + Math.abs(q.y - p.y);
+    const gem = p.gems.reduce((a, b) => (d(b) < d(a) ? b : a));
     await hold(t, gem.x > p.x ? "right" : gem.x < p.x ? "left" : gem.y > p.y ? "down" : "up", 1);
   }
   throw new Error("couldn't walk to a gem in 100 taps");
@@ -58,7 +57,7 @@ export default {
       const p = await grabGem(t);
       expect(p.score === 10 * i, `gem ${i} should make the score ${10 * i}, got ${p.score}`);
       expect(p.gems.length === 3, `there should always be 3 gems, there are ${p.gems.length}`);
-      expect(!p.gems.some((/** @type {any} */ g) => g.x === p.x && g.y === p.y), "the new gem appeared under the gardener");
+      expect(!p.gems.some((g) => g.x === p.x && g.y === p.y), "the new gem appeared under the gardener");
     }
     expect((await t.sounds()).length >= 3, "each gem should play a sound");
   },
