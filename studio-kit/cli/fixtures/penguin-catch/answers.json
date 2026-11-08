@@ -3,14 +3,30 @@
   "maker": "A",
   "questions": [
     {
-      "choice": "A"
+      "question": "What happens if you catch a boot?",
+      "match": [
+        "boot",
+        "catch|touch|hit|grab|get|land"
+      ],
+      "choice": "A",
+      "answer": "You lose a life"
     },
     {
-      "choice": "B"
+      "question": "How should the game get harder?",
+      "match": [
+        "hard|difficult|fast|speed|tough"
+      ],
+      "choice": "B",
+      "answer": "Faster and more boots"
     },
     {
+      "question": "How does the penguin move?",
+      "match": [
+        "move|moves|moving|slide|slides|hop|hops|control|walk|waddle|get around"
+      ],
       "choice": "C",
-      "said": "slides left and right but really slippery like on ice"
+      "said": "slides left and right but really slippery like on ice",
+      "answer": "slides left and right but really slippery like on ice"
     }
   ],
   "plan": [

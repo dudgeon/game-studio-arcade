@@ -188,12 +188,31 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 
 **D44. Checks frozen; fix the game.** *(Geoff, 2026-11-08, after the first real build changed only `checks.js` to get its rules passing; implemented by Claude, tasks 7+8 worker.)*
 - Checks are written from the spec before any game code, then frozen. A failing check means fix `game.js`.
-- A check may change only if the agent **first** changes the spec rule or adds an Assumption naming the rule, so the numbers live in the spec. That includes a check that is simply buggy.
-- Every such change shows in the plan: the agent calls `show_plan` again with a `changes` list (`[{id, text}]`, rule id and plain words).
-- Every such change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest, and the CLI fetches them itself when that playtest starts, so later writes can't change the baseline (the first trial overwrote its snapshot at pack-up). The CLI compares each rule's check there with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
+- **Amended by D46:** changing what a rule means requires **first** changing the spec rule or adding an Assumption naming the rule, so the numbers live in the spec. A check bug takes D46's lighter route.
+- A change of meaning shows in the plan: the agent calls `show_plan` again with a `changes` list (`[{id, text}]`, rule id and plain words).
+- Every check change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest, and the CLI fetches them itself when that playtest starts, so later writes can't change the baseline (the first trial overwrote its snapshot at pack-up). The CLI compares each rule's check there with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
 - Edits are also detected from the event stream, independently of the snapshot. `baseline` is `captured`, `snapshot` or `none`; with `none` the edits are still counted, with `rules_known: false`. `snapshot_overwritten` flags a rewritten snapshot.
 - The record also gets `first_playtest` (which rules passed and failed on the first run) and `edits_after_first_playtest` (`game_js`, `checks_js`, `spec_md`).
 - This logs and doesn't block: a cart with an unjustified change can still commit (no approval loop; the activity log is the oversight).
+
+**D46. A check bug is quoted, fixed and logged; only a change of meaning goes through the spec.** *(Geoff, 2026-11-08, on the question raised by D44's first trials; amends D44. Implemented by Claude, tasks 7+8 worker.)* Geoff's words: when a check contradicts the unchanged spec's own words, "the agent quotes the rule, fixes the check to match it, and the change is logged as a check bug and shown in the build summary. Changing what a rule means still requires changing the spec first."
+- A **check bug** needs no Assumption and no re-plan, and doesn't stop the kid. This covers test mechanics that don't change what the rule means: a check too slow to finish, a bot that ends the game mid-test, a type error.
+- The agent declares every check change in `report.json`: `check_changes: [{rule, kind: "check_bug" | "rule_change", quote, what}]`, where `quote` is the rule's exact words.
+- The CLI classifies each rule whose check changed since the frozen snapshot, in `checks_changed_after_playtest.rules[].classification`:
+  - `rule_change`: the rule's text changed, or a new or changed Assumption names it. `shown_in_plan` says whether the re-plan happened.
+  - `check_bug`: the spec is unchanged for that rule, and the agent declared a bug with a quote that is really in the rule's text.
+  - `unexplained`: neither. These rules are also listed in `unjustified`.
+- Classification is per rule, comparing the snapshot with the final cart, because bash edits can't be attributed to a rule one at a time. Comments are ignored in the comparison. With no usable baseline the rules are unknown (D44).
+- The CLI's build summary lists check bugs and rule changes. Like D44, this logs and doesn't block.
+
+**D47. Replays match answers by question.** *(Director's instruction; design by Claude, tasks 7+8 worker. Changes D43's replay by position.)*
+- A recorded answer holds the question and the answer's words, plus `match`: regexes that must all match a question for this answer to apply. Files recorded from now on save `question`, `option_a`, `option_b` and `answer`; without `match`, questions are compared by word overlap (at least half).
+- The reply is by meaning: tile A or B if that option's words overlap the recorded answer by at least half, otherwise C with the recorded words. Options differ between runs, so a letter alone would mean something else.
+- A question with no recorded answer gets D ("make it now") and logs `replay_unmatched`. Every replayed question is logged in `replay_log` (asked, matched, reply).
+- A file with no questions in it still replays by position.
+- Plans still replay in order, and a plan past the end gets build (`replay_replanned`).
+
+**D48. One browser-driver run, at the end.** *(Director's instruction; Claude, tasks 7+8 worker.)* Timeouts on long checks cost minutes in the browser (D45's tarball run). The brief has the agent use the node driver while working, and run the browser driver once as a final check when node passes, and once more only if that run found something to fix.
 
 **D45. The context pack stays in the kit tarball, not a custom skill.** *(Claude, tasks 7+8 worker; settles D40's experiment, on the director's clearance.)* Two builds of the penguin request on Sonnet 5.5, 300¢ cap, the D44 brief, replaying the recorded answers (2026-11-08):
 

@@ -12,7 +12,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--maker A` | the maker's initial (required, or from the answers file) |
 | `--with O` | a second player |
 | `--model ID` | per-run model; the agent's default is Sonnet 5.5 |
-| `--answers FILE` | replay recorded answers by position (D43); runs out → D |
+| `--answers FILE` | replay recorded answers, matched by question (D47); no recorded answer → D |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
 | `--context-pack skill` | attach the context pack as a skill and leave it out of the kit (default `tarball`; D45) |
@@ -68,6 +68,7 @@ The frog-hop stream is hand-written from the docs. Replace it with a recorded st
   - Committed to the dev cart library. The stream dropped once and the driver reconnected.
   - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
 
+- **2026-11-08, models:** `scripts/compare-models.sh` built the penguin request on Haiku ×2, Sonnet and Opus ×2. See `docs/phase-0-results.md`. `scripts/play-headless.js` plays a cart with a bot and writes a contact sheet.
 - **2026-11-08, D44 and D45:** two more builds of the same request under the frozen-checks brief, tarball and skill. See D45 for the comparison.
 
 ## Still needs a live session

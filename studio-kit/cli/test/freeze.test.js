@@ -43,6 +43,7 @@ test("isPlaytestRun matches running it, not reading about it", () => {
 
 test("parsePlaytestLines and splitChecks", () => {
   assert.deepEqual(parsePlaytestLines("  FAIL      R1: nope\n  PASS      R2\n  PASS      loads\n"), { pass: ["R2"], fail: ["R1"] });
+  assert.deepEqual(parsePlaytestLines("ok  13 rules\ntrue\nR1 pass \nR2 fail too slow\nR3 you-check the player checks\nloads pass\n"), { pass: ["R1"], fail: ["R2"] }, "an agent's own --json summary");
   const s = splitChecks('const h = 1;\nexport default {\n  R1: async (t) => { await t.step(1); },\n  "R2": async (t) => {},\n};\n');
   assert.equal(s.header, "const h = 1; export default {");
   assert.deepEqual(Object.keys(s.rules), ["R1", "R2"]);
@@ -122,13 +123,18 @@ test("a check changed with an Assumption naming the rule, shown in the plan: jus
   assert.equal(c.changed, true);
   assert.equal(c.edit_events, 1);
   assert.deepEqual(c.assumptions_added, ["A2"]);
-  assert.deepEqual(c.rules, [{ rule: "R2", spec_changed: true, rule_text_changed: false, assumption_names_rule: true, shown_in_plan: true }]);
+  assert.equal(c.rules.length, 1);
+  assert.equal(c.rules[0].rule, "R2");
+  assert.equal(c.rules[0].classification, "rule_change");
+  assert.deepEqual([c.rules[0].spec_changed, c.rules[0].rule_text_changed, c.rules[0].assumption_names_rule, c.rules[0].shown_in_plan], [true, false, true, true]);
+  assert.deepEqual(c.rule_changes, ["R2"]);
   assert.deepEqual(c.unjustified, []);
 });
 
 test("a rule's own text changing also justifies its check", () => {
   const a = analyzeFreeze([use("a", SNAP), use("b", RUN)], { frozenChecks: CHECKS("t.step(2)"), frozenSpec: SPEC("Hit costs a life."), finalChecks: CHECKS("t.step(9)"), finalSpec: SPEC("Hit costs two lives.") });
-  assert.deepEqual(a.checks_changed_after_playtest.rules, [{ rule: "R2", spec_changed: true, rule_text_changed: true, assumption_names_rule: false, shown_in_plan: false }]);
+  const r = a.checks_changed_after_playtest.rules;
+  assert.deepEqual(r.map((x) => [x.rule, x.classification, x.rule_text_changed, x.assumption_names_rule, x.shown_in_plan]), [["R2", "rule_change", true, false, false]], "logged as not shown in the plan");
 });
 
 test("a check changed with no spec change is unjustified, and only that rule is named", () => {
@@ -185,4 +191,40 @@ test("changed helpers need some spec change", () => {
   assert.deepEqual([bare.changed, bare.helpers_changed, bare.helpers_unjustified], [true, true, true]);
   const noted = analyzeFreeze(events, { frozenChecks: base, frozenSpec: SPEC("x"), finalChecks: edited, finalSpec: SPEC("x", "- A1: Fish are worth 10.\n- A2: The helper moves less often.") }).checks_changed_after_playtest;
   assert.equal(noted.helpers_unjustified, false);
+});
+
+const EDIT = [use("a", SNAP), use("b", RUN), use("c", "sed -i 's/x/y/' checks.js")];
+const edited = (declared, spec = SPEC("Hit costs a life.")) => analyzeFreeze(EDIT, { frozenChecks: CHECKS("t.step(2)"), frozenSpec: SPEC("Hit costs a life."), finalChecks: CHECKS("t.step(9)"), finalSpec: spec, declared }).checks_changed_after_playtest;
+
+test("D46: a declared check bug quoting the rule is a check bug, with no spec change or plan", () => {
+  const c = edited([{ rule: "R2", kind: "check_bug", quote: "Hit costs  a LIFE", what: "The check ran too long." }]);
+  assert.deepEqual(c.check_bugs, ["R2"]);
+  assert.deepEqual(c.unjustified, []);
+  assert.equal(c.rules[0].classification, "check_bug");
+  assert.equal(c.rules[0].quote_matches_rule, true);
+  assert.equal(c.rules[0].what, "The check ran too long.");
+  assert.equal(c.rules[0].shown_in_plan, false);
+});
+
+test("D46: a quote that isn't in the rule, or no declaration, is unexplained", () => {
+  const made = edited([{ rule: "R2", kind: "check_bug", quote: "Hits are forgiven", what: "x" }]);
+  assert.deepEqual(made.unjustified, ["R2"]);
+  assert.equal(made.rules[0].quote_matches_rule, false);
+  assert.deepEqual(edited([]).unjustified, ["R2"]);
+  assert.deepEqual(edited(null).unjustified, ["R2"]);
+  assert.deepEqual(edited([{ rule: "R3", kind: "check_bug", quote: "Lives start at 3", what: "x" }]).unjustified, ["R2"], "a declaration for another rule doesn't count");
+  assert.deepEqual(edited([{ rule: "R2", kind: "rule_change", quote: "Hit costs a life.", what: "x" }]).unjustified, ["R2"], "calling it a rule change without changing the spec isn't one");
+});
+
+test("D46: changing the spec makes it a rule change whatever was declared", () => {
+  const c = edited([{ rule: "R2", kind: "check_bug", quote: "Hit costs two lives", what: "x" }], SPEC("Hit costs two lives."));
+  assert.deepEqual(c.rule_changes, ["R2"]);
+  assert.deepEqual(c.check_bugs, []);
+});
+
+test("comments and type annotations aren't changed checks", () => {
+  const annotated = "export default {\n  R1: async (t) => { /** @type {any} */ let x = await t.step(1); },\n};\n";
+  const plain = "export default {\n  // a note\n  R1: async (t) => { let x = await t.step(1); },\n};\n";
+  const a = analyzeFreeze([use("a", SNAP), use("b", RUN)], { frozenChecks: plain, frozenSpec: SPEC("x"), finalChecks: annotated, finalSpec: SPEC("x") });
+  assert.equal(a.checks_changed_after_playtest.changed, false);
 });

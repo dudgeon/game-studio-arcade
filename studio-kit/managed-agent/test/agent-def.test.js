@@ -53,7 +53,12 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "The checks are now frozen",
     "Never write to them again",
     "A failing check means fix `game.js`",
-    "**first** change the spec rule",
+    "**First** change the spec rule",
+    "**Check bug:**",
+    "**Rule change:**",
+    "Quote the rule",
+    "check_changes",
+    "only once, as a final check",
   ]) {
     assert.ok(body.includes(needle), `prompt mentions ${needle}`);
   }

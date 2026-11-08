@@ -8,7 +8,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mockApi } from "../test-support/mock-api.js";
-import { makeCart } from "../src/make.js";
+import { buildSummary, makeCart } from "../src/make.js";
 import { replayAnswerer } from "../src/answers.js";
 import { dataPaths } from "../src/config.js";
 import { readLog } from "../src/log.js";
@@ -141,7 +141,8 @@ test("a passing build is committed with complete log records", async () => {
     assert.ok(fs.existsSync(path.join(sessionDir, f)), `kept ${f}`);
   }
   const saved = JSON.parse(fs.readFileSync(record, "utf8"));
-  assert.deepEqual(saved, answers, "the recorded answers equal the replayed ones");
+  assert.deepEqual(saved.questions.map((a) => [a.choice, a.said]), answers.questions.map((a) => [a.choice, a.said]), "the recorded answers equal the replayed ones");
+  assert.deepEqual(saved.plan, answers.plan);
   assert.equal(s.m.calls.filter((c) => c === "listOutputs").length, 3, "waited out the output lag");
 });
 
@@ -240,4 +241,36 @@ test("reanalyze appends a correction and leaves the original record", async () =
   assert.deepEqual(c.edits_after_first_playtest, fixed.edits_after_first_playtest);
   assert.ok(fs.existsSync(sessionDir));
   assert.throws(() => reanalyzeSession({ paths: s.paths, session: "sesn_nope", why: "x" }), /no session folder/);
+});
+
+test("the build summary shows check bugs and rule changes (D46)", () => {
+  const base = { changed: true, rules_known: true, edit_events: 2, helpers_unjustified: false };
+  const lines = buildSummary({
+    ...base,
+    rules: [
+      { rule: "R2", classification: "check_bug", quote: "Hit costs a life.", what: "The check ran too long." },
+      { rule: "R3", classification: "rule_change", shown_in_plan: true, what: "Three lives now." },
+      { rule: "R4", classification: "rule_change", shown_in_plan: false, what: null },
+      { rule: "R5", classification: "unexplained", what: null },
+    ],
+  });
+  assert.deepEqual(lines, [
+    'Test fixed, rule unchanged: R2 "Hit costs a life.". The check ran too long.',
+    "Rule changed: R3. Three lives now.",
+    "Rule changed: R4 (not shown in the plan).",
+    "Test changed with no explanation: R5.",
+  ]);
+  assert.match(buildSummary({ ...base, rules: [], rules_known: false })[0], /can't be said which/);
+});
+
+test("a run saves its answers with the question and words, so they replay by question", async () => {
+  const s = setup();
+  const record = path.join(s.root, "answers.json");
+  await s.make({ recordFile: record });
+  const saved = JSON.parse(fs.readFileSync(record, "utf8"));
+  assert.equal(saved.questions[0].question, "What does the frog dodge?");
+  assert.equal(saved.questions[0].answer, "Cars");
+  assert.equal(saved.questions[1].answer, "medium and it gets faster");
+  const again = replayAnswerer(saved);
+  assert.deepEqual(await again.question({ question: "What does the frog dodge?", option_a: "Logs", option_b: "Cars" }), { choice: "B" });
 });

@@ -8,7 +8,8 @@ import { formatPlan, formatQuestion, parseChoice } from "./tiles.js";
  * @typedef {object} Answerer
  * @property {(q: {question: string, option_a: string, option_b: string}) => Promise<QuestionAnswer>} question
  * @property {(p: {summary: string, rules: any[]}) => Promise<PlanAnswer>} plan
- * @property {() => string[]} [notes]   things to log, e.g. replay_exhausted
+ * @property {() => string[]} [notes]   things to log, e.g. replay_unmatched
+ * @property {() => any[]} [replayLog]   each replayed question: asked, matched, reply (D47)
  *
  * Recorded answers file:
  *   {"request": "...", "maker": "A", "questions": [{"choice":"A"}, {"choice":"C","said":"..."}],
@@ -49,35 +50,96 @@ async function askUntilSaid(io, prompt) {
   }
 }
 
+const STOP = new Set("a an and at be do does for from how if in is it of on or should so the then to what when where which will with you your".split(" "));
+const words = (text) => new Set(String(text ?? "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w)).map((w) => (w.length > 3 ? w.replace(/s$/, "") : w)));
+
+/** Shared words as a share of all the words in either. */
+export function overlap(a, b) {
+  const x = words(a);
+  const y = words(b);
+  if (!x.size || !y.size) return 0;
+  const shared = [...x].filter((w) => y.has(w)).length;
+  return shared / new Set([...x, ...y]).size;
+}
+
+/** Does this recorded answer apply to the question asked? */
+function applies(rec, question) {
+  if (Array.isArray(rec.match)) return rec.match.every((re) => new RegExp(re, "i").test(question));
+  return Boolean(rec.question) && overlap(rec.question, question) >= 0.5;
+}
+
 /**
- * Replay a recorded answers file by position. When it runs out, questions get D
- * and notes() reports replay_exhausted; an extra plan gets build and replay_replanned.
- * @param {{questions?: QuestionAnswer[], plan?: PlanAnswer[]}} recorded
+ * Say a recorded answer on this question's tiles (D47): by meaning, because the
+ * options differ from run to run.
+ * @returns {QuestionAnswer}
+ */
+function replyFor(rec, q) {
+  const said = rec.answer ?? rec.said;
+  if (!said) return { choice: rec.choice, ...(rec.said ? { said: rec.said } : {}) };
+  // Words the player typed stay as said, unless an option now says the same thing.
+  const a = overlap(said, q.option_a);
+  const b = overlap(said, q.option_b);
+  if (a >= 0.5 && a > b) return { choice: "A" };
+  if (b >= 0.5 && b > a) return { choice: "B" };
+  return { choice: "C", said };
+}
+
+/**
+ * Replay a recorded answers file (D47). Answers match by question; a question
+ * with no recorded answer gets D and notes() reports replay_unmatched. A file
+ * with no questions in it replays by position. An extra plan gets build and
+ * replay_replanned.
+ * @param {{questions?: any[], plan?: PlanAnswer[]}} recorded
  * @param {{print?: (text: string) => void}} [io]
  * @returns {Answerer}
  */
 export function replayAnswerer(recorded, io = {}) {
-  const qs = [...(recorded.questions ?? [])];
+  const all = recorded.questions ?? [];
+  const byQuestion = all.some((r) => r.question || r.match);
+  const positional = byQuestion ? [] : [...all];
+  const used = new Set();
   const ps = [...(recorded.plan ?? [])];
   const notes = new Set();
+  /** @type {any[]} */
+  const log = [];
   const print = io.print ?? (() => {});
+  const fresh = (q) => all.find((r) => !used.has(r) && applies(r, q));
+  const again = (q) => all.find((r) => applies(r, q));
   return {
     async question(q) {
       print(formatQuestion(q));
-      const a = qs.shift();
-      if (!a) {
-        notes.add("replay_exhausted");
-        print("(replay) D, out of recorded answers");
-        return { choice: "D" };
+      /** @type {QuestionAnswer} */
+      let a;
+      let matched = null;
+      if (byQuestion) {
+        const rec = fresh(q.question) ?? again(q.question);
+        if (rec) {
+          used.add(rec);
+          matched = rec.question ?? String(rec.match);
+          a = replyFor(rec, q);
+        } else {
+          notes.add("replay_unmatched");
+          a = { choice: "D" };
+        }
+      } else {
+        const rec = positional.shift();
+        if (rec) {
+          matched = "(by position)";
+          a = rec;
+        } else {
+          notes.add("replay_exhausted");
+          a = { choice: "D" };
+        }
       }
-      print(`(replay) ${a.choice}${a.said ? `: ${a.said}` : ""}`);
+      log.push({ asked: q.question, option_a: q.option_a, option_b: q.option_b, matched, choice: a.choice, said: a.said ?? null });
+      print(`(replay) ${a.choice}${a.said ? `: ${a.said}` : ""}${matched ? "" : " (no recorded answer)"}`);
       return a;
     },
     async plan(p) {
       print(formatPlan(p));
       const a = ps.shift();
       if (!a) {
-        // A re-plan the recording never saw (D44) isn't the questions running out.
+        // A re-plan the recording never saw isn't the questions running out.
         if (recorded.plan?.length) notes.add("replay_replanned");
         print("(replay) build");
         return { choice: "build" };
@@ -86,6 +148,7 @@ export function replayAnswerer(recorded, io = {}) {
       return a;
     },
     notes: () => [...notes],
+    replayLog: () => log,
   };
 }
 

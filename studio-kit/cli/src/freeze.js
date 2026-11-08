@@ -50,11 +50,15 @@ export function isPlaytestRun(cmd) {
 
 const resultText = (ev) => (Array.isArray(ev.content) ? ev.content.map((b) => b.text ?? "").join("") : String(ev.content ?? ""));
 
-/** The harness's per-rule lines: "  FAIL      R1: reason", "  PASS      R2". */
+/**
+ * Per-rule results in a command's output: the harness's "  FAIL      R1: reason",
+ * or an agent's own summary of --json, such as "R1 pass" or "R1: fail".
+ */
 export function parsePlaytestLines(text) {
   const pass = [];
   const fail = [];
   for (const m of text.matchAll(/^\s*(PASS|FAIL)\s+(R\d+)\b/gm)) (m[1] === "PASS" ? pass : fail).push(m[2]);
+  for (const m of text.matchAll(/^\s*(R\d+):?\s+(pass|fail|missing)\b/gm)) (m[2] === "pass" ? pass : fail).push(m[1]);
   return { pass, fail };
 }
 
@@ -73,11 +77,15 @@ export function splitChecks(source) {
   return { header: norm(source.slice(0, keys[0]?.index ?? source.length)), rules };
 }
 
-const norm = (s) => s.replace(/\s+/g, " ").trim();
+/** Compare code, not comments: a type annotation or a note isn't a changed check. */
+/** Compare quotes ignoring case and spacing. */
+const squash = (s) => String(s).toLowerCase().replace(/\s+/g, " ").trim();
+
+const norm = (s) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ").replace(/\s+/g, " ").trim();
 
 /**
  * @param {any[]} events the session's events, in order
- * @param {{frozenChecks: string|null, frozenSpec: string|null, finalChecks: string|null, finalSpec: string|null, capturedChecks?: string|null, capturedSpec?: string|null}} files
+ * @param {{frozenChecks: string|null, frozenSpec: string|null, finalChecks: string|null, finalSpec: string|null, capturedChecks?: string|null, capturedSpec?: string|null, declared?: any[]|null}} files
  */
 export function analyzeFreeze(events, files) {
   const uses = events.filter((e) => e.type === "agent.tool_use");
@@ -143,12 +151,24 @@ export function analyzeFreeze(events, files) {
       const haveSpecs = Boolean(specA && specB);
       const ruleTextChanged = haveSpecs && ruleText(specA, id) !== ruleText(specB, id);
       const named = haveSpecs && newOrChanged.some((x) => new RegExp(`\\b${id}\\b`).test(x.text));
+      const specChanged = ruleTextChanged || named;
+      // D46: the quote must really be in the rule's text, not a paraphrase.
+      const said = (files.declared ?? []).find((c) => c?.rule === id) ?? null;
+      const quote = typeof said?.quote === "string" ? said.quote : null;
+      const inSpec = (text) => Boolean(quote && text && squash(text).includes(squash(quote)));
+      const quoteMatches = inSpec(ruleText(specB ?? specA, id));
+      const classification = specChanged ? "rule_change" : said?.kind === "check_bug" && quoteMatches ? "check_bug" : "unexplained";
       return {
         rule: id,
-        spec_changed: ruleTextChanged || named,
+        classification,
+        spec_changed: specChanged,
         rule_text_changed: ruleTextChanged,
         assumption_names_rule: named,
         shown_in_plan: shownIds.has(id),
+        declared: said?.kind ?? null,
+        quote,
+        quote_matches_rule: quoteMatches,
+        what: typeof said?.what === "string" ? said.what : null,
       };
     });
   }
@@ -164,12 +184,14 @@ export function analyzeFreeze(events, files) {
       rules_known: known,
       rules,
       helpers_changed: helpersChanged,
-      // Shared helpers belong to no one rule, so they're justified by any spec change.
-      helpers_unjustified: helpersChanged && assumptionsAdded.length === 0 && !rules.some((r) => r.rule_text_changed),
+      // Shared helpers belong to no one rule, so any spec change or declared change covers them.
+      helpers_unjustified: helpersChanged && assumptionsAdded.length === 0 && !rules.some((r) => r.rule_text_changed) && !(files.declared ?? []).length,
       plan_changes: [...shownIds],
       snapshot_overwritten: snapshotOverwritten,
       assumptions_added: assumptionsAdded,
-      unjustified: rules.filter((r) => !r.spec_changed).map((r) => r.rule),
+      check_bugs: rules.filter((r) => r.classification === "check_bug").map((r) => r.rule),
+      rule_changes: rules.filter((r) => r.classification === "rule_change").map((r) => r.rule),
+      unjustified: rules.filter((r) => r.classification === "unexplained").map((r) => r.rule),
       plans_after_first_playtest: plans.length,
     },
   };

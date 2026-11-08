@@ -14,7 +14,15 @@ export function reanalyzeSession(o) {
   const dir = path.join(o.paths.sessions, o.session);
   if (!fs.existsSync(dir)) throw new Error(`no session folder for ${o.session}`);
   const events = fs.readFileSync(path.join(dir, "events.jsonl"), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  let declared = null;
+  try {
+    const report = JSON.parse(fs.readFileSync(path.join(dir, "outputs/report.json"), "utf8"));
+    if (Array.isArray(report.check_changes)) declared = report.check_changes;
+  } catch {
+    // No report: nothing was declared.
+  }
   const fixed = analyzeFreeze(events, {
+    declared,
     frozenChecks: textOrNull(path.join(dir, "outputs/checks.frozen.js")),
     frozenSpec: textOrNull(path.join(dir, "outputs/spec.frozen.md")),
     finalChecks: textOrNull(path.join(dir, "cart/checks.js")),
