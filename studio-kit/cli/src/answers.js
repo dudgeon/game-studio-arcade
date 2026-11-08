@@ -86,14 +86,16 @@ function replyFor(rec, q) {
 
 /**
  * Replay a recorded answers file (D47). Answers match by question; a question
- * with no recorded answer gets D and notes() reports replay_unmatched. A file
+ * with no recorded answer gets D and notes() reports replay_unmatched, or with
+ * `unmatched: "A"` (D168) gets A and notes() reports replay_fallback. A file
  * with no questions in it replays by position. An extra plan gets build and
  * replay_replanned.
  * @param {{questions?: any[], plan?: PlanAnswer[]}} recorded
- * @param {{print?: (text: string) => void}} [io]
+ * @param {{print?: (text: string) => void, unmatched?: "A"|"D"}} [io]
  * @returns {Answerer}
  */
 export function replayAnswerer(recorded, io = {}) {
+  const fallback = io.unmatched === "A";
   const all = recorded.questions ?? [];
   const byQuestion = all.some((r) => r.question || r.match);
   const positional = byQuestion ? [] : [...all];
@@ -117,6 +119,9 @@ export function replayAnswerer(recorded, io = {}) {
           used.add(rec);
           matched = rec.question ?? String(rec.match);
           a = replyFor(rec, q);
+        } else if (fallback) {
+          notes.add("replay_fallback");
+          a = { choice: "A" };
         } else {
           notes.add("replay_unmatched");
           a = { choice: "D" };
@@ -131,7 +136,8 @@ export function replayAnswerer(recorded, io = {}) {
           a = { choice: "D" };
         }
       }
-      log.push({ asked: q.question, option_a: q.option_a, option_b: q.option_b, matched, choice: a.choice, said: a.said ?? null });
+      const fell = fallback && byQuestion && !matched;
+      log.push({ asked: q.question, option_a: q.option_a, option_b: q.option_b, matched, choice: a.choice, said: a.said ?? null, ...(fell ? { fallback: true } : {}) });
       print(`(replay) ${a.choice}${a.said ? `: ${a.said}` : ""}${matched ? "" : " (no recorded answer)"}`);
       return a;
     },

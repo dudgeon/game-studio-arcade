@@ -564,3 +564,14 @@ Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like
 - **The template build isn't a like-for-like saving.** It reskinned `catch`, and used one of three recorded answers: the slippery penguin and "more boots" weren't built. Part of that is the replay (an unmatched question gets D, D47), and part may be that it read the template before asking.
 - **Condition before relying on templates:** the brief should make the agent ask first and treat a template's rules as defaults, then one more build should show a template honouring the kid's answers. Not done here: the task allowed two sessions, and the brief as measured is the brief on this branch.
 - `studio make --context-pack no-templates` builds the blank-only kit for this comparison. The `skill` route is untouched and unused.
+
+**D167. A starting point's rules are defaults; the player's answers override them.** *(Director's instruction after D166; Claude, library worker. Tightens D161, D165.)*
+- The brief says not to open a template or module until the questions are done, and to ask as if there were no template, including how the player moves.
+- After asking, every answer must show up in the spec as a rule or an Assumption, and `CFG` and the code change to match, however much of the template that replaces.
+
+**D168. A replay can answer an unmatched question with A instead of D.** *(Director's instruction; Claude, library worker. Option on D47.)* `studio make --replay-unmatched A`. D ends the questioning (D166's template build stopped early that way), so a comparison that needs the whole conversation answers A, logs `replay_fallback` in the session's notes, and marks that question `fallback: true` in `replay_log`. The default stays D.
+
+**D169. D166's condition is met: use a template when one fits.** *(Claude, library worker; Geoff's to accept with D166. Measured in [phase-0-results.md](phase-0-results.md#re-run-a-template-build-that-honours-the-answers-d167d169).)* Under D167's brief, and with D168 so the questions couldn't end early, a build from `catch` asked all three questions before opening the template and cost 29.4¢, against 40.4¢ from blank and 56.9¢ with the old bundle. It passed 11 of 11 auto rules first time. Measured on the running cart, the penguin slides 74 px after letting go and boots rise from 19% to 35%; the earlier template build does neither.
+- **13.7¢ wasn't a build's price; 29.4¢ is the figure to use,** still from one build on the request `catch` fits best.
+- **The trade remains the one Geoff named:** the build is cheaper and looks more like the template than the blank-start build does. Worth Geoff playing both before accepting.
+- Not changed by this: a replay maps recorded words onto the nearest tile (D47), so "Faster and more boots" became "More fish and more boots" in both builds, and fall speed never rose.

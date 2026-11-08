@@ -4,7 +4,7 @@
 
 ## Summary
 
-**Recommendation so far: Sonnet 5.5 as the default model,** now with the library fetched on demand (40¢ against about 57¢ for the same request; see [The library redesign](#the-library-redesign-d160d166)).
+**Recommendation so far: Sonnet 5.5 as the default model,** now with the library fetched on demand: about 57¢ for this request before, 40¢ from a blank start, 29¢ from a template that fits ([The library redesign](#the-library-redesign-d160d166)).
 
 - It's the best value in these builds: 57¢ for a game close to the Opus ones in polish. It also holds up across all four Sonnet builds so far (57–80¢).
 - Opus 5.5 made the most polished games, and passed every auto rule on its first playtest, at 2.3–3.5 times the cost.
@@ -57,9 +57,48 @@ The skill run is from before D46 and D47, under a brief that said to read everyt
 - **It looks plainer** (contact sheets in `~/game-studio-data/library-comparison-2026-11-08/`). (c) has a clear penguin, fish and boot on a pale sky, text for lives, and things frozen in the air at game over. (b) has "+10", "MISS" and "OUCH" pop-ups, penguin icons for lives, and "NEW BEST!". (b)'s fish and boots are small against a dark sky, as in (a). These are readings from still frames; nobody has played them.
 - **This is a best case for templates:** the request is exactly what `catch` does. A request no template fits would look like (b).
 
-**Recommendation (D166):** use the catalog and fetch on demand for every build; the 29% and the smaller prompt come with no visible loss. Keep the templates, but don't take 13.7¢ as the price of a build until a template build has been shown to honour the kid's answers. Before relying on them, tighten the brief so the agent asks first and treats a template's rules as defaults, then re-run (c) with a recording that answers its questions. That's one more session of about 15–40¢, and it needs a go-ahead.
+**Recommendation (D166, D169):** use the catalog and fetch on demand for every build; the 29% and the smaller prompt come with no visible loss. D166 held templates back until one honoured the kid's answers; the re-run below did, at 29.4¢, so use them when one fits.
 
 One build each, and the games differ, so these are the size of the differences rather than exact prices. Sonnet builds of this request have ranged 57–80¢ under the old pack.
+
+### Re-run: a template build that honours the answers (D167–D169)
+
+D166's condition was that a template build must honour the kid's answers. So the brief now says to ask before opening any template, and that a template's rules are defaults the answers override, and the replay answers an unmatched question A rather than ending the questions (D168). Same request, Sonnet, $3 cap: `sesn_01W2pcfVneKYM4YUBbsnF3gT`, **Penguin Pond**, from `catch`.
+
+| | (a) Up-front bundle | (b) Fetch, blank | (c) Template, first try | **(c2) Template, tightened brief** |
+|---|---:|---:|---:|---:|
+| **Cost, attributed** | 56.9¢ | 40.4¢ | 13.7¢ | **29.4¢** |
+| Output / writes / reads / runtime, ¢ | 31.1 / 17.3 / 7.8 / 0.8 | 24.7 / 11.1 / 4.1 / 0.5 | 7.3 / 4.1 / 2.1 / 0.2 | 17.0 / 9.3 / 2.8 / 0.3 |
+| Active time | 364 s | 218 s | 94 s | 153 s |
+| Model requests | 18 | 17 | 12 | 14 |
+| Prompt at first question | 35,267 | 10,200 | 15,559 | 10,500 |
+| Peak prompt | 69,091 | 44,256 | 24,996 | 37,014 |
+| Questions, ended by | 2, answers | 3, answers | 2, make it now | 3, answers |
+| Rules (auto) | 13 (11) | 15 (13) | 11 (10) | 13 (11) |
+| Auto rules passing, first playtest | 9 of 11 | 12 of 13 | 10 of 10 | **11 of 11** |
+| Fix rounds; check bugs; rule changes | 2; 2; 0 | 1; 1; 0 | 0; 0; 0 | 0; 0; 0 |
+| `game.js`, `checks.js` | 7.2, 13.3 KB | 8.2, 10.0 KB | 5.5, 4.3 KB | 6.1, 6.9 KB |
+| Validate; node playtest; browser runs | ok; pass; 2 | ok; pass; 1 | ok; pass; 1 | ok; pass; 1 |
+
+**Asked first:** all three questions came before it opened the template, and the fallback never fired (no `replay_fallback`).
+
+**Did it honour the answers?** Yes for what it was told, measured by driving the real cart rather than from the spec or its own checks, with (c) as the control:
+
+| Answer | Measured in (c2) | Same measure in (c) |
+|---|---:|---:|
+| "Really slippery like on ice": slide after letting go at full speed | 74 px over 52 frames | 0 px |
+| Frames holding left before it turns round | 10 | 1 |
+| First frame of holding right | 0.29 px | 3 px |
+| "More boots": boots in frames 0–1200, then 4800–6000 | 4 of 21 (19%), then 15 of 43 (35%) | 4 of 23 (17%), then 4 of 24 (17%) |
+| "More fish": things per 1200 frames, same two bands | 21, then 43 | 23, then 24 |
+| "Catching a boot loses a life" | 1 life, no score change | 1 life, no score change |
+| "Miss three fish and you lose" | game over at 3 landed | game over at 3 landed |
+
+**Two qualifications:**
+- **"Faster" didn't reach the agent.** The recording says "Faster and more boots", but the replay's match by meaning (D47) picked the tile "More fish and more boots". So things come more often and fall speed stays 1.5, written down as A3. (b) got the same tile and did the same. That's the replay, not the template, but a kid who meant faster falling wouldn't get it here.
+- **It still looks like the template:** text for lives, no pop-ups, things frozen at game over, and small dark boots. The title sits partly under the big penguin, a small bug. (b) is more polished. These are readings from still frames. The test bot scored less here than on (b), which may just mean slippery is hard: R13, whether it's still steerable, needs a person.
+
+**What it shows:** the template's saving is real once it's like for like: 29.4¢ against 40.4¢ for (b) and 56.9¢ for (a), with the same three answers honoured, no fix rounds and no check changes. The first try's 13.7¢ was mostly the cost of not building what was asked. It's still one build, on the request `catch` fits best. Measuring script and contact sheet: `~/game-studio-data/library-comparison-2026-11-08/`.
 
 ## The builds
 
@@ -167,4 +206,4 @@ $3 hasn't been reached. The highest so far is $1.98 (Opus); Sonnet's highest is 
 
 ## Spend so far
 
-From the sessions recorded by the tasks 7+8 worker: these five came to $4.41. Adding Step 5 (68¢), the skill trial (80¢ and 60¢), the parity check (under 1¢) and the two library builds (54¢) makes about **$7.03**. The probe (about 0.3¢) and any other sessions are logged elsewhere. The Phase 0 ceiling is $25.
+From the sessions recorded by the tasks 7+8 worker: these five came to $4.41. Adding Step 5 (68¢), the skill trial (80¢ and 60¢), the parity check (under 1¢) and the three library builds (83¢) makes about **$7.32**. The probe (about 0.3¢) and any other sessions are logged elsewhere. The Phase 0 ceiling is $25.

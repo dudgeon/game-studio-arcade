@@ -18,6 +18,7 @@ import { buildKit, NO_TEMPLATES_KIT, SKILL_KIT, stageContextPackSkill } from "..
 const USAGE = `usage:
   studio make "<request>" --maker A [--with O] [--model ID] [--answers FILE] [--record FILE]
                           [--budget-cents 300] [--context-pack tarball|no-templates|skill] [--brief-from-file]
+                          [--replay-unmatched D|A]
                           [--commit-anyway] [--verbose]
   studio kit [--upload]            build the studio kit tarball (and upload it once)
   studio skill --upload            create the context-pack skill through the API
@@ -53,6 +54,7 @@ async function make(args) {
       "budget-cents": { type: "string", default: "300" },
       "context-pack": { type: "string", default: "tarball" },
       "brief-from-file": { type: "boolean", default: false },
+      "replay-unmatched": { type: "string", default: "D" },
       "commit-anyway": { type: "boolean", default: false },
       verbose: { type: "boolean", short: "v", default: false },
     },
@@ -65,6 +67,11 @@ async function make(args) {
     return 2;
   }
   const budgetCents = Number(values["budget-cents"]);
+  const unmatched = values["replay-unmatched"];
+  if (unmatched !== "A" && unmatched !== "D") {
+    console.error("--replay-unmatched must be A or D");
+    return 2;
+  }
   const contextPack = /** @type {"tarball"|"no-templates"|"skill"} */ (values["context-pack"]);
   if (contextPack !== "tarball" && contextPack !== "no-templates" && contextPack !== "skill") {
     console.error("--context-pack must be tarball, no-templates or skill");
@@ -77,7 +84,7 @@ async function make(args) {
   const api = sdkApi(await createClient());
   const print = (s) => console.log(s);
   const rl = recorded ? null : readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answerer = recorded ? replayAnswerer(recorded, { print }) : liveAnswerer({ prompt: (q) => /** @type {readline.Interface} */ (rl).question(q), print });
+  const answerer = recorded ? replayAnswerer(recorded, { print, unmatched }) : liveAnswerer({ prompt: (q) => /** @type {readline.Interface} */ (rl).question(q), print });
   try {
     const { record } = await makeCart({
       api,

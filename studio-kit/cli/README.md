@@ -13,6 +13,7 @@ node studio-kit/cli/bin/studio.js make --answers studio-kit/cli/fixtures/<run>/a
 | `--with O` | a second player |
 | `--model ID` | per-run model; the agent's default is Sonnet 5.5 |
 | `--answers FILE` | replay recorded answers, matched by question (D47); no recorded answer → D |
+| `--replay-unmatched A` | on a replay, answer an unmatched question A rather than D, so the questions don't end early; logged as `replay_fallback` (D168) |
 | `--record FILE` | also save this run's answers here (always saved in the session folder) |
 | `--budget-cents N` | the session's hard list-cost cap; default 300 ($3) |
 | `--context-pack V` | `tarball` (default): the library in the kit, with its templates. `no-templates`: the same with only the blank start (D166). `skill`: attach the context pack as a skill and leave it out of the kit (D45) |
@@ -69,7 +70,7 @@ The frog-hop stream is hand-written from the docs. Replace it with a recorded st
   - Its answers and full event stream are in `fixtures/penguin-catch/`; `test/recorded.test.js` replays them.
 
 - **2026-11-08, models:** `scripts/compare-models.sh` built the penguin request on Haiku ×2, Sonnet and Opus ×2. See `docs/phase-0-results.md`. `scripts/play-headless.js` plays a cart with a bot and writes a contact sheet.
-- **2026-11-08, library redesign:** two builds of the same request on the catalog and fetch kit, from blank (40¢) and from the `catch` template (14¢). See D166 and `docs/phase-0-results.md`.
+- **2026-11-08, library redesign:** two builds of the same request on the catalog and fetch kit, from blank (40¢) and from the `catch` template (14¢), then from `catch` under the tightened brief (29¢). See D166, D169 and `docs/phase-0-results.md`.
 - **2026-11-08, D44 and D45:** two more builds of the same request under the frozen-checks brief, tarball and skill. See D45 for the comparison.
 
 ## Still needs a live session
