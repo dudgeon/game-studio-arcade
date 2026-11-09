@@ -92,7 +92,21 @@ echo "$ARCADE_HOST" > "$VM_ROOT/host"
 
 echo "waiting for the cabinet at $ARCADE_HOST (first boot installs packages; allow up to 30 minutes)"
 deadline=$(( $(date +%s) + 1800 ))
+# Bridged on Wi-Fi, the mini sometimes can't reach a healthy guest until it restarts (D156). Provisioning
+# takes under 5 minutes and can safely repeat, so 10 minutes of silence earns one restart.
+restart_at=$(( $(date +%s) + 600 ))
+heard=no
 while [ "$(date +%s)" -lt "$deadline" ]; do
+  if [ "$heard" = no ] && "$REPO/cabinet/vm/drive" ssh true 2>/dev/null; then heard=yes; fi
+  if [ "$heard" = no ] && [ "$restart_at" != 0 ] && [ "$(date +%s)" -gt "$restart_at" ]; then
+    echo "no answer from the cabinet after 10 minutes: restarting it once"
+    restart_at=0
+    "$UTMCTL" stop --request arcade-virtual >/dev/null 2>&1 || true
+    for _ in $(seq 1 12); do [ "$("$UTMCTL" status arcade-virtual 2>/dev/null)" = started ] || break; sleep 5; done
+    "$UTMCTL" stop arcade-virtual >/dev/null 2>&1 || true
+    sleep 3
+    "$UTMCTL" start arcade-virtual
+  fi
   if "$REPO/cabinet/vm/drive" ssh test -f /etc/arcade/provisioned-version 2>/dev/null; then
     "$REPO/cabinet/vm/drive" status
     exit 0
