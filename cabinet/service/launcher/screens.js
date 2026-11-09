@@ -147,7 +147,7 @@ export function flow(text, color, cols = SCROLL_COLS) {
 
 // ---------- the screens ----------
 
-/** @typedef {{ kind: "make" | "back" | "cart", title: string, by?: string, note?: string, urgent?: boolean }} ShelfItem */
+/** @typedef {{ kind: "make" | "back" | "result" | "cart", title: string, by?: string, note?: string, urgent?: boolean }} ShelfItem */
 
 /** @param {Painter} p @param {any} v */
 function shelf(p, v) {
@@ -355,6 +355,10 @@ function progress(p, v) {
 function result(p, v) {
   p.header(v.ok ? "Your game is ready!" : "Oh no");
   let y = BODY_Y + 6;
+  if (!v.ok && v.by) {
+    p.box({ id: "result-by", text: `${clean(v.by)}'s game`, x: M, y, w: INNER, h: GLYPH_H, color: C.silver });
+    y += LINE_H + 3;
+  }
   if (v.ok) {
     const r = p.box({ id: "result-title", text: v.title, x: M, y, w: INNER, h: heightOf(3) * 2, scale: 2, color: C.yellow, align: "center" });
     y += heightOf(Math.max(1, r.rows)) * 2 + 8;
@@ -362,6 +366,7 @@ function result(p, v) {
       p.box({ id: "result-by", text: `by ${clean(v.by)}`, x: M, y, w: INNER, h: GLYPH_H, color: C.silver, align: "center" });
       y += LINE_H + 6;
     }
+    if (v.note) p.box({ id: "result-note", text: v.note, x: M, y, w: INNER, h: heightOf(3), align: "center" });
   } else {
     const r = p.box({ id: "result-message", text: v.message, x: M, y, w: INNER, h: heightOf(ROWS.failure), keepLines: true });
     y += heightOf(Math.max(1, r.rows)) + 8;

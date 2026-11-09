@@ -62,6 +62,7 @@ const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted
  *   answerer: Answerer, ui: Ui,
  *   message?: object,
  *   onEvent?: (ev: SessionEvent, sessionId: string) => Promise<void>,
+ *   resume?: {sessionId: string},
  *   now?: () => Date, maxReconnects?: number,
  * }} o
  * @returns {Promise<SessionResult>}
@@ -72,7 +73,8 @@ export async function runSession(o) {
   const debug = ui.debug ?? (() => {});
   const started = now();
 
-  const created = await o.api.createSession(o.session);
+  // resume: pick a session back up after the process running it died (D191).
+  const created = o.resume ? { id: o.resume.sessionId } : await o.api.createSession(o.session);
   const sessionId = created.id;
   debug(`session ${sessionId}`);
 
@@ -212,14 +214,49 @@ export async function runSession(o) {
     }
   }
 
+  // What was already asked and answered, from a session's history (D191).
+  function restoreTurns(history) {
+    const uses = new Map();
+    for (const ev of history) {
+      if (ev.type === "agent.custom_tool_use") uses.set(ev.id, ev);
+      if (ev.type !== "user.custom_tool_result") continue;
+      answered.add(ev.custom_tool_use_id);
+      const use = uses.get(ev.custom_tool_use_id);
+      /** @type {any} */
+      let a = {};
+      try {
+        a = JSON.parse(ev.content?.[0]?.text ?? "{}");
+      } catch {}
+      const input = use?.input ?? {};
+      if (use?.name === "ask_player") {
+        if (a.choice === "D") madeItNow = true;
+        turns.push({ question: String(input.question ?? ""), option_a: String(input.option_a ?? ""), option_b: String(input.option_b ?? ""), choice: a.choice, said: a.choice === "C" ? (a.said ?? "") : null });
+      } else if (use?.name === "show_plan") {
+        planTurns.push({ summary: String(input.summary ?? ""), rules: Array.isArray(input.rules) ? input.rules : [], choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
+      }
+    }
+  }
+
   // Open the stream before sending anything: it only carries later events.
   let stream = await o.api.openStream(sessionId);
-  await o.api.send(sessionId, [o.message ?? requestMessage(o)]);
-  say("Reading your idea");
+  let done = false;
+  if (o.resume) {
+    notes.add("resumed_after_restart");
+    const history = await o.api.listEvents(sessionId);
+    restoreTurns(history);
+    for (const ev of history) {
+      if (await handle(ev)) {
+        done = true;
+        break;
+      }
+    }
+  } else {
+    await o.api.send(sessionId, [o.message ?? requestMessage(o)]);
+    say("Reading your idea");
+  }
 
   const maxReconnects = o.maxReconnects ?? 5;
   let reconnects = 0;
-  let done = false;
   while (!done) {
     for await (const ev of stream) {
       if (await handle(ev)) {

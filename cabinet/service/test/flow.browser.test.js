@@ -373,6 +373,106 @@ test("a restart with a game being played leaves the game alone; the message wait
   });
 });
 
+test("the service restarts mid-build: told, back at the shelf, and the finished game arrives with a note (D191)", { skip: skip || false, timeout: 240_000 }, async () => {
+  await withCabinet(
+    FIXTURE,
+    async ({ service, url, page, run, data, faults }) => {
+      await run(TO_FIRST_QUESTION);
+      await run(`
+        press a
+        wait question
+        press a
+        wait question
+        press a
+        wait plan
+        press a
+        wait progress
+      `);
+      service.kill();
+      await page.waitForFunction(() => /** @type {any} */ (window).launcher.screen() === "notice", null, { timeout: 15_000 });
+      const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, port: Number(new URL(url).port) }));
+      try {
+        await run(`
+          wait result
+          shot restarted-while-building
+        `);
+        assert.match(await boxText(page, "result-message"), /may still finish/);
+        await run(`
+          press a
+          wait shelf
+        `);
+        await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
+        assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+        assert.equal(await boxText(page, "shelf-by-1"), "by Alina - Penguin Catch");
+        await run(`
+          press down
+          press a
+          wait result
+          shot collected-after-restart
+        `);
+        assert.match(await boxText(page, "result-note"), /finished while the cabinet was restarting/);
+        await run(`
+          press a
+          wait play
+          sleep 400
+          press esc
+          wait check
+          press up
+          press a
+          wait shelf
+          sleep 200
+        `);
+        assert.equal(await boxText(page, "shelf-title-1"), "Penguin Catch", "seen: the entry has gone, the game is there");
+        const session = readLog(path.join(data, "logs", "studio_session.jsonl")).find((/** @type {any} */ r) => r.outcome === "committed");
+        assert.equal(session.resumed_after_restart, true);
+        assert.deepEqual(await faults(), []);
+      } finally {
+        again.stop();
+      }
+    },
+    { pace: 400 },
+  );
+});
+
+test("someone else's result is its own entry, and Make stays Make (D192)", { skip: skip || false, timeout: 240_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, faults }) => {
+    await run(TO_FIRST_QUESTION);
+    await run(`
+      press a
+      wait question
+      press a
+      wait question
+      press a
+      wait plan
+      press a
+      wait progress
+      press esc
+      wait shelf
+    `);
+    assert.equal(await boxText(page, "shelf-title-0"), "Back to your game", "while it's running");
+    await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
+    await run("shot shelf-with-result");
+    assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+    assert.equal(await boxText(page, "shelf-by-1"), "by Alina - Penguin Catch");
+    // The next kid can just make.
+    await run(`
+      press a
+      wait who
+      press esc
+      wait shelf
+      press down
+      press a
+      wait result
+      press down
+      press a
+      wait shelf
+      sleep 200
+    `);
+    assert.equal(await boxText(page, "shelf-title-1"), "Penguin Catch");
+    assert.deepEqual(await faults(), []);
+  });
+});
+
 test("a game that won't start says so, and doesn't strand the kid", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
     const dir = path.join(data, "carts", "broken");
