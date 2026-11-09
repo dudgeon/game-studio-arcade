@@ -91,7 +91,9 @@ async function step(s, out, shots) {
       await sleep(SETTLE_MS);
       const st = await state();
       const words = st.boxes.flatMap((b) => b.lines.map((l) => l.text)).join(" ");
-      if (!words.includes(rest)) throw new Error(`expected "${rest}" on screen; ${st.screen} shows: ${words}`);
+      // Long text wraps across lines, so spaces don't count.
+      const flat = (t) => t.replace(/\s+/g, "");
+      if (!flat(words).includes(flat(rest))) throw new Error(`expected "${rest}" on screen; ${st.screen} shows: ${words}`);
       return;
     }
     case "shot": {
