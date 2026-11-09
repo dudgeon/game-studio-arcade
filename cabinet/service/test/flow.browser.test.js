@@ -473,6 +473,44 @@ test("someone else's result is its own entry, and Make stays Make (D192)", { ski
   });
 });
 
+test("a starter game has no label and asks nothing after a play; a made game has both (D193)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, data, faults, problems }) => {
+    const carts = path.join(data, "carts");
+    fs.cpSync(path.resolve(import.meta.dirname, "../../../studio-kit/context-pack/templates/catch"), path.join(carts, "apple-catch"), { recursive: true });
+    fs.cpSync(path.join(FIXTURE, "cart"), path.join(carts, "penguin-catch"), { recursive: true });
+    await page.reload();
+    await page.waitForFunction(() => /** @type {any} */ (window).launcher?.screen() === "shelf");
+    await run("sleep 100");
+    // The made game sorts first: it has a created date, and the starter doesn't.
+    assert.equal(await boxText(page, "shelf-title-1"), "Penguin Catch");
+    assert.equal(await boxText(page, "shelf-by-1"), "by A - 3 to check");
+    assert.equal(await boxText(page, "shelf-title-2"), "Apple Catch");
+    assert.equal(await boxText(page, "shelf-by-2"), undefined, "no maker and no label");
+    await run(`
+      shot shelf-starter-and-made
+      press down
+      press down
+      press a
+      wait play
+      sleep 400
+      press esc
+      wait shelf
+      sleep 200
+    `);
+    assert.equal(readLog(path.join(data, "logs", "play.jsonl"))[0].cart_id, "apple-catch");
+    await run(`
+      press down
+      press a
+      wait play
+      sleep 400
+      press esc
+      wait check
+    `);
+    assert.deepEqual(await faults(), []);
+    assert.deepEqual(problems, []);
+  });
+});
+
 test("a game that won't start says so, and doesn't strand the kid", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
     const dir = path.join(data, "carts", "broken");

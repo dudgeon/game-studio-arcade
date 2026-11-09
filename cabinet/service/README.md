@@ -46,6 +46,10 @@ Verbs: `press KEY [MS]`, `hold KEY MS`, `down KEY`, `up KEY`, `type TEXT`, `say 
 
 Stick moves the highlight, **any** of the six player buttons or START picks it (D182). ESC goes back; on a question or plan it asks first: keep going, come back later, or stop making this game (D188). On a talk screen: hold any button, talk, let go. F1 types instead (D184). Where words don't fit: stick right opens a reader with all of them (D181).
 
+## You-check
+
+A made game asks its `(you check)` rules after a play, and the shelf says how many are left. A starter game, one with no `maker` in its `cart.json`, does neither (D193).
+
 ## Text fitting
 
 All words go through `Painter.box` in `launcher/screens.js`, which uses `launcher/text.js` (D181). To add a string, give it a box and say what a cut means:

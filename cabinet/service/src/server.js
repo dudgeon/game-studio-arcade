@@ -77,6 +77,7 @@ export function createServiceHandler(o) {
     origin: "cabinet",
     checker: null,
     checkerFromBody: true,
+    checksForMadeOnly: true, // D193
   });
 
   /** @param {http.ServerResponse} res @param {number} status @param {unknown} body */
