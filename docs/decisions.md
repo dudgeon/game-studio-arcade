@@ -769,3 +769,9 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 - An entry shows its maker's name: "New game ready!" with "by Alina - Penguin Catch", or "A new game didn't finish" with "by Alina". Opening it shows the result screen, and leaving that screen marks it viewed, whoever opened it.
 - A kid following their own make still goes straight to the result, and an entry they've seen doesn't appear.
 - Entries live in `studio-results.json` next to the library, so they survive a restart. Viewing one stamps `viewed_at` and nothing is removed.
+
+**D193. The shelf's starter games don't ask kids to check anything.** *(Geoff, 2026-11-09, through the director.)*
+- The shelf keeps the three starter games, but drops their "1 to check" label, because no kid made them. Made games keep the label and the questions. How it's done is Claude's:
+- A cart with no `maker` in its `cart.json` is a starter. Everything made through the Studio has one (`makeCart`, D87), and the seeded templates don't, so this needs no marker, no re-seeding and no change to carts already on a cabinet.
+- On the cabinet, a starter's you-check rules aren't offered at all: no label, no questions after a play, and `/api/you-check` refuses an answer. The rules stay in its `spec.md`, untouched. A game made from a starter has a maker, so it asks as usual.
+- The desktop player (D71) is unchanged: there, a person checking any cart is the point.

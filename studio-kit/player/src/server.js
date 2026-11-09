@@ -42,11 +42,14 @@ const TYPES = {
  *   players?: number,
  *   origin?: "desktop" | "cabinet",
  *   checkerFromBody?: boolean,
+ *   checksForMadeOnly?: boolean,
  *   now?: () => Date,
  * }} PlayerOptions
  *   origin: logged on play records (default "desktop"). The cabinet service passes "cabinet".
  *   checkerFromBody: the page says who answered you-check, since a cabinet has
  *     many players; otherwise it's always `checker`.
+ *   checksForMadeOnly: a cart with no maker asks nobody to check it (D193). The
+ *     cabinet's starter games. Its rules stay in its spec.
  *   libraryDir: the dev cart library (default <data>/carts).
  *   logsDir: where JSONL logs go (default <data>/logs).
  *   examples: also list runtime/examples/* (the library wins on a clash).
@@ -102,7 +105,10 @@ export function createPlayerHandler(opts = {}) {
   const roots = [{ root: libraryDir, source: "library" }];
   if (opts.examples) roots.push({ root: EXAMPLES_DIR, source: "example" });
 
-  const carts = () => listCarts(roots);
+  const carts = () => {
+    const all = listCarts(roots);
+    return opts.checksForMadeOnly ? all.map((c) => (c.maker ? c : { ...c, youCheck: [] })) : all;
+  };
   const findCart = (id) => carts().find((c) => c.id === id) ?? null;
 
   /** The cart list as the page sees it: no paths, plus answers and plays from the logs. */

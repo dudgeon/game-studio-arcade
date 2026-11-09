@@ -523,6 +523,32 @@ test("the service won't start on a bad config, and doesn't quote it (D131, D185)
   assert.ok(!noAgent.stderr.includes(KEY));
 });
 
+test("a starter game asks nobody to check it; a made game still does (D193)", async () => {
+  const data = tmp();
+  const paths = dataPaths(data);
+  const template = path.resolve(import.meta.dirname, "../../../studio-kit/context-pack/templates/catch");
+  assert.match(fs.readFileSync(path.join(template, "spec.md"), "utf8"), /\(you check\)/, "the starter does have such a rule");
+  fs.cpSync(template, path.join(paths.carts, "apple-catch"), { recursive: true });
+  fs.cpSync(path.join(FIXTURE, "cart"), path.join(paths.carts, "penguin-catch"), { recursive: true });
+  const { studio } = setup();
+  const s = await startService({ studio, makers: makersStore({ file: path.join(data, "makers.json") }), speech: stubSpeech(), libraryDir: paths.carts, logsDir: paths.logs, port: 0 });
+  /** @param {any} body */
+  const answer = (body) => fetch(`${s.url}/api/you-check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  try {
+    const { carts } = await (await fetch(`${s.url}/api/carts`)).json();
+    const starter = carts.find((/** @type {any} */ c) => c.id === "apple-catch");
+    const made = carts.find((/** @type {any} */ c) => c.id === "penguin-catch");
+    assert.deepEqual(starter.youCheck, []);
+    assert.equal(made.youCheck.length, 3);
+    assert.equal((await answer({ cart_id: "apple-catch", answers: [{ rule: "R11", answer: "yes" }] })).status, 400);
+    assert.equal(readLog(path.join(paths.logs, "you_check.jsonl")).length, 0, "nothing recorded for a starter");
+    assert.equal((await answer({ cart_id: "penguin-catch", answers: [{ rule: made.youCheck[0].id, answer: "yes" }] })).status, 200);
+    assert.ok(fs.readFileSync(path.join(paths.carts, "apple-catch", "spec.md"), "utf8").includes("(you check)"), "the rule stays in its spec");
+  } finally {
+    await s.close();
+  }
+});
+
 test("the server: routes, origin guard, bad input", async () => {
   const data = tmp();
   const paths = dataPaths(data);
