@@ -62,6 +62,11 @@ step_keys() {
   systemctl restart arcade-keyd
 }
 
+# No API key on this cabinet yet: replay a recorded make, which spends nothing (D186).
+service_args_without_key() {
+  echo "--replay $ARCADE_HOME/current/studio-kit/cli/fixtures/penguin-catch"
+}
+
 kiosk_env() {
   cat <<'ENV'
 WLR_BACKENDS=headless,libinput
@@ -69,6 +74,6 @@ WLR_RENDERER=pixman
 WLR_HEADLESS_OUTPUTS=1
 WLR_LIBINPUT_NO_DEVICES=1
 ARCADE_OUTPUT=HEADLESS-1
-CHROMIUM_EXTRA=--disable-gpu
+CHROMIUM_EXTRA=--disable-gpu --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
 ENV
 }

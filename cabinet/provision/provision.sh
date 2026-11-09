@@ -110,12 +110,8 @@ step_bundle() {
   if [ ! -d "$release" ]; then
     install -d "$release.tmp"
     tar -xzf "$PAYLOAD/bundle.tar.gz" -C "$release.tmp"
-    # The same links npm's workspaces make. These packages have no outside dependencies at run time.
-    install -d "$release.tmp/node_modules/@game-studio-arcade"
-    ln -sfn ../../runtime "$release.tmp/node_modules/@game-studio-arcade/runtime"
-    ln -sfn ../../studio-kit/spec "$release.tmp/node_modules/@game-studio-arcade/spec"
-    ln -sfn ../../studio-kit/player "$release.tmp/node_modules/@game-studio-arcade/player"
-    ln -sfn ../../studio-kit/playtest "$release.tmp/node_modules/@game-studio-arcade/playtest"
+    # Exact versions from the repo's lock file, each checked by its hash; no install scripts run.
+    (cd "$release.tmp" && PATH="$ARCADE_HOME/node/$(lock_value version)/bin:$PATH" npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
     mv "$release.tmp" "$release"
   fi
   ln -sfn "$release" "$ARCADE_HOME/current"
@@ -145,6 +141,12 @@ step_services() {
   install -d /etc/arcade
   kiosk_env > /etc/arcade/kiosk.env
   printf 'profile=%s\nplayers=1\n' "$PROFILE" > /etc/arcade/cabinet.conf
+  # The cabinet's own key file (D131) means live. Without one, the profile says what to do.
+  if [ -f /etc/arcade/service.json ]; then
+    echo 'ARCADE_SERVICE_ARGS=--config /etc/arcade/service.json' > /etc/arcade/service.env
+  else
+    echo "ARCADE_SERVICE_ARGS=$(service_args_without_key)" > /etc/arcade/service.env
+  fi
   systemctl daemon-reload
   systemctl disable --now getty@tty1.service 2>/dev/null || true
   systemctl set-default multi-user.target >/dev/null

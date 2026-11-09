@@ -172,7 +172,7 @@ function writeSeed(mount, { modulesTgz, nodeTarball, profile }) {
   mkdirSync(seed, { recursive: true });
   const provDir = join(REPO, "cabinet/provision");
   run("tar", ["-czf", join(seed, "provision.tar.gz"), "--no-xattrs", "--no-mac-metadata", "-C", provDir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-  bundle(join(seed, "bundle.tar.gz"), ["package.json", "runtime", "studio-kit/player", "studio-kit/playtest", "studio-kit/spec", "studio-kit/context-pack/templates", "cabinet/vm/guest"]);
+  bundle(join(seed, "bundle.tar.gz"), ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest"]);
   cpSync(modulesTgz, join(seed, "kernel-modules.tar.gz"));
   cpSync(nodeTarball, join(seed, lock.node.name));
   cpSync(join(provDir, "files/firstboot.sh"), join(seed, "firstboot.sh"));

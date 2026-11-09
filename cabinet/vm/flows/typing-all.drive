@@ -1,0 +1,22 @@
+# Every printable character through `drive type`, on the Make flow's F1 typing screen (D184).
+# Needs a maker named Alina (penguin.drive makes one). Backs out before anything is made.
+wait shelf
+press a
+wait who
+press a
+wait say idle
+press f1
+wait say typing
+type abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789
+expect abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789
+type  !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+expect !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+shot typed-everything
+press esc
+sleep 500
+press esc
+sleep 500
+press esc
+sleep 500
+press esc
+wait shelf
