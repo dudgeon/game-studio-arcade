@@ -16,7 +16,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 
 ## 2. Vocabulary
 
-- **Studio**: everything that makes games. Studio sessions (an agent building or forking a cart against its spec), the studio kit, and the Studio's front ends: the cabinet's MAKE flow, Claude Code on the Mac mini, and later a browser front end. Replaces the earlier name "the Forge".
+- **Studio**: everything that makes games. Studio sessions (an agent building or forking a cart against its spec), the studio kit, and the Studio's front ends: the cabinet's Make flow, Claude Code on the Mac mini, and later a browser front end. Replaces the earlier name "the Forge".
 - **Arcade**: everything that plays games: the cabinet, launcher, shelf, game players, play telemetry.
 - **Cabinet-initiated**: a kid makes or forks a game at the cabinet, solo. The core workflow.
 - **Desktop-initiated**: Geoff, with a kid, builds or changes a game in local Claude Code on the Mac mini and publishes it to the cabinet.
@@ -96,7 +96,7 @@ CLOUD
   GitHub (private): nightly cart-library backup <- from cabinet
 
 CABINET  (Raspberry Pi 5, basement, mesh Wi-Fi)
-  Launcher (full-screen browser): shelf, MAKE flow, tiles
+  Launcher (full-screen browser): shelf, Make flow, tiles
   House runtime (browser) | native RetroArch, TIC-80, PICO-8
   Cabinet service
     Arcade side: local web server, git cart library, play log,
@@ -147,14 +147,13 @@ game-studio-arcade/
   runtime/             house console: SDK + starter library
   studio-kit/
     spec/              spec.md template, guide to writing checkable rules
-    context-pack/      library reference, recipes, 3-4 tiny example carts
+    context-pack/      short catalog, guides read on demand, 4 templates and a blank start (D160, D161)
     playtest/          Playwright harness: scripted input, frames, per-rule JSON report
     tools/             new_cart, validate_cart, import_asset
     plugin/            Claude Code plugin "game-studio": skill build-cart + studio.* tools
     managed-agent/     agent .md, environment.yaml, kit packaging, claude-lock.json
   cabinet/
-    service/           Arcade side + Studio side
-    launcher/          web UI on the cabinet screen
+    service/           Arcade side + Studio side; launcher/ inside it is the cabinet screen's UI (D180, D183)
     image/             reproducible Pi OS Lite build: kiosk, systemd, players
   manager/             Cabinet Manager web app + menu bar launcher
   carts-examples/      Falling Blocks and other seed carts
@@ -262,7 +261,7 @@ The Manager's Activity view joins these: request → session → cart version �
 
 Collision (overlap, plus who destroys whom); gravity, jump, platforms; grid movement and rotation; tile maps and a scrolling camera; spawners and waves; particles; timers and tweening; score, lives, high scores; title → play → game-over flow; turn taking for more than one player, built for any number of controllers (D85); chip-synth sound effects and jingles; sprite and palette helpers.
 
-Context pack: the library reference, short recipes, and 3–4 tiny example carts. Keep it lean. Use the logs to promote helpers Claude keeps rewriting.
+Context pack (D160–D166): a short catalog the agent always reads, modules and guides it fetches only when a game needs them, and four tested templates plus a blank start. Keep it lean. Use the logs to promote helpers Claude keeps rewriting.
 
 ## 11. Safety and kids
 

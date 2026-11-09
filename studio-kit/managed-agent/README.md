@@ -16,9 +16,11 @@ Run from **this directory**, so the lockfile lands here:
 
 ```sh
 cd studio-kit/managed-agent
-ant --profile game-studio-arcade apply --dry-run .   # look at the plan
-ant --profile game-studio-arcade apply .             # create or update; commit claude-lock.json afterwards
+ant --profile game-studio-arcade apply --dry-run   # look at the plan
+ant --profile game-studio-arcade apply             # update what the lockfile tracks; commit claude-lock.json afterwards
 ```
+
+Use bare `apply`, not `apply .`: `.` also walks the folder for new resources (D173). `studio check-brief` says whether the applied agent matches the files here, and `studio make` won't run if it doesn't.
 
 Re-running with no changes must show nothing to do (idempotent). A file renamed is a new resource; `--prune` archives the old one.
 
@@ -30,7 +32,7 @@ npm run pack-kit -w studio-kit/managed-agent     # or: node studio-kit/cli/bin/s
 
 The kit includes `runtime/`, `studio-kit/spec`, `studio-kit/tools`, `studio-kit/playtest` and `studio-kit/context-pack`, minus tests and `node_modules`. `KIT.md` lists each part and the commands from its `package.json` `bin`, so **the spec, tools and playtest packages should declare their commands as `bin` entries** for the agent to find them. Parts that don't exist yet are listed under "Not in this kit yet".
 
-The skill experiment: `node scripts/pack-kit.js --skill-dir skills-staged` stages the context pack as a custom skill (`skills-staged/studio-context-pack/SKILL.md`). To try it, add `skills: [../skills-staged/studio-context-pack]` to a copy of the agent file and apply it.
+The skill experiment (D45; tarball won): `studio skill --upload` stages the context pack as a custom skill and creates it through the API, once, with its id in `claude-lock.skill.json`. `studio make --context-pack skill` attaches it and leaves the pack out of that session's kit.
 
 ## What's tested offline
 
@@ -46,4 +48,5 @@ In order, once the director clears it (after task 1's probe):
 4. ~~One capped session that extracts the kit and playtests a cart.~~ Done with `parity/run-parity.js` on the playtest's `dot-catch` fixture (`sesn_0183yE1n3dd38YdPPA5WBRZU`, Haiku 5.5, 50¢ cap, 36 s). Both drivers passed and `comparable()` matched the mini exactly. Re-run it on a context-pack example once task 6 lands.
 5. ~~Output filenames and lag.~~ Done: bare names; `DONE.json` complete about 7 s after idle. See platform-notes.
 6. ~~Cost.~~ Done: `usage.list_cost` "0" against a recomputed 0.16¢. Comparing against the Console is still open.
-7. Try the context pack as a skill instead of a tarball; keep whichever builds better (cost, first-try pass), and record it in `docs/decisions.md`.
+7. ~~Try the context pack as a skill instead of a tarball.~~ Done 2026-11-08: tarball stays the default (D45).
+8. ~~Apply the current brief as agent v2 and commit `claude-lock.json`.~~ Done 2026-11-08; the re-apply reported "Everything is up to date, 2 unchanged". See D173.

@@ -5,9 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { formatPlan, formatQuestion, parseChoice, planResult, questionResult } from "../src/tiles.js";
-import { liveAnswerer, loadAnswers } from "../src/answers.js";
+import { liveAnswerer, loadAnswers, overlap, replayAnswerer } from "../src/answers.js";
 import { sessionCreateBody } from "../src/api.js";
-import { readLock } from "../src/config.js";
+import { MANAGED_AGENT_DIR, readAgentDef, readLock, readSkillLock, STUDIO_TOOLSET } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
 import { progressFor } from "../src/progress.js";
 import { judgeReport } from "../src/checks.js";
@@ -33,6 +33,9 @@ test("tiles: question, plan and results", () => {
   const plan = formatPlan({ summary: "Dodge cars.", rules: [{ id: "R1", kind: "auto", text: "Up moves up." }, { id: "R2", kind: "you-check", text: "Frog smiles." }] });
   assert.match(plan, /R1\. Up moves up\.\n/);
   assert.match(plan, /R2\. Frog smiles\.  \(you check\)/);
+  assert.doesNotMatch(plan, /What changed/);
+  const replan = formatPlan({ summary: "s", rules: [], changes: [{ id: "R8", text: "Boots start at 15%." }] });
+  assert.match(replan, /What changed:\n  R8\. Boots start at 15%\./);
 });
 
 test("live answerer: re-asks on bad input, C needs words", async () => {
@@ -59,6 +62,10 @@ test("session body: pinned agent, model override, kit mount, budget as cents str
   const over = sessionCreateBody({ ...base, agentVersion: 4, model: "claude-opus-5-5" });
   assert.deepEqual(over.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-opus-5-5" }, version: 4 });
   assert.equal(sessionCreateBody(base).agent, "agent_1");
+  const sk = sessionCreateBody({ ...base, model: "claude-sonnet-5-5", skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
+  assert.deepEqual(sk.agent, { type: "agent_with_overrides", id: "agent_1", model: { id: "claude-sonnet-5-5" }, skills: [{ type: "custom", skill_id: "skill_1", version: "7" }] });
+  const brief = sessionCreateBody({ ...base, agentVersion: 1, system: "brief", tools: [{ type: "agent_toolset_20260401" }] });
+  assert.deepEqual(brief.agent, { type: "agent_with_overrides", id: "agent_1", version: 1, system: "brief", tools: [{ type: "agent_toolset_20260401" }] });
   const sys = sessionCreateBody({ ...base, system: "harness", extraFiles: [{ fileId: "file_p", mountPath: "/mnt/session/uploads/parity.tgz" }] });
   assert.deepEqual(sys.agent, { type: "agent_with_overrides", id: "agent_1", system: "harness" });
   assert.deepEqual(sys.resources[1], { type: "file", file_id: "file_p", mount_path: "/mnt/session/uploads/parity.tgz" });
@@ -81,6 +88,25 @@ test("readLock finds the agent and environment by path", () => {
   assert.deepEqual(readLock(f), { agentId: "agent_9", agentVersion: 3, environmentId: "env_9" });
 });
 
+test("readAgentDef gives the repo's brief, and its toolset matches the agent file", () => {
+  const def = readAgentDef();
+  assert.match(def.system, /^You are the Studio/);
+  assert.match(def.system, /The checks are now frozen/);
+  assert.doesNotMatch(def.system, /^---/);
+  assert.deepEqual(def.tools.map((t) => /** @type {any} */ (t).name ?? /** @type {any} */ (t).type), ["agent_toolset_20260401", "ask_player", "show_plan", "tell_player"]);
+  const yaml = fs.readFileSync(path.join(MANAGED_AGENT_DIR, "agents/studio.md"), "utf8");
+  for (const c of STUDIO_TOOLSET.configs) assert.match(yaml, new RegExp(`- name: ${c.name}\\n\\s+enabled: false`));
+  assert.match(yaml, /default_config:\n\s+enabled: true\n\s+permission_policy:\n\s+type: always_allow/);
+  assert.match(yaml, /- type: agent_toolset_20260401/);
+});
+
+test("readSkillLock finds the skill's id and version", () => {
+  const f = path.join(tmp(), "claude-lock.skill.json");
+  assert.throws(() => readSkillLock(f), /apply the context-pack skill/);
+  fs.writeFileSync(f, JSON.stringify({ resources: { "./skills-staged/studio-context-pack": { kind: "skill", id: "skill_9", version: "123" } } }));
+  assert.deepEqual(readSkillLock(f), { type: "custom", skill_id: "skill_9", version: "123" });
+});
+
 test("library ids: slug, suffix, title from spec", () => {
   assert.equal(slugify("Candy Pop!"), "candy-pop");
   assert.equal(slugify("Café Crème"), "cafe-creme");
@@ -99,7 +125,7 @@ test("progress lines are kid language", () => {
   assert.equal(progressFor({ name: "edit", input: { file_path: "/workspace/cart/game.js" } }), "Fixing the game");
   assert.equal(progressFor({ name: "mystery" }), null);
   assert.equal(progressFor({ name: "bash", input: { command: "cd /workspace/kit; cat studio-kit/playtest/README.md" } }), "Reading up");
-  assert.equal(progressFor({ name: "bash", input: { command: "node /workspace/kit/studio-kit/spec/bin/validate-cart.js /workspace/cart" } }), "Checking the cart");
+  assert.equal(progressFor({ name: "bash", input: { command: "node /workspace/kit/studio-kit/spec/bin/validate-cart.js /workspace/cart" } }), "Checking your game");
 });
 
 test("judgeReport: every auto rule and generic check must pass", () => {
@@ -181,4 +207,83 @@ test("the fixture spec is in canonical form: format(parse(x)) === x", async () =
   const spec = parseSpec(text);
   assert.deepEqual(spec.errors, []);
   assert.equal(formatSpec(spec), text);
+});
+
+const PENGUIN = JSON.parse(fs.readFileSync(new URL("../fixtures/penguin-catch/answers.json", import.meta.url), "utf8"));
+const q = (question, option_a = "One", option_b = "Two") => ({ question, option_a, option_b });
+
+test("D47: replay finds an answer by its question, in any order and wording", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("Does the penguin slide or hop?", "Slides", "Hops")), { choice: "C", said: "slides left and right but really slippery like on ice" });
+  assert.deepEqual(await a.question(q("How does the game get harder?", "Things fall faster", "Faster and more boots")), { choice: "B" });
+  assert.deepEqual(await a.question(q("What if you catch a boot?", "Lose a life", "Lose 5 points")), { choice: "A" });
+  assert.deepEqual(a.notes?.(), []);
+  assert.equal(a.replayLog?.().length, 3);
+});
+
+test("D47: options that don't say the recorded answer get its words through C", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens if you catch a boot?", "Counts as a miss", "Lose some points")), { choice: "C", said: "You lose a life" });
+});
+
+test("D171: a tile that only partly says the recorded answer doesn't take it", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("How does it get harder?", "Fish fall faster", "More fish and more boots")), { choice: "C", said: "Faster and more boots" });
+  const b = replayAnswerer(PENGUIN);
+  assert.deepEqual(await b.question(q("What happens if you catch a boot?", "Lose a life too", "Lose points")), { choice: "C", said: "You lose a life" });
+});
+
+test("D171: a tile that says the same in other small words still takes it", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens if you catch a boot?", "Lose points", "Lose a life")), { choice: "B" });
+  const b = replayAnswerer(PENGUIN);
+  assert.deepEqual(await b.question(q("How does it get harder?", "Fish fall faster", "More boots and faster!")), { choice: "B" });
+});
+
+test("D47: options keep their meaning when they swap places", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What happens when you touch a boot?", "Lose 5 points", "You lose a life")), { choice: "B" });
+});
+
+test("D47: a question with no recorded answer gets D, and that's logged", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("What should the game be called?")), { choice: "D" });
+  assert.deepEqual(a.notes?.(), ["replay_unmatched"]);
+  assert.deepEqual(a.replayLog?.()[0], { asked: "What should the game be called?", option_a: "One", option_b: "Two", matched: null, choice: "D", said: null });
+});
+
+test("D47: a boot question about something else doesn't take the catch answer", async () => {
+  const a = replayAnswerer(PENGUIN);
+  assert.deepEqual(await a.question(q("How often should boots appear?")), { choice: "D" });
+});
+
+test("D47: a follow-up on the same topic reuses the answer", async () => {
+  const a = replayAnswerer(PENGUIN);
+  await a.question(q("What happens if you catch a boot?", "You lose a life", "Lose points"));
+  assert.deepEqual(await a.question(q("And if you touch a boot again?", "You lose a life", "Lose points")), { choice: "A" });
+});
+
+test("D47: without match, recorded questions compare by word overlap", async () => {
+  const a = replayAnswerer({ questions: [{ question: "What color is the frog?", answer: "Bright green" }] });
+  assert.ok(overlap("What color is the frog?", "What color should the frog be?") >= 0.5);
+  assert.deepEqual(await a.question(q("What color should the frog be?", "Bright green", "Dark blue")), { choice: "A" });
+  assert.deepEqual(await a.question(q("How many lives?")), { choice: "D" });
+});
+
+test("D168: unmatched: A answers A, keeps asking, and logs the fallback", async () => {
+  const a = replayAnswerer(PENGUIN, { unmatched: "A" });
+  assert.deepEqual(await a.question({ question: "What should the game be called?", option_a: "One", option_b: "Two" }), { choice: "A" });
+  assert.deepEqual(a.notes?.(), ["replay_fallback"]);
+  assert.equal(a.replayLog?.()[0].fallback, true);
+  assert.equal(a.replayLog?.()[0].matched, null);
+  const b = await a.question({ question: "How should the game get harder?", option_a: "Bigger", option_b: "Faster and more boots" });
+  assert.notEqual(b.choice, "D", "a recorded answer still applies after a fallback");
+  assert.equal(a.replayLog?.()[1].fallback, undefined);
+});
+
+test("a file with no questions still replays by position", async () => {
+  const a = replayAnswerer({ questions: [{ choice: "B" }] });
+  assert.deepEqual(await a.question(q("Anything?")), { choice: "B" });
+  assert.deepEqual(await a.question(q("More?")), { choice: "D" });
+  assert.deepEqual(a.notes?.(), ["replay_exhausted"]);
 });

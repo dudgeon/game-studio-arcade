@@ -22,9 +22,14 @@ export function parseChoice(input) {
   return c === "A" || c === "B" || c === "C" || c === "D" ? c : null;
 }
 
-/** @param {{summary: string, rules: {id: string, kind: string, text: string}[]}} plan */
+/** @param {{summary: string, rules: {id: string, kind: string, text: string}[], changes?: {id: string, text: string}[]}} plan */
 export function formatPlan(plan) {
   const lines = ["Here's the plan:", `  ${plan.summary}`, ""];
+  if (plan.changes?.length) {
+    lines.push("  What changed:");
+    for (const c of plan.changes) lines.push(`  ${c.id}. ${c.text}`);
+    lines.push("");
+  }
   for (const r of plan.rules ?? []) {
     lines.push(`  ${r.id}. ${r.text}${r.kind === "you-check" ? "  (you check)" : ""}`);
   }

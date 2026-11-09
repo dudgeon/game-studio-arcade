@@ -8,10 +8,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mockApi } from "../test-support/mock-api.js";
-import { makeCart } from "../src/make.js";
+import { buildSummary, makeCart } from "../src/make.js";
 import { replayAnswerer } from "../src/answers.js";
 import { dataPaths } from "../src/config.js";
 import { readLog } from "../src/log.js";
+import { reanalyzeSession } from "../src/reanalyze.js";
+import { addYouCheckRules, questionsFor } from "../src/untested.js";
+import { parseSpec, formatSpec, validateRuleCoverage } from "@game-studio-arcade/spec";
+import { readCart } from "../../player/src/library.js";
+import { compareBrief } from "../src/brief.js";
+import { readAgentDef } from "../src/config.js";
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/frog-hop");
 const script = JSON.parse(fs.readFileSync(path.join(fixtures, "session.json"), "utf8"));
@@ -47,10 +53,11 @@ const passing = {
   },
 };
 
+/** @param {any} [opts] */
 function setup(opts = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-data-"));
   const paths = dataPaths(root);
-  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5, input_tokens: 41000, output_tokens: 9800, cache_read_input_tokens: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } }, sessionId: opts.sessionId });
+  const m = mockApi(script, { outputs: opts.outputs ?? outputs(), outputLag: 2, appliedAgent: opts.appliedAgent, usage: { list_cost: { amount: "143", currency: "USD" }, active_seconds: 312.5, input_tokens: 41000, output_tokens: 9800, cache_read_input_tokens: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } }, sessionId: opts.sessionId });
   const info = [];
   let t = Date.parse("2026-11-07T21:00:00Z");
   const make = (extra = {}) =>
@@ -123,6 +130,11 @@ test("a passing build is committed with complete log records", async () => {
   assert.equal(session.cart_id, "frog-hop");
   assert.deepEqual(session.missing_outputs, []);
   assert.equal(session.outputs_complete, true);
+  assert.equal(session.context_pack, "tarball");
+  assert.deepEqual(session.edits_after_first_playtest, { game_js: 1, checks_js: 0, spec_md: 0 });
+  assert.equal(session.playtest_runs, 1);
+  assert.equal(session.checks_changed_after_playtest.changed, false);
+  assert.equal(session.checks_changed_after_playtest.baseline, "none", "that fixture has no snapshot");
   assert.equal(session.active_seconds, 312.5);
   assert.deepEqual(session.tokens, { input: 41000, output: 9800, cache_read: 120000, cache_creation: { ephemeral_5m_input_tokens: 8000, ephemeral_1h_input_tokens: 0 } });
   assert.deepEqual({ type: "studio_session", ...rec }, session);
@@ -135,7 +147,8 @@ test("a passing build is committed with complete log records", async () => {
     assert.ok(fs.existsSync(path.join(sessionDir, f)), `kept ${f}`);
   }
   const saved = JSON.parse(fs.readFileSync(record, "utf8"));
-  assert.deepEqual(saved, answers, "the recorded answers equal the replayed ones");
+  assert.deepEqual(saved.questions.map((a) => [a.choice, a.said]), answers.questions.map((a) => [a.choice, a.said]), "the recorded answers equal the replayed ones");
+  assert.deepEqual(saved.plan, answers.plan);
   assert.equal(s.m.calls.filter((c) => c === "listOutputs").length, 3, "waited out the output lag");
 });
 
@@ -196,4 +209,209 @@ test("no cart.tgz: the spec is still logged and kept", async () => {
   assert.equal(record.outputs_complete, true, "the manifest didn't promise a cart");
   assert.match(record.spec_diff ?? "", /\+# Frog Hop/);
   assert.ok(fs.existsSync(path.join(sessionDir, "outputs/spec.md")));
+});
+
+test("the frozen snapshot is fetched when the first playtest starts, so overwriting it later changes nothing", async () => {
+  const frozen = Buffer.from("export default {\n  R1: async (t) => { await t.step(1); },\n};\n");
+  const base = outputs({ "checks.frozen.js": frozen, "spec.frozen.md": fs.readFileSync(path.join(fixtures, "cart/spec.md")) });
+  const s = setup({ outputs: base });
+  const { record, sessionDir } = await s.make();
+  assert.equal(fs.readFileSync(path.join(sessionDir, "frozen/checks.frozen.js"), "utf8"), frozen.toString());
+  const c = record.checks_changed_after_playtest;
+  assert.equal(c.baseline, "captured");
+  assert.ok(c.rules.some((r) => r.rule === "R1"), "the final checks differ from what was captured");
+});
+
+test("a failed capture doesn't stop the build", async () => {
+  const s = setup();
+  const real = s.m.api.listOutputs;
+  let calls = 0;
+  s.m.api.listOutputs = async (id) => {
+    if (calls++ === 0) throw new Error("network blip");
+    return real(id);
+  };
+  const { record } = await s.make();
+  assert.equal(record.outcome, "committed");
+});
+
+test("reanalyze appends a correction and leaves the original record", async () => {
+  const s = setup();
+  const { sessionDir, record } = await s.make();
+  const file = path.join(s.paths.logs, "studio_session.jsonl");
+  const before = fs.readFileSync(file, "utf8");
+  const fixed = reanalyzeSession({ paths: s.paths, session: record.id, why: "detector bug" });
+  assert.equal(fs.readFileSync(file, "utf8"), before, "the original log is untouched");
+  const [c] = readLog(path.join(s.paths.logs, "studio_session_correction.jsonl"));
+  assert.equal(c.corrects, record.id);
+  assert.equal(c.why, "detector bug");
+  assert.deepEqual(c.edits_after_first_playtest, fixed.edits_after_first_playtest);
+  assert.ok(fs.existsSync(sessionDir));
+  assert.throws(() => reanalyzeSession({ paths: s.paths, session: "sesn_nope", why: "x" }), /no session folder/);
+});
+
+test("the build summary shows check bugs and rule changes (D46)", () => {
+  const base = { changed: true, rules_known: true, edit_events: 2, helpers_unjustified: false };
+  const lines = buildSummary({
+    ...base,
+    rules: [
+      { rule: "R2", classification: "check_bug", quote: "Hit costs a life.", what: "The check ran too long." },
+      { rule: "R3", classification: "rule_change", shown_in_plan: true, what: "Three lives now." },
+      { rule: "R4", classification: "rule_change", shown_in_plan: false, what: null },
+      { rule: "R5", classification: "unexplained", what: null },
+    ],
+  });
+  assert.deepEqual(lines, [
+    'Test fixed, rule unchanged: R2 "Hit costs a life.". The check ran too long.',
+    "Rule changed: R3. Three lives now.",
+    "Rule changed: R4 (not shown in the plan).",
+    "Test changed with no explanation: R5.",
+  ]);
+  assert.match(buildSummary({ ...base, rules: [], rules_known: false })[0], /can't be said which/);
+});
+
+test("a run saves its answers with the question and words, so they replay by question", async () => {
+  const s = setup();
+  const record = path.join(s.root, "answers.json");
+  await s.make({ recordFile: record });
+  const saved = JSON.parse(fs.readFileSync(record, "utf8"));
+  assert.equal(saved.questions[0].question, "What does the frog dodge?");
+  assert.equal(saved.questions[0].answer, "Cars");
+  assert.equal(saved.questions[1].answer, "medium and it gets faster");
+  const again = replayAnswerer(saved);
+  assert.deepEqual(await again.question({ question: "What does the frog dodge?", option_a: "Logs", option_b: "Cars" }), { choice: "B" });
+});
+
+const SPEC_TEXT = fs.readFileSync(path.join(fixtures, "cart/spec.md"), "utf8");
+
+test("D49: questionsFor asks each lost part, or the whole rule if it doesn't say", () => {
+  const q = questionsFor([
+    { rule: "R1", narrowed: false },
+    { rule: "R2", narrowed: true, untested: [{ words: "up to 3", question: "Do things  stop\nspeeding up?" }, { words: "every 600", question: "" }] },
+    { rule: "R3", narrowed: true, untested: [], rule_text: "Lives start\nat 3." },
+  ]);
+  assert.deepEqual(q, [
+    { from: "R2", words: "up to 3", text: "Do things stop speeding up?" },
+    { from: "R2", words: "every 600", text: "Play and check: every 600" },
+    { from: "R3", words: null, text: "Play and check: Lives start at 3." },
+  ]);
+});
+
+test("D49: addYouCheckRules adds valid rules with new ids, a Changelog line, and canonical form", () => {
+  const { text, added } = addYouCheckRules(SPEC_TEXT, [{ from: "R4", words: "faster", text: "Do the cars get faster?" }]);
+  assert.deepEqual(added, [{ rule: "R6", from: "R4", words: "faster", text: "Do the cars get faster?" }], "R1-R5 are taken");
+  const spec = parseSpec(text);
+  assert.deepEqual(spec.errors, []);
+  assert.equal(spec.rules.at(-1)?.id, "R6");
+  assert.equal(spec.rules.at(-1)?.kind, "you-check");
+  assert.equal(spec.rules.filter((r) => r.kind === "auto").length, 4, "the auto rules are untouched");
+  assert.match(spec.changelog.at(-1)?.text ?? "", /tests for R4 no longer prove all of the rule, so R6 ask/);
+  assert.equal(spec.changelog.at(-1)?.id, "v2");
+  assert.equal(formatSpec(spec), text, "still canonical");
+  assert.deepEqual(addYouCheckRules(SPEC_TEXT, []), { text: SPEC_TEXT, added: [] });
+  assert.deepEqual(addYouCheckRules("no spec here", [{ from: "R1", words: null, text: "x" }]).added, [], "nothing to add it to");
+});
+
+test("D49 end to end: a check that lost a point reaches the local player as a question", async () => {
+  // Frog-hop's final R1 has no list of points; this snapshot's did.
+  const frozen = fs.readFileSync(path.join(fixtures, "cart/checks.js"), "utf8").replace("await t.step(1);", "for (const at of [10, 20]) await t.step(at);");
+  const report = JSON.parse(fs.readFileSync(path.join(fixtures, "report.json"), "utf8"));
+  report.check_changes = [{ rule: "R1", kind: "check_bug", quote: "one lane up", what: "Too slow.", untested: [{ words: "one lane up", question: "Does pressing up move one lane?" }] }];
+  const s = setup({ outputs: outputs({ "checks.frozen.js": Buffer.from(frozen), "spec.frozen.md": Buffer.from(SPEC_TEXT), "report.json": Buffer.from(JSON.stringify(report)) }) });
+  const { record, committed, sessionDir } = await s.make();
+
+  assert.deepEqual(record.you_check_added, [{ rule: "R6", from: "R1", words: "one lane up", text: "Does pressing up move one lane?" }]);
+  const r1 = record.checks_changed_after_playtest.rules.find((r) => r.rule === "R1");
+  assert.equal(r1.classification, "check_bug");
+  assert.equal(r1.narrowed, true);
+  const summary = s.info.join("\n");
+  assert.match(summary, /Test proves less: R1 no longer tests "one lane up"\. You check it on first play: R6\./);
+  assert.ok(committed);
+
+  // The agent's copy is as sent; the cart has the new rule, the checks still line up.
+  assert.doesNotMatch(fs.readFileSync(path.join(sessionDir, "outputs/spec.md"), "utf8"), /Does pressing up/);
+  assert.match(record.spec_diff ?? "", /\+- R6 \(you check\): Does pressing up move one lane\?/);
+  assert.equal((await validateRuleCoverage(committed.dir)).ok, true);
+  const cart = readCart(s.paths.carts, committed.id);
+  assert.ok(cart);
+  assert.deepEqual(cart.youCheck.map((r) => r.id), ["R5", "R6"]);
+  assert.equal(cart.youCheck[1].text, "Does pressing up move one lane?");
+});
+
+test("D49 summary: a narrowed rule that won't say what still gets flagged, and still gets asked", async () => {
+  const lines = buildSummary(
+    { changed: true, rules_known: true, edit_events: 1, helpers_unjustified: false, helpers_narrowed: true, rules: [{ rule: "R7", classification: "unexplained", narrowed: true, untested: [], what: null }] },
+    [{ rule: "R20", from: "R7", words: null }],
+  );
+  assert.deepEqual(lines, ["Test changed with no explanation: R7.", "Test may prove less: R7, and it doesn't say what. You check it on first play: R20.", "Shared test code may prove less. Worth reading."]);
+});
+
+const DEF = readAgentDef();
+// As the API returns it: defaults filled in on the toolset, keys in another order.
+const asReturned = () => ({
+  version: 2,
+  system: DEF.system + "\n",
+  tools: DEF.tools.map((t) => {
+    const tool = /** @type {any} */ (t);
+    if (tool.type === "custom") return { input_schema: tool.input_schema, description: tool.description, name: tool.name, type: "custom" };
+    return { ...tool, configs: tool.configs.map((c) => ({ ...c, type: c.name })) };
+  }),
+});
+
+test("D173: compareBrief ignores what the API fills in, and catches what matters", () => {
+  assert.deepEqual(compareBrief(asReturned(), DEF), []);
+  const changed = (fn) => {
+    const a = asReturned();
+    fn(a);
+    return compareBrief(a, DEF);
+  };
+  assert.deepEqual(changed((a) => (a.system = "You are an old brief.")), ["system prompt"]);
+  assert.deepEqual(changed((a) => (a.tools.find((t) => t.name === "show_plan").description = "old")), ["tool show_plan"]);
+  assert.deepEqual(changed((a) => (a.tools = a.tools.filter((t) => t.name !== "ask_player"))), ["tool ask_player missing"]);
+  assert.deepEqual(changed((a) => a.tools.push({ type: "custom", name: "extra", description: "x", input_schema: {} })), ["tool extra not in the repo"]);
+  assert.deepEqual(changed((a) => (a.tools[0].configs = [])), ["web_fetch is not disabled", "web_search is not disabled"]);
+  assert.deepEqual(changed((a) => (a.tools = a.tools.slice(1))), ["toolset missing"]);
+});
+
+test("D173: a build on a matching applied agent runs, pinned, and logs the check", async () => {
+  const s = setup({ appliedAgent: asReturned() });
+  const { record } = await s.make();
+  assert.equal(s.m.calls[0], "retrieveAgent:agent_x@2", "the version sessions pin, before anything else");
+  assert.equal(record.brief, "applied-agent");
+  assert.deepEqual(record.brief_check, { match: true, agent_version: 2, diffs: [] });
+  assert.equal(s.m.created.system, undefined, "no override");
+  assert.equal(s.m.created.tools, undefined);
+});
+
+test("D173: a stale applied brief stops the build before anything is uploaded or started", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  let kitAsked = false;
+  await assert.rejects(s.make({ kit: async () => ((kitAsked = true), { fileId: "f", hash: "h" }) }), /applied Studio agent \(v2\) doesn't match agents\/studio\.md: system prompt[\s\S]*ant --profile game-studio-arcade apply[\s\S]*--brief-from-file/);
+  assert.equal(kitAsked, false);
+  assert.ok(!s.m.calls.includes("createSession"));
+  assert.ok(!fs.existsSync(path.join(s.paths.logs, "studio_session.jsonl")), "no build, no record");
+});
+
+test("D173: an agent that can't be read counts as stale", async () => {
+  const s = setup({ appliedAgent: new Error("network down") });
+  await assert.rejects(s.make(), /couldn't read the agent: network down/);
+  assert.ok(!s.m.calls.includes("createSession"));
+});
+
+test("D173: --applied-brief runs a stale one on purpose, says so, and logs it", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  const { record } = await s.make({ allowStaleBrief: true });
+  assert.ok(s.m.calls.includes("createSession"));
+  assert.deepEqual(record.brief_check, { match: false, agent_version: 2, diffs: ["system prompt"] });
+  assert.equal(record.brief, "applied-agent");
+  assert.match(s.info[0], /differs from the repo, as asked: system prompt/);
+});
+
+test("D173: --brief-from-file needs no check, and logs the override", async () => {
+  const s = setup({ appliedAgent: { ...asReturned(), system: "You are an old brief." } });
+  const { record } = await s.make({ brief: DEF });
+  assert.ok(!s.m.calls.some((c) => c.startsWith("retrieveAgent")));
+  assert.equal(record.brief, "file-override");
+  assert.equal(record.brief_check, null);
+  assert.equal(s.m.created.system, DEF.system);
+  assert.deepEqual(s.m.created.tools, DEF.tools);
 });

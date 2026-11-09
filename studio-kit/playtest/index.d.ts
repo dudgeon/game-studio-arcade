@@ -23,6 +23,8 @@ export interface GenericResult {
   status: "pass" | "fail";
   passed: boolean;
   reason: string | null;
+  /** `deterministic` only, on a fail: the first frame where two runs differed. Random on a random cart, so `comparable()` drops it (D65). */
+  frame?: number;
 }
 
 export interface FrameTime {
@@ -92,7 +94,7 @@ export const GENERIC: readonly string[];
 export class HarnessError extends Error {}
 export function playtest(cartDir: string, opts?: PlaytestOptions): Promise<Report>;
 /** The machine-independent part of a report (D62). */
-export function comparable(report: Report): Omit<Report, "env" | "frameTime"> & { frameTime: { frames: number; budgetMs: number } };
+export function comparable(report: Report): Omit<Report, "env" | "frameTime" | "generic"> & { generic: Omit<GenericResult, "frame">[]; frameTime: { frames: number; budgetMs: number } };
 export function encodePng(frame: { width: number; height: number; pixels: ArrayLike<number> }, palette: readonly string[]): Buffer;
 export function soakScript(frames: number, seed: number): Arcade.InputStep[];
 export function frameStats(times: number[], budgetMs: number): FrameTime;

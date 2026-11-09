@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { buildKit, collectKit, stageContextPackSkill } from "../scripts/pack-kit.js";
+import { buildKit, catalogFor, collectKit, NO_TEMPLATES_KIT, renderKitMd, SKILL_KIT, stageContextPackSkill } from "../scripts/pack-kit.js";
 
 function fakeRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kit-repo-"));
@@ -60,7 +60,7 @@ test("buildKit writes a tarball with KIT.md, a stable hash, and commands from pa
   execFileSync("tar", ["-xzf", out, "-C", x]);
   const kitMd = fs.readFileSync(path.join(x, "KIT.md"), "utf8");
   assert.match(kitMd, /`validate-cart`: `node \/workspace\/kit\/studio-kit\/spec\/bin\/validate-cart.js`/);
-  assert.match(kitMd, /Read first: `studio-kit\/spec\/README.md`/);
+  assert.doesNotMatch(kitMd, /Read first/, "KIT.md tells the agent to read nothing else up front (D160)");
   assert.match(kitMd, /## Not in this kit yet\n\n- studio-kit\/playtest\//);
   assert.ok(fs.existsSync(path.join(x, "runtime/lib/grid.js")));
   assert.ok(!fs.existsSync(path.join(x, "runtime/test")));
@@ -79,5 +79,58 @@ test("stageContextPackSkill writes a SKILL.md beside the pack", () => {
   const skill = fs.readFileSync(path.join(r.dir, "SKILL.md"), "utf8");
   assert.match(skill, /^---\nname: studio-context-pack\n/);
   assert.match(skill, /- `reference.md`/);
+  assert.match(skill, /under `\/workspace\/kit\/`/);
   assert.ok(fs.existsSync(path.join(r.dir, "examples/dodge/spec.md")));
+});
+
+test("the skill kit leaves the context pack out and says where it is", () => {
+  const repo = fakeRepo();
+  const out = path.join(repo, "dist/noctx.tgz");
+  buildKit({ repoRoot: repo, out, ...SKILL_KIT });
+  const x = fs.mkdtempSync(path.join(os.tmpdir(), "kit-x-"));
+  execFileSync("tar", ["-xzf", out, "-C", x]);
+  assert.ok(!fs.existsSync(path.join(x, "studio-kit/context-pack")));
+  const kitMd = fs.readFileSync(path.join(x, "KIT.md"), "utf8");
+  assert.match(kitMd, /attached to this session as the skill `studio-context-pack`/);
+  assert.doesNotMatch(kitMd, /Not in this kit yet[\s\S]*context-pack/);
+});
+
+test("the staged skill keeps the reading and carts, not the pack's tooling", () => {
+  const repo = fakeRepo();
+  fs.writeFileSync(path.join(repo, "studio-kit/context-pack/package.json"), "{}");
+  fs.mkdirSync(path.join(repo, "studio-kit/context-pack/carts/dodge"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "studio-kit/context-pack/carts/dodge/game.js"), "export default {};");
+  const r = stageContextPackSkill({ repoRoot: repo, outDir: path.join(repo, "skills") });
+  assert.ok(!fs.existsSync(path.join(r.dir, "package.json")));
+  assert.ok(fs.existsSync(path.join(r.dir, "carts/dodge/game.js")));
+});
+
+test("the real KIT.md carries the catalog and the commands, within budget (D160, D164)", () => {
+  const { present, missing } = collectKit();
+  const md = renderKitMd({ present, missing });
+  assert.match(md, /## The library: read only what this game needs/);
+  assert.match(md, /`catch\/`/);
+  assert.match(md, /`validate-cart`: `node /);
+  assert.match(md, /`gsa-playtest`: `node /);
+  assert.doesNotMatch(md, /<!--/, "no markers left");
+  assert.ok(md.length / 2.58 <= 2300, `KIT.md is ~${Math.ceil(md.length / 2.58)} tokens`);
+});
+
+test("the no-templates kit has only the blank start, and its catalog says so", () => {
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "kit-nt-")), "kit.tgz");
+  buildKit({ out, ...NO_TEMPLATES_KIT });
+  const x = fs.mkdtempSync(path.join(os.tmpdir(), "kit-x-"));
+  execFileSync("tar", ["-xzf", out, "-C", x]);
+  assert.deepEqual(fs.readdirSync(path.join(x, "studio-kit/context-pack/templates")), ["blank"]);
+  const md = fs.readFileSync(path.join(x, "KIT.md"), "utf8");
+  assert.match(md, /### Starting point\n/);
+  assert.doesNotMatch(md, /`catch\/`|`dodge\/`|`maze\/`|`paddle\/`/);
+  assert.doesNotMatch(md, /no-templates|<!--/);
+  assert.match(md, /`collide`:/, "the modules stay");
+});
+
+test("catalogFor keeps one version of the starting points", () => {
+  const src = "a\n<!-- templates -->\nMANY\n<!-- /templates -->\n<!-- no-templates\nONE\nno-templates -->\nb\n";
+  assert.equal(catalogFor(src, true), "a\nMANY\nb\n");
+  assert.equal(catalogFor(src, false), "a\nONE\nb\n");
 });

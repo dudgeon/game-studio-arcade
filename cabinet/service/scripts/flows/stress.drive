@@ -1,0 +1,104 @@
+# Every long string Claude or a kid might send (D181). Run with a fixture from
+# scripts/make-stress-fixture.js.
+wait shelf
+press a
+wait who
+press a
+wait say typing
+type bartholomew-maximilian-the-third extra words here
+shot name-too-long
+press enter
+wait say idle
+say Make me a game about a penguin that slides across the whole of Antarctica collecting every single fish in the ocean while a giant boot chases it and the ice melts and the music gets faster and faster and there are ninety nine levels and a secret boss at the end who is also a penguin but evil, and it should also have a shop where you buy hats, and the hats give you powers, and one of the powers is that you can fly, and then the boot can fly too, and you have to save your friends who are stuck in ice cubes, and when you save them they help you, and the final level is on the moon
+hold a 200
+wait say confirm
+shot heard-very-long
+press right
+wait reader
+shot heard-reader
+press a
+wait say confirm
+press a
+wait question
+shot q1-everything-long
+press right
+wait reader
+shot q1-reader
+press down
+press down
+press down
+press down
+press down
+press down
+shot q1-reader-scrolled
+press esc
+wait question
+press a
+wait question
+shot q2-emoji-and-quotes
+press a
+wait question
+shot q3-one-long-word
+press right
+wait reader
+shot q3-reader
+press esc
+wait question
+press down
+press down
+press a
+wait say idle
+shot something-else-long-prompt
+press f1
+wait say typing
+type slippery
+shot typing-answer
+press enter
+wait plan
+shot plan-long
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+shot plan-long-scrolled
+press right
+shot plan-change-lit
+press a
+wait say idle
+say Everything should be different and I mean absolutely everything, starting with the penguin
+hold a 200
+wait say confirm
+press a
+wait progress
+shot progress-long
+press esc
+wait shelf
+shot shelf-while-making
+press a
+wait result
+shot result-long-title
+press a
+wait play
+sleep 800
+press esc
+wait check
+shot check-long-rule
+press right
+wait reader
+shot check-reader
+press a
+wait check
+press down
+press down
+press down
+press a
+wait shelf
+shot shelf-long-title

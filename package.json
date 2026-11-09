@@ -5,7 +5,8 @@
   "description": "A basement arcade cabinet that builds its own games. The Studio makes the games; the Arcade plays them.",
   "workspaces": [
     "runtime",
-    "studio-kit/*"
+    "studio-kit/*",
+    "cabinet/service"
   ],
   "engines": {
     "node": ">=22 <23"

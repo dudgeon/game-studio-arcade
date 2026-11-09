@@ -186,6 +186,63 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - Log records (§9.5) are appended to `~/game-studio-data/logs/studio_session.jsonl` and `cart_version.jsonl`. List cost is read from the session's `usage.list_cost` (whole cents as a string; D19). It rounds to the cent, so each record also logs `active_seconds` and the token counts.
 - Answers replay by position: `--answers <file>` gives the same answers in the same order to every model. If a run asks more questions than were recorded, the replay answers D and the log marks `replay_exhausted`. Every run saves its answers, so a live run can be replayed.
 
+**D44. Checks frozen; fix the game.** *(Geoff, 2026-11-08, after the first real build changed only `checks.js` to get its rules passing; implemented by Claude, tasks 7+8 worker.)*
+- Checks are written from the spec before any game code, then frozen. A failing check means fix `game.js`.
+- **Amended by D46:** changing what a rule means requires **first** changing the spec rule or adding an Assumption naming the rule, so the numbers live in the spec. A check bug takes D46's lighter route.
+- A change of meaning shows in the plan: the agent calls `show_plan` again with a `changes` list (`[{id, text}]`, rule id and plain words).
+- Every check change is logged. The agent saves `spec.frozen.md` and `checks.frozen.js` to outputs before its first playtest, and the CLI fetches them itself when that playtest starts, so later writes can't change the baseline (the first trial overwrote its snapshot at pack-up). The CLI compares each rule's check there with the final cart and writes `checks_changed_after_playtest` on the `studio_session` record: `changed`, `edit_events`, `baseline`, and per rule `{rule, spec_changed, rule_text_changed, assumption_names_rule, shown_in_plan}`, plus `unjustified` (rules whose check changed with no spec change).
+- Edits are also detected from the event stream, independently of the snapshot. `baseline` is `captured`, `snapshot` or `none`; with `none` the edits are still counted, with `rules_known: false`. `snapshot_overwritten` flags a rewritten snapshot.
+- The record also gets `first_playtest` (which rules passed and failed on the first run) and `edits_after_first_playtest` (`game_js`, `checks_js`, `spec_md`).
+- This logs and doesn't block: a cart with an unjustified change can still commit (no approval loop; the activity log is the oversight).
+
+**D45. The context pack stays in the kit tarball, not a custom skill.** *(Claude, tasks 7+8 worker; settles D40's experiment, on the director's clearance.)* Two builds of the penguin request on Sonnet 5.5, 300¢ cap, the D44 brief, replaying the recorded answers (2026-11-08):
+
+| | Tarball | Skill |
+|---|---|---|
+| Session | `sesn_0137VBbwE4xHnZy1Bupx84v6` | `sesn_01Mt89MxLgQtq7L6Ezeqf3Jh` |
+| List cost (recomputed) | 80¢ ($0.798) | 60¢ ($0.595) |
+| Active time | 534 s | 296 s |
+| Questions | 2 | 3 |
+| Auto rules passing on the first playtest | 10 of 10 | 10 of 11 (R2 failed) |
+| Fix rounds (agent's report) | 1 | 1 |
+| `game.js` edits after the first playtest | 1 (title screen polish) | 0 |
+| Check edits after the first playtest | 1 (R2, R6: too slow for the browser driver) | 1 (R2: test ran until the game ended) |
+| Spec change and plan first? | Yes: A10 naming both, re-plan | Yes: A10, re-plan |
+| Driver runs in the browser | 4 | 1 |
+
+Why tarball, though the skill run was cheaper:
+- **The gap isn't from how the pack arrives.** Cost by phase, tarball vs skill: read and ask $0.20 vs $0.24; build $0.41 vs $0.16; test and fix $0.18 vs $0.20. Context at the first plan was 44.7k vs 42.0k tokens: the brief says to read the whole pack, so the skill's load-on-demand saves nothing. The whole gap is the build phase, where the tarball run wrote 28k output tokens to the skill run's 9k.
+- **One run each, and not the same game.** Answers replay by position, and the two runs asked different questions, so the tarball run built a lane-hopping penguin and the skill run a slippery slider. Earlier, a tarball build under the old brief cost 68¢, so 60–80¢ looks like ordinary variation.
+- **The tarball is simpler.** One artifact, versioned by content hash with the runtime and tools it describes. A skill is a second resource to keep in step with the kit.
+
+Revisit if a test with more runs, or a brief that doesn't say to read everything, shows a real saving. The experiment's skill stays in the workspace (`claude-lock.skill.json`, `studio make --context-pack skill`).
+
+**D46. A check bug is quoted, fixed and logged; only a change of meaning goes through the spec.** *(Geoff, 2026-11-08, on the question raised by D44's first trials; amends D44. Implemented by Claude, tasks 7+8 worker.)* Geoff's words: when a check contradicts the unchanged spec's own words, "the agent quotes the rule, fixes the check to match it, and the change is logged as a check bug and shown in the build summary. Changing what a rule means still requires changing the spec first."
+- A **check bug** needs no Assumption and no re-plan, and doesn't stop the kid. This covers test mechanics that don't change what the rule means: a check too slow to finish, a bot that ends the game mid-test, a type error.
+- The agent declares every check change in `report.json`: `check_changes: [{rule, kind: "check_bug" | "rule_change", quote, what}]`, where `quote` is the rule's exact words.
+- The CLI classifies each rule whose check changed since the frozen snapshot, in `checks_changed_after_playtest.rules[].classification`:
+  - `rule_change`: the rule's text changed, or a new or changed Assumption names it. `shown_in_plan` says whether the re-plan happened.
+  - `check_bug`: the spec is unchanged for that rule, and the agent declared a bug with a quote that is really in the rule's text.
+  - `unexplained`: neither. These rules are also listed in `unjustified`.
+- Classification is per rule, comparing the snapshot with the final cart, because bash edits can't be attributed to a rule one at a time. Comments are ignored in the comparison. With no usable baseline the rules are unknown (D44).
+- The CLI's build summary lists check bugs and rule changes. Like D44, this logs and doesn't block.
+
+**D47. Replays match answers by question.** *(Director's instruction; design by Claude, tasks 7+8 worker. Changes D43's replay by position.)*
+- A recorded answer holds the question and the answer's words, plus `match`: regexes that must all match a question for this answer to apply. Files recorded from now on save `question`, `option_a`, `option_b` and `answer`; without `match`, questions are compared by word overlap (at least half).
+- The reply is by meaning: tile A or B if that option's words overlap the recorded answer by at least half, otherwise C with the recorded words. Options differ between runs, so a letter alone would mean something else.
+- A question with no recorded answer gets D ("make it now") and logs `replay_unmatched`. Every replayed question is logged in `replay_log` (asked, matched, reply).
+- A file with no questions in it still replays by position.
+- Plans still replay in order, and a plan past the end gets build (`replay_replanned`).
+
+**D48. One browser-driver run, at the end.** *(Director's instruction; Claude, tasks 7+8 worker.)* Timeouts on long checks cost minutes in the browser (D45's tarball run). The brief has the agent use the node driver while working, and run the browser driver once as a final check when node passes, and once more only if that run found something to fix.
+
+**D49. Must say what's untested.** *(Geoff, 2026-11-08, after the model comparison found Fishy Penguin's R7 and R8 had dropped their caps under a clean check-bug label; amends D46. Implemented by Claude, tasks 7+8 worker.)* When a check-bug fix tests less of its rule, the agent states which words of the rule the fixed check no longer tests. Any rule that loses tested words is flagged in the build summary and becomes a you-check question on first play, so the kid checks what the test can't.
+- **The agent says it:** `check_changes[].untested: [{words, question}]`. `words` must be the rule's exact words. `question` is a short question for the player.
+- **The CLI looks for it.** Comparing each rule's check in the snapshot and the final cart, it counts a check as narrowed if a number left a literal list (`[100, 700, 1300, 2500]` → `[100, 700, 1300]`) or it has fewer assertions. A check bug that narrowed and gives no valid `untested` words is `unexplained`, with `untested_missing: true`. An empty list counts as missing. These signals can't prove a check tests the same: they catch the common ways of losing strength, and a false alarm costs the kid one extra question. Moving to a helper can hide a narrowing, so changes in shared helpers are logged as `helpers_narrowed`.
+- **The hand-off is the spec.** The CLI adds a `(you check)` rule per untested item to the cart's `spec.md` before validating and committing, with new ids and a Changelog line. The local player and the cabinet already ask a spec's you-check rules on first play, answers log by rule id, and forks inherit them, so nothing else changes. `cart.json` is unchanged. The record lists them as `you_check_added: [{rule, from, words, text}]`. A rule that narrowed without saying how is asked whole. The agent's own copy in `outputs/spec.md` stays as it was.
+- **No re-plan.** Like D46, this doesn't stop the kid during the build. The new question appears in the build summary and at first play. `show_plan` is unchanged. A change of meaning through the spec (`rule_change`) doesn't add a question, because the spec already says what the rule now means.
+- Carts built before this keep their specs (Fishy Penguin has no added questions).
+
 ## 2026-11-07 — Starter library (Phase 0 task 3)
 
 **D50. Carts reach the starter library as `g.lib`.** *(Claude, director-approved; Phase 0 task 3, keeps D21's "a cart imports nothing".)*
@@ -227,6 +284,11 @@ Decided by Claude (the tasks 7+8 worker) from live Managed Agents docs, before a
 - **Default budgets:** the node driver keeps p95 ≤ 4 ms (update+draw only, the number that predicts the Pi). The browser driver gets p95 ≤ 16.7 ms, a whole 60 Hz frame, which still catches a cart that can't keep up. `--budget-ms` overrides either. The real frame-time verdict stays on the Pi (D8).
 - The agent runs the node driver first (the default) and the browser driver for parity.
 - **Palette:** every job reads `t.warnings()` when the handle has it. The report lists each warning once in `warnings`, and any color warning fails `palette` with the runtime's message. `comparable()` keeps `warnings`, since they're deterministic.
+
+**D65. The frame where two runs first differ is its own field, outside `comparable()`.** *(Claude, playtest parity flake; refines D61, D62.)*
+- On a cart that really uses `Math.random`, the first differing frame is random too. It was in the `deterministic` reason, so the same cart could give two different "same" reports, about 1 run in 256 on `dot-catch-broken`.
+- The reason now has no frame in it. A failed `deterministic` carries `frame` (the first sampled frame that differed, or the earlier of the two ending frames), and the CLI prints it. `comparable()` drops `frame`, as it does the other numbers that can't match.
+- The check itself is unchanged: the same frames are hashed and compared, and it fails on the same carts.
 
 ## 2026-11-07 — Local player (Phase 0 task 9)
 
@@ -503,3 +565,177 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 - **UTM keeps a VM's config in memory.** Replacing `config.plist` changes nothing until UTM quits, so `rebuild.sh` quits it. That's why boots with other `console=` settings seemed to freeze the same way: they were still running the old config, and those tests showed nothing about `console=`.
 
 **D149. How the VM starts with no window.** *(Claude, measured 2026-11-08.)* `open -gj` launches UTM hidden, then a plain `utmctl start`: no UTM windows on screen, and `verify.sh` counts them. `utmctl --hide` doesn't work here: it asks UTM to close its main window, that's refused with `-10004`, and a 900×652 window stayed on Geoff's screen until UTM quit. Opening the `.utm` package is only needed the first time, and may show that window. No privacy setting was changed.
+## 2026-11-08 — Virtual cabinet: Geoff's answers
+
+**D150. Games made on the virtual cabinet move to the Picade's shelf when it arrives, with their history.** *(Geoff; answers virtual-cabinet.md question 3.)* Nothing is deleted on either cabinet (D5).
+
+**D151. After the Picade arrives, the virtual cabinet stays as a staging cabinet.** *(Geoff; answers question 4.)* Updates are tried there before they reach the Pi (D122).
+
+**D152. The virtual cabinet is bridged on the home Wi-Fi.** *(Geoff; answers question 7, confirms D124.)* It's a device on the home network like the real cabinet, so any home device could open its pages. Bridging works (D147).
+
+**D153. Played with the Mac keyboard for now; a USB arcade controller later, with its own key map.** *(Geoff; answers question 8, updates D125.)* Geoff: "I plan to buy an arcade controller; it may have different key mappings but we could use it for testing." So a controller passed through to the VM must be able to carry its own key map rather than assume D82's keys. Nothing is bought or built for it now. It's a test device for the virtual cabinet, and it doesn't change the Picade's map (D82).
+
+## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
+
+Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).
+
+**D160. The library is a short catalog plus modules fetched on demand.** *(Geoff's direction; design by Claude, library worker. Replaces D100's "read it all"; refines D45.)*
+- The agent always sees one file, the kit's `KIT.md`: conventions, one line per module and template, and the commands. Its source is `studio-kit/context-pack/CATALOG.md`. Budget: 2,000 tokens, enforced by a test.
+- Everything else is read only when the game needs it. Library modules are one file each beside the code, `runtime/lib/ref/<module>.md`, tested against the exports; these stay the one source (D100), and `runtime/lib/REFERENCE.md` becomes an index. Kit-level modules (`cart-api`, `checks`, `sprites`, `spec`) are in `studio-kit/context-pack/modules/`.
+- The modules are written for token efficiency: signatures and what a cart needs to know, not paragraphs. `RECIPES.md` is folded into the modules and templates.
+- **How it grows:** a new capability (for example a pseudo-3D raycasting or isometric module, which is what "three dimensional space" means on a 256×192 console) adds one code file, one `ref/` file and one catalog line. The catalog grows by a line and a build that doesn't use it pays only for that line. A test fails if a catalog line points to nothing or a module has no line.
+- Files read with bash, not a skill. A token costs the same either way, so what matters is reading less (D45, cost breakdown). A skill adds a second versioned resource for no saving.
+
+**D161. Four tested templates and one blank start.** *(Geoff's direction; choice of templates by Claude.)*
+- `studio-kit/context-pack/templates/`: `catch` (things fall, catch the good, avoid the bad), `dodge` (free movement, things fly at you), `maze` (tile-by-tile walking with walls and pickups), `paddle` (a ball off walls) and `blank` (title, play, game over, nothing else).
+- Each is a complete passing cart (`spec.md`, `cart.json`, `game.js`, `checks.js`), with the numbers an agent would change in one `CFG` block. They replace the three example carts of D100.
+- **None is a falling-blocks game (D12);** the test from D100 stays and covers them, so the model comparison still measures building Falling Blocks rather than copying it.
+- The agent copies one and edits it in small steps rather than rewriting. Order stays spec first (D44): spec, then checks, then freeze, then `game.js`.
+- The trade Geoff named: most token-efficient, less expressive. A game that doesn't fit starts from `blank`, and the agent says which it chose. Forks still start from the parent, not a template.
+
+**D162. Checks get a tested bot helper, `t.bot`.** *(Claude.)* Measured: `checks.js` cost more than twice `game.js`, and almost every first-playtest failure was the agent's own test bot.
+- `runtime/lib/bot.js`, with its own tests: `start`, `hold`, `press`, `wait`, `delta`, `play` and `reach`; steering helpers `toward`, `away`, `nearest`; assertions `ok`, `eq`, `near`.
+- `checks.js` still imports nothing (D21, D30): the handle carries it, so it works unchanged on both drivers. It isn't in `g.lib`, because carts have no use for it.
+- `reach` fails with a message that says what it wanted and where the game stopped, and says plainly that a bot lost, so a dead bot can't be mistaken for a game bug. Steered loops stop at 3,000 frames by default, to stay inside the browser limit.
+- D11 and D44 are unchanged: checks still come from the spec, before code, and freeze.
+
+**D163. Checks may set up state with `t.poke`, a cart's optional test hook.** *(Claude; refines D103; additive to D21.)*
+- A cart may export `poke(g, s, o)`, called only by `t.poke(o)`, e.g. `{ lives: 99 }`. A cart without it gets a clear error if a check asks.
+- It exists because "the bot died before frame 3,000" was the commonest failure and the reason some checks were weakened (phase-0-results: Fishy Penguin R5–R8, R12). With `poke`, a check reads the real speed at frame 3,000 by keeping the player alive, and no bot has to be good at the game.
+- **Limit:** poke sets up the situation; it never stands in for the thing a rule is about. A rule about losing lives can't poke lives, and a rule about score can't poke score. `checks.md` says so and a reader can see it in `checks.js`. D103's steering stays the default for anything that can be reached by playing.
+
+**D164. Pack size uses a calibrated ratio.** *(Claude; replaces D102's estimate and ceiling.)*
+- Measured from the Penguin Catch reads: Markdown 2.58 characters per token, code 2.35. `pack-size.js` uses those, and the fixture's measured reads are in a test, so the ratio can't drift from the evidence silently.
+- Budgets: catalog 2,000; any one module 1,500; any one template's files 4,500. A template costs about a third as much to read as to write, so it can be bigger than a module. There's no more single pack total, since no build reads it all. `pack-size` also prints what a typical build reads.
+- Keep prompts well under 100k: Haiku's price jumps about 5× past it. The first builds under this design are the check.
+
+**D165. Ask before reading more.** *(Claude; from the cost breakdown's "ask questions before reading the kit".)* The brief reads only the catalog before asking, which is enough to ask good questions. Modules and templates come after the questions, so a kid's long think (over 5 minutes expires the cache) rewrites about 10k tokens rather than 37k.
+
+**D166. Recommendation: catalog and fetch for every build; templates stay available, with a condition.** *(Claude, library worker; **accepted by Geoff, 2026-11-08**, through the director, with D169. Measured in [phase-0-results.md](phase-0-results.md#the-library-redesign-d160d166).)* Same request, Sonnet 5.5, one build each: up-front bundle 56.9¢, catalog and fetch from blank 40.4¢, from the `catch` template 13.7¢. Peak prompts 69k, 44k and 25k.
+- **Fetch on demand is the default.** It costs less at the same question depth, and it makes the prompt small while the kid is thinking. How it's packaged stays files in the tarball (D45).
+- **The template build isn't a like-for-like saving.** It reskinned `catch`, and used one of three recorded answers: the slippery penguin and "more boots" weren't built. Part of that is the replay (an unmatched question gets D, D47), and part may be that it read the template before asking.
+- **Condition before relying on templates:** the brief should make the agent ask first and treat a template's rules as defaults, then one more build should show a template honouring the kid's answers. Not done here: the task allowed two sessions, and the brief as measured is the brief on this branch.
+- `studio make --context-pack no-templates` builds the blank-only kit for this comparison. The `skill` route is untouched and unused.
+
+**D167. A starting point's rules are defaults; the player's answers override them.** *(Director's instruction after D166; Claude, library worker. Tightens D161, D165.)*
+- The brief says not to open a template or module until the questions are done, and to ask as if there were no template, including how the player moves.
+- After asking, every answer must show up in the spec as a rule or an Assumption, and `CFG` and the code change to match, however much of the template that replaces.
+
+**D168. A replay can answer an unmatched question with A instead of D.** *(Director's instruction; Claude, library worker. Option on D47.)* `studio make --replay-unmatched A`. D ends the questioning (D166's template build stopped early that way), so a comparison that needs the whole conversation answers A, logs `replay_fallback` in the session's notes, and marks that question `fallback: true` in `replay_log`. The default stays D.
+
+**D169. D166's condition is met: use a template when one fits.** *(Claude, library worker; **accepted by Geoff, 2026-11-08**, through the director, with D166. Measured in [phase-0-results.md](phase-0-results.md#re-run-a-template-build-that-honours-the-answers-d167d169).)* Under D167's brief, and with D168 so the questions couldn't end early, a build from `catch` asked all three questions before opening the template and cost 29.4¢, against 40.4¢ from blank and 56.9¢ with the old bundle. It passed 11 of 11 auto rules first time. Measured on the running cart, the penguin slides 74 px after letting go and boots rise from 19% to 35%; the earlier template build does neither.
+- **13.7¢ wasn't a build's price; 29.4¢ is the figure to use,** still from one build on the request `catch` fits best.
+- **The trade remains the one Geoff named:** the build is cheaper and looks more like the template than the blank-start build does. Worth Geoff playing both before accepting.
+- Not changed by this: a replay maps recorded words onto the nearest tile (D47), so "Faster and more boots" became "More fish and more boots" in both builds, and fall speed never rose.
+
+**D170. `g.lib.fx`, and templates polished with it.** *(Geoff asked for polish when accepting D169, through the director; how by Claude, library worker. Extends D50, D161.)*
+- A new library module, because four templates each carrying pop-up and heart code would pass D164's budget and be rewritten by every build. `fx.pop`, `fx.tick`, `fx.draw` for pop-ups, `fx.lives` for hearts, `fx.title`, `fx.banner`. It changes no game state, keeps pop-ups as plain data, and has one catalog line and its own tests.
+- `fx.title` returns the clear space between its words, so art drawn there can't cover them. That's the fix for Penguin Pond's title sitting under its big penguin, which an agent wrote by hand: the `catch` template had no picture on its title, so it now has one, placed this way, for agents to copy. A test checks that no word lands in that space, including for a title too long for double size.
+- `catch`, `dodge`, `paddle`: pop-ups on events, hearts rather than the word LIVES, a game-over panel showing the score or NEW BEST, and falling or flying things cleared at game over rather than hanging in mid-air. `maze` has one life and a clock, so it gets pop-ups and the panel but no hearts. Clearer sprites: `catch` an apple, rock and basket, `dodge` a ship and comet, `maze` a walker and gem, `paddle` a bigger round ball (6 pixels, from 4) and a shaded paddle. `blank` uses the title and panel, so a game built from it starts with them.
+- D12 and D164 hold. Sizes in tokens, before → after: `catch` 4,468 → 4,489, `dodge` 3,156 → 3,341, `maze` 3,659 → 3,911, `paddle` 3,406 → 3,582, `blank` 1,763 → 1,720, all within the 4,500 budget, plus `ref/fx.md` at 549 for an agent that wants its details. `pack-size` prints them. No live build has used these yet, so what they do to a build's cost isn't measured.
+
+**D171. A replay picks a tile only if it says the same as the recorded words; otherwise it says them through C.** *(Director's instruction after D169; Claude, library worker. Changes D47's reply by meaning.)*
+- D47 picked a tile when the words overlapped by at least half, so "Faster and more boots" picked "More fish and more boots", and "faster" was lost silently in both D169 builds. Now the content words must be the same both ways. "You lose a life" still picks "Lose a life", while "Faster and more boots" goes through C in its own words.
+- Matching a recorded answer to a question is unchanged, since that's about which answer applies, not what it says. Earlier builds aren't re-run, so their replay logs stand as recorded.
+
+**D172. `studio make` runs the brief in the repo by default.** *(Geoff's acceptance of D166 and D169 says this is the default; Claude, library worker.)*
+- The applied agent is still v1, from before D44, because `ant apply` is blocked. So a plain `studio make` would have run the old read-everything brief. It now sends `agents/studio.md` as a session override unless `--applied-brief` says otherwise; `--brief-from-file` still works and does nothing new.
+- **Not done:** applying the agent. The cabinet service will use the applied agent, so `ant --profile game-studio-arcade apply .` must happen before the virtual cabinet makes games. *(Done 2026-11-08, and the default changed back: see D173.)*
+
+## 2026-11-08 — Applied agent v2
+
+**D173. `studio make` runs the applied agent again, and refuses a stale one.** *(Director asked for the decision; decided by Claude, tasks 7+8 worker. Changes D172's default.)*
+- Agent v2 is applied, carrying the repo's brief at that time (D44, D46, D48, D49, fetch on demand). `claude-lock.json` pins it, and a re-apply reports nothing to do.
+- **Default back to the applied agent.** The cabinet service will run the applied agent, so that's what a CLI build should test. Its version is pinned and logged, where an override is just text in a session.
+- **A stale brief can't run silently.** Before anything is uploaded or started, `studio make` reads the pinned agent version from the API and compares its system prompt, custom tools and toolset safeguards with `agents/studio.md`. On a mismatch it stops and says what differs and how to fix it. A live read, because the lockfile only knows what was last applied, not what the repo says now or what changed in the Console. If the agent can't be read, that counts as a mismatch.
+- **Two ways past it, both on purpose:** `--brief-from-file` runs the repo's brief as a session override (the way to try a brief before applying it), and `--applied-brief` runs the applied one anyway. The record says which: `brief` is `applied-agent` or `file-override`, and `brief_check` holds the result of the check.
+- `studio check-brief` runs just the check. The cabinet service should make the same check.
+- **Apply with bare `ant --profile game-studio-arcade apply`,** not `apply .` as D40 said. Bare apply updates only what the lockfile tracks. `apply .` also walks the folder, and it planned to create a second skill from D45's leftover `skills-staged/`. `studio skill` now stages in a temp folder so this can't recur.
+
+**D174. Files over a skill, under the fetch brief, was reasoned and not measured.** *(Director's instruction from the completeness audit; Claude, library worker. Qualifies D160, D166.)*
+- **What was measured:** the only skill build (`sesn_01Mt89MxLgQtq7L6Ezeqf3Jh`, D45) ran under an older brief that said to read everything, before D46 and D47. It shows that packaging alone saves nothing. It doesn't show what a skill does when the agent reads only what it needs.
+- **What was reasoned:** D160 keeps files because a token read from a skill costs what a token read with bash does, and a skill is a second versioned resource to keep in step with the kit. The one thing that could differ is a skill's description sitting in the prompt, or the agent reading more or less through it. Neither was tested.
+- **The comparison as it ran:** (a) up-front bundle, (b) catalog and fetch from blank, (c) and (c2) catalog and fetch from a template, with the older skill build shown for reference only. The task's original wording named a three-way with "pack as skill". No build ran catalog and fetch through a skill.
+- Revisit only if a skill offers something files don't. A build to settle it would cost about what (b) did.
+
+## 2026-11-08 — Studio screens on the launcher
+
+Geoff: "Next time I want you to fully run a game build, once the stack is ready, fully from the simulated interface; this will let you pressure test the ui that Alina will be looking at, see text field overruns, pressure test that the studio s output works there". The first slice of the cabinet service and the launcher's Studio flow. Implementation is in [cabinet/service/](../cabinet/service/README.md).
+
+**D180. The launcher draws on the 256×192 console, not as a host page.** *(Claude; the brief left this to the worker. Extends D81.)*
+- It uses the runtime's own `Framebuffer`, font and palette, on a canvas the same size as a cart's, shown at the largest whole multiple (4× on 1024×768). So what Alina sees between games is the same chunky pixels as the games, and there's no jump in look or scale.
+- It's the deciding reason for text fitting, too: a fixed font on a fixed grid makes a string's size pure arithmetic. A test can prove what fits without a browser, with no font-loading or HTML reflow to go wrong. Every Studio string has 40 columns by 21 rows at most, so overruns are real and worth the care (D181).
+- It isn't a cart. A cart can't reach the network (D13), and the launcher must reach the service. It's the trusted host page; carts still run in the sandboxed frame inside it, through the runtime's `createHost`.
+- Not chosen: an HTML page at 1024×768, which has room for four times the text but looks like a web page around the games, and whose fit depends on layout we'd have to measure in a browser only.
+
+**D181. Every Studio string goes through one text box, and nothing Claude says is lost.** *(Claude; first-class in the brief.)*
+- `text.js` is the only way words reach the screen. It cleans a string to what the font can draw (smart quotes, dashes and accents become their plain forms; emoji and control characters go; D21's font would draw each as `?`), wraps by word, breaks a word too long for a line, and fits the result to a box of columns and rows.
+- Text too long for its box ends in `...`, deliberately. Then one of two things applies, and each box says which:
+  - **A kid must read it to answer** (questions, options, plan rules, you-check rules, a transcript): stick right opens a reader with the full words, scrolled with the stick. Nothing is lost.
+  - **It's passing or a label** (progress lines, shelf titles, names, failure messages): the `...` is the end of it. The full words are in the logs.
+  - **Our own words** (hints and fixed messages) must fit: a cut there is a fault, so a test fails rather than a hint trailing off.
+- Each frame records every box drawn: its text, position and size, the lines drawn, and whether it was cut. `check()` turns that into violations: a line wider than its box, lines taller than it, a box off screen, two boxes overlapping, or a cut with no way to read the rest when one is required. Tests feed long strings to every screen and fail on any violation, and measure real ink from the framebuffer against the box. The browser run asserts the same report at every step.
+
+**D182. Stick chooses, any player button picks.** *(Claude. Follows D87's "any of the six player buttons".)* Tiles are lettered A, B, C, D, and the cabinet has buttons labelled A, B, X, Y, so "press A" on tile B invites a mistake: picking by a button's letter would sometimes mean another tile than the one lit. So the stick moves the highlight and any of the six buttons, or START, picks what's lit. A button already held when a screen opens does nothing until it's let go, so picking C can't start the mic. ESC always goes back (D88). F1 and F2 (launcher-only, D82) are spare; F1 is used by D184.
+
+**D183. The first service slice: one process, one Studio session at a time.** *(Claude; implements §4's cabinet service in part.)*
+- `cabinet/service` runs the session through the CLI's `makeCart` and driver, imported, not copied: the tile relay is an `Answerer` that waits for the launcher. It mounts the local player's handler for the cart list, plays, you-check and the runtime, so the logs have one shape. Launcher to service is plain local HTTP, with server-sent events for Studio state.
+- One session at a time; its state is in memory. A launcher reload picks it up again. A service restart loses a running session; D189 says what happens then.
+- A failure before `makeCart` can log anything (no network, a refused key) still appends a `studio_session` record with `outcome: "error"`, so no kid's turn goes unlogged (§3.1).
+- It serves on 127.0.0.1:8330, the port the kiosk already opens (D140s), and takes the data folder as `GSA_DATA_DIR` does, so `arcade-launcher.service` can point at it.
+- Only kid-language lines reach the screen: `tell_player`, `progressFor`, and the service's own words for each outcome. The build summary with test changes (D46, D49) goes in the log, as for the CLI, not on the kid's screen.
+- **Stubbed or not here:** real speech (D184), request screening and guardrails (Phase 3), forks (`studio fork` isn't built), MCP, Manager API, publish gate, launcher sound, gamepads in the launcher's own menus, guest players. Screens exist for every step of §8.1; the shelf shows carts one to a line, without a fork action.
+
+**D184. Speech is an interface; for now it's a stub fed text or a WAV, and F1 types instead.** *(Claude; the brief's stub. Phase 3 replaces it.)*
+- `start()` when a button goes down, `stop()` when it comes up, returning a transcript. This is the §8.1 shape, so the bake-off's winner fits without touching the screens. No audio is stored.
+- The stub answers from a queue, fed by `POST /api/speech/feed` with `{text}` or `{wav}`. A WAV is checked to be one and its transcript comes from the `.txt` beside it, so the path can be tried before there's real speech. An empty queue is silence, and the screen says it didn't hear.
+- F1 on a talk screen types instead, since the virtual cabinet has a keyboard (D125) and no mic yet. New names start in typing, as the brief asks; when real speech comes, one flag makes them start on hold-to-talk as D87 says. The Picade has no keyboard, so real speech must land before kids use it there.
+- Letter keys only type on the typing screen; everywhere else Z X C V Q E are buttons (D82).
+
+**D185. The cabinet's auth path: the key file, strictly.** *(Claude; implements D131. Closes tasks/cabinet-auth-path-read-the-cabinet-s-api-key-file.md.)*
+- `createCabinetClient({configFile})` in `studio-kit/auth` reads `anthropic_api_key` from the service's config file and hands it to the SDK directly, with no profile. It refuses a file that group or others can read or write, a missing file, or a missing key, and never puts the key in an error. `createClient` stays profile-only and still refuses a key, so the mini can't pick this path by accident; the two are separate functions on purpose.
+- **What D131 implies, for Geoff's setup step:** a workspace-scoped key can reach only its workspace, so `claude-lock.json`'s agent and environment, which live in the mini's workspace, aren't reachable from a cabinet. The cabinet's config names its own `agent_id` and `environment_id`, made by `ant apply` in the cabinet's workspace, and the kit uploads there on first use.
+- **The stale-brief check (D173) applies to the service as it does to the CLI.** The service runs the applied agent through `makeCart`, which makes the check before anything is uploaded or started and stops on a mismatch. The kid sees "the Studio isn't ready" and the log has the record, with what differs. There's no override in the service: `--brief-from-file` and `--applied-brief` are for a person at the mini.
+
+**D186. Scripted in headless Chromium, against a replay.** *(Claude; the brief's "test without spending".)*
+- `--replay DIR` on the service swaps the API for a replay of a recorded session (`studio-kit/cli/fixtures/penguin-catch`, now with its cart, so the whole make can finish and be played). The real `makeCart`, library commit, logs, validation and playtest all run. It's never the default, and the service prints that it's replaying.
+- `scripts/drive.js` starts the service and a headless browser at 1024×768 with no window, and runs a script of the same verbs and D82 key names as `cabinet/vm/drive` (`press down`, `hold a 800`, `type name`), plus `say`, `wait` and `shot`. So moving to the VM later means swapping the transport. Each step checks the fit report.
+- Live runs use the same script against the real API and are the director's call.
+
+**D187. ESC during a make goes to the shelf; the make carries on.** *(Claude; §8.1 step 5, "the kid can play something else meanwhile".)* While a session runs, the Make tile becomes "Back to your game" and says when Claude is waiting on a question, so an answer is one press away. A question doesn't pull a kid out of a game they're playing. *(The gap this left, a kid walking away from a question, is closed by D188.)*
+
+**D188. A make nobody is answering gets released; Make is never stuck.** *(Director's instruction; design by Claude. Closes D187's gap.)*
+- **The timeout:** 10 minutes on a question or the plan with no key pressed anywhere on the cabinet, including in a game (`question_timeout_s` in the config). In the last minute the hint says "Still there? Move the stick!", and any key starts the clock again. The service keeps the clock, so a reloaded page or a kid in another game doesn't change it. Waiting costs little (D165: past 5 minutes the prompt cache expires, about 10k tokens to rewrite), so 10 minutes favours a kid who's thinking.
+- **The way back:** ESC on a question or plan now asks: keep going, come back later (the shelf, with the way back on its tile, D187), or stop making this game.
+- **Release:** the driver is stopped, the session's events are saved in its folder, usage is read, and the session is **archived**, never deleted (D5). The docs (session-operations, checked 2026-11-08): archiving prevents new events and preserves history, and only a `running` session can't be archived. A session waiting on a custom tool is `idle`, so it can go straight away. If the archive is refused, it interrupts, waits briefly and tries once more. Whatever happens, Make is free at once, and a failed archive is logged, not shown.
+- **What's logged:** a `studio_session` record with `outcome: "abandoned"`, `ended_by: "timed_out" | "stopped"`, the request, turns, usage and `archive: {ok, error}`.
+- **What the kid sees:** after a timeout, a plain message if they're on that screen, then the shelf; if they've gone elsewhere, a line on the Make tile. After choosing to stop, just the shelf.
+- A build running with no question pending isn't timed out: it ends by itself under its budget, and the shelf says when it's ready. **Not run against the real API**, like the rest of the service.
+
+**D189. A service restart mid-make: the kid gets a message and the shelf; the session is logged as still running.** *(Director's instruction; design by Claude. Changes D183's "its record isn't written".)*
+- The service keeps `studio-run.json` in the data folder from a make's start to its end: maker, request, session id, turns. If it finds one when it starts, the last run didn't end, so it appends a `studio_session` record with `outcome: "service_restarted"` and `session_left_running: true`, and removes the file.
+- **The session isn't stopped.** *(D191 corrects this: a session stalls at its next `tell_player` with nobody relaying, and the service now picks it back up and collects the cart.)* It carries on at Anthropic, under its budget, until it finishes or waits on a question no one will answer. Nothing resumes it; the log has its id, for a person or the Manager later. Its work isn't collected, so any cart it finishes never reaches the shelf.
+- **What a kid sees:** within a few seconds of the service going, "Just a moment. The cabinet is restarting." When it's back, on any Studio screen: "Sorry! The cabinet restarted, so your game didn't get finished. Tell me your idea again!" and a button to the shelf, where Make is free. If the page reloaded as well, or they weren't on a Studio screen, the message is a line on the Make tile. A game being played carries on, since it's already loaded.
+
+**D190. The brief states the screen's real limits; agent v3.** *(Director's instruction, cleared to apply; Claude.)*
+- `ask_player` now gives them: a question under about 60 characters shows double size (20 × 3), 240 at most (40 × 6), each option 111 at most (37 × 3), plain ASCII. Word wrap takes some of each. A test ties these numbers to the layout, so they can't drift. (The first figure given for options, 114, was out by one column.)
+- `tell_player` no longer names "unpacking the kit" as a milestone, and rules out words like kit and cart. Its example was why agents wrote "Unpacking the studio kit".
+- `progressFor`'s lines are now "Getting my tools out", "Putting it together" and "Checking your game". Recorded streams keep the words they were recorded with.
+- Applied with bare `ant --profile game-studio-arcade apply` after a dry run: only the agent's tools changed, the environment didn't. `studio check-brief` says v3 matches the repo.
+
+**D191. After a restart the service picks the make back up, so the kid's game isn't thrown away.** *(Director's instruction; design by Claude. Corrects and changes D189.)*
+- **D189 was wrong that a session "carries on until it finishes".** `tell_player` is a custom tool that waits for a result, so with nobody relaying, a session goes idle at its next progress line. Polling for "idle with outputs" would wait forever. So the service re-attaches the driver to the session (`resume` in `runSession` and `makeCart`, the same code, not a copy). It rebuilds the turns from the session's history, relays `tell_player`, waits on the stream to the end, then runs the normal validate, playtest, commit and log path.
+- **Finished:** the cart goes on the shelf, with a shelf entry (D192) noting "It finished while the cabinet was restarting". The `studio_session` record has `resumed_after_restart: true`. The session is then archived, never deleted, and that's logged as a `studio_session_correction` with the session's id.
+- **Failed its checks or came back with no cart:** nothing goes on the shelf. The entry says so in kid words, everything's kept, and the session is archived.
+- **Not finished yet:** it stays attached, within its budget. If the attach fails (no network), it tries again every minute (`recheck_s`). The list of sessions still to collect is `studio-left.json`, so another restart picks up where this left off and doesn't log the restart twice. A session the API says is gone (404) is logged and dropped.
+- **Waiting on a question or plan** (*Claude's call; the director's instruction didn't cover it*): nobody can answer, and answering for the kid would build things they didn't choose, so it isn't finished for them. It's archived and logged as `outcome: "abandoned"`, `ended_by: "no_one_to_answer"`. If that was already the case at the restart, the kid has been told; if the question came later, they get a shelf entry saying so.
+- **What the kid is told** now depends on where it stopped: on a question, "Tell me your idea again!"; while building, "Your game may still finish: look for it on the shelf."
+- No override for the brief check on this path: the session already exists, and it runs what it was started with. The record keeps the lock it started under.
+- Not built: deferring this playtest while a kid is playing (§14 wants that for the publish gate, which isn't built either).
+- **Not run against the real API**, in particular re-attaching to a live stream and archiving.
+
+**D192. How a make ended is its own shelf entry; Make stays Make.** *(Director's instruction; Claude. Changes D187's tile.)*
+- A make that has ended no longer holds Make's place, so the next kid doesn't see someone else's result in its way. The shelf is Make, then any results not yet viewed, then the games. Only a make still running takes Make's place, as "Back to your game" (D183: one session at a time).
+- An entry shows its maker's name: "New game ready!" with "by Alina - Penguin Catch", or "A new game didn't finish" with "by Alina". Opening it shows the result screen, and leaving that screen marks it viewed, whoever opened it.
+- A kid following their own make still goes straight to the result, and an entry they've seen doesn't appear.
+- Entries live in `studio-results.json` next to the library, so they survive a restart. Viewing one stamps `viewed_at` and nothing is removed.

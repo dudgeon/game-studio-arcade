@@ -43,11 +43,32 @@ test("system prompt covers the kid brief, D-meaning, spec-first and outputs", ()
     "tell_player",
     "/mnt/session/uploads/studio-kit.tgz",
     "KIT.md",
+    "and nothing else yet",
+    "Don't open a template, module or guide until you've finished asking",
+    "how the player moves",
+    "the player's answers override them",
+    "Every answer must show up as a rule or an Assumption",
+    "Fetch the rest as you need it",
+    "t.bot",
+    "started_from",
     "/mnt/session/outputs/",
     "cart.tgz",
     "report.json",
     "gave_up",
     "DONE.json",
+    "checks.frozen.js",
+    "spec.frozen.md",
+    "The checks are now frozen",
+    "Never write to them again",
+    "A failing check means fix `game.js`",
+    "**First** change the spec rule",
+    "**Check bug:**",
+    "**Rule change:**",
+    "Quote the rule",
+    "check_changes",
+    "only once, as a final check",
+    "**Say what's untested (D49):**",
+    '"untested": [{"words"',
   ]) {
     assert.ok(body.includes(needle), `prompt mentions ${needle}`);
   }
@@ -74,6 +95,27 @@ test("ask_player matches HANDOFF §9.1", () => {
   for (const choice of ['{\\"choice\\":\\"A\\"}', '{\\"choice\\":\\"D\\"}', '\\"said\\"']) {
     assert.ok(JSON.stringify(t.description).includes(choice), `description documents ${choice}`);
   }
+});
+
+test("show_plan can carry the changes a frozen check needs (D44)", () => {
+  const t = JSON.parse(read("agents/tools/show_plan.json"));
+  assert.deepEqual(t.input_schema.required, ["summary", "rules"], "changes stays optional");
+  assert.deepEqual(t.input_schema.properties.changes.items.required, ["id", "text"]);
+});
+
+test("the prompt asks before reading more, and starts from a template before the spec (D161, D165)", () => {
+  const { body } = frontmatter(read("agents/studio.md"));
+  const at = (s) => body.indexOf(s);
+  assert.ok(at("Ask, before reading anything more") < at("Pick a starting point"));
+  assert.ok(at("Pick a starting point") < at("Write the checks, from the spec"));
+});
+
+test("the prompt puts checks before game code and the snapshot before the build", () => {
+  const { body } = frontmatter(read("agents/studio.md"));
+  const at = (s) => body.indexOf(s);
+  assert.ok(at("Write the checks, from the spec") < at("Build from the spec"));
+  assert.ok(at("checks.frozen.js") < at("Build from the spec"));
+  assert.ok(at("Build from the spec") < at("Test and fix the game"));
 });
 
 test("environment is limited with no hosts", () => {

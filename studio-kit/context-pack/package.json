@@ -2,7 +2,7 @@
   "name": "@game-studio-arcade/context-pack",
   "version": "0.1.0",
   "private": true,
-  "description": "Context pack for Studio sessions: recipes and three tiny example carts (dodge, paddle, collect), plus the library reference by pointer",
+  "description": "Context pack for Studio sessions: a short catalog, guides read on demand, and templates (D160, D161)",
   "type": "module",
   "engines": { "node": ">=22 <23" },
   "scripts": {

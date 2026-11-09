@@ -55,7 +55,7 @@ test("relays questions, the plan and progress; opens the stream before sending",
   assert.equal(r.lastMessage, "Built Frog Hop. All four auto rules pass after one fix.");
 
   // tell_player lines and tool-derived lines, no repeats in a row, nothing technical.
-  assert.ok(lines.includes("Unpacking my toolbox"));
+  assert.ok(lines.includes("Getting my tools out"));
   assert.ok(lines.includes("Writing down the rules"));
   assert.ok(lines.includes("Testing the game"));
   assert.ok(lines.includes("Playing your game to test it"));
@@ -159,6 +159,14 @@ test("replay runs out: D, and replay_exhausted is noted", async () => {
   assert.deepEqual(m.problems, []);
   assert.ok(r.notes.includes("replay_exhausted"));
   assert.equal(r.endedBy, "make_it_now");
+});
+
+test("an extra plan during a replay is noted as a re-plan, not as running out", async () => {
+  const plan = (id) => toolUse(id, "show_plan", { summary: "s", rules: [] });
+  const m = mockApi({ steps: [{ await_message: true }, plan("p1"), { await_result: "p1" }, plan("p2"), { await_result: "p2", expect: { choice: "build" } }, idle("i", "end_turn")] });
+  const { r } = await run(m.api, replayAnswerer({ questions: [], plan: [{ choice: "build" }] }));
+  assert.ok(r.notes.includes("replay_replanned"));
+  assert.ok(!r.notes.includes("replay_exhausted"));
 });
 
 test("an unknown custom tool gets an error result instead of hanging", async () => {

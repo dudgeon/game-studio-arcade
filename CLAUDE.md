@@ -6,7 +6,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 
 ## Vocabulary
 
-- **Studio**: everything that makes games: Studio sessions, the studio kit, and its front ends (cabinet MAKE flow, Claude Code on the Mac mini, later a browser). Never "Forge".
+- **Studio**: everything that makes games: Studio sessions, the studio kit, and its front ends (cabinet Make flow, Claude Code on the Mac mini, later a browser). Never "Forge".
 - **Arcade**: everything that plays games: cabinet, launcher, shelf, players, play telemetry.
 - **Cabinet-initiated**: a kid makes or forks a game at the cabinet, solo. The core workflow.
 - **Desktop-initiated**: Geoff, with a kid, builds in local Claude Code on the Mac mini and publishes to the cabinet.

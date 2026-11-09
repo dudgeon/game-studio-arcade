@@ -196,6 +196,7 @@ declare namespace Arcade {
     type Score = import("./lib/score.js").Score;
     type Flow = import("./lib/flow.js").Flow;
     type Turns = import("./lib/turns.js").Turns;
+    type Pop = import("./lib/fx.js").Pop;
   }
 
   /**
@@ -213,5 +214,10 @@ declare namespace Arcade {
      * positions, mode...). Called only by the test hook; never change state here.
      */
     probe?(g: G, s: S): unknown;
+    /**
+     * Optional test setup (D163), called only by a check's `t.poke(o)`, e.g.
+     * `poke(g, s, o) { if (o.lives) s.sc.lives = o.lives; }`. Never runs in play.
+     */
+    poke?(g: G, s: S, o: any): void;
   }
 }

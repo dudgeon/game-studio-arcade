@@ -6,8 +6,8 @@ aliases:
   - Quarter Deck
 status: active
 goal: A basement arcade cabinet where Owen and Alina describe a game out loud, answer Claude's questions with the joystick, and play the new game minutes later
-health: on-track — auth works (ant CLI login, D16); runtime, library, spec, validator, playtest, player and offline CLI on main; context pack being fixed; Picade 10" ordered
-next: Land the context pack, then a first live `studio make` and task 10 (Falling Blocks with Geoff); design the virtual cabinet on the mini
+health: on-track — Phase 0 stack built and measured (agent v2 live; fetch on demand, templates, frozen checks); virtual cabinet booting; Studio screens in progress; Picade 10" ordered
+next: Finish the launcher Studio screens and virtual cabinet V0, then run a full build driven through the cabinet UI; task 10 (Falling Blocks with Geoff) after that
 created: 2026-11-07
 repo: https://github.com/dudgeon/game-studio-arcade
 ---
@@ -45,6 +45,16 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: [tasks/phase-0-task-3-starter-library-falling-blocks-subset.md](tasks/phase-0-task-3-starter-library-falling-blocks-subset.md): starter library as g.lib (collide, grid, timers, score, flow) with an agent-facing reference
 - 2026-11-08: [tasks/phase-0-task-5-playtest-harness.md](tasks/phase-0-task-5-playtest-harness.md): playtest harness with node and browser drivers; sandbox parity matched exactly
 - 2026-11-08: [tasks/full-validate-cart.md](tasks/full-validate-cart.md): validate_cart covering rule coverage, cart.json, the D13 lint and a cart type check
+- 2026-11-08: [tasks/phase-0-task-4-spec-format-and-parser.md](tasks/phase-0-task-4-spec-format-and-parser.md): spec template, checkable-rules guide, parser with byte-exact round-trip
+- 2026-11-08: [tasks/phase-0-tasks-7-8-studio-agent-definition-and-cli-driver.md](tasks/phase-0-tasks-7-8-studio-agent-definition-and-cli-driver.md): Studio agent v2 live, `studio make` end to end, frozen checks (D44/D46/D49), stale-brief check, model comparison (Sonnet looks like the default)
+- 2026-11-08: [tasks/token-breakdown-of-the-penguin-catch-build.md](tasks/token-breakdown-of-the-penguin-catch-build.md): where a 68c build's money goes, plus a re-measuring script
+- 2026-11-08: [tasks/redesign-the-library-catalog-fetch-on-demand-templates.md](tasks/redesign-the-library-catalog-fetch-on-demand-templates.md): catalog, modules on demand, four templates plus blank; 57c down to 40c, or 29c from a template
+- 2026-11-08: [tasks/phase-0-task-6-context-pack-and-example-carts.md](tasks/phase-0-task-6-context-pack-and-example-carts.md): the context pack, later restructured by the library redesign
+- 2026-11-08: [tasks/players-setting-and-turn-based-helpers-in-the-runtime.md](tasks/players-setting-and-turn-based-helpers-in-the-runtime.md): controller count as a setting (1-8), g.lib.turns
+- 2026-11-08: [tasks/switch-cabinet-to-picade-10-inch-check-specs-and-update-the.md](tasks/switch-cabinet-to-picade-10-inch-check-specs-and-update-the.md): plan moved to the Picade 10"; screen 256x192 at 4x; launcher decisions D85-D88
+- 2026-11-08: [tasks/fix-flaky-playtest-parity-test.md](tasks/fix-flaky-playtest-parity-test.md): parity test made reliable (D65)
+- 2026-11-08: [tasks/docs-tidy-from-the-completeness-audit.md](tasks/docs-tidy-from-the-completeness-audit.md): stale doc lines fixed
+- 2026-11-08: [tasks/get-established-as-director-and-split-phase-0-work.md](tasks/get-established-as-director-and-split-phase-0-work.md): director set up, Phase 0 split across workers
 
 ## Decisions
 
@@ -65,3 +75,10 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: mic: a USB mic for now; Geoff will find one that fits the cabinet (the researched picks didn't integrate well with the hardware)
 - 2026-11-08: virtual cabinet users: Geoff with a kid; cabinets (virtual and Picade) sign in with a workspace-scoped API key each, stored only on the cabinet (Geoff)
 - 2026-11-08: checks are frozen once written from the spec: a failing check means fix the game; a check may change only after the spec rule or an Assumption changes first, shown in the plan and logged (Geoff, after the first live build bent its checks to fit the game)
+- 2026-11-08: virtual cabinet V0 approved: install UTM, download pinned Pi OS Lite and Debian arm64 images, one ~32 GB VM, headless; ask before any window (Geoff)
+- 2026-11-08: library direction: a medium model (Sonnet) fetches context from the library as needed; the library is built for expressiveness and token efficiency, grows over time (e.g. 3D navigation), and offers a few templates plus a start-from-scratch option. Measure the Penguin Catch build's tokens first, then redesign (Geoff)
+- 2026-11-08: the next game build runs fully from the virtual cabinet's own interface, once the stack is ready (Make tile, who's making, hold-to-talk, tiles, plan, progress, play, you-check), driven by Claude to pressure-test the UI Alina will see: text overruns, layout, and whether the Studio's output works there (Geoff)
+- 2026-11-08: model comparison adds Haiku 5.5: run Opus and Haiku comparisons (Geoff, after the token breakdown put the same build at about 4.5c on Haiku vs 68c on Sonnet)
+- 2026-11-08: when a check contradicts the unchanged spec's own words (a check bug), the agent fixes the check, quoting the rule; it's logged as a check bug and shown in the build summary. Changing what a rule means still needs the spec changed first (Geoff)
+- 2026-11-08: a check-bug fix that tests less of its rule must say which words are no longer tested; such a rule is flagged in the build summary and becomes a you-check question on first play (Geoff)
+- 2026-11-08: Studio builds fetch modules on demand and start from a template when the kid's idea fits one, else from blank; templates get some visual polish (pop-ups, life icons) (Geoff, D166/D169)

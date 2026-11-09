@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.6.0",
-    "@game-studio-arcade/auth": "0.1.0"
+    "@game-studio-arcade/auth": "0.1.0",
+    "@game-studio-arcade/spec": "0.1.0"
   }
 }

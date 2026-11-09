@@ -63,7 +63,7 @@ try {
     console.log(`${report.cart}: ${report.ok ? "all good" : "something failed"} (${report.driver} driver)`);
     for (const r of report.rules) console.log(`  ${mark[r.status].padEnd(9)} ${r.id}${r.status === "fail" || r.status === "missing" ? `: ${r.reason}` : ""}`);
     for (const c of report.coverage) console.log(`  DRIFT     ${c.rule ?? ""} ${c.message}`);
-    for (const x of report.generic) console.log(`  ${x.status === "pass" ? "PASS" : "FAIL"}      ${x.id}${x.reason ? `: ${x.reason}` : ""}`);
+    for (const x of report.generic) console.log(`  ${x.status === "pass" ? "PASS" : "FAIL"}      ${x.id}${x.reason ? `: ${x.reason}` : ""}${x.frame !== undefined ? ` (first at frame ${x.frame})` : ""}`);
     const f = report.frameTime;
     console.log(`  frame time: mean ${f.meanMs} ms, p95 ${f.p95Ms} ms, max ${f.maxMs} ms over ${f.frames} frames (budget ${f.budgetMs} ms)`);
   }

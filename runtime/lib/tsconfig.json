@@ -10,5 +10,5 @@
     "module": "ESNext",
     "moduleResolution": "Bundler"
   },
-  "include": ["*.js", "../cart.d.ts"]
+  "include": ["*.js", "../cart.d.ts", "../test-hook.d.ts"]
 }

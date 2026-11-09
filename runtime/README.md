@@ -4,7 +4,7 @@ A small JavaScript fantasy console: 256×192 (shown 4× on the Picade 10"'s 1024
 
 - **Cart API:** [cart.d.ts](cart.d.ts) (`Arcade.Cart`, `Arcade.G`, `Arcade.Lib.*`)
 - **Test hook:** [test-hook.d.ts](test-hook.d.ts) (`Arcade.Checks`, `Arcade.TestHandle`)
-- **Starter library:** [lib/REFERENCE.md](lib/REFERENCE.md) (carts use it as `g.lib`)
+- **Starter library:** [lib/REFERENCE.md](lib/REFERENCE.md), an index of `lib/ref/<module>.md` (carts use it as `g.lib`)
 - **Example:** [examples/hello/](examples/hello/) (`game.js` + `checks.js`)
 
 ## Writing a cart
@@ -40,10 +40,10 @@ export default {
 - **Sound:** `g.sfx(name)` takes `blip select jump coin pop hit explode powerup lose win`. Also `g.tone({ note: "C5", wave, frames, vol, slide })` and `g.stop()`.
 - **Colors outside 0–31** still draw (wrapped), but each one is reported once as a dev warning (`t.warnings()`, `arcade.warnings`, the browser console), so the playtest's palette check can flag it.
 - **Saves:** `g.save(data)` and `g.load()` hold one JSON value of at most 4 KB, e.g. for a high score.
-- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score`, `g.lib.flow` and `g.lib.turns`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
+- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score`, `g.lib.flow`, `g.lib.turns` and `g.lib.fx`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
 - **Not allowed:** `document`, `window`, `fetch`, timers, `eval` and imports. The frame's sandbox blocks them anyway, and the type-check flags them.
 
-`checks.js` has one async check per `(auto)` rule id. A check fails by throwing, and the message becomes the reason in the report. See [test-hook.d.ts](test-hook.d.ts) and [examples/hello/checks.js](examples/hello/checks.js).
+`checks.js` has one async check per `(auto)` rule id. A check fails by throwing, and the message becomes the reason in the report. Each check's `t` also has the tested bot `t.bot` (D162, [lib/bot.js](lib/bot.js)), and `t.poke(o)` calls a cart's optional `poke(g, s, o)` to set up a situation (D163). See [test-hook.d.ts](test-hook.d.ts) and [examples/hello/checks.js](examples/hello/checks.js).
 
 Commands (package.json `bin`):
 

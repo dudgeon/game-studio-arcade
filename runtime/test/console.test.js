@@ -1,5 +1,6 @@
 // The g API and the test handle: drawing, text, sprites, input edges, sound,
 // saves and errors.
+import { withBot } from "../lib/bot.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { headless } from "../src/headless.js";
@@ -15,7 +16,7 @@ const drawing = (fn) => ({ init: () => ({}), update: () => {}, draw: (g) => fn(g
 
 test("the hello cart passes its own checks", async () => {
   for (const [id, check] of Object.entries(checks)) {
-    const t = await headless(HELLO);
+    const t = withBot(await headless(HELLO));
     await check(t);
     assert.ok(true, id);
   }

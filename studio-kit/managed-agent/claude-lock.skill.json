@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "resources": {
+    "./skills-staged/studio-context-pack": {
+      "kind": "skill",
+      "id": "skill_016DW2ByeBYfoZiHYkX3S34u",
+      "version": "skver_01VK82ZMmtQgabjoXzDjYbPu",
+      "via": "skills.create (ant was unavailable)",
+      "files": 15
+    }
+  }
+}
