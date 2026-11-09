@@ -124,9 +124,12 @@ step_bundle() {
 step_carts() {
   # The cabinet's own library. Add only what's missing: a cart is never overwritten (D5).
   install -d -o arcade -g arcade "$DATA" "$DATA/carts" "$DATA/logs"
-  local src id
-  for src in "$ARCADE_HOME"/current/studio-kit/context-pack/carts/*/; do
-    id="$(basename "$src")"
+  local name src id
+  # Three of the context pack's playable starting points (D161), under their carts' own ids.
+  for name in catch dodge paddle; do
+    src="$ARCADE_HOME/current/studio-kit/context-pack/templates/$name"
+    id="$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$src/cart.json")"
+    [ -n "$id" ] || { echo "no id in $src/cart.json" >&2; return 1; }
     if [ ! -e "$DATA/carts/$id" ]; then
       cp -R "$src" "$DATA/carts/$id"
       chown -R arcade:arcade "$DATA/carts/$id"

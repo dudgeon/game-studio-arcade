@@ -1,0 +1,24 @@
+# `drive type` through the real key path, on the Make flow's typing screens (D184).
+# Run on a fresh cabinet, before any maker exists. Ends back on the shelf with no maker kept.
+wait shelf
+press a
+wait who
+press a
+wait say typing
+# Capitals, a space, an apostrophe, a hyphen, digits: what a name can hold.
+type Zoe O'Hara-2
+expect Zoe O'Hara-2
+shot typed-name
+# Backspace mends a slip.
+press backspace
+press backspace
+expect Zoe O'Hara
+# Over the name limit stops at the limit: 16 in all.
+type xyzXYZ789
+shot typed-to-limit
+press esc
+sleep 500
+press esc
+sleep 500
+press esc
+wait shelf

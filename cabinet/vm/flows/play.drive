@@ -1,0 +1,17 @@
+# Play a cart from the shelf with the real keys. Safe to run on any cabinet, any number of times.
+wait shelf
+shot shelf
+press down
+shot shelf-moved
+press a
+wait play
+sleep 1500
+shot game-title
+press a
+sleep 1000
+shot game-playing
+hold left 500
+shot game-after-hold
+press esc
+sleep 800
+shot left-the-game

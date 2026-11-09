@@ -20,7 +20,7 @@ guest() { "$D" ssh "$@"; }
 check services guest 'systemctl is-active arcade-launcher arcade-kiosk arcade-keyd nftables avahi-daemon'
 check hostname guest 'test "$(hostname)" = arcade-virtual'
 check screen-mode guest 'sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user/$(id -u arcade) WAYLAND_DISPLAY=wayland-0 wlr-randr | grep -E "1024x768.*current"'
-check three-carts guest 'test "$(ls /var/lib/arcade/carts | wc -l)" -ge 3 && ls /var/lib/arcade/carts/collect/game.js /var/lib/arcade/carts/dodge/game.js /var/lib/arcade/carts/paddle/game.js'
+check three-carts guest 'test "$(ls /var/lib/arcade/carts | wc -l)" -ge 3 && ls /var/lib/arcade/carts/apple-catch/game.js /var/lib/arcade/carts/comet-dodge/game.js /var/lib/arcade/carts/wall-ball/game.js'
 check launcher-lists guest 'node -e "fetch(\"http://127.0.0.1:8330/\").then(r=>process.exit(r.ok?0:1))"'
 
 check console-not-on-serial guest '! grep -q hvc /proc/consoles'
