@@ -163,3 +163,26 @@ Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also
 
 **Escape in the guest players** (checked 2026-11-08, for D88): RetroArch's default Escape is "Exit RetroArch" and F1 toggles the menu (docs.libretro.com/guides/input-and-controls). TIC-80: "ESC: Switch console/editor or open menu while in game" (github.com/nesbox/TIC-80/wiki/Hotkeys). PICO-8 manual v0.2.7: "Press escape to stop the program, and once more to enter editing mode"; Enter/P is its pause menu. So PICO-8 drops to its own console on Escape, and the launcher has to take over when it does.
 
+
+## UTM on the mini (checked 2026-11-08, UTM 5.0.8)
+
+Read from UTM's v5.0.8 source and docs, or checked on the mini.
+
+- **Installing with `brew install --cask utm` leaves UTM quarantined.** Running anything from the app, even `utmctl --help`, raises Gatekeeper's first-open dialog and hangs until someone answers. `spctl` still calls it accepted: Notarized Developer ID, Turing Software, LLC (WDNLXAD4W8).
+- **Approval shows in the attribute's flags, not its absence:** `xattr -p com.apple.quarantine` read `0181` before Geoff clicked Open and `01c1` after (bit 0x40).
+- **`utm://start`, `stop` and the rest were removed in v4.5.1.** Only `downloadVM` remains. Scripted starts go through `utmctl` (Apple Events) or a hand-made Shortcut. There's no per-VM start-on-launch: `shouldAutoStartVM` applies to a display window already opened. UTM's remote server needs pairing in its GUI.
+- **An unread serial pseudo-terminal can freeze the guest.** With `console=hvc0`, once its buffer filled (about 1 KB was written) the guest froze until something read it. So normal builds have no serial device (D148).
+- **`.local` from the mini needs `ssh -4`:** mDNS can offer the VM's IPv6 address first, and the mini answers `Network is unreachable` for it. Its IPv6 default routes went through VPN tunnels when this was seen (2026-11-08). Its DHCP address can also change between builds.
+- **UTM caches a VM's config in memory.** A replaced `config.plist` has no effect until UTM quits (D148).
+- **`utmctl --hide` didn't work here** (it should close UTM's main window). Its events got `-10004`, printed as `Error from event`, and the window stayed. `open -gj` then plain `utmctl start` shows no window (D149). **A VM with no display device and no built-in-terminal serial device is headless**, with no VM window (confirmed by the window count).
+- **Config:** `config.plist` in `<name>.utm/`, `ConfigurationVersion` 4, `Backend` `Apple`, files in `Data/`. Opening a `.utm` package registers it as a shortcut where it is, without copying it (`importUTM(asShortcut: true)`).
+- **UEFI needs UTM's GUI or scripting save:** only that creates `efi_vars.fd`. Direct Linux boot needs just `vmlinux` and `initrd` in `Data/`.
+- **`AudioInput` defaults to the value of `Audio`**, so set it false explicitly, or the VM may ask for the microphone.
+
+## Debian arm64 kernel (checked 2026-11-08)
+
+- `linux-image-6.12.107+deb13-arm64`: `vmlinuz` is already a plain arm64 Image with a PE header, not gzip or zboot. 4K pages.
+- Trixie also has an `-arm64-16k` flavor, which matches the Pi 5's 16K pages. Worth trying for fidelity after V0.
+- The `.deb` has no `modules.dep`: `depmod` makes it on install. `virtio_blk`, `virtio_net`, `ext4`, `vfat` and `uinput` are modules. `virtio_pci`, `virtio_console` and `devtmpfs` are built in. Modules are `.ko.xz`.
+- macOS can't safely unpack the whole modules tree onto case-insensitive APFS. `build.mjs` passes it archive to archive instead.
+- Trixie arm64 has `cage` 0.2.0, `grim` 1.4.0, `wlr-randr` 0.4.1, `nodejs` 20.19.2 and `chromium` 150.

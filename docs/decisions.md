@@ -523,6 +523,58 @@ Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full
 - Code follows (not done here): the auth helper (D17) gets a cabinet path that reads the key file, while the mini path stays profile-only.
 - Why not the alternatives: WIF needs the account converted to an organization (D15, D16); browser login needs a person present, which fits an unattended cabinet badly.
 
+## 2026-11-08 — Virtual cabinet V0 build
+
+Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and platform-notes.md.
+
+**D140. V0 boots Plan A's way: the pinned Pi OS root filesystem, Debian's kernel, our own small initramfs, UTM's direct Linux boot.** *(Claude; implements D121. The Plan A/B verdict waits for the first boot.)*
+- Kernel: Debian trixie `linux-image-6.12.107+deb13-arm64`. Its `vmlinuz` is already the uncompressed arm64 Image that Apple's Linux boot loader needs (checked 2026-11-08).
+- Initramfs: `busybox-static` plus the kernel modules needed to mount the root, built by our script. It installs the kernel's modules on the root filesystem and hands over to the stock systemd.
+- Direct boot, not UEFI, because UTM only creates a UEFI variable store when its GUI saves a VM, and direct boot is fully scriptable. If the display (D141) needs UEFI, it comes with that step.
+
+**D141. V0's VM has no display device, and the kiosk draws to a headless compositor at 1024×768.** *(Claude; proposes a change to D123 and D126 for V0. Follows Geoff's "no windows without my OK" and his request that Claude can drive the screens from the mini without any window.)*
+- UTM opens a window for any VM with a display device. A VM without one runs headless.
+- Same kiosk above the compositor: `cage` and Chromium, with `WLR_BACKENDS=headless,libinput` and software rendering in the `virtual` profile. The `picade` profile uses `cage`'s normal DRM backend.
+- Geoff's window (D126) is still wanted for playing with a kid (D130). It is a later generator option plus his OK. V0 doesn't prove it. Also not proven in V0: the window-focus checks and how the display behaves.
+- Sound-in is off in the VM config (`AudioInput` false), so UTM never asks for the microphone. Sound-out stays on.
+
+**D142. Where it lives.** *(Claude.)* `cabinet/provision/` holds the script, its profiles, files and locks. `cabinet/vm/` holds the driver. `scripts/virtual-cabinet/` holds the generator and boot commands (D123). VM disks, downloads and keys live in `~/game-studio-data/vm/`, never in git.
+
+**D143. The seed goes on the image's FAT partition.** *(Claude; extends D4.)* macOS can't write ext4, but it can write the FAT boot partition without sudo. The generator puts the script, the bundle, the kernel modules and the cabinet's SSH public key in `seed/`. A one-shot systemd service runs `provision.sh` on first boot and logs to `seed/provision.log`, which the mini can read with the VM off. The real Pi can use the same seed, so the same script runs on both.
+
+**D144. The driver: uinput for keys, `grim` for screenshots, both over SSH.** *(Claude; implements Geoff's request, via the director, that Claude can drive the virtual cabinet's own screens.)*
+- `cabinet/vm/drive` has `press`, `hold`, `down`, `up`, `type` and `screenshot`, using the D82 key names.
+- Keys go through a small uinput daemon in the VM, `arcade-keyd` (Python standard library only, `virtual` profile only). So they travel kernel → libinput → compositor → Chromium, the same path as the Picade overlay's virtual keyboard. Chromium's DevTools protocol would skip that path. A real hold is two events apart, which hold-to-talk (D87) needs.
+- Screenshots are the compositor's actual 1024×768 output.
+- Simulating audio in for hold-to-talk later, not built: load `snd-aloop` in the `virtual` profile and play a WAV into the loopback while `drive hold` holds the talk button, so the speech pipeline hears it through ALSA as if from a mic. Testing the pipeline alone can feed the WAV straight to it.
+
+**D145. Node 22 from nodejs.org, pinned by SHA-256, and `gsa-playtest` uses its node driver in the VM.** *(Director's call, following D9: Node 22 everywhere, matching the sandbox and the Pi.)*
+- The official linux-arm64 tarball, v22.23.4, not trixie's Node 20. The generator seeds it, and the script checks its SHA-256 and installs it under `/opt/arcade/node/`.
+- Playwright isn't installed in the VM yet, so V0's frame-time numbers come from the node driver, labelled `host: "virtual"` by `cabinet/vm/` (D128). The browser-driver gate is V1.
+
+**D146. Starting the VM needs two steps from Geoff, once.** *(Claude; facts checked 2026-11-08. Geoff decides.)*
+- **Gatekeeper:** UTM (notarized, Developer ID Turing Software, WDNLXAD4W8) is still quarantined. Anything that runs from `UTM.app`, even `utmctl --help`, raises the first-open dialog. Removing quarantine by script was OK'd through the director, but Claude Code's permission system refused it, so it stands. Geoff clears it by opening UTM once.
+- **Automation:** the only scripted way to start a VM is `utmctl start`, which uses Apple Events. So the first start should raise one "control UTM" consent prompt. UTM removed `utm://start` in v4.5.1 and has no start-on-launch setting (its `shouldAutoStartVM` only applies to a display window already opened), so no route without Apple Events was found. Its remote server needs pairing through the GUI, and Shortcuts would need a shortcut made by hand.
+- Geoff approved UTM's first open on 2026-11-08. macOS keeps the quarantine attribute and sets its 0x40 flag (`0181` became `01c1`).
+- `scripts/virtual-cabinet/up.sh` is the one command for after that. It refuses to run until that flag is set.
+- The 16K-page kernel (it matches the Pi 5) waits until a 4K boot works, so one thing changes at a time.
+
+**D147. Plan A won (D121): the stock Pi OS userland boots on Debian's kernel.** *(Claude, from the first boots, 2026-11-08; D121's checks.)* Boots unattended, apt sees Pi OS's own sources (Chromium comes from Raspberry Pi's archive), and bridged Wi-Fi gives an address and `arcade-virtual.local`. What Debian's kernel changes: `loop` and `uinput` are modules, so the `virtual` profile loads them, which keeps Pi OS's zram-and-file swap working as on the Pi. `rpi-eeprom-update` is masked (no EEPROM).
+
+**D148. A normal build has no serial device.** *(Claude, from a boot that froze for an hour, 2026-11-08.)* UTM's serial device is a pseudo-terminal. With `console=hvc0` and nobody reading it, its buffer fills and the kernel spins on the console: `soft lockup … stuck for 3512s`, with the guest frozen and the mini's CPU at about 190%. The first boot only worked because a reader happened to be attached. So the VM doesn't get one, and nothing can block on it. This goes beyond D123, and UTM's docs recommend keeping a serial device on a headless VM. SSH and `seed/provision.log` are how to look inside. `build.mjs --serial-console` adds it for debugging, with `serial.sh` reading.
+- **UTM keeps a VM's config in memory.** Replacing `config.plist` changes nothing until UTM quits, so `rebuild.sh` quits it. That's why boots with other `console=` settings seemed to freeze the same way: they were still running the old config, and those tests showed nothing about `console=`.
+
+**D149. How the VM starts with no window.** *(Claude, measured 2026-11-08.)* `open -gj` launches UTM hidden, then a plain `utmctl start`: no UTM windows on screen, and `verify.sh` counts them. `utmctl --hide` doesn't work here: it asks UTM to close its main window, that's refused with `-10004`, and a 900×652 window stayed on Geoff's screen until UTM quit. Opening the `.utm` package is only needed the first time, and may show that window. No privacy setting was changed.
+## 2026-11-08 — Virtual cabinet: Geoff's answers
+
+**D150. Games made on the virtual cabinet move to the Picade's shelf when it arrives, with their history.** *(Geoff; answers virtual-cabinet.md question 3.)* Nothing is deleted on either cabinet (D5).
+
+**D151. After the Picade arrives, the virtual cabinet stays as a staging cabinet.** *(Geoff; answers question 4.)* Updates are tried there before they reach the Pi (D122).
+
+**D152. The virtual cabinet is bridged on the home Wi-Fi.** *(Geoff; answers question 7, confirms D124.)* It's a device on the home network like the real cabinet, so any home device could open its pages. Bridging works (D147).
+
+**D153. Played with the Mac keyboard for now; a USB arcade controller later, with its own key map.** *(Geoff; answers question 8, updates D125.)* Geoff: "I plan to buy an arcade controller; it may have different key mappings but we could use it for testing." So a controller passed through to the VM must be able to carry its own key map rather than assume D82's keys. Nothing is bought or built for it now. It's a test device for the virtual cabinet, and it doesn't change the Picade's map (D82).
+
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
 Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).

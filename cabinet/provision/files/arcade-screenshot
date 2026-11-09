@@ -1,0 +1,5 @@
+#!/bin/bash
+# Writes the compositor's real output as a PNG on stdout. Needs root (the driver uses sudo).
+set -eu
+uid="$(id -u arcade)"
+exec runuser -u arcade -- env XDG_RUNTIME_DIR="/run/user/$uid" WAYLAND_DISPLAY=wayland-0 grim -t png -

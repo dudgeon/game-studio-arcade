@@ -1,0 +1,15 @@
+[Unit]
+Description=Provision the cabinet from the seed on the boot partition (D143)
+Wants=network-online.target
+After=network-online.target boot-firmware.mount
+RequiresMountsFor=/boot/firmware
+ConditionPathExists=!/etc/arcade/provisioned-version
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=45min
+ExecStart=/bin/sh -c 'exec /bin/bash /boot/firmware/seed/firstboot.sh >> /boot/firmware/seed/provision.log 2>&1'
+
+[Install]
+WantedBy=multi-user.target

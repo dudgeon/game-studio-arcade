@@ -1,6 +1,6 @@
 # Virtual cabinet on the Mac mini
 
-**Status:** design only, nothing built (2026-11-08). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
+**Status:** V0 built: boots, plays and passes `verify.sh` from a clean build, headless, with no VM window yet (2026-11-08; D140–D149). How to run it: [cabinet/README.md](../cabinet/README.md). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
 
 Geoff (2026-11-08): "It will be a while before the Picade arrives, so we will need a full emulator stack running as close to accurate a version of a logically isolated (I think this is the term?) version of the cabinet on the mini."
 
@@ -36,7 +36,7 @@ How it differs from the Cabinet Manager's simulator (D70's local player, which g
 | Model | Mac mini (Mac18,5), Apple M6, 12 cores (2 Super, 4 Performance, 6 Efficiency) |
 | Memory | 32 GB |
 | macOS | 27.0 (26A428) |
-| Disk | 926 GB data volume, **31 GB free (97% used)**: see question 6 |
+| Disk | 926 GB data volume, about 218 GiB free when V0 was built (2026-11-08); 31 GB free on 2026-11-07 |
 | Network | Wi-Fi (`en1`) in use; Ethernet `en0` inactive |
 | Audio | Built-in speakers only. **No microphone** (only "Mac mini Speakers" in System Information) |
 | VM tools installed | none (no UTM, QEMU, Lima, Tart or Docker) |
@@ -179,12 +179,12 @@ Placed into the build plan (HANDOFF §14). Each step ends with something Geoff c
    - (b) Convert the Console account to an organization, unlocking Workload Identity Federation (`scripts/wif/` is ready): per-device identity, 10-minute credentials, no pasted secret.
    - (c) The `ant` CLI browser login on each cabinet, as on the mini. Nothing pasted, but it needs a person to log in, which fits an unattended cabinet badly.
    - Also: should the virtual cabinet have **its own workspace and spend limit**, or share the `game-studio-arcade` workspace's?
-3. **Games made on the virtual cabinet:** (a) move to the real cabinet's shelf when it arrives, with their history, or (b) stay on the virtual cabinet as test games. *Lean: (a)*, if the kids make games on it. Nothing is deleted either way.
-4. **After the Picade arrives:** (a) keep the virtual cabinet as a staging cabinet, where updates are tried before the Pi, or (b) archive it (disk kept, VM off). *Lean: (a).*
+3. **Answered (D150, Geoff: (a), they move to the Picade's shelf).** **Games made on the virtual cabinet:** (a) move to the real cabinet's shelf when it arrives, with their history, or (b) stay on the virtual cabinet as test games. *Lean: (a)*, if the kids make games on it. Nothing is deleted either way.
+4. **Answered (D151, Geoff: (a), it stays as a staging cabinet).** **After the Picade arrives:** (a) keep the virtual cabinet as a staging cabinet, where updates are tried before the Pi, or (b) archive it (disk kept, VM off). *Lean: (a).*
 5. **The mic:** buy the cabinet's mic now, so the virtual cabinet uses the same device (the mini has no mic at all). It's a USB mic you're picking yourself (D89), passed through to the VM (D127). *Lean: yes, once you've picked it.* Without one, voice waits.
-6. **Disk space:** the mini has 31 GB free (97% used). The virtual cabinet needs about 8–12 GB now and is capped at 32 GB. (a) Fine as is, (b) free some space first, (c) keep the VM on an external drive. *Lean: (b)*; at 97% the mini itself is close to trouble.
-7. **Who on the home network can see it:** (a) bridged, so it's a device on the home Wi-Fi like the real cabinet (any home device could open its pages, as with the real one), or (b) visible only to the mini. *Lean: (a)*, for fidelity.
-8. **How it's played:** (a) the Mac keyboard (same keys as the Picade), or (b) also a USB arcade stick passed through, for the feel (a purchase; D85 put external controllers off). *Lean: (a)* for now.
+6. **Disk space:** (now about 218 GiB free, 2026-11-08) the mini had 31 GB free (97% used). The virtual cabinet needs about 8–12 GB now and is capped at 32 GB. (a) Fine as is, (b) free some space first, (c) keep the VM on an external drive. *Lean: (b)*; at 97% the mini itself is close to trouble.
+7. **Answered (D152, Geoff: (a), bridged on the home Wi-Fi).** **Who on the home network can see it:** (a) bridged, so it's a device on the home Wi-Fi like the real cabinet (any home device could open its pages, as with the real one), or (b) visible only to the mini. *Lean: (a)*, for fidelity.
+8. **Answered (D153, Geoff: keyboard for now; a USB arcade controller later, with its own key map).** **How it's played:** (a) the Mac keyboard (same keys as the Picade), or (b) also a USB arcade stick passed through, for the feel (a purchase; D85 put external controllers off). *Lean: (a)* for now.
 
 ## Sources (checked 2026-11-07)
 
@@ -202,4 +202,4 @@ Placed into the build plan (HANDOFF §14). Each step ends with something Geoff c
 - Tart (Virtualization.framework, fair-source licence): https://github.com/openai/tart, https://computingforgeeks.com/install-tart-macos-linux-vms-apple-silicon/
 - Pi OS kernel needs Pi boot firmware; generic VM path is a Debian arm64 kernel: https://forum.level1techs.com/t/virtualizing-rpi-on-ampere-ubuntu-24-04-aarch64/225253, https://github.com/utmapp/UTM/discussions/4970
 
-Not verified, checked in V0: that Plan A boots; Chromium's rendering path and frame time inside the VM; that bridging on the mini's Wi-Fi works; that UTM's window can be closed without stopping the VM or taking focus; that a USB audio device passes through cleanly; the access to Raspberry Pi's apt archive (its index returned 403 to a plain web fetch).
+Checked in V0 (D147): Plan A boots; bridging on the mini's Wi-Fi works; apt reaches Raspberry Pi's archive. Still not verified: Chromium's frame time inside the VM; that UTM's window can be closed without stopping the VM or taking focus (V0 has no VM window, D141); that a USB audio device passes through cleanly.

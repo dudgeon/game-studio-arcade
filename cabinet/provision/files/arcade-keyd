@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""A keyboard the driver can press (D144). Python standard library only.
+
+  arcade-keyd serve            keep a uinput keyboard open and take commands (the service)
+  arcade-keyd down CODE ...    press and keep held
+  arcade-keyd up CODE ...      release
+  arcade-keyd tap MS CODE ...  press, wait MS, release
+  arcade-keyd seq CODE:SHIFT ...   tap each in turn (for typing); SHIFT is 0 or 1
+
+The device stays open because libinput only notices a new keyboard after a moment.
+Codes are Linux key codes, the same ones the Picade overlay sends (D82).
+"""
+import fcntl
+import os
+import socket
+import struct
+import sys
+import time
+
+SOCK = "/run/arcade/keys.sock"
+UI_SET_EVBIT = 0x40045564
+UI_SET_KEYBIT = 0x40045565
+UI_DEV_SETUP = 0x405C5503
+UI_DEV_CREATE = 0x5501
+UI_DEV_DESTROY = 0x5502
+EV_SYN, EV_KEY, BUS_VIRTUAL = 0, 1, 6
+KEY_LEFTSHIFT = 42
+TYPE_GAP = 0.02
+
+
+def emit(fd, ev_type, code, value):
+    os.write(fd, struct.pack("qqHHi", 0, 0, ev_type, code, value))
+
+
+def key(fd, code, value):
+    emit(fd, EV_KEY, code, value)
+    emit(fd, EV_SYN, 0, 0)
+
+
+def open_device():
+    fd = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
+    fcntl.ioctl(fd, UI_SET_EVBIT, EV_KEY)
+    for code in range(1, 120):
+        fcntl.ioctl(fd, UI_SET_KEYBIT, code)
+    setup = struct.pack("HHHH80sI", BUS_VIRTUAL, 0x1209, 0x0ADE, 1, b"arcade-driver-keyboard", 0)
+    fcntl.ioctl(fd, UI_DEV_SETUP, setup)
+    fcntl.ioctl(fd, UI_DEV_CREATE)
+    return fd
+
+
+def handle(fd, held, words):
+    cmd, args = words[0], words[1:]
+    if cmd == "down":
+        for code in map(int, args):
+            key(fd, code, 1)
+            held.add(code)
+    elif cmd == "up":
+        for code in map(int, args):
+            key(fd, code, 0)
+            held.discard(code)
+    elif cmd == "tap":
+        codes = [int(c) for c in args[1:]]
+        for code in codes:
+            key(fd, code, 1)
+        time.sleep(int(args[0]) / 1000)
+        for code in codes:
+            key(fd, code, 0)
+    elif cmd == "seq":
+        for item in args:
+            code, shift = (int(n) for n in item.split(":"))
+            if shift:
+                key(fd, KEY_LEFTSHIFT, 1)
+            key(fd, code, 1)
+            time.sleep(TYPE_GAP)
+            key(fd, code, 0)
+            if shift:
+                key(fd, KEY_LEFTSHIFT, 0)
+            time.sleep(TYPE_GAP)
+    else:
+        raise ValueError(f"unknown command {cmd}")
+
+
+def serve():
+    fd = open_device()
+    held = set()
+    if os.path.exists(SOCK):
+        os.unlink(SOCK)
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(SOCK)
+    os.chmod(SOCK, 0o600)
+    srv.listen(8)
+    try:
+        while True:
+            conn, _ = srv.accept()
+            with conn:
+                data = conn.makefile().readline()
+                try:
+                    handle(fd, held, data.split())
+                    conn.sendall(b"ok\n")
+                except (ValueError, IndexError, OSError) as err:
+                    conn.sendall(f"error {err}\n".encode())
+    finally:
+        for code in list(held):
+            key(fd, code, 0)
+        fcntl.ioctl(fd, UI_DEV_DESTROY)
+
+
+def client(words):
+    conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    conn.connect(SOCK)
+    conn.sendall((" ".join(words) + "\n").encode())
+    answer = conn.makefile().readline().strip()
+    if answer != "ok":
+        sys.exit(f"arcade-keyd: {answer}")
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["serve"]:
+        serve()
+    elif len(sys.argv) > 2:
+        client(sys.argv[1:])
+    else:
+        sys.exit(__doc__)
