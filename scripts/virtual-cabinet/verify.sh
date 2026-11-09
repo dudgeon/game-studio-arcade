@@ -35,7 +35,8 @@ check no-utm-window swift "$REPO/scripts/virtual-cabinet/windows.swift"
 # Isolation (D123, D124).
 check no-shared-folders guest '! grep -qE "virtiofs|9p" /proc/mounts'
 check no-guest-tools guest '! dpkg -l spice-vdagent qemu-guest-agent 2>/dev/null | grep -q ^ii'
-check no-api-key guest '! sudo grep -rIlE "sk-ant-|ANTHROPIC_API_KEY" /etc/arcade /var/lib/arcade/carts /opt/arcade/current/cabinet'
+# The key lives in service.json and nowhere else (D131, D155). Run as a script file, for the quoting.
+check key-only-in-its-file "$D" run "$REPO/cabinet/vm/guest/key-check.sh"
 check firewall-rule guest 'sudo nft list table inet arcade_isolation | grep -q reject'
 mini_probe() {
   local addr addrs
