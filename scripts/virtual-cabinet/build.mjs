@@ -16,7 +16,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { cpioNewc, dir, file, growSecondPartition, link, loadOrder, modinfoValues, normalizeModule, partition, unwrapZboot, utmConfig } from "./lib.mjs";
+import { cpioNewc, dir, file, growSecondPartition, link, loadOrder, makeBundle, makeProvisionTar, modinfoValues, normalizeModule, partition, unwrapZboot, utmConfig } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../..");
@@ -139,16 +139,6 @@ function modulesTarball(kernelData, release, out) {
   run("tar", ["-czf", out, "--format", "gnutar", "--include", `./usr/lib/modules/${release}*`, `@${kernelData}`], { maxBuffer: 2 ** 26 });
 }
 
-/** Tracked and new files only, so nothing ignored or local gets in. */
-function bundle(out, paths) {
-  const files = run("git", ["ls-files", "-co", "--exclude-standard", "--", ...paths], { cwd: REPO, maxBuffer: 2 ** 26 }).split("\n").filter((f) => f && existsSync(join(REPO, f)));
-  const list = join(dirname(out), `${basename(out)}.list`);
-  writeFileSync(list, `${files.join("\n")}\n`);
-  run("tar", ["-czf", out, "--no-xattrs", "--no-mac-metadata", "-C", REPO, "-T", list], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-  rmSync(list);
-  say(`${basename(out)}: ${files.length} files, ${(statSync(out).size / 1024).toFixed(0)} KiB`);
-}
-
 /** The cabinet's own SSH key on the mini; never one of the mini's existing keys (D123). */
 function sshKey() {
   const keyDir = join(VM_ROOT, "ssh");
@@ -171,8 +161,9 @@ function writeSeed(mount, { modulesTgz, nodeTarball, profile }) {
   const seed = join(mount, "seed");
   mkdirSync(seed, { recursive: true });
   const provDir = join(REPO, "cabinet/provision");
-  run("tar", ["-czf", join(seed, "provision.tar.gz"), "--no-xattrs", "--no-mac-metadata", "-C", provDir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-  bundle(join(seed, "bundle.tar.gz"), ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest"]);
+  makeProvisionTar(REPO, join(seed, "provision.tar.gz"));
+  say(`bundle.tar.gz: ${makeBundle(REPO, join(seed, "bundle.tar.gz"))} files`);
+  writeFileSync(join(seed, "commit"), `${run("git", ["rev-parse", "--short=12", "HEAD"], { cwd: REPO }).trim()}\n`);
   cpSync(modulesTgz, join(seed, "kernel-modules.tar.gz"));
   cpSync(nodeTarball, join(seed, lock.node.name));
   cpSync(join(provDir, "files/firstboot.sh"), join(seed, "firstboot.sh"));

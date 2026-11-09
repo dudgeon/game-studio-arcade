@@ -1,0 +1,58 @@
+# A long walk on the real screens, for a boot in its gap phase (D156, D195). Every press is checked against the
+# screen: a key pressed twice, or not at all, puts the highlight or the typed text in the wrong place.
+# Safe on any cabinet with no makers: it plays starter carts and types a name it never keeps.
+# Takes about a minute a round: `repeat` sets how long it runs.
+wait shelf
+repeat 40
+home
+press down
+expect-sel 1
+press down
+expect-sel 2
+press down
+expect-sel 3
+press up
+expect-sel 2
+press up
+expect-sel 1
+press up
+expect-sel 0
+# Typing, read back from the screen.
+press a
+wait who
+press a
+wait say typing
+type Abc 123
+expect Abc 123
+press backspace
+press backspace
+expect Abc 1
+type xy
+expect Abc 1xy
+shot typed
+press esc
+sleep 300
+press esc
+sleep 300
+press esc
+sleep 300
+wait shelf
+# A hold on a game in play: how far it moved is on the screen.
+home
+press down
+expect-sel 1
+press a
+wait play
+sleep 1200
+press a
+sleep 800
+shot before-hold
+hold left 500
+shot after-hold
+press esc
+sleep 800
+press esc
+sleep 500
+wait shelf
+sleep 2000
+end

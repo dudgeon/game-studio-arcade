@@ -1,5 +1,30 @@
 // Pure helpers for the virtual cabinet's generator: no disk, no network, so they can be tested.
+import { execFileSync } from "node:child_process";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
+
+/** What goes to a cabinet, for a build's seed and for an update (D195). */
+export const BUNDLE_PATHS = ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest"];
+
+const NO_MAC_FILES = { ...process.env, COPYFILE_DISABLE: "1" };
+
+/** Tracked and new files only, so nothing ignored or local gets in. Returns how many. */
+export function makeBundle(repo, out) {
+  const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", ...BUNDLE_PATHS], { cwd: repo, encoding: "utf8", maxBuffer: 2 ** 26 })
+    .split("\n")
+    .filter((f) => f && existsSync(join(repo, f)));
+  const list = join(dirname(out), `${basename(out)}.list`);
+  writeFileSync(list, `${files.join("\n")}\n`);
+  execFileSync("tar", ["-czf", out, "--no-xattrs", "--no-mac-metadata", "-C", repo, "-T", list], { env: NO_MAC_FILES });
+  rmSync(list);
+  return files.length;
+}
+
+/** The provisioning script and what it installs. */
+export function makeProvisionTar(repo, out) {
+  execFileSync("tar", ["-czf", out, "--no-xattrs", "--no-mac-metadata", "-C", join(repo, "cabinet/provision"), "."], { env: NO_MAC_FILES });
+}
 
 const SECTOR = 512;
 
