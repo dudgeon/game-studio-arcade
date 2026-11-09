@@ -39,7 +39,7 @@ if ! "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then
 fi
 "$UTMCTL" start arcade-virtual
 # UTM caches a VM's config in memory (D148). A serial device the file doesn't have means a stale one.
-if plutil -extract Serial.0 raw "$PACKAGE/config.plist" >/dev/null 2>&1; then :
+if plutil -extract Serial.0 xml1 -o - "$PACKAGE/config.plist" >/dev/null 2>&1; then :
 elif lsof -c UTM 2>/dev/null | grep -q /dev/ptmx; then
   echo "UTM is running a stale config for this VM: stop the VM, quit UTM, and run this again" >&2
   exit 1

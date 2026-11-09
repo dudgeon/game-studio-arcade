@@ -13,7 +13,11 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 NETWORK=Bridged
 [ "${1:-}" = "--network" ] && NETWORK="$2"
 
-state() { "$UTMCTL" status arcade-virtual 2>/dev/null || echo absent; }
+# Ask utmctl only while UTM is running: a utmctl call would launch it, and that can show its window.
+state() {
+  pgrep -x UTM >/dev/null || { echo stopped; return; }
+  "$UTMCTL" status arcade-virtual 2>/dev/null || echo absent
+}
 
 if [ "$(state)" = started ]; then
   "$REPO/cabinet/vm/drive" ssh sudo poweroff || true
