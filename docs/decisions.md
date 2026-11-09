@@ -591,7 +591,8 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
   - **It needs nothing new on the cabinet.** Running `ant` in the VM would mean another binary on the cabinet, just for setup.
 - One lock file per workspace, as the docs recommend. The ids aren't secrets, so it's committed.
 - **Replay can't go live:** the script stops if a replay cart, session or log is on the cabinet, so one can't move to the Picade under D150. The fix is a rebuild.
-- The same script serves the Picade later, with `ARCADE_HOST` and `CABINET` set. It has only been tested with stand-ins for `ant` and the API, because a live run is Geoff's and the director's call.
+- `sudo` logs its command lines to the journal, so the key must never be on one. `service-config.mjs` takes it on stdin, and `key-check.sh` keeps its search patterns in a file.
+- The same script serves the Picade later, with `ARCADE_HOST` and `CABINET` set. It has only been tested with stand-ins for `ant` and the API, because a live run is Geoff's and the director's call. So a real `ant apply` with a real key, the first thing Geoff's run does, is unproven.
 
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
