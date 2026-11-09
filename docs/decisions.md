@@ -594,7 +594,7 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 - `sudo` logs its command lines to the journal, so the key must never be on one. `service-config.mjs` takes it on stdin, and `key-check.sh` keeps its search patterns in a file.
 - The same script serves the Picade later, with `ARCADE_HOST` and `CABINET` set. It has only been tested with stand-ins for `ant` and the API, because a live run is Geoff's and the director's call. So a real `ant apply` with a real key, the first thing Geoff's run does, is unproven.
 
-**D156. Bridged stays (D152), with its Wi-Fi gaps handled, not hidden.** *(Claude; the finding is for Geoff.)* Measured 2026-11-08: see platform-notes.md. `up.sh` restarts a VM that's silent for 10 minutes, once. The cabinet plays on its own through a gap, because its service and kiosk are inside the VM. A gap only stops the mini reaching it: the driver, SSH, and later the Manager and MCP. Shared networking is the documented fallback (D124), and Geoff would lose the home-network visibility he chose.
+**D156. Bridged stays (D152), with its Wi-Fi gaps handled, not hidden.** *(Claude; the finding is for Geoff.)* Measured 2026-11-08: see platform-notes.md. `up.sh` restarts a VM that's silent for 10 minutes, once. The cabinet plays on its own through a gap, because its service and kiosk are inside the VM. A gap stops the mini reaching it: the driver, SSH, and later the Manager and MCP. Whether a gap also cuts the guest's internet, and so a live make, isn't known. Shared networking is the documented fallback (D124), and Geoff would lose the home-network visibility he chose.
 
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
