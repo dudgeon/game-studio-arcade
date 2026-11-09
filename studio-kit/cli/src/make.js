@@ -29,6 +29,7 @@ import { readAgentDef } from "./config.js";
  * @property {"tarball"|"no-templates"|"skill"} [contextPack]   how this run got the library (D45, D166)
  * @property {{type: string, skill_id: string, version?: string}[]} [skills]   session-level skills
  * @property {{system: string, tools: object[]}} [brief]   run this brief instead of the applied agent's
+ * @property {{sessionId: string, kitHash?: string|null}} [resume]   collect a session a restart cut off, rather than start one (D191)
  * @property {boolean} [allowStaleBrief]   run the applied agent even if it differs from the repo (D173)
  * @property {{system: string, tools: any[]}} [repoBrief]   what the applied agent should match; default agents/studio.md
  * @property {string} [recordFile]     also write the answers here
@@ -49,14 +50,14 @@ export async function makeCart(o) {
   // D173: a stale applied brief can't run silently. Checked before anything is uploaded or started.
   /** @type {{match: boolean, agent_version: number|null, diffs: string[]}|null} */
   let briefCheck = null;
-  if (!o.brief) {
+  if (!o.brief && !o.resume) {
     briefCheck = await checkAppliedBrief({ api: o.api, lock: o.lock, def: o.repoBrief ?? readAgentDef() });
     if (!briefCheck.match) {
       if (!o.allowStaleBrief) throw new Error(staleMessage(briefCheck));
       ui.info(`Running an applied brief that differs from the repo, as asked: ${briefCheck.diffs.join(", ")}.`);
     }
   }
-  const kit = await o.kit();
+  const kit = o.resume ? { fileId: "", hash: o.resume.kitHash ?? null } : await o.kit();
 
   // D44: fetch the frozen snapshot as the first playtest starts, so nothing the
   // agent writes later can change the baseline. It's written well before then.
@@ -99,7 +100,10 @@ export async function makeCart(o) {
     ui,
     now,
     onEvent: captureSnapshot,
+    resume: o.resume,
   });
+  // Nothing here says the session has ended, so there's nothing to collect yet: try again later.
+  if (o.resume && result.stopReason === "stream_lost") throw new Error("the stream was lost while picking the session back up");
 
   // Keep everything first (D43): answers and the raw session result.
   const sessionDir = path.join(o.paths.sessions, result.sessionId);
@@ -260,6 +264,7 @@ export async function makeCart(o) {
     errors: result.errors,
     notes: result.notes,
     replay_log: o.answerer.replayLog?.() ?? null,
+    ...(o.resume ? { resumed_after_restart: true } : {}),
   };
   appendLog(o.paths.logs, "studio_session", record);
 

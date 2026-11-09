@@ -1,7 +1,8 @@
 // The Studio side (D183): one session at a time, through the CLI's makeCart and
 // driver. The tile relay is an Answerer that waits for the launcher. Everything a
 // kid sees comes from `state()`, in kid language; the rest goes to the logs.
-// A make nobody answers is released (D188); one a restart cut off is logged (D189).
+// A make nobody answers is released (D188); one a restart cut off is logged (D189)
+// and picked back up to collect its cart (D191). How a make ended is a shelf entry (D192).
 import fs from "node:fs";
 import path from "node:path";
 import { makeCart } from "@game-studio-arcade/studio-cli/src/make.js";
@@ -12,6 +13,8 @@ const KEEP_LINES = 12;
 
 export const QUESTION_TIMEOUT_MS = 10 * 60 * 1000;
 export const WARNING_MS = 60 * 1000;
+/** After a failed attempt to pick a session back up, try again this much later. */
+export const RECHECK_MS = 60 * 1000;
 /** After a refused archive: how long to wait for an interrupted session to go idle. */
 const ARCHIVE_RETRY_MS = 5000;
 
@@ -22,11 +25,15 @@ const MESSAGES = {
   refusal: "Claude can't make that game. Try a different idea!",
   stale: "The Studio isn't ready to make games right now. A grown-up needs to update it.",
   error: "Something went wrong while making your game. Try again in a little while.",
+  no_one_to_answer: "Claude had a question while the cabinet was restarting, and nobody could answer it. Tell me your idea again!",
 };
+
+const FINISHED_AFTER_RESTART = "It finished while the cabinet was restarting.";
 
 const NOTICES = {
   timed_out: { message: "You were away for a while, so I stopped making this game. Tell me your idea again any time!", short: "Your last game was put away" },
   restarted: { message: "Sorry! The cabinet restarted, so your game didn't get finished. Tell me your idea again!", short: "Your last game didn't finish" },
+  restarted_building: { message: "Sorry! The cabinet restarted. Your game may still finish: look for it on the shelf.", short: "Your last game may still finish" },
 };
 
 /** Why a make ended, in kid language. Only the log has the details. */
@@ -38,7 +45,7 @@ export function kidMessage(record) {
 
 /**
  * @typedef {{
- *   api: () => Promise<import("@game-studio-arcade/studio-cli/src/api.js").StudioApi> | import("@game-studio-arcade/studio-cli/src/api.js").StudioApi,
+ *   api: (resume?: {answered?: number}) => Promise<import("@game-studio-arcade/studio-cli/src/api.js").StudioApi> | import("@game-studio-arcade/studio-cli/src/api.js").StudioApi,
  *   paths: ReturnType<typeof import("@game-studio-arcade/studio-cli/src/config.js").dataPaths>,
  *   lock: () => {agentId: string, agentVersion?: number, environmentId: string},
  *   kit: (api: any) => Promise<{fileId: string, hash: string}>,
@@ -51,6 +58,7 @@ export function kidMessage(record) {
  *   onStart?: (makerId: string) => void,
  *   questionTimeoutMs?: number,
  *   warningMs?: number,
+ *   recheckMs?: number,
  *   now?: () => Date,
  * }} StudioOptions
  */
@@ -59,13 +67,18 @@ export class StudioBusy extends Error {}
 export class StudioGone extends Error {}
 /** Thrown into the driver to stop it when a make is released (D188). */
 class Released extends Error {}
+/** Thrown into the driver when a picked-up session asks something (D191). */
+class NoOneToAnswer extends Error {}
 
 /** @param {StudioOptions} o */
 export function createStudio(o) {
   const now = o.now ?? (() => new Date());
   const timeoutMs = o.questionTimeoutMs ?? QUESTION_TIMEOUT_MS;
   const warningMs = Math.min(o.warningMs ?? WARNING_MS, timeoutMs / 2);
+  const recheckMs = o.recheckMs ?? RECHECK_MS;
   const journalFile = path.join(o.paths.root, "studio-run.json");
+  const leftFile = path.join(o.paths.root, "studio-left.json");
+  const resultsFile = path.join(o.paths.root, "studio-results.json");
   /** @type {Set<(s: any) => void>} */
   const listeners = new Set();
   /** @type {any} */
@@ -77,15 +90,45 @@ export function createStudio(o) {
   /** @type {NodeJS.Timeout[]} */
   let timers = [];
 
+  const readJson = (file, fallback) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch {
+      return fallback;
+    }
+  };
+  const writeJson = (file, data) => {
+    fs.mkdirSync(o.paths.root, { recursive: true });
+    fs.writeFileSync(`${file}.tmp`, JSON.stringify(data, null, 2) + "\n");
+    fs.renameSync(`${file}.tmp`, file);
+  };
+
+  // ---------- how makes ended (D192) ----------
+
+  /** @type {any[]} */
+  const results = readJson(resultsFile, []);
+  const unviewed = () => results.filter((r) => !r.viewed_at);
+  /** @param {object} r */
+  const addResult = (r) => {
+    const entry = { id: nextId++, created: now().toISOString(), ...r };
+    results.push(entry);
+    writeJson(resultsFile, results);
+    return entry;
+  };
+
+  /** @returns {any} */
   const state = () => {
-    if (!run) return notice ? { phase: "idle", notice } : { phase: "idle" };
+    const shelf = unviewed();
+    const ended = shelf.length ? { results: shelf } : {};
+    if (!run) return notice ? { phase: "idle", notice, ...ended } : { phase: "idle", ...ended };
     return {
-      phase: run.result ? "done" : "running",
+      phase: "running",
+      run_id: run.id,
+      ...ended,
       maker: run.maker,
       maker_name: run.makerName,
       lines: run.lines.slice(-KEEP_LINES),
       pending: run.pending ? { ...run.pending.shown, warn: run.warn } : null,
-      result: run.result,
     };
   };
   const changed = () => {
@@ -97,10 +140,18 @@ export function createStudio(o) {
 
   /** @param {any} current */
   const writeJournal = (current) => {
-    fs.mkdirSync(o.paths.root, { recursive: true });
-    const tmp = `${journalFile}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ session_id: current.sessionId ?? null, maker: current.maker, request: current.request, turns: current.turns, started_at: current.startedAt }, null, 2) + "\n");
-    fs.renameSync(tmp, journalFile);
+    writeJson(journalFile, {
+      session_id: current.sessionId ?? null,
+      maker: current.maker,
+      maker_name: current.makerName,
+      request: current.request,
+      turns: current.turns,
+      answered: current.answered,
+      waiting: Boolean(current.pending),
+      kit_hash: current.kitHash ?? null,
+      lock: current.lock ?? null,
+      started_at: current.startedAt,
+    });
   };
   const clearJournal = () => fs.rmSync(journalFile, { force: true });
 
@@ -128,9 +179,78 @@ export function createStudio(o) {
       ended_at: now().toISOString(),
     });
     clearJournal();
-    notice = { id: nextId++, kind: "restarted", ...NOTICES.restarted };
+    const stillGoing = Boolean(left.session_id) && !left.waiting;
+    notice = { id: nextId++, kind: "restarted", ...(stillGoing ? NOTICES.restarted_building : NOTICES.restarted) };
+    if (left.session_id) writeJson(leftFile, [...readJson(leftFile, []), left]);
   };
   recover();
+
+  // ---------- picking up what a restart cut off (D191) ----------
+
+  /** The record of what happened to a session goes with its first record. @param {string} id @param {string} why @param {any} archived */
+  const logArchive = (id, why, archived) => appendLog(o.paths.logs, "studio_session_correction", { corrects: id, why, archive: archived, at: now().toISOString() });
+
+  /** @param {any} item */
+  const collectLeft = async (item) => {
+    /** @type {any} */
+    let api = null;
+    const askNobody = async () => {
+      throw new NoOneToAnswer();
+    };
+    const lock = item.lock ?? o.lock();
+    const base = { maker: item.maker, makerName: item.maker_name ?? o.nameOf?.(item.maker) ?? item.maker };
+    try {
+      api = await o.api({ answered: item.answered ?? 0 });
+      const { record, committed } = await makeCart({
+        api,
+        request: item.request ?? "",
+        maker: item.maker,
+        model: o.model,
+        budgetCents: o.budgetCents ?? 300,
+        answerer: { question: askNobody, plan: askNobody },
+        checker: o.checker,
+        paths: o.paths,
+        lock,
+        kit: async () => ({ fileId: "", hash: item.kit_hash ?? "" }),
+        origin: "cabinet",
+        resume: { sessionId: item.session_id, kitHash: item.kit_hash },
+        ui: { progress: () => {}, info: () => {} },
+      });
+      addResult(
+        committed
+          ? { ...shelfEntry(base), ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
+          : { ...shelfEntry(base), ok: false, message: kidMessage(record), session_id: record.id },
+      );
+      logArchive(item.session_id, "collected after a service restart (D191)", await archive(api, item.session_id));
+    } catch (/** @type {any} */ e) {
+      if (e instanceof NoOneToAnswer) {
+        await finishRelease({ api, sessionId: item.session_id, maker: item.maker, request: item.request, turns: item.turns ?? [], released: "no_one_to_answer", startedAt: item.started_at });
+        // Already told, if it was waiting at the restart.
+        if (!item.waiting) addResult({ ...shelfEntry(base), ok: false, message: MESSAGES.no_one_to_answer, session_id: item.session_id });
+      } else if (e?.status === 404) {
+        appendLog(o.paths.logs, "studio_session_correction", { corrects: item.session_id, why: "the API no longer has this session, so nothing could be collected (D191)", at: now().toISOString() });
+      } else throw e;
+    }
+    writeJson(leftFile, readJson(leftFile, []).filter((/** @type {any} */ x) => x.session_id !== item.session_id));
+    changed();
+  };
+
+  let collecting = false;
+  const collectAllLeft = async () => {
+    if (collecting) return;
+    collecting = true;
+    let again = false;
+    for (const item of readJson(leftFile, [])) {
+      try {
+        await collectLeft(item);
+      } catch (/** @type {any} */ e) {
+        again = true;
+        console.error(`cabinet-service: session ${item.session_id} not collected yet: ${e?.message ?? e}`);
+      }
+    }
+    collecting = false;
+    if (again) setTimeout(collectAllLeft, recheckMs).unref?.();
+  };
 
   // ---------- waiting on the kid ----------
 
@@ -154,14 +274,18 @@ export function createStudio(o) {
     for (const t of timers) t.unref?.();
   };
 
-  /** Wait for the launcher. @param {object} shown */
-  const ask = (shown) =>
+  /** Wait for the launcher. @param {any} current @param {object} shown */
+  const ask = (current, shown) =>
     new Promise((resolve, reject) => {
-      run.pending = { shown: { id: nextId++, ...shown }, resolve, reject };
-      run.warn = false;
+      current.pending = { shown: { id: nextId++, ...shown }, resolve, reject };
+      current.warn = false;
+      writeJournal(current);
       armTimers();
       changed();
     });
+
+  /** A result entry's shared fields. @param {{maker: string, makerName: string, id?: number}} current */
+  const shelfEntry = (current) => ({ run_id: current.id ?? null, maker: current.maker, maker_name: current.makerName });
 
   // ---------- letting go of a make (D188) ----------
 
@@ -271,17 +395,18 @@ export function createStudio(o) {
     },
     /** @param {{ maker: string, request: string }} a */
     start({ maker, request }) {
-      if (run && !run.result) throw new StudioBusy("a game is already being made");
+      if (run) throw new StudioBusy("a game is already being made");
       /** @type {any} */
       const current = {
+        id: nextId++,
         maker,
         makerName: o.nameOf?.(maker) ?? maker,
         request,
         lines: [],
         pending: null,
         warn: false,
-        result: null,
         turns: [],
+        answered: 0,
         startedAt: now().toISOString(),
       };
       run = current;
@@ -291,13 +416,19 @@ export function createStudio(o) {
       /** @type {import("@game-studio-arcade/studio-cli/src/answers.js").Answerer} */
       const answerer = {
         question: async (q) => {
-          const a = /** @type {any} */ (await ask({ kind: "question", ...q }));
+          const a = /** @type {any} */ (await ask(current, { kind: "question", ...q }));
           // For the records of a make that doesn't reach makeCart's own (D188, D189).
           current.turns.push({ ...q, choice: a.choice, said: a.said ?? null });
+          current.answered++;
           writeJournal(current);
           return a;
         },
-        plan: (p) => /** @type {Promise<any>} */ (ask({ kind: "plan", ...p })),
+        plan: async (p) => {
+          const a = /** @type {any} */ (await ask(current, { kind: "plan", ...p }));
+          current.answered++;
+          writeJournal(current);
+          return a;
+        },
       };
       const ui = {
         progress: (/** @type {string} */ s) => {
@@ -319,6 +450,7 @@ export function createStudio(o) {
             return created;
           },
         };
+        current.lock = o.lock();
         const { record, committed } = await makeCart({
           api,
           request,
@@ -328,26 +460,33 @@ export function createStudio(o) {
           answerer,
           checker: o.checker,
           paths: o.paths,
-          lock: o.lock(),
-          kit: () => o.kit(api),
+          lock: current.lock,
+          kit: async () => {
+            const kit = await o.kit(api);
+            current.kitHash = kit.hash;
+            return kit;
+          },
           origin: "cabinet",
           repoBrief: o.repoBrief,
           ui,
         });
-        current.result = committed
-          ? { ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id }
-          : { ok: false, message: kidMessage(record), session_id: record.id };
+        addResult(
+          committed
+            ? { ...shelfEntry(current), ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id }
+            : { ...shelfEntry(current), ok: false, message: kidMessage(record), session_id: record.id },
+        );
       })()
         .catch(async (e) => {
           if (e instanceof Released) return finishRelease(current);
           logFailure(current, e);
           const stale = /doesn't match agents\/studio\.md/.test(String(e?.message));
-          current.result = { ok: false, message: stale ? MESSAGES.stale : MESSAGES.error, session_id: current.sessionId ?? null };
+          addResult({ ...shelfEntry(current), ok: false, message: stale ? MESSAGES.stale : MESSAGES.error, session_id: current.sessionId ?? null });
         })
         .catch((e) => console.error(`cabinet-service: logging a make that ended: ${e?.message ?? e}`))
         .finally(() => {
           if (current.released) return;
           current.pending = null;
+          if (run === current) run = null; // Make is free: how it ended is a shelf entry (D192).
           clearTimers();
           clearJournal();
           changed();
@@ -382,11 +521,16 @@ export function createStudio(o) {
     stop() {
       release("stopped");
     },
-    /** The kid has seen how it ended; Make is free again. */
-    acknowledge() {
-      if (run?.result) run = null;
+    /** Someone has seen how a make ended. Stamped, not removed. @param {number} id */
+    viewResult(id) {
+      const r = results.find((x) => x.id === id);
+      if (!r || r.viewed_at) return;
+      r.viewed_at = now().toISOString();
+      writeJson(resultsFile, results);
       changed();
     },
+    /** Go after anything a restart left (D191). The service calls this once it's ready. */
+    collectLeft: collectAllLeft,
     /** The kid has read the message. @param {number} id */
     dismissNotice(id) {
       if (notice?.id === id) {

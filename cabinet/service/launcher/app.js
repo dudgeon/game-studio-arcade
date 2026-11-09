@@ -26,8 +26,11 @@ let studio = { phase: "idle" };
 let config = { console: "Arcade", players: 1, speech: "stub" };
 /** Follow the Studio's state on screen? Off once ESC has gone to the shelf (D187). */
 let following = false;
-/** Has the make being followed been seen running? Then "idle" means it's gone (D188, D189). */
-let seenRun = false;
+/** The make being followed. Once it's no longer running, there's a result for it, or it's gone (D188, D189, D192). */
+/** @type {number | null} */
+let followRun = null;
+/** Seen it running on the stream? Only then does "idle" with no result mean it's gone. */
+let seenRunning = false;
 /** The event stream is down. */
 let offlineSince = 0;
 let lastStillHere = 0;
@@ -72,9 +75,13 @@ async function showShelf() {
     carts = (await get("/api/carts")).carts;
     const makers = (await get("/api/makers")).makers;
     const nameOf = (/** @type {string} */ id) => makers.find((/** @type {any} */ m) => m.id === id)?.name ?? id;
-    const items = [makeTile(), ...carts.map((/** @type {any} */ c) => ({ kind: "cart", cart: c, title: c.title, by: c.maker ? nameOf(c.maker) : undefined, note: toCheck(c) }))];
-    const keep = view.screen === "shelf" ? view.sel : 0;
-    const v = { screen: "shelf", console: config.console, count: carts.length, items, sel: Math.min(keep, items.length - 1) };
+    // Make, then how makes ended until someone has seen (D192), then the games.
+    const ended = (studio.results ?? []).map((/** @type {any} */ r) => ({ kind: "result", result: r, title: r.ok ? "New game ready!" : "A new game didn't finish", by: r.maker_name ?? r.maker, note: r.ok ? r.title : undefined, urgent: true }));
+    const items = [makeTile(), ...ended, ...carts.map((/** @type {any} */ c) => ({ kind: "cart", cart: c, title: c.title, by: c.maker ? nameOf(c.maker) : undefined, note: toCheck(c) }))];
+    // The highlight stays on what it was on, whatever arrives above it.
+    const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : "tile");
+    const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : "tile";
+    const v = { screen: "shelf", console: config.console, count: carts.length, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)) };
     if (view.screen === "shelf") view = v;
     else show(v);
   } catch {
@@ -87,7 +94,6 @@ const toCheck = (/** @type {any} */ c) => (c.youCheck?.length && !c.answered ? `
 /** The Make tile, or the way back to a game being made (D87, D187). */
 function makeTile() {
   if (studio.phase === "idle") return { kind: "make", title: "Make a new game", note: studio.notice?.short ?? "Tell Claude your idea", urgent: !!studio.notice };
-  if (studio.phase === "done") return { kind: "back", title: studio.result?.ok ? "Your new game is ready!" : "About your new game", urgent: true, note: "Have a look" };
   const asking = !!studio.pending;
   return { kind: "back", title: "Back to your game", note: asking ? "Claude has a question for you!" : "Still making it...", urgent: asking };
 }
@@ -112,9 +118,17 @@ function showSay(o) {
 /** Where the Studio's state says the screen should be, when following it. */
 function followStudio() {
   if (!following) return;
-  if (studio.phase !== "idle") seenRun = true;
-  else {
-    if (seenRun) showGone();
+  if (studio.phase !== "idle") {
+    followRun = studio.run_id;
+    seenRunning = true;
+  }
+  const ended = followRun === null ? null : (studio.results ?? []).find((/** @type {any} */ r) => r.run_id === followRun);
+  if (ended) {
+    if (view.resultId !== ended.id) showResult(ended);
+    return;
+  }
+  if (studio.phase === "idle") {
+    if (seenRunning) showGone();
     return;
   }
   const p = studio.pending && !answered.has(studio.pending.id) ? studio.pending : null;
@@ -124,21 +138,31 @@ function followStudio() {
     else show({ screen: "plan", pendingId: p.id, ...p, maker: studio.maker_name, flowed: planLines(p), top: 0, sel: 0 });
     return;
   }
-  if (studio.phase === "done") {
-    if (view.screen === "result") return;
-    const r = studio.result;
-    show({ screen: "result", ok: r.ok, title: r.title, by: studio.maker_name, message: r.message, cartId: r.cart_id, tiles: r.ok ? ["Play it now", "Back to the shelf"] : ["Back to the shelf"], sel: 0 });
-    return;
-  }
   if (studio.phase === "running") {
     if (view.screen === "progress") view.lines = studio.lines;
     else show({ screen: "progress", lines: studio.lines, maker: studio.maker_name });
   }
 }
 
+/** How a make ended, whoever's it was. @param {any} r */
+function showResult(r) {
+  show({ screen: "result", resultId: r.id, ok: r.ok, title: r.title, by: r.maker_name ?? r.maker, message: r.message, note: r.note, cartId: r.cart_id, tiles: r.ok ? ["Play it now", "Back to the shelf"] : ["Back to the shelf"], sel: 0 });
+}
+
+/** Seen: the entry leaves the shelf (D192). @param {number} id */
+function resultSeen(id) {
+  following = false;
+  followRun = null;
+  seenRunning = false;
+  post("/api/studio/result-seen", { id }).catch(() => {});
+  studio = { ...studio, results: (studio.results ?? []).filter((/** @type {any} */ r) => r.id !== id) };
+}
+
 /** The make being followed has gone: a timeout or a restart. Say so, then the shelf (D188, D189). */
 function showGone() {
   following = false;
+  followRun = null;
+  seenRunning = false;
   const n = studio.notice;
   show({ screen: "result", ok: false, message: n?.message ?? "This game stopped being made. Tell me your idea again!", tiles: ["Back to the shelf"], sel: 0, afterPlay: true, noticeId: n?.id });
 }
@@ -165,20 +189,17 @@ async function answer(choice, said) {
 /** @param {string} maker @param {string} request */
 async function startMake(maker, request) {
   show({ screen: "progress", lines: [], maker: "" });
-  seenRun = false;
+  followRun = null;
+  seenRunning = false;
   try {
     following = true;
-    await post("/api/studio/start", { maker, request });
+    // Only its id: state comes from the stream, but this may land after a quick ending.
+    followRun = (await post("/api/studio/start", { maker, request })).state.run_id ?? followRun;
+    followStudio();
   } catch {
     following = false;
     offline();
   }
-}
-
-async function acknowledge() {
-  following = false;
-  await post("/api/studio/ack").catch(() => {});
-  studio = { phase: "idle" }; // so the shelf is right at once; the stream says the same
 }
 
 // ---------- play ----------
@@ -303,7 +324,8 @@ function onButton() {
       else if (it.kind === "back") {
         following = true;
         followStudio();
-      } else startPlay(it.cart);
+      } else if (it.kind === "result") showResult(it.result);
+      else startPlay(it.cart);
       break;
     }
     case "who":
@@ -366,9 +388,10 @@ function onButton() {
       break;
     case "result":
       if (v.afterPlay) leaveMessage(v);
-      else if (v.ok && v.sel === 0) pickUpNewGame(v.cartId);
       else {
-        acknowledge().then(showShelf);
+        resultSeen(v.resultId);
+        if (v.ok && v.sel === 0) pickUpNewGame(v.cartId);
+        else showShelf();
       }
       break;
     case "check":
@@ -401,7 +424,6 @@ function askRequest(maker) {
 
 /** @param {string} id */
 async function pickUpNewGame(id) {
-  await acknowledge();
   try {
     const { carts } = await get("/api/carts");
     const cart = carts.find((/** @type {any} */ c) => c.id === id);
@@ -446,7 +468,10 @@ function onBack() {
       break;
     case "result":
       if (v.afterPlay) leaveMessage(v);
-      else acknowledge().then(showShelf);
+      else {
+        resultSeen(v.resultId);
+        showShelf();
+      }
       break;
     case "check":
       finishCheck();

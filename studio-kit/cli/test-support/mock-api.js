@@ -11,7 +11,7 @@ import { readAgentDef } from "../src/config.js";
 /**
  * @param {{steps: any[]}} script
  * @param {{sessionId?: string, outputs?: Record<string, Buffer|string>, outputLag?: number,
- *          usage?: any, timeoutMs?: number, appliedAgent?: any, archiveRefusals?: number}} [opts]
+ *          usage?: any, timeoutMs?: number, appliedAgent?: any, archiveRefusals?: number, history?: any[]}} [opts]
  */
 export function mockApi(script, opts = {}) {
   const sessionId = opts.sessionId ?? "sesn_mock_01";
@@ -21,7 +21,7 @@ export function mockApi(script, opts = {}) {
   let lag = opts.outputLag ?? 0;
   let archiveTries = 0;
   /** @type {any[]} */
-  const history = [];
+  const history = [...(opts.history ?? [])];
   /** @type {string[]} */
   const calls = [];
   /** @type {any[]} */

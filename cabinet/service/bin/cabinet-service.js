@@ -67,11 +67,12 @@ const studio = createStudio({
   nameOf: (id) => makers.get(id)?.name ?? id,
   titleOf: (id) => readCart(paths.carts, id)?.title ?? null,
   onStart: (id) => makers.touch(id),
-  api: async () => {
+  recheckMs: config.recheck_s ? config.recheck_s * 1000 : undefined,
+  api: async (resume) => {
     if (replaying) {
-      // A fresh replay for each make.
+      // A fresh replay for each make; one picked up after a restart starts part way through (D191).
       const { replayApi } = await import("../test-support/replay-api.js");
-      return replayApi({ dir: path.resolve(/** @type {string} */ (values.replay)), paceMs: Number(values.pace) }).api;
+      return replayApi({ dir: path.resolve(/** @type {string} */ (values.replay)), paceMs: Number(values.pace), resume }).api;
     }
     if (!api) {
       const { sdkApi } = await import("@game-studio-arcade/studio-cli/src/api.js");
@@ -105,5 +106,6 @@ const s = await startService({
 console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
 console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : `Managed Agents, with the key in ${values.config} (D131)`);
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
+studio.collectLeft();
 
 for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => s.close().then(() => process.exit(0)));

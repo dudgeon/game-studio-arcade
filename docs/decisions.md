@@ -662,7 +662,7 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 
 **D189. A service restart mid-make: the kid gets a message and the shelf; the session is logged as still running.** *(Director's instruction; design by Claude. Changes D183's "its record isn't written".)*
 - The service keeps `studio-run.json` in the data folder from a make's start to its end: maker, request, session id, turns. If it finds one when it starts, the last run didn't end, so it appends a `studio_session` record with `outcome: "service_restarted"` and `session_left_running: true`, and removes the file.
-- **The session isn't stopped.** It carries on at Anthropic, under its budget, until it finishes or waits on a question no one will answer. Nothing resumes it; the log has its id, for a person or the Manager later. Its work isn't collected, so any cart it finishes never reaches the shelf.
+- **The session isn't stopped.** *(D191 corrects this: a session stalls at its next `tell_player` with nobody relaying, and the service now picks it back up and collects the cart.)* It carries on at Anthropic, under its budget, until it finishes or waits on a question no one will answer. Nothing resumes it; the log has its id, for a person or the Manager later. Its work isn't collected, so any cart it finishes never reaches the shelf.
 - **What a kid sees:** within a few seconds of the service going, "Just a moment. The cabinet is restarting." When it's back, on any Studio screen: "Sorry! The cabinet restarted, so your game didn't get finished. Tell me your idea again!" and a button to the shelf, where Make is free. If the page reloaded as well, or they weren't on a Studio screen, the message is a line on the Make tile. A game being played carries on, since it's already loaded.
 
 **D190. The brief states the screen's real limits; agent v3.** *(Director's instruction, cleared to apply; Claude.)*
@@ -670,3 +670,20 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 - `tell_player` no longer names "unpacking the kit" as a milestone, and rules out words like kit and cart. Its example was why agents wrote "Unpacking the studio kit".
 - `progressFor`'s lines are now "Getting my tools out", "Putting it together" and "Checking your game". Recorded streams keep the words they were recorded with.
 - Applied with bare `ant --profile game-studio-arcade apply` after a dry run: only the agent's tools changed, the environment didn't. `studio check-brief` says v3 matches the repo.
+
+**D191. After a restart the service picks the make back up, so the kid's game isn't thrown away.** *(Director's instruction; design by Claude. Corrects and changes D189.)*
+- **D189 was wrong that a session "carries on until it finishes".** `tell_player` is a custom tool that waits for a result, so with nobody relaying, a session goes idle at its next progress line. Polling for "idle with outputs" would wait forever. So the service re-attaches the driver to the session (`resume` in `runSession` and `makeCart`, the same code, not a copy). It rebuilds the turns from the session's history, relays `tell_player`, waits on the stream to the end, then runs the normal validate, playtest, commit and log path.
+- **Finished:** the cart goes on the shelf, with a shelf entry (D192) noting "It finished while the cabinet was restarting". The `studio_session` record has `resumed_after_restart: true`. The session is then archived, never deleted, and that's logged as a `studio_session_correction` with the session's id.
+- **Failed its checks or came back with no cart:** nothing goes on the shelf. The entry says so in kid words, everything's kept, and the session is archived.
+- **Not finished yet:** it stays attached, within its budget. If the attach fails (no network), it tries again every minute (`recheck_s`). The list of sessions still to collect is `studio-left.json`, so another restart picks up where this left off and doesn't log the restart twice. A session the API says is gone (404) is logged and dropped.
+- **Waiting on a question or plan** (*Claude's call; the director's instruction didn't cover it*): nobody can answer, and answering for the kid would build things they didn't choose, so it isn't finished for them. It's archived and logged as `outcome: "abandoned"`, `ended_by: "no_one_to_answer"`. If that was already the case at the restart, the kid has been told; if the question came later, they get a shelf entry saying so.
+- **What the kid is told** now depends on where it stopped: on a question, "Tell me your idea again!"; while building, "Your game may still finish: look for it on the shelf."
+- No override for the brief check on this path: the session already exists, and it runs what it was started with. The record keeps the lock it started under.
+- Not built: deferring this playtest while a kid is playing (§14 wants that for the publish gate, which isn't built either).
+- **Not run against the real API**, in particular re-attaching to a live stream and archiving.
+
+**D192. How a make ended is its own shelf entry; Make stays Make.** *(Director's instruction; Claude. Changes D187's tile.)*
+- A make that has ended no longer holds Make's place, so the next kid doesn't see someone else's result in its way. The shelf is Make, then any results not yet viewed, then the games. Only a make still running takes Make's place, as "Back to your game" (D183: one session at a time).
+- An entry shows its maker's name: "New game ready!" with "by Alina - Penguin Catch", or "A new game didn't finish" with "by Alina". Opening it shows the result screen, and leaving that screen marks it viewed, whoever opened it.
+- A kid following their own make still goes straight to the result, and an entry they've seen doesn't appear.
+- Entries live in `studio-results.json` next to the library, so they survive a restart. Viewing one stamps `viewed_at` and nothing is removed.

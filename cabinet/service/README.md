@@ -24,7 +24,7 @@ The config file, created on the cabinet by Geoff, never in git (D131, D185):
 
 ```json
 { "anthropic_api_key": "...", "agent_id": "...", "agent_version": 2, "environment_id": "...",
-  "budget_cents": 300, "question_timeout_s": 600, "players": 1, "console_name": "Quarter Deck", "model": null }
+  "budget_cents": 300, "question_timeout_s": 600, "recheck_s": 60, "players": 1, "console_name": "Quarter Deck", "model": null }
 ```
 
 `agent_id` and `environment_id` come from `ant apply` in the **cabinet's own workspace**, because a workspace-scoped key can't reach what `claude-lock.json` names. It won't start with a config others can read, or one missing a key or an agent.
@@ -62,15 +62,18 @@ All words go through `Painter.box` in `launcher/screens.js`, which uses `launche
 |---|---|---|---|
 | Nobody answers for 10 minutes (D188) | "Still there? Move the stick!" for the last minute, then a message and the shelf, or a line on the Make tile if they've gone elsewhere | `outcome: "abandoned"`, `ended_by: "timed_out"`, `archive` | Archived, never deleted |
 | The kid picks "Stop making this game" (D188) | The shelf | `outcome: "abandoned"`, `ended_by: "stopped"`, `archive` | Archived, never deleted |
-| The service restarts mid-make (D189) | "The cabinet is restarting", then a message and the shelf, or a line on the Make tile if the page reloaded or they weren't on a Studio screen. A game being played carries on | `outcome: "service_restarted"`, `session_left_running` | Left running, under its budget. Nothing collects its work |
+| The service restarts mid-build (D189, D191) | "The cabinet is restarting", then "may still finish" and the shelf, then a shelf entry when it's done. A game being played carries on | `outcome: "service_restarted"`, then the usual record with `resumed_after_restart` | Picked back up, within its budget; its cart is checked and committed as usual. Then archived, and that's logged as a correction |
+| The service restarts on a question, or one comes up after (D191) | "Tell me your idea again", or a shelf entry saying nobody could answer | `outcome: "service_restarted"`, then `"abandoned"`, `ended_by: "no_one_to_answer"` | Archived, never deleted |
 
-Make is free in every case. `studio-run.json` in the data folder is how a restart finds the make it cut off. It exists only while a make runs.
+Make is free in every case. How a make ended is its own shelf entry with its maker's name, under Make, until someone opens it (D192).
+
+Files in the data folder: `studio-run.json` exists only while a make runs, and is how a restart finds the make it cut off. `studio-left.json` lists sessions still to collect. `studio-results.json` holds the entries; viewing one stamps it.
 
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
-- **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188), whose call is written from the docs and SDK types.
-- **Not built:** request screening (Phase 3), forks, resuming a session across a restart (D189), launcher sound, gamepads in the launcher's menus, guest players, MCP, Manager API, publish gate.
+- **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
+- **Not built:** request screening (Phase 3), forks, launcher sound, gamepads in the launcher's menus, guest players, MCP, Manager API, publish gate.
 
 ## Deploying to the virtual cabinet
 

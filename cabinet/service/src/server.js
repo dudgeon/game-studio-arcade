@@ -10,7 +10,7 @@
 //   GET  /api/studio/events      the same, as server-sent events
 //   POST /api/studio/start       {maker, request}
 //   POST /api/studio/answer      {id, choice, said?}
-//   POST /api/studio/ack         the kid has seen how it ended
+//   POST /api/studio/result-seen {id}: someone has seen how a make ended (D192)
 //   POST /api/studio/still-here  a key was pressed: the walk-away clock starts again (D188)
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
@@ -126,9 +126,9 @@ export function createServiceHandler(o) {
       o.studio.answer({ id: body.id, choice: body.choice, said: body.said });
       return json(res, 200, { ok: true, state: o.studio.state() });
     }
-    if (pathname === "/api/studio/ack") {
-      o.studio.acknowledge();
-      return json(res, 200, { ok: true, state: o.studio.state() });
+    if (pathname === "/api/studio/result-seen") {
+      o.studio.viewResult(body.id);
+      return json(res, 200, { ok: true });
     }
     if (pathname === "/api/studio/still-here") {
       o.studio.stillHere();
@@ -158,7 +158,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/ack", "/api/studio/still-here", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed"]);
+  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
