@@ -13,6 +13,27 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 | `vm/drive` | The driver: press, hold, type, screenshot over SSH, no window |
 | `../scripts/virtual-cabinet/` | Generates the UTM VM (`build.mjs`), starts it (`up.sh`), checks it (`verify.sh`) |
 
+## Connect the virtual cabinet to Claude
+
+Until this is done, the virtual cabinet replays a recorded make and spends nothing. Geoff does these once. Page names checked against the docs on 2026-11-08 (D131, D155).
+
+**In the [Claude Console](https://platform.claude.com):**
+
+1. **Make the workspace.** On [Workspaces](https://platform.claude.com/settings/workspaces), click **Create workspace**, name it `cabinet-virtual`, pick a color, and click **Create workspace**.
+2. **Cap its spending.** Still on **Workspaces**, select `cabinet-virtual`, then click **Spend limits** in the panel that opens. Set a monthly limit. The cabinet also caps each make at about $3 (a session can overshoot by one model request), so $20 a month covers about six makes; the amount is your call.
+3. **Make its key.** On [API keys](https://platform.claude.com/settings/keys), click **Create key**. Name it `arcade-virtual`, **scope it to the `cabinet-virtual` workspace**, and set **Linked account** to yourself, or to a service account if your account offers one. Choose an expiration: **Never** means no surprise stop mid-make, and the spend limit still caps it. Copy the key when it's shown. Don't paste it anywhere else, including a chat with Claude.
+
+**At the mini, in a Terminal window** (not with Claude Code's `!`, so the key can't land in a chat):
+
+4. **Connect it:** on a current `main`, from the repo, run `scripts/virtual-cabinet/up.sh` if the VM isn't running, then `scripts/virtual-cabinet/connect-cabinet.sh`. Paste the key when asked; nothing shows as you paste. Check the workspace it names, read the plan, and answer `y`. It clears the key from the clipboard.
+5. **Tell Claude it's done.** Claude commits `studio-kit/managed-agent/claude-lock.arcade-virtual.json` (no secrets in it) and runs the first live make when you and the director say so.
+
+To undo: on **API keys**, disable or delete the key. The cabinet's Make stops working, and nothing else changes. Rebuilding the VM also removes the key from it, so run step 4 again after a rebuild.
+
+If the script says it can't reach the cabinet, the mini's path to the VM has dropped (D156). Restart the VM: `/Applications/UTM.app/Contents/MacOS/utmctl stop arcade-virtual`, then `scripts/virtual-cabinet/up.sh`, and run step 4 again.
+
+After the Studio agent changes: `scripts/virtual-cabinet/connect-cabinet.sh --reapply`, which reuses the key on the cabinet.
+
 ## Bring up the virtual cabinet
 
 Once per Mac, with someone there: `open /Applications/UTM.app`, click Open, quit UTM. The first `utmctl` call may ask to control UTM.
@@ -47,7 +68,8 @@ Keys travel kernel → libinput → compositor → Chromium, as the Picade's do 
 ## Running a whole flow
 
 ```sh
-# On a fresh cabinet: the Studio flow, on replay. It makes a real cart and a maker, so it runs once per build.
+# On a fresh cabinet: the Studio flow, on replay. It makes a real cart and a maker, so it runs once per build,
+# and the cabinet can't be connected to Claude until it's rebuilt (D155).
 node cabinet/vm/flow.mjs --script cabinet/service/scripts/flows/penguin.drive --out ~/game-studio-data/vm/verify/studio
 node cabinet/vm/flow.mjs --script cabinet/vm/flows/typing.drive --out /tmp/typing  # typing checks; keeps no maker
 node cabinet/vm/flow.mjs --script cabinet/vm/flows/play.drive --out /tmp/play      # any time
