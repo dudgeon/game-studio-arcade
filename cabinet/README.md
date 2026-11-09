@@ -35,7 +35,7 @@ The soak (`soak.sh`, D156) restarts the VM while it runs. If one is going, tell 
 
 To undo: on **API keys**, disable or delete the key. The cabinet's Make stops working, and nothing else changes. Rebuilding the VM also removes the key from it, so run step 4 again after a rebuild.
 
-If the script says it can't reach the cabinet, the mini's path to the VM has dropped (D156). Restart the VM: `/Applications/UTM.app/Contents/MacOS/utmctl stop arcade-virtual`, then `scripts/virtual-cabinet/up.sh`, and run step 4 again.
+If the script says it can't reach the cabinet or can't write its config, the mini's path to the VM has dropped (D156). These gaps usually last under a minute, and running it again is safe, so wait a minute and try again. If it still can't, restart the VM: `/Applications/UTM.app/Contents/MacOS/utmctl stop arcade-virtual`, then `scripts/virtual-cabinet/up.sh`, and run step 4 again.
 
 After the Studio agent changes: `scripts/virtual-cabinet/connect-cabinet.sh --reapply`, which reuses the key on the cabinet.
 
