@@ -499,7 +499,7 @@ test("a starter game has no label and asks nothing after a play; a made game has
     `);
     assert.equal(readLog(path.join(data, "logs", "play.jsonl"))[0].cart_id, "apple-catch");
     await run(`
-      press down
+      press up
       press a
       wait play
       sleep 400
@@ -508,6 +508,58 @@ test("a starter game has no label and asks nothing after a play; a made game has
     `);
     assert.deepEqual(await faults(), []);
     assert.deepEqual(problems, []);
+  });
+});
+
+test("back from a game, the shelf stays on it; a game that's gone falls back to Make (D194)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, data, faults, problems }) => {
+    const carts = path.join(data, "carts");
+    fs.cpSync(path.resolve(import.meta.dirname, "../../../studio-kit/context-pack/templates/catch"), path.join(carts, "apple-catch"), { recursive: true });
+    fs.cpSync(path.resolve(import.meta.dirname, "../../../studio-kit/context-pack/templates/dodge"), path.join(carts, "comet-dodge"), { recursive: true });
+    fs.cpSync(path.join(FIXTURE, "cart"), path.join(carts, "penguin-catch"), { recursive: true });
+    await page.reload();
+    await page.waitForFunction(() => /** @type {any} */ (window).launcher?.screen() === "shelf");
+    const sel = () => page.evaluate(() => /** @type {any} */ (window).launcher.sel());
+    const litTitle = async () => boxText(page, `shelf-title-${await sel()}`);
+    const toShelf = "wait shelf\nsleep 200";
+
+    // ESC, from a starter: no you-check on the way. Items: Make, Penguin, Apple, Comet.
+    await run("sleep 100\npress down\npress down\npress a\nwait play\nsleep 300\npress esc");
+    await run(toShelf);
+    assert.equal(await litTitle(), "Apple Catch");
+
+    // Playing it again is one press.
+    await run("press a\nwait play\nsleep 300\npress esc");
+    await run(toShelf);
+    assert.equal(await litTitle(), "Apple Catch");
+
+    // Through every you-check question, answered.
+    await run("press up\npress a\nwait play\nsleep 300\npress esc\nwait check\npress a\npress a\npress a");
+    await run(toShelf);
+    assert.equal(await litTitle(), "Penguin Catch");
+
+    // It stays while the shelf refreshes, and moving on works from there.
+    await run("press down\npress a\nwait play\nsleep 300\npress esc");
+    await run(toShelf);
+    assert.equal(await litTitle(), "Apple Catch");
+
+    // Only coming back from a game: from any other screen, it's Make.
+    await run("press up\npress up\npress a\nwait who\npress esc");
+    await run(toShelf);
+    assert.equal(await sel(), 0);
+    assert.equal(await litTitle(), "Make a new game");
+
+    assert.deepEqual(problems, []);
+
+    // The game goes away while it's being played. (Its play can't be logged: a 404 here, expected.)
+    await run("press down\npress down\npress down\npress a\nwait play\nsleep 300");
+    fs.rmSync(path.join(carts, "comet-dodge"), { recursive: true });
+    await run("press esc");
+    await run(toShelf);
+    assert.equal(await sel(), 0);
+    assert.equal(await litTitle(), "Make a new game");
+
+    assert.deepEqual(await faults(), []);
   });
 });
 

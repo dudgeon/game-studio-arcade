@@ -775,3 +775,5 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 - A cart with no `maker` in its `cart.json` is a starter. Everything made through the Studio has one (`makeCart`, D87), and the seeded templates don't, so this needs no marker, no re-seeding and no change to carts already on a cabinet.
 - On the cabinet, a starter's you-check rules aren't offered at all: no label, no questions after a play, and `/api/you-check` refuses an answer. The rules stay in its `spec.md`, untouched. A game made from a starter has a maker, so it asks as usual.
 - The desktop player (D71) is unchanged: there, a person checking any cart is the point.
+
+**D194. Back from a game, the shelf stays on that game.** *(Director's instruction; Claude.)* Pressing ESC, answering you-check, or a game that wouldn't start all return to the game just played, so playing it again is one press. If that game no longer exists, the highlight falls back to Make. This only applies to coming back from a game: from any other screen, such as leaving "Who's making?", it's on Make as before.
