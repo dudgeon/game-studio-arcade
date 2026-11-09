@@ -20,13 +20,18 @@ Until this is done, the virtual cabinet replays a recorded make and spends nothi
 **In the [Claude Console](https://platform.claude.com):**
 
 1. **Make the workspace.** On [Workspaces](https://platform.claude.com/settings/workspaces), click **Create workspace**, name it `cabinet-virtual`, pick a color, and click **Create workspace**.
-2. **Cap its spending.** Still on **Workspaces**, select `cabinet-virtual`, then click **Spend limits** in the panel that opens. Set a monthly limit. The cabinet also caps each make at about $3 (a session can overshoot by one model request), so $20 a month covers about six makes; the amount is your call.
-3. **Make its key.** On [API keys](https://platform.claude.com/settings/keys), click **Create key**. Name it `arcade-virtual`, **scope it to the `cabinet-virtual` workspace**, and set **Linked account** to yourself, or to a service account if your account offers one. Choose an expiration: **Never** means no surprise stop mid-make, and the spend limit still caps it. Copy the key when it's shown. Don't paste it anywhere else, including a chat with Claude.
+2. **Cap its spending.** Still on **Workspaces**, select `cabinet-virtual`, then click **Spend limits** in the panel that opens. Set it to **$10 a month**, Geoff's choice (D157). The cabinet also caps each make at about $3 (a session can overshoot by one model request), so $10 is about three makes at worst. Measured builds cost 30–60¢, so it's more like 15–30 in practice.
+3. **Make its key** (Geoff's choices, D158).
+   - **Who owns it.** Open [Service accounts](https://platform.claude.com/settings/service-accounts). If that page is there and lets you create one, make `arcade-virtual`, then pick **Add to workspace** in its menu and add it to `cabinet-virtual` (as **Workspace Developer**, if it asks for a role). The key's owner is that service account. If the page is missing or won't let you make one, the owner is you. Expect that on an Individual account, and don't convert the account for this.
+   - **The key.** On [API keys](https://platform.claude.com/settings/keys), click **Create key** and name it `arcade-virtual`. Set **Linked account** to the owner above, **scope it to the `cabinet-virtual` workspace**, and set the expiration to **Never**. If **Linked account** only offers you, that settles it: the owner is you.
+   - Copy the key when it's shown. Don't paste it anywhere else, including a chat with Claude.
 
 **At the mini, in a Terminal window** (not with Claude Code's `!`, so the key can't land in a chat):
 
 4. **Connect it:** on a current `main`, from the repo, run `scripts/virtual-cabinet/up.sh` if the VM isn't running, then `scripts/virtual-cabinet/connect-cabinet.sh`. Paste the key when asked; nothing shows as you paste. Check the workspace it names, read the plan, and answer `y`. It clears the key from the clipboard.
 5. **Tell Claude it's done.** Claude commits `studio-kit/managed-agent/claude-lock.arcade-virtual.json` (no secrets in it) and runs the first live make when you and the director say so.
+
+The soak (`soak.sh`, D156) restarts the VM while it runs. If one is going, tell Claude first: a restart in the middle of step 4 would make it fail, though running it again is safe.
 
 To undo: on **API keys**, disable or delete the key. The cabinet's Make stops working, and nothing else changes. Rebuilding the VM also removes the key from it, so run step 4 again after a rebuild.
 
@@ -79,4 +84,9 @@ Same verbs as `cabinet/service/scripts/drive.js`, plus `expect TEXT`. It reports
 
 ## Tests
 
-`node --test scripts/virtual-cabinet/test/lib.test.mjs` covers the generator's disk, kernel, initramfs and config logic.
+`npm test` runs these with the rest: `scripts/virtual-cabinet/test/lib.test.mjs` covers the generator's disk, kernel, initramfs and config logic. `connect.test.mjs` runs `connect-cabinet.sh` end to end with stand-ins, a fake key and no VM.
+
+Run by hand, because they need the cabinet:
+- `scripts/virtual-cabinet/test/connect-vm.sh`: the connect path on a real cabinet. **It leaves a fake key, so rebuild afterwards.**
+- `scripts/virtual-cabinet/verify.sh`: the whole cabinet, safe to repeat.
+- `scripts/virtual-cabinet/soak.sh`: bridged network reachability from both sides (D156), restarting but never rebuilding.
