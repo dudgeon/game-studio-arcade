@@ -21,7 +21,8 @@ check services guest 'systemctl is-active arcade-launcher arcade-kiosk arcade-ke
 check hostname guest 'test "$(hostname)" = arcade-virtual'
 check screen-mode guest 'sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user/$(id -u arcade) WAYLAND_DISPLAY=wayland-0 wlr-randr | grep -E "1024x768.*current"'
 check three-carts guest 'test "$(ls /var/lib/arcade/carts | wc -l)" -ge 3 && ls /var/lib/arcade/carts/apple-catch/game.js /var/lib/arcade/carts/comet-dodge/game.js /var/lib/arcade/carts/wall-ball/game.js'
-check launcher-lists guest 'node -e "fetch(\"http://127.0.0.1:8330/\").then(r=>process.exit(r.ok?0:1))"'
+check service-replying guest 'node -e "fetch(\"http://127.0.0.1:8330/api/config\").then(r=>process.exit(r.ok?0:1))"'
+check devtools-local-only guest '! ss -ltn | grep ":9222" | grep -qv "127.0.0.1"'
 
 check console-not-on-serial guest '! grep -q hvc /proc/consoles'
 check swap-as-on-pi guest 'grep -q zram /proc/swaps'
@@ -47,32 +48,20 @@ mini_probe() {
 }
 check firewall-refuses-mini mini_probe
 
-# The screens, through the driver, by the real input path.
-check shot-launcher "$D" screenshot "$OUT/launcher.png"
-check press-down "$D" press down
-sleep 1
-check shot-launcher-moved "$D" screenshot "$OUT/launcher-moved.png"
+# The screens: a cart from the shelf, by the real input path. Safe to repeat.
+PLAY="$OUT/play"
+rm -rf "$PLAY"
+check play-flow /opt/homebrew/opt/node@22/bin/node "$REPO/cabinet/vm/flow.mjs" --script "$REPO/cabinet/vm/flows/play.drive" --out "$PLAY"
 different() { [ -s "$1" ] && [ -s "$2" ] && ! cmp -s "$1" "$2"; }
-check input-moved-selection different "$OUT/launcher.png" "$OUT/launcher-moved.png"
-check press-a "$D" press a
-sleep 3
-check shot-cart "$D" screenshot "$OUT/cart-running.png"
-check cart-started different "$OUT/launcher-moved.png" "$OUT/cart-running.png"
-# Past the title screen, so a held button acts on a game in play.
-check press-start "$D" press start
+check input-moved-selection different "$PLAY/01-shelf.png" "$PLAY/02-shelf-moved.png"
+check game-started different "$PLAY/03-game-title.png" "$PLAY/04-game-playing.png"
+check hold-changed-game different "$PLAY/04-game-playing.png" "$PLAY/05-game-after-hold.png"
+check left-the-game different "$PLAY/05-game-after-hold.png" "$PLAY/06-left-the-game.png"
+check play-logged-as-cabinet guest 'sudo grep -q "\"origin\":\"cabinet\"" /var/lib/arcade/logs/play.jsonl && ! sudo grep -q "\"origin\":\"desktop\"" /var/lib/arcade/logs/play.jsonl'
+# Leave wherever the game left us, so the next run starts from the shelf.
+"$D" press esc >/dev/null 2>&1 || true
 sleep 1
-check shot-playing "$D" screenshot "$OUT/cart-playing.png"
-check game-started different "$OUT/cart-running.png" "$OUT/cart-playing.png"
-check hold-button "$D" hold left 400
-check shot-cart-after-hold "$D" screenshot "$OUT/cart-after-hold.png"
-check hold-changed-game different "$OUT/cart-playing.png" "$OUT/cart-after-hold.png"
-check back-to-shelf "$D" press esc
-sleep 2
-check shot-after-esc "$D" screenshot "$OUT/after-esc.png"
-check left-the-game different "$OUT/cart-after-hold.png" "$OUT/after-esc.png"
-check play-logged guest 'sudo test -s /var/lib/arcade/logs/play.jsonl'
-# Leave the check screen, so the next run starts from the shelf.
-"$D" press b >/dev/null 2>&1 || true
+"$D" press esc >/dev/null 2>&1 || true
 sleep 1
 
 # Frame time, labelled virtual (D128).

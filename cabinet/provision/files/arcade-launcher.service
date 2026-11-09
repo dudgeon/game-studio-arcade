@@ -1,11 +1,13 @@
 [Unit]
-Description=Arcade launcher (V0: the local player, serving the cabinet's own cart library)
+Description=Cabinet service (launcher and Studio)
 After=local-fs.target
 
 [Service]
 User=arcade
 Environment=GSA_DATA_DIR=/var/lib/arcade
-ExecStart=/usr/local/bin/node /opt/arcade/current/studio-kit/player/bin/studio-play.js --host 127.0.0.1 --port 8330 --carts /var/lib/arcade/carts --logs /var/lib/arcade/logs --players 1
+Environment=HOME=/home/arcade
+EnvironmentFile=/etc/arcade/service.env
+ExecStart=/usr/local/bin/node /opt/arcade/current/cabinet/service/bin/cabinet-service.js --data /var/lib/arcade $ARCADE_SERVICE_ARGS
 Restart=always
 RestartSec=2
 

@@ -575,6 +575,13 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 
 **D153. Played with the Mac keyboard for now; a USB arcade controller later, with its own key map.** *(Geoff; answers question 8, updates D125.)* Geoff: "I plan to buy an arcade controller; it may have different key mappings but we could use it for testing." So a controller passed through to the VM must be able to carry its own key map rather than assume D82's keys. Nothing is bought or built for it now. It's a test device for the virtual cabinet, and it doesn't change the Picade's map (D82).
 
+## 2026-11-08 — Cabinet service in the virtual cabinet
+
+**D154. The cabinet service replaces the V0 launcher in the VM, on replay until the cabinet has a key.** *(Claude; carries out the director's deploy request and cabinet/service/README.md.)*
+- `arcade-launcher.service` runs `cabinet-service.js`. With `/etc/arcade/service.json` (D131) it's live; without it, the `virtual` profile replays Penguin Catch and spends nothing (D186), and the `picade` profile stays down and says why.
+- `node_modules` comes from `npm ci --omit=dev --ignore-scripts` on the cabinet, from the repo's lock file, so the cabinet contacts registry.npmjs.org while provisioning and never at run time.
+- `cabinet/vm/flow.mjs` runs the same `.drive` scripts as `cabinet/service/scripts/drive.js`, but on the VM's own screens: keys by uinput, shots from the compositor, screen state read through Chromium's DevTools port. That port is 127.0.0.1 only and `virtual` only, and only reads state. It is not part of the Picade.
+
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
 Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).

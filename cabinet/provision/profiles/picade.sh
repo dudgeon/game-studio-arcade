@@ -52,6 +52,11 @@ $end
 CONF
 }
 
+# The Picade needs its key file: with none, the service says so and stays down (D185).
+service_args_without_key() {
+  echo "--config /etc/arcade/service.json"
+}
+
 kiosk_env() {
   cat <<'ENV'
 ARCADE_OUTPUT=
