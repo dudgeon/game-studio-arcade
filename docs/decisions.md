@@ -598,6 +598,13 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 
 **D157. `cabinet-virtual`'s spend limit is $10 a month.** *(Geoff.)* With the cabinet's cap of about $3 a make, that's about three makes at worst. Measured builds cost 30–60¢, so more like 15–30 in practice.
 
+**D158. The cabinet's key: a service account's if the Console offers one, otherwise Geoff's, scoped to `cabinet-virtual`, expiring never.** *(Geoff. Supersedes D131's "workspace-scoped key" only where that means an ownerless key.)*
+- The docs now call ownerless workspace keys legacy, and a new key has an owner. D131's other terms stand: one key per cabinet, a dedicated workspace with its own spend limit (D157), stored only on that cabinet.
+- **Owner:** a service account, on the Service accounts page, added to `cabinet-virtual`. Otherwise a personal key linked to Geoff. Geoff's account is an Individual org, and the service-accounts API returned 404 on 2026-11-07, so a personal key is likely. The Console page itself hasn't been looked at, so step 3 of cabinet/README.md says how to tell.
+- **A personal key acts as Geoff, but only in this workspace.** It isn't his login (D129, D130), but it stops working if he loses access to the organization or the workspace.
+- **A service account key changes nothing in `connect-cabinet.sh`:** both start `sk-ant-`, and the script tells them apart only by whether the API answers for one workspace. A service account's key must be scoped too, because the account also belongs to the Default Workspace. A key that isn't scoped gets the API's 400, and the script stops and says so.
+- **Expiration:** Never. An expiry would stop Make with no warning to whoever's at the cabinet.
+
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
 Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).
