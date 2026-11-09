@@ -76,6 +76,7 @@ press down
 press a
 wait shelf
 shot shelf-with-new-game
+press up
 press a
 wait who
 shot who-knows-alina

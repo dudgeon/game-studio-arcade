@@ -45,6 +45,9 @@ const faults = new Set();
 let playing = null;
 /** Questions already answered: an event sent before the answer arrived can still come in after it. */
 const answered = new Set();
+/** The game just played: the next shelf opens on it, once (D194). */
+/** @type {string | null} */
+let returnTo = null;
 
 // ---------- service ----------
 
@@ -80,7 +83,8 @@ async function showShelf() {
     const items = [makeTile(), ...ended, ...carts.map((/** @type {any} */ c) => ({ kind: "cart", cart: c, title: c.title, by: c.maker ? nameOf(c.maker) : undefined, note: toCheck(c) }))];
     // The highlight stays on what it was on, whatever arrives above it.
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : "tile");
-    const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : "tile";
+    const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
+    returnTo = null;
     const v = { screen: "shelf", console: config.console, count: carts.length, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)) };
     if (view.screen === "shelf") view = v;
     else show(v);
@@ -235,6 +239,7 @@ async function endPlay(ended) {
   if (!p || p.ended) return;
   p.ended = true;
   playing = null;
+  returnTo = p.cart.id;
   const duration = (performance.now() - p.t0) / 1000;
   const ticks = p.host.ticks;
   p.host.destroy();
