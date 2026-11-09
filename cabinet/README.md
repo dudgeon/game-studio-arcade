@@ -20,7 +20,7 @@ Until this is done, the virtual cabinet replays a recorded make and spends nothi
 **In the [Claude Console](https://platform.claude.com):**
 
 1. **Make the workspace.** On [Workspaces](https://platform.claude.com/settings/workspaces), click **Create workspace**, name it `cabinet-virtual`, pick a color, and click **Create workspace**.
-2. **Cap its spending.** Still on **Workspaces**, select `cabinet-virtual`, then click **Spend limits** in the panel that opens. Set a monthly limit. The cabinet also caps each make at about $3 (a session can overshoot by one model request), so $20 a month covers about six makes; the amount is your call.
+2. **Cap its spending.** Still on **Workspaces**, select `cabinet-virtual`, then click **Spend limits** in the panel that opens. Set it to **$10 a month**, Geoff's choice (D157). The cabinet also caps each make at about $3 (a session can overshoot by one model request), so $10 is about three makes at worst. Measured builds cost 30–60¢, so it's more like 15–30 in practice.
 3. **Make its key.** On [API keys](https://platform.claude.com/settings/keys), click **Create key**. Name it `arcade-virtual`, **scope it to the `cabinet-virtual` workspace**, and set **Linked account** to yourself, or to a service account if your account offers one. Choose an expiration: **Never** means no surprise stop mid-make, and the spend limit still caps it. Copy the key when it's shown. Don't paste it anywhere else, including a chat with Claude.
 
 **At the mini, in a Terminal window** (not with Claude Code's `!`, so the key can't land in a chat):
@@ -79,4 +79,9 @@ Same verbs as `cabinet/service/scripts/drive.js`, plus `expect TEXT`. It reports
 
 ## Tests
 
-`node --test scripts/virtual-cabinet/test/lib.test.mjs` covers the generator's disk, kernel, initramfs and config logic.
+`npm test` runs these with the rest: `scripts/virtual-cabinet/test/lib.test.mjs` covers the generator's disk, kernel, initramfs and config logic. `connect.test.mjs` runs `connect-cabinet.sh` end to end with stand-ins, a fake key and no VM.
+
+Run by hand, because they need the cabinet:
+- `scripts/virtual-cabinet/test/connect-vm.sh`: the connect path on a real cabinet. **It leaves a fake key, so rebuild afterwards.**
+- `scripts/virtual-cabinet/verify.sh`: the whole cabinet, safe to repeat.
+- `scripts/virtual-cabinet/soak.sh`: bridged network reachability from both sides (D156), restarting but never rebuilding.

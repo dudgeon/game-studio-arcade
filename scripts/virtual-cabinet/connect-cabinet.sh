@@ -13,18 +13,19 @@
 # never an argument, an environment variable, a file on the mini, or a log line.
 #
 # ARCADE_HOST and CABINET pick another cabinet: CABINET names its lock file, default arcade-virtual.
+# ARCADE_DRIVE, ARCADE_AGENT_DIR and GSA_NODE are for its test (test/connect.test.mjs).
 set -euo pipefail
 set +x
 ulimit -c 0
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-AGENT_DIR="$REPO/studio-kit/managed-agent"
+AGENT_DIR="${ARCADE_AGENT_DIR:-$REPO/studio-kit/managed-agent}"
 CABINET="${CABINET:-arcade-virtual}"
 LOCK="claude-lock.$CABINET.json"
 VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
-DRIVE="$REPO/cabinet/vm/drive"
+DRIVE="${ARCADE_DRIVE:-$REPO/cabinet/vm/drive}"
 GUEST=/opt/arcade/current/cabinet/vm/guest/service-config.mjs
-NODE=/opt/homebrew/opt/node@22/bin/node
+NODE="${GSA_NODE:-/opt/homebrew/opt/node@22/bin/node}"
 [ -f "$VM_ROOT/host" ] && export ARCADE_HOST="${ARCADE_HOST:-$(cat "$VM_ROOT/host")}"
 
 key=""

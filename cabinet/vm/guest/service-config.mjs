@@ -9,9 +9,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const CONFIG = "/etc/arcade/service.json";
-const ENV_FILE = "/etc/arcade/service.env";
-const DATA = "/var/lib/arcade";
+// The ARCADE_ variables are for its test. sudo drops them, so a cabinet always uses the real paths.
+const ETC = process.env.ARCADE_ETC ?? "/etc/arcade";
+const CONFIG = path.join(ETC, "service.json");
+const ENV_FILE = path.join(ETC, "service.env");
+const DATA = process.env.ARCADE_DATA ?? "/var/lib/arcade";
 const DEFAULTS = { budget_cents: 300, question_timeout_s: 600, recheck_s: 60, players: 1, console_name: "Quarter Deck", model: null };
 
 function fail(message, code = 1) {
@@ -72,7 +74,7 @@ if (cmd === "check") {
   fs.closeSync(fd);
   fs.renameSync(temp, CONFIG);
   fs.writeFileSync(ENV_FILE, `ARCADE_SERVICE_ARGS=--config ${CONFIG}\n`);
-  execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
+  if (!process.env.ARCADE_NO_RESTART) execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
   const mode = (fs.statSync(CONFIG).mode & 0o777).toString(8);
   console.log(`service.json written, mode ${mode}; agent ${config.agent_id} version ${config.agent_version ?? "?"}; budget ${config.budget_cents} cents a make`);
 } else {

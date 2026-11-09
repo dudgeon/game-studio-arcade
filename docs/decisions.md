@@ -596,6 +596,8 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 
 **D156. Bridged stays (D152), with its Wi-Fi gaps handled, not hidden.** *(Claude; the finding is for Geoff.)* Measured 2026-11-08: see platform-notes.md. `up.sh` restarts a VM that's silent for 10 minutes, once. The cabinet plays on its own through a gap, because its service and kiosk are inside the VM. A gap stops the mini reaching it: the driver, SSH, and later the Manager and MCP. Whether a gap also cuts the guest's internet, and so a live make, isn't known. Shared networking is the documented fallback (D124), and Geoff would lose the home-network visibility he chose.
 
+**D157. `cabinet-virtual`'s spend limit is $10 a month.** *(Geoff.)* With the cabinet's cap of about $3 a make, that's about three makes at worst. Measured builds cost 30–60¢, so more like 15–30 in practice.
+
 ## 2026-11-08 — Library redesign: catalog, fetch on demand, templates
 
 Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like sonnet) retrieve context as needed from the library; and the library is built for expressiveness and token efficiency", with "a few canned starting points/templates which would be most token efficient but less expressive, and one start from scratch option". It will grow, including "the ability to navigate three dimensional space". The measurements behind this are in [cost-penguin-catch.md](cost-penguin-catch.md) and [phase-0-results.md](phase-0-results.md).
