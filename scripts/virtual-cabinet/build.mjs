@@ -4,7 +4,7 @@
 //
 //   node scripts/virtual-cabinet/build.mjs [--replace] [--network Bridged|Shared] [--bridge en1]
 //
-// --serial-console sends boot messages to the serial device: always run serial.sh with it.
+// --serial-console adds a serial device for debugging. Always run serial.sh with it, or the guest freezes (D148).
 // Output: ~/game-studio-data/vm/arcade-virtual.utm (never in git). It refuses to
 // overwrite an existing VM unless you pass --replace.
 import { execFileSync, spawn, spawnSync } from "node:child_process";
@@ -28,9 +28,10 @@ const DISK_BYTES = 32 * 2 ** 30;
 // Fixed, so a rebuilt VM is the same machine on the network (locally administered MAC).
 const MAC = "5a:47:41:43:41:42";
 const UUID = "6F0C9A52-3B1E-4D7A-8C24-A1B2C3D4E5F6";
-// Not console=hvc0 unless debugging: UTM's serial is a pseudo-terminal, and when nobody reads it
-// and its buffer fills, the kernel spins on the console and the whole guest freezes (D148).
-const CMDLINE = process.argv.includes("--serial-console") ? "console=hvc0 root=/dev/vda2 rw" : "root=/dev/vda2 rw";
+// UTM's serial device is a pseudo-terminal. When nobody reads it and its buffer fills, the kernel spins and
+// the guest freezes, whatever console= says. So the VM has none, unless a debug build asks for it (D148).
+const SERIAL = process.argv.includes("--serial-console");
+const CMDLINE = `console=${SERIAL ? "hvc0" : "tty0"} root=/dev/vda2 rw`;
 const BOOT_MODULES = ["virtio_blk", "ext4", "vfat", "nls_cp437", "nls_ascii", "crc32c_generic"];
 
 const args = process.argv.slice(2);
@@ -247,7 +248,7 @@ async function main() {
 
     withBootPartition(disk, (mount) => writeSeed(mount, { modulesTgz, nodeTarball, profile: "virtual" }));
 
-    const config = utmConfig({ name: NAME, uuid: UUID, mac: MAC, network, bridgeInterface: bridge, cmdline: CMDLINE });
+    const config = utmConfig({ name: NAME, uuid: UUID, mac: MAC, network, bridgeInterface: bridge, cmdline: CMDLINE, serial: SERIAL });
     const json = join(work, "config.json");
     writeFileSync(json, JSON.stringify(config));
     run("plutil", ["-convert", "xml1", "-o", join(tmp, "config.plist"), json]);

@@ -112,7 +112,7 @@ export const file = (name, data, perm = 0o644) => ({ name, mode: S_IFREG | perm,
 export const link = (name, target) => ({ name, mode: S_IFLNK | 0o777, link: target });
 
 /** The UTM 5 config for D123, with no display (D141). Same input, same config. */
-export function utmConfig({ name, uuid, mac, network, bridgeInterface, cmdline, cpus = 4, memoryMb = 8192 }) {
+export function utmConfig({ name, uuid, mac, network, bridgeInterface, cmdline, serial = false, cpus = 4, memoryMb = 8192 }) {
   const net = { Mode: network, MacAddress: mac };
   if (network === "Bridged") net.BridgeInterface = bridgeInterface;
   return {
@@ -147,7 +147,8 @@ export function utmConfig({ name, uuid, mac, network, bridgeInterface, cmdline, 
     Display: [],
     Drive: [{ Identifier: "A7C3F1E2-0D4B-4E6A-9B21-3C5D7E9F1A2B", ImageName: "disk.img", ReadOnly: false, Nvme: false }],
     Network: [net],
-    Serial: [{ Mode: "Ptty" }],
+    // No serial device unless debugging: an unread one freezes the guest (D148).
+    Serial: serial ? [{ Mode: "Ptty" }] : [],
   };
 }
 

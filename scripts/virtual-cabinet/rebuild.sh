@@ -20,5 +20,10 @@ if [ "$(state)" = started ]; then
   for _ in $(seq 1 24); do [ "$(state)" = started ] || break; sleep 5; done
   [ "$(state)" = started ] && "$UTMCTL" stop arcade-virtual
 fi
+# UTM keeps a VM's config in memory, so it must quit to see the new one. Only with no VM of ours running.
+[ "$(state)" = started ] && { echo "the VM is still running" >&2; exit 1; }
+killall UTM 2>/dev/null || true
+for _ in $(seq 1 20); do pgrep -x UTM >/dev/null || break; sleep 1; done
+pgrep -x UTM >/dev/null && { echo "UTM didn't quit" >&2; exit 1; }
 node "$REPO/scripts/virtual-cabinet/build.mjs" --replace --network "$NETWORK"
 exec "$REPO/scripts/virtual-cabinet/up.sh" --network "$NETWORK"

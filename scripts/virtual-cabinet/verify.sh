@@ -23,10 +23,13 @@ check screen-mode guest 'sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user
 check three-carts guest 'test "$(ls /var/lib/arcade/carts | wc -l)" -ge 3 && ls /var/lib/arcade/carts/collect/game.js /var/lib/arcade/carts/dodge/game.js /var/lib/arcade/carts/paddle/game.js'
 check launcher-lists guest 'node -e "fetch(\"http://127.0.0.1:8330/\").then(r=>process.exit(r.ok?0:1))"'
 
+check console-not-on-serial guest '! grep -q hvc /proc/consoles'
 check swap-as-on-pi guest 'grep -q zram /proc/swaps'
 check sound-out guest 'sudo runuser -u arcade -- aplay -l | grep -q virtio-snd && head -c 96000 /dev/zero | sudo runuser -u arcade -- aplay -q -D hw:0 -f S16_LE -r 48000 -c 2 -t raw -'
 # Pi OS enables networkd's wait-online too, but NetworkManager runs the network, so that unit always times out.
 check no-failed-units guest 'test -z "$(systemctl --failed --no-legend --plain | grep -vE "systemd-networkd-wait-online" )" || { systemctl --failed --no-legend --plain; false; }'
+
+check no-utm-window swift "$REPO/scripts/virtual-cabinet/windows.swift"
 
 # Isolation (D123, D124).
 check no-shared-folders guest '! grep -qE "virtiofs|9p" /proc/mounts'

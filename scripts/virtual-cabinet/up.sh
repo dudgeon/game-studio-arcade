@@ -4,8 +4,8 @@
 #
 #   scripts/virtual-cabinet/up.sh [--network Bridged|Shared]
 #
-# First run on a Mac: UTM must have been opened once (D146), and `utmctl start`
-# should raise one "control UTM" Automation prompt. Geoff needs to be there for that.
+# First run on a Mac: UTM must have been opened once (D146), and `utmctl` may raise
+# one "control UTM" Automation prompt. Geoff needs to be there for that.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
@@ -28,12 +28,22 @@ fi
 export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 [ -d "$PACKAGE" ] || node "$REPO/scripts/virtual-cabinet/build.mjs" --network "$NETWORK"
 
-# Hidden and in the background. Opening the package registers it with UTM where it is.
+# Launch hidden at the OS level, then a plain start: that shows no window. Don't use utmctl's --hide:
+# it asks UTM to close its window, which is refused here (-10004), and the window stays (D149).
 open -gj "$UTM"
-sleep 3
-open -gj -a "$UTM" "$PACKAGE"
-sleep 3
-"$UTMCTL" start --hide arcade-virtual
+sleep 4
+if ! "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then
+  # Only the first time: opening the package registers it with UTM where it is, and can show UTM's window.
+  open -gj -a "$UTM" "$PACKAGE"
+  sleep 4
+fi
+"$UTMCTL" start arcade-virtual
+# UTM caches a VM's config in memory (D148). A serial device the file doesn't have means a stale one.
+if plutil -extract Serial.0 raw "$PACKAGE/config.plist" >/dev/null 2>&1; then :
+elif lsof -c UTM 2>/dev/null | grep -q /dev/ptmx; then
+  echo "UTM is running a stale config for this VM: stop the VM, quit UTM, and run this again" >&2
+  exit 1
+fi
 
 case "$NETWORK" in
   Bridged) export ARCADE_HOST="${ARCADE_HOST:-arcade-virtual.local}" ;;
@@ -51,12 +61,13 @@ esac
 echo "$ARCADE_HOST" > "$VM_ROOT/host"
 
 echo "waiting for the cabinet at $ARCADE_HOST (first boot installs packages; allow up to 30 minutes)"
-for _ in $(seq 1 360); do
+deadline=$(( $(date +%s) + 1800 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
   if "$REPO/cabinet/vm/drive" ssh test -f /etc/arcade/provisioned-version 2>/dev/null; then
     "$REPO/cabinet/vm/drive" status
     exit 0
   fi
   sleep 5
 done
-echo "timed out. Stop the VM and read seed/provision.log on the boot partition." >&2
+echo "timed out. Stop the VM and read seed/provision.log on the boot partition, or rebuild with build.mjs --serial-console and run serial.sh." >&2
 exit 1

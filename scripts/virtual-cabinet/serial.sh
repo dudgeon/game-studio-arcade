@@ -1,5 +1,6 @@
 #!/bin/bash
-# Reads the VM's serial console without a window: the way to see a boot that never reaches SSH.
+# Reads the serial console of a debug build (build.mjs --serial-console), without a window:
+# the way to see a boot that never reaches SSH. Normal builds have no serial device (D148).
 #
 #   scripts/virtual-cabinet/serial.sh LOGFILE [SECONDS]
 #

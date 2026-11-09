@@ -463,7 +463,7 @@ Decided by Claude (the virtual-cabinet worker), from Geoff's request for "a full
 
 ## 2026-11-08 — Virtual cabinet V0 build
 
-Decided by Claude (the V0 worker) unless marked. **The VM has not booted yet: see D146.** Anything marked "unproven" needs the first boot.
+Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and platform-notes.md.
 
 **D140. V0 boots Plan A's way: the pinned Pi OS root filesystem, Debian's kernel, our own small initramfs, UTM's direct Linux boot.** *(Claude; implements D121. The Plan A/B verdict waits for the first boot.)*
 - Kernel: Debian trixie `linux-image-6.12.107+deb13-arm64`. Its `vmlinuz` is already the uncompressed arm64 Image that Apple's Linux boot loader needs (checked 2026-11-08).
@@ -499,4 +499,7 @@ Decided by Claude (the V0 worker) unless marked. **The VM has not booted yet: se
 
 **D147. Plan A won (D121): the stock Pi OS userland boots on Debian's kernel.** *(Claude, from the first boots, 2026-11-08; D121's checks.)* Boots unattended, apt sees Pi OS's own sources (Chromium comes from Raspberry Pi's archive), and bridged Wi-Fi gives an address and `arcade-virtual.local`. What Debian's kernel changes: `loop` and `uinput` are modules, so the `virtual` profile loads them, which keeps Pi OS's zram-and-file swap working as on the Pi. `rpi-eeprom-update` is masked (no EEPROM).
 
-**D148. The kernel console stays off the serial device.** *(Claude, from a boot that froze for an hour, 2026-11-08.)* UTM's serial device is a pseudo-terminal. With `console=hvc0` and nobody reading it, its buffer fills and the kernel spins on the console: `soft lockup … stuck for 3512s`, with the guest frozen and the mini's CPU at about 190%. The first boot only worked because a reader happened to be attached. So the normal command line has no serial console. `build.mjs --serial-console` turns it back on for debugging, with `serial.sh` reading.
+**D148. A normal build has no serial device.** *(Claude, from a boot that froze for an hour, 2026-11-08.)* UTM's serial device is a pseudo-terminal. With `console=hvc0` and nobody reading it, its buffer fills and the kernel spins on the console: `soft lockup … stuck for 3512s`, with the guest frozen and the mini's CPU at about 190%. The first boot only worked because a reader happened to be attached. So the VM doesn't get one, and nothing can block on it. This goes beyond D123, and UTM's docs recommend keeping a serial device on a headless VM. SSH and `seed/provision.log` are how to look inside. `build.mjs --serial-console` adds it for debugging, with `serial.sh` reading.
+- **UTM keeps a VM's config in memory.** Replacing `config.plist` changes nothing until UTM quits, so `rebuild.sh` quits it. That's why boots with other `console=` settings seemed to freeze the same way: they were still running the old config, and those tests showed nothing about `console=`.
+
+**D149. How the VM starts with no window.** *(Claude, measured 2026-11-08.)* `open -gj` launches UTM hidden, then a plain `utmctl start`: no UTM windows on screen, and `verify.sh` counts them. `utmctl --hide` doesn't work here: it asks UTM to close its main window, that's refused with `-10004`, and a 900×652 window stayed on Geoff's screen until UTM quit. Opening the `.utm` package is only needed the first time, and may show that window. No privacy setting was changed.

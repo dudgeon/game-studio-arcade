@@ -71,6 +71,8 @@ test("the VM config matches D123 and D141", () => {
   assert.equal(c.Virtualization.Rosetta, false);
   assert.equal(c.Virtualization.AudioInput, false);
   assert.equal(c.SharedDirectory, undefined);
+  assert.deepEqual(c.Serial, [], "an unread serial device freezes the guest (D148)");
+  assert.equal(utmConfig({ name: "n", uuid: "u", mac: "m", network: "Shared", cmdline: "c", serial: true }).Serial.length, 1);
   assert.equal(c.Network[0].BridgeInterface, "en1");
   assert.equal(utmConfig({ name: "n", uuid: "u", mac: "m", network: "Shared", cmdline: "c" }).Network[0].BridgeInterface, undefined);
 });

@@ -1,6 +1,6 @@
 # Virtual cabinet on the Mac mini
 
-**Status:** V0 scripts written, VM not yet booted (2026-11-08; D140–D146). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
+**Status:** V0 built: boots, plays and passes `verify.sh` from a clean build, headless, with no VM window yet (2026-11-08; D140–D149). How to run it: [cabinet/README.md](../cabinet/README.md). Decisions D120–D129 in [decisions.md](decisions.md#2026-11-08--virtual-cabinet). Open questions for Geoff are at the end.
 
 Geoff (2026-11-08): "It will be a while before the Picade arrives, so we will need a full emulator stack running as close to accurate a version of a logically isolated (I think this is the term?) version of the cabinet on the mini."
 
@@ -202,4 +202,4 @@ Placed into the build plan (HANDOFF §14). Each step ends with something Geoff c
 - Tart (Virtualization.framework, fair-source licence): https://github.com/openai/tart, https://computingforgeeks.com/install-tart-macos-linux-vms-apple-silicon/
 - Pi OS kernel needs Pi boot firmware; generic VM path is a Debian arm64 kernel: https://forum.level1techs.com/t/virtualizing-rpi-on-ampere-ubuntu-24-04-aarch64/225253, https://github.com/utmapp/UTM/discussions/4970
 
-Not verified, checked in V0: that Plan A boots; Chromium's rendering path and frame time inside the VM; that bridging on the mini's Wi-Fi works; that UTM's window can be closed without stopping the VM or taking focus; that a USB audio device passes through cleanly; the access to Raspberry Pi's apt archive (its index returned 403 to a plain web fetch).
+Checked in V0 (D147): Plan A boots; bridging on the mini's Wi-Fi works; apt reaches Raspberry Pi's archive. Still not verified: Chromium's frame time inside the VM; that UTM's window can be closed without stopping the VM or taking focus (V0 has no VM window, D141); that a USB audio device passes through cleanly.

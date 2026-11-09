@@ -6,8 +6,8 @@ PATH=/bin
 mount -t proc proc /proc
 mount -t sysfs sys /sys
 mount -t devtmpfs dev /dev
-# Only a few lines, well under the serial buffer, and only readable with serial.sh.
-exec >/dev/hvc0 2>&1 || true
+# A debug build has a serial device. Test first: a failed redirect on exec would end this shell, and PID 1 with it.
+if [ -c /dev/hvc0 ]; then exec >/dev/hvc0 2>&1; fi
 echo "[arcade-init] loading modules"
 for m in @MODULES@; do insmod "/mods/$m.ko" || echo "[arcade-init] insmod $m failed"; done
 

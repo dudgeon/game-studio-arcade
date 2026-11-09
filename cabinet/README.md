@@ -2,7 +2,7 @@
 
 The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), and the tools to drive the virtual one. Design: [docs/virtual-cabinet.md](../docs/virtual-cabinet.md). Decisions: D120–D131 and D140–D146 in [docs/decisions.md](../docs/decisions.md).
 
-**Status:** written and unit-tested, but never booted, because UTM still needs clearing (D146). Everything inside the VM is unproven until the first boot. The `picade` profile can't be tested until the Picade arrives.
+**Status:** the virtual cabinet boots, plays and passes `verify.sh` when built from clean. No VM window yet (D141), so nobody can sit and play at it. The `picade` profile has never run: it needs the Picade.
 
 | Path | What it is |
 |---|---|
@@ -15,14 +15,16 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 
 ## Bring up the virtual cabinet
 
-Once, on the mini, with Geoff there: `open /Applications/UTM.app`, click Open, quit UTM.
+Once per Mac, with someone there: `open /Applications/UTM.app`, click Open, quit UTM. The first `utmctl` call may ask to control UTM.
 
 ```sh
 scripts/virtual-cabinet/up.sh        # builds if needed, starts headless, waits for first-boot provisioning
 scripts/virtual-cabinet/verify.sh ~/game-studio-data/vm/verify
 ```
 
-If bridging on Wi-Fi fails, rebuild with `node scripts/virtual-cabinet/build.mjs --replace --network Shared`, then `up.sh --network Shared`.
+If bridging on Wi-Fi fails: `scripts/virtual-cabinet/rebuild.sh --yes-destroy-this-vm --network Shared`.
+
+A boot that never reaches SSH: stop the VM, then `hdiutil attach` its disk and read `seed/provision.log`, or rebuild with `build.mjs --replace --serial-console` and read it with `serial.sh`. Never leave a serial build unread: it freezes (D148).
 
 To rebuild from scratch and prove it's reproducible: `scripts/virtual-cabinet/rebuild.sh --yes-destroy-this-vm`. **That destroys the VM's disk, carts and logs (D129).** Only use it on a VM with nothing to keep.
 
@@ -37,10 +39,11 @@ cabinet/vm/drive hold a 2000        # hold-to-talk style
 cabinet/vm/drive down a; cabinet/vm/drive up a
 cabinet/vm/drive type "make a game"
 cabinet/vm/drive screenshot shot.png
+cabinet/vm/drive run my-script.sh    # run a local script on the cabinet
 ```
 
 Keys travel kernel → libinput → compositor → Chromium, as the Picade's do (D144). Screenshots are the compositor's real 1024×768 output.
 
 ## Tests
 
-`node --test scripts/virtual-cabinet/test/` covers the generator's disk, kernel, initramfs and config logic.
+`node --test scripts/virtual-cabinet/test/lib.test.mjs` covers the generator's disk, kernel, initramfs and config logic.
