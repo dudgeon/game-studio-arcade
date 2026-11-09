@@ -5,7 +5,7 @@
 #   drive hold KEY MS         hold it for MS, as hold-to-talk does
 #   drive down KEY            press and keep held, until `drive up KEY`
 #   drive up KEY
-#   drive type TEXT           type lower-case letters, digits, space, . , - /
+#   drive type TEXT           type any printable ASCII, US layout
 #   drive screenshot FILE     save the 1024x768 screen as a PNG; checks its size
 #   drive playtest            run the harness on the cabinet's carts, labelled virtual (D128)
 #   drive apt-lock            print apt.lock with the versions the cabinet has now
@@ -22,10 +22,12 @@ VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
 KEY="$VM_ROOT/ssh/arcade-virtual_ed25519"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
+# IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.
+# ARCADE_SSH_CONTROL reuses a connection flow.mjs holds open, so a key takes milliseconds.
 cabinet() {
-  ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
+  ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$VM_ROOT/ssh/known_hosts" \
-    "cabinet@$HOST" "$@"
+    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@"
 }
 
 keycode() {
@@ -34,27 +36,42 @@ keycode() {
     a) echo 44 ;; b) echo 45 ;; x) echo 46 ;; y) echo 47 ;;
     q) echo 16 ;; e) echo 18 ;;
     start|enter) echo 28 ;; esc|star) echo 1 ;;
-    f1) echo 59 ;; f2) echo 60 ;;
-    *) echo "unknown key: $1 (up down left right a b x y q e start enter esc star f1 f2)" >&2; return 1 ;;
+    f1) echo 59 ;; f2) echo 60 ;; backspace) echo 14 ;;
+    *) echo "unknown key: $1 (up down left right a b x y q e start enter esc star f1 f2 backspace)" >&2; return 1 ;;
   esac
 }
 
-# Linux key codes for typing, as CODE:SHIFT, US layout.
+# A letter's Linux key code, US layout.
+lettercode() {
+  local row p
+  for row in "16 qwertyuiop" "30 asdfghjkl" "44 zxcvbnm"; do
+    case "${row#* }" in
+      *"$1"*) p="${row#* }"; p="${p%%"$1"*}"; echo $((${row%% *} + ${#p})); return ;;
+    esac
+  done
+}
+
+# Printable ASCII as Linux key codes, CODE:SHIFT, US layout (the kiosk's default).
 typecodes() {
-  local text="$1" out="" i c row code
+  local LC_ALL=C text="$1" out="" i c k
   for ((i = 0; i < ${#text}; i++)); do
     c="${text:i:1}"
     case "$c" in
-      [1-9]) code=$((c + 1)) ;;
-      0) code=11 ;;
-      ' ') code=57 ;; .) code=52 ;; ,) code=51 ;; -) code=12 ;; /) code=53 ;;
-      [a-z])
-        row="qwertyuiop"; if [[ "$row" == *"$c"* ]]; then local p="${row%%"$c"*}"; code=$((16 + ${#p}));
-        else row="asdfghjkl"; if [[ "$row" == *"$c"* ]]; then local p="${row%%"$c"*}"; code=$((30 + ${#p}));
-        else row="zxcvbnm"; local p="${row%%"$c"*}"; code=$((44 + ${#p})); fi; fi ;;
+      [a-z]) k="$(lettercode "$c"):0" ;;
+      [A-Z]) k="$(lettercode "$(printf '%s' "$c" | tr 'A-Z' 'a-z')"):1" ;;
+      [1-9]) k="$((c + 1)):0" ;;
+      0) k=11:0 ;;
+      ' ') k=57:0 ;;
+      '!') k=2:1 ;; '@') k=3:1 ;; '#') k=4:1 ;; '$') k=5:1 ;; '%') k=6:1 ;;
+      '^') k=7:1 ;; '&') k=8:1 ;; '*') k=9:1 ;; '(') k=10:1 ;; ')') k=11:1 ;;
+      -) k=12:0 ;; _) k=12:1 ;; =) k=13:0 ;; +) k=13:1 ;;
+      '[') k=26:0 ;; '{') k=26:1 ;; ']') k=27:0 ;; '}') k=27:1 ;;
+      ';') k=39:0 ;; :) k=39:1 ;; "'") k=40:0 ;; '"') k=40:1 ;;
+      '`') k=41:0 ;; '~') k=41:1 ;; '\') k=43:0 ;; '|') k=43:1 ;;
+      ,) k=51:0 ;; '<') k=51:1 ;; .) k=52:0 ;; '>') k=52:1 ;; /) k=53:0 ;; '?') k=53:1 ;;
       *) echo "can't type: '$c'" >&2; return 1 ;;
     esac
-    out+=" $code:0"
+    out+=" $k"
   done
   echo "$out"
 }
@@ -65,7 +82,11 @@ case "$cmd" in
   hold) code="$(keycode "$1")"; cabinet sudo arcade-keyd tap "$2" "$code" ;;
   down) code="$(keycode "$1")"; cabinet sudo arcade-keyd down "$code" ;;
   up) code="$(keycode "$1")"; cabinet sudo arcade-keyd up "$code" ;;
-  type) codes="$(typecodes "$1")"; [ -z "$codes" ] || cabinet sudo arcade-keyd seq $codes ;;
+  type)
+    codes="$(typecodes "$1")"
+    # shellcheck disable=SC2086  # one argument per key
+    [ -z "$codes" ] || cabinet sudo arcade-keyd seq $codes
+    ;;
   screenshot)
     out="$1"
     cabinet sudo arcade-screenshot > "$out.tmp"

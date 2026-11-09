@@ -31,8 +31,13 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 # Launch hidden at the OS level, then a plain start: that shows no window. Don't use utmctl's --hide:
 # it asks UTM to close its window, which is refused here (-10004), and the window stays (D149).
 open -gj "$UTM"
-sleep 4
-if ! "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then
+# UTM takes a while to load its list, and a slow start mustn't look like an unknown VM: that opens a window.
+known=no
+for _ in $(seq 1 15); do
+  if "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then known=yes; break; fi
+  sleep 2
+done
+if [ "$known" = no ]; then
   # Only the first time: opening the package registers it with UTM where it is, and can show UTM's window.
   open -gj -a "$UTM" "$PACKAGE"
   sleep 4

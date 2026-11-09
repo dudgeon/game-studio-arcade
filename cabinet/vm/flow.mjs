@@ -32,7 +32,7 @@ const HOST = process.env.ARCADE_HOST || (fs.existsSync(hostFile) ? fs.readFileSy
 // One SSH connection for the whole flow, so a key takes milliseconds, not a new handshake.
 const CONTROL = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "flow-")), "c");
 const env = { ...process.env, ARCADE_HOST: HOST, ARCADE_SSH_CONTROL: CONTROL };
-const sshArgs = ["-i", path.join(VM_ROOT, "ssh/arcade-virtual_ed25519"), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", `UserKnownHostsFile=${path.join(VM_ROOT, "ssh/known_hosts")}`, "-o", "StrictHostKeyChecking=accept-new", "-S", CONTROL];
+const sshArgs = ["-4", "-i", path.join(VM_ROOT, "ssh/arcade-virtual_ed25519"), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", `UserKnownHostsFile=${path.join(VM_ROOT, "ssh/known_hosts")}`, "-o", "StrictHostKeyChecking=accept-new", "-S", CONTROL];
 const target = `cabinet@${HOST}`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
