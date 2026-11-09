@@ -82,3 +82,5 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: when a check contradicts the unchanged spec's own words (a check bug), the agent fixes the check, quoting the rule; it's logged as a check bug and shown in the build summary. Changing what a rule means still needs the spec changed first (Geoff)
 - 2026-11-08: a check-bug fix that tests less of its rule must say which words are no longer tested; such a rule is flagged in the build summary and becomes a you-check question on first play (Geoff)
 - 2026-11-08: Studio builds fetch modules on demand and start from a template when the kid's idea fits one, else from blank; templates get some visual polish (pop-ups, life icons) (Geoff, D166/D169)
+- 2026-11-08: virtual cabinet: its games move to the Picade's shelf when it arrives; it stays as a staging cabinet afterwards; bridged on home Wi-Fi; keyboard for now, with an arcade controller Geoff plans to buy usable for testing (Geoff)
+- 2026-11-08: Falling Blocks (task 10) keeps the stand-in request for Alina (Geoff)
