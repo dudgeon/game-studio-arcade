@@ -32,17 +32,42 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 # it asks UTM to close its window, which is refused here (-10004), and the window stays (D149).
 open -gj "$UTM"
 # UTM takes a while to load its list, and a slow start mustn't look like an unknown VM: that opens a window.
-known=no
-for _ in $(seq 1 15); do
-  if "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then known=yes; break; fi
-  sleep 2
-done
-if [ "$known" = no ]; then
-  # Only the first time: opening the package registers it with UTM where it is, and can show UTM's window.
+# Polls until UTM knows the VM, for up to about $1 tries.
+vm_known() {
+  for _ in $(seq 1 "$1"); do
+    if "$UTMCTL" status arcade-virtual >/dev/null 2>&1; then return 0; fi
+    sleep 2
+  done
+  return 1
+}
+quit_utm() {
+  killall UTM 2>/dev/null || true
+  for _ in $(seq 1 20); do pgrep -x UTM >/dev/null || return 0; sleep 1; done
+  return 1
+}
+windows_clear() { swift "$REPO/scripts/virtual-cabinet/windows.swift" >/dev/null 2>&1; }
+
+if [ -n "${ARCADE_TEST_FORCE_REGISTER:-}" ] || ! vm_known 15; then
+  # Only the first time: opening the package registers it with UTM where it is. That can show UTM's
+  # window, and nothing here can close it. So register, quit UTM before the VM starts, and launch hidden again.
+  echo "registering the VM with UTM (a window may show for a few seconds)"
   open -gj -a "$UTM" "$PACKAGE"
-  sleep 4
+  vm_known 15 || { quit_utm || true; echo "UTM didn't take the VM at $PACKAGE. UTM has been quit." >&2; exit 4; }
+  quit_utm || { echo "UTM didn't quit, so its window may still be up. Quit UTM, then run this again." >&2; exit 4; }
+  open -gj "$UTM"
+  vm_known 15 || { quit_utm || true; echo "UTM didn't remember the VM after registering it. UTM has been quit." >&2; exit 4; }
 fi
 "$UTMCTL" start arcade-virtual
+# Geoff's rule: no window left up (D149). Stop rather than leave one there.
+sleep 2
+if ! windows_clear; then
+  echo "a UTM window is on screen after starting. Stopping the VM and quitting UTM rather than leaving it up." >&2
+  "$UTMCTL" stop --request arcade-virtual >/dev/null 2>&1 || true
+  for _ in $(seq 1 12); do [ "$("$UTMCTL" status arcade-virtual 2>/dev/null)" = started ] || break; sleep 5; done
+  "$UTMCTL" stop arcade-virtual >/dev/null 2>&1 || true
+  quit_utm || true
+  exit 5
+fi
 # UTM caches a VM's config in memory (D148). A serial device the file doesn't have means a stale one.
 if plutil -extract Serial.0 xml1 -o - "$PACKAGE/config.plist" >/dev/null 2>&1; then :
 elif lsof -c UTM 2>/dev/null | grep -q /dev/ptmx; then
