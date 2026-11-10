@@ -8,6 +8,9 @@ import { gunzipSync } from "node:zlib";
 export const BUNDLE_PATHS = ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest"];
 
 const NO_MAC_FILES = { ...process.env, COPYFILE_DISABLE: "1" };
+// The same files make the same archive, byte for byte: no gzip timestamp, no owner names, plain ustar.
+// A cabinet names a release by the bundle's hash, so otherwise every update would make a new release (D195).
+const SAME_EACH_TIME = ["--format", "ustar", "--options", "gzip:!timestamp", "--uid", "0", "--gid", "0", "--uname", "root", "--gname", "root"];
 
 /** Tracked and new files only, so nothing ignored or local gets in. Returns how many. */
 export function makeBundle(repo, out) {
@@ -16,14 +19,14 @@ export function makeBundle(repo, out) {
     .filter((f) => f && existsSync(join(repo, f)));
   const list = join(dirname(out), `${basename(out)}.list`);
   writeFileSync(list, `${files.join("\n")}\n`);
-  execFileSync("tar", ["-czf", out, "--no-xattrs", "--no-mac-metadata", "-C", repo, "-T", list], { env: NO_MAC_FILES });
+  execFileSync("tar", ["-czf", out, ...SAME_EACH_TIME, "--no-xattrs", "--no-mac-metadata", "-C", repo, "-T", list], { env: NO_MAC_FILES });
   rmSync(list);
   return files.length;
 }
 
 /** The provisioning script and what it installs. */
 export function makeProvisionTar(repo, out) {
-  execFileSync("tar", ["-czf", out, "--no-xattrs", "--no-mac-metadata", "-C", join(repo, "cabinet/provision"), "."], { env: NO_MAC_FILES });
+  execFileSync("tar", ["-czf", out, ...SAME_EACH_TIME, "--no-xattrs", "--no-mac-metadata", "-C", join(repo, "cabinet/provision"), "."], { env: NO_MAC_FILES });
 }
 
 const SECTOR = 512;

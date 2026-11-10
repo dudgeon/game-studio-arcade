@@ -22,6 +22,19 @@ test("the bundle holds what the service needs and nothing local", () => {
   assert.ok(BUNDLE_PATHS.includes("cabinet/service"));
 });
 
+test("the same checkout makes the same bundle, so updating twice doesn't make a second release", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-"));
+  const hash = (f) => execFileSync("shasum", ["-a", "256", f], { encoding: "utf8" }).split(" ")[0];
+  makeBundle(REPO, path.join(dir, "a.tgz"));
+  await new Promise((r) => setTimeout(r, 1100));
+  makeBundle(REPO, path.join(dir, "b.tgz"));
+  assert.equal(hash(path.join(dir, "a.tgz")), hash(path.join(dir, "b.tgz")));
+  makeProvisionTar(REPO, path.join(dir, "c.tgz"));
+  await new Promise((r) => setTimeout(r, 1100));
+  makeProvisionTar(REPO, path.join(dir, "d.tgz"));
+  assert.equal(hash(path.join(dir, "c.tgz")), hash(path.join(dir, "d.tgz")));
+});
+
 test("the provisioning tar holds the update script", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "prov-"));
   const out = path.join(dir, "p.tgz");
