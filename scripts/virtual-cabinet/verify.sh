@@ -15,7 +15,26 @@ check() {
   local name="$1"; shift
   if "$@" > "$OUT/$name.log" 2>&1; then echo "PASS $name"; else echo "FAIL $name (see $OUT/$name.log)"; fails=$((fails + 1)); fi
 }
-guest() { "$D" ssh "$@"; }
+# These only look, so they can repeat while SSH itself is failing (exit 255, D156). Each try is limited.
+export ARCADE_SSH_TIMEOUT_S="${ARCADE_SSH_TIMEOUT_S:-120}"
+guest() {
+  local rc i
+  for i in $(seq 1 60); do
+    "$D" ssh "$@"; rc=$?
+    [ "$rc" = 255 ] || return "$rc"
+    sleep 5
+  done
+  return 255
+}
+guest_run() {
+  local rc i
+  for i in $(seq 1 60); do
+    "$D" run "$@"; rc=$?
+    [ "$rc" = 255 ] || return "$rc"
+    sleep 5
+  done
+  return 255
+}
 
 check services guest 'systemctl is-active arcade-launcher arcade-kiosk arcade-keyd nftables avahi-daemon'
 check hostname guest 'test "$(hostname)" = arcade-virtual'
@@ -36,7 +55,7 @@ check no-utm-window swift "$REPO/scripts/virtual-cabinet/windows.swift"
 check no-shared-folders guest '! grep -qE "virtiofs|9p" /proc/mounts'
 check no-guest-tools guest '! dpkg -l spice-vdagent qemu-guest-agent 2>/dev/null | grep -q ^ii'
 # The key lives in service.json and nowhere else (D131, D155). Run as a script file, for the quoting.
-check key-only-in-its-file "$D" run "$REPO/cabinet/vm/guest/key-check.sh"
+check key-only-in-its-file guest_run "$REPO/cabinet/vm/guest/key-check.sh"
 check firewall-rule guest 'sudo nft list table inet arcade_isolation | grep -q reject'
 mini_probe() {
   local addr addrs
@@ -66,7 +85,16 @@ sleep 1
 sleep 1
 
 # Frame time, labelled virtual (D128).
-if "$D" playtest > "$OUT/playtest-virtual.json" 2> "$OUT/playtest-virtual.err"; then
+playtest_virtual() {
+  local rc i
+  for i in $(seq 1 60); do
+    ARCADE_SSH_TIMEOUT_S=900 "$D" playtest > "$OUT/playtest-virtual.json" 2> "$OUT/playtest-virtual.err"; rc=$?
+    [ "$rc" = 255 ] || return "$rc"
+    sleep 5
+  done
+  return 255
+}
+if playtest_virtual; then
   echo "PASS playtest ($OUT/playtest-virtual.json)"
 else
   echo "FAIL playtest (see $OUT/playtest-virtual.json)"; fails=$((fails + 1))

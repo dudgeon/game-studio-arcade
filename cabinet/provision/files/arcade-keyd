@@ -6,6 +6,11 @@
   arcade-keyd up CODE ...      release
   arcade-keyd tap MS CODE ...  press, wait MS, release
   arcade-keyd seq CODE:SHIFT ...   tap each in turn (for typing); SHIFT is 0 or 1
+  arcade-keyd id=ID COMMAND ...    the same, exactly once however many times it's asked (D195)
+  arcade-keyd log                  print what this daemon has pressed, for a test to compare
+
+An id lets the driver ask again when SSH failed and it can't tell whether a key landed: if this daemon has done
+that id, it answers ok and presses nothing. Commands run one at a time, so a repeat can't overlap the original.
 
 The device stays open because libinput only notices a new keyboard after a moment.
 Codes are Linux key codes, the same ones the Picade overlay sends (D82).
@@ -26,6 +31,8 @@ UI_DEV_DESTROY = 0x5502
 EV_SYN, EV_KEY, BUS_VIRTUAL = 0, 1, 6
 KEY_LEFTSHIFT = 42
 TYPE_GAP = 0.02
+LOG = "/run/arcade/keys.log"
+KEEP_IDS = 8192
 
 
 def emit(fd, ev_type, code, value):
@@ -48,7 +55,14 @@ def open_device():
     return fd
 
 
-def handle(fd, held, words):
+def handle(fd, held, words, done):
+    key_id = None
+    if words[0].startswith("id="):
+        key_id, words = words[0][3:], words[1:]
+        if key_id in done:
+            with open(LOG, "a") as log:
+                log.write(f"{time.time():.3f} {key_id} ALREADY-DONE\n")
+            return
     cmd, args = words[0], words[1:]
     if cmd == "down":
         for code in map(int, args):
@@ -78,11 +92,18 @@ def handle(fd, held, words):
             time.sleep(TYPE_GAP)
     else:
         raise ValueError(f"unknown command {cmd}")
+    if key_id:
+        done[key_id] = True
+        while len(done) > KEEP_IDS:
+            done.pop(next(iter(done)))
+    with open(LOG, "a") as log:
+        log.write(f"{time.time():.3f} {key_id or '-'} {cmd} {' '.join(args)}\n")
 
 
 def serve():
     fd = open_device()
     held = set()
+    done = {}
     if os.path.exists(SOCK):
         os.unlink(SOCK)
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -95,7 +116,7 @@ def serve():
             with conn:
                 data = conn.makefile().readline()
                 try:
-                    handle(fd, held, data.split())
+                    handle(fd, held, data.split(), done)
                     conn.sendall(b"ok\n")
                 except (ValueError, IndexError, OSError) as err:
                     conn.sendall(f"error {err}\n".encode())
@@ -117,6 +138,9 @@ def client(words):
 if __name__ == "__main__":
     if sys.argv[1:] == ["serve"]:
         serve()
+    elif sys.argv[1:] == ["log"]:
+        if os.path.exists(LOG):
+            sys.stdout.write(open(LOG).read())
     elif len(sys.argv) > 2:
         client(sys.argv[1:])
     else:

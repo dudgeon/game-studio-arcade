@@ -255,6 +255,23 @@ test("the full path: the key reaches ant and the cabinet by pipe, and nowhere el
   assert.match(read(path.join(w.agent, "claude-lock.arcade-virtual.json")), /wrkspc_CABINET/);
 });
 
+test("a gap in the middle doesn't cost the pasted key: it waits and carries on (D156)", { skip }, async () => {
+  const w = world();
+  // The stand-in driver fails as SSH does, exit 255, the first two times it's asked to do anything.
+  const real = path.join(w.bin, "stub-drive");
+  fs.renameSync(real, path.join(w.bin, "stub-drive-real"));
+  exe(real, `
+n="$(cat "${w.log}/gaps" 2>/dev/null || echo 0)"
+echo $((n + 1)) > "${w.log}/gaps"
+case "$n" in 0|3) exit 255 ;; esac
+exec "${w.bin}/stub-drive-real" "$@"`);
+  const r = await inTerminal(w, { env: { ARCADE_CONNECT_WAIT_S: "0" } });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /The cabinet is live/);
+  assert.match(read(configOf(w)), /anthropic_api_key/);
+  assert.doesNotMatch(r.out, /FAKEKEY/);
+});
+
 test("leaves a clipboard alone unless it holds the key", { skip }, async () => {
   const w = world();
   fs.writeFileSync(w.clipboard, "Geoff's own words");

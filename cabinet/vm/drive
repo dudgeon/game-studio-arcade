@@ -15,6 +15,10 @@
 #
 # Keys: up down left right a b x y q e start enter esc star f1 f2 (D82).
 # ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124).
+#
+# The mini can lose the cabinet for a while (D156), so this waits it out for up to ARCADE_RIDE_S (default 300)
+# seconds. Reads just repeat. Each key has an id, and a repeat with that id is pressed only if it wasn't already
+# (D195), so a key lands exactly once. `drive ssh` and `drive run` don't repeat: their commands may not be safe to.
 set -euo pipefail
 
 HOST="${ARCADE_HOST:-arcade-virtual.local}"
@@ -24,10 +28,18 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.
 # ARCADE_SSH_CONTROL reuses a connection flow.mjs holds open, so a key takes milliseconds.
+# ServerAlive gives up on a dead connection after about 2 minutes, longer than a usual gap (D156).
+# ARCADE_SSH_TIMEOUT_S, if set, is a hard limit on one attempt: an SSH call once sat stuck for 29 hours.
+# A timed-out attempt exits 255, like any other SSH failure: the command may or may not have run.
 cabinet() {
+  local rc=0
+  ${ARCADE_SSH_TIMEOUT_S:+perl -e 'alarm shift; exec @ARGV' "$ARCADE_SSH_TIMEOUT_S"} \
   ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
+    -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$VM_ROOT/ssh/known_hosts" \
-    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@"
+    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@" || rc=$?
+  [ "$rc" = 142 ] && return 255
+  return "$rc"
 }
 
 keycode() {
@@ -76,20 +88,49 @@ typecodes() {
   echo "$out"
 }
 
+# SSH exits 255 when SSH itself failed: the command may or may not have run.
+RIDE_S="${ARCADE_RIDE_S:-300}"
+ride() {
+  local until=$(( $(date +%s) + RIDE_S )) rc
+  while true; do
+    "$@" && return 0
+    rc=$?
+    [ "$rc" = 255 ] || return "$rc"
+    if [ "$(date +%s)" -ge "$until" ]; then
+      echo "drive: no answer from the cabinet at $HOST for $RIDE_S s" >&2
+      return 255
+    fi
+    sleep 3
+  done
+}
+
+# Sends a key command, exactly once: the daemon ignores an id it has already done. Each attempt is limited to
+# 60 s plus however long the keys take, so a stuck one is cut off and asked again by id.
+keys() {
+  local id extra=0
+  id="$(uuidgen | tr -d -)"
+  case "$1" in
+    tap) extra=$(( ${2:-0} / 1000 )) ;;
+    seq) extra=$(( ($# - 1) / 10 )) ;;
+  esac
+  ARCADE_SSH_TIMEOUT_S=$(( 60 + extra )) ride cabinet sudo arcade-keyd "id=$id" "$@"
+}
+
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
-  press) code="$(keycode "$1")"; cabinet sudo arcade-keyd tap "${2:-80}" "$code" ;;
-  hold) code="$(keycode "$1")"; cabinet sudo arcade-keyd tap "$2" "$code" ;;
-  down) code="$(keycode "$1")"; cabinet sudo arcade-keyd down "$code" ;;
-  up) code="$(keycode "$1")"; cabinet sudo arcade-keyd up "$code" ;;
+  press) code="$(keycode "$1")"; keys tap "${2:-80}" "$code" ;;
+  hold) code="$(keycode "$1")"; keys tap "$2" "$code" ;;
+  down) code="$(keycode "$1")"; keys down "$code" ;;
+  up) code="$(keycode "$1")"; keys up "$code" ;;
   type)
     codes="$(typecodes "$1")"
     # shellcheck disable=SC2086  # one argument per key
-    [ -z "$codes" ] || cabinet sudo arcade-keyd seq $codes
+    [ -z "$codes" ] || keys seq $codes
     ;;
   screenshot)
     out="$1"
-    cabinet sudo arcade-screenshot > "$out.tmp"
+    grab() { ARCADE_SSH_TIMEOUT_S=60 cabinet sudo arcade-screenshot > "$out.tmp"; }
+    ride grab
     size="$(file -b "$out.tmp")"
     case "$size" in
       *"PNG image data, 1024 x 768"*) mv "$out.tmp" "$out"; echo "$out" ;;
@@ -99,10 +140,11 @@ case "$cmd" in
   playtest) cabinet sudo -u arcade node /opt/arcade/current/cabinet/vm/guest/playtest-virtual.mjs ;;
   apt-lock)
     names="$(grep -vE '^[[:space:]]*(#|$)' "$REPO/cabinet/provision/apt.lock" | cut -d= -f1 | tr '\n' ' ')"
+    # shellcheck disable=SC2086
     cabinet "dpkg-query -W -f='\${Package}=\${Version}\n' $names"
     ;;
   status)
-    cabinet 'cat /etc/hostname; cat /etc/arcade/provisioned-version; uname -r; systemctl is-active arcade-launcher arcade-kiosk arcade-keyd nftables avahi-daemon; sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user/$(id -u arcade) WAYLAND_DISPLAY=wayland-0 wlr-randr'
+    cabinet 'cat /etc/hostname; cat /etc/arcade/provisioned-version; cat /etc/arcade/provisioned-commit 2>/dev/null; uname -r; systemctl is-active arcade-launcher arcade-kiosk arcade-keyd nftables avahi-daemon; sudo runuser -u arcade -- env XDG_RUNTIME_DIR=/run/user/$(id -u arcade) WAYLAND_DISPLAY=wayland-0 wlr-randr'
     ;;
   run) cabinet bash -s < "$1" ;;
   ssh) cabinet "$@" ;;

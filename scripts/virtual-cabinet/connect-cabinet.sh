@@ -32,6 +32,21 @@ key=""
 trap 'key=""' EXIT
 stop() { echo "Stopped: $*" >&2; exit 1; }
 
+# The cabinet over SSH, waiting out a gap (D156). SSH exits 255 only when SSH itself failed, and every
+# command here is safe to repeat. A gap mustn't cost Geoff his pasted key, which the Console shows once.
+# Each try is limited, so a stuck connection can't hang the script with Geoff waiting.
+export ARCADE_SSH_TIMEOUT_S="${ARCADE_SSH_TIMEOUT_S:-120}"
+on_cabinet() {
+  local rc i
+  for i in $(seq 1 "${ARCADE_CONNECT_TRIES:-60}"); do
+    "$DRIVE" ssh "$@"; rc=$?
+    [ "$rc" = 255 ] || return "$rc"
+    [ "$i" = 1 ] && echo "Waiting for the cabinet to answer..." >&2
+    sleep "${ARCADE_CONNECT_WAIT_S:-5}"
+  done
+  return 255
+}
+
 REAPPLY=no
 case "${1:-}" in
   "") ;;
@@ -46,7 +61,7 @@ command -v ant >/dev/null || stop "the ant CLI is missing: brew install anthropi
 [ -x "$NODE" ] || stop "Node 22 is missing at $NODE"
 
 # 1. The cabinet: reachable, and with no replay data that could move to the Picade (D150).
-if ! state="$("$DRIVE" ssh sudo node "$GUEST" check 2>"$VM_ROOT/.connect-check.err")"; then
+if ! state="$(on_cabinet sudo node "$GUEST" check 2>"$VM_ROOT/.connect-check.err")"; then
   reason="$(grep -v -E 'Please note|rptl|^$' "$VM_ROOT/.connect-check.err" | tail -1 || true)"
   rm -f "$VM_ROOT/.connect-check.err"
   case "$reason" in
@@ -59,7 +74,7 @@ rm -f "$VM_ROOT/.connect-check.err"
 # 2. The key: from the keyboard with no echo, or from the cabinet. Never from stdin of a pipeline.
 if [ "$REAPPLY" = yes ]; then
   [ "$state" = live ] || stop "this cabinet has no key yet. Run this without --reapply."
-  key="$("$DRIVE" ssh sudo node "$GUEST" key 2>/dev/null)" || stop "couldn't read the key from the cabinet."
+  key="$(on_cabinet sudo node "$GUEST" key 2>/dev/null)" || stop "couldn't read the key from the cabinet."
 else
   [ -t 0 ] && [ -t 1 ] || stop "run this in a Terminal window on the mini, so the key can't land in a chat or a log."
   printf "Paste the cabinet's API key, then press Return (nothing will show): " >/dev/tty
@@ -115,8 +130,17 @@ read -r lock_workspace agent_id agent_version environment_id <<<"$ids"
 [ "$lock_workspace" = "$workspace" ] || stop "$LOCK is for $lock_workspace, but the key is for $workspace."
 
 # 6. Into the cabinet, over SSH's stdin.
-printf '{"anthropic_api_key":"%s","agent_id":"%s","agent_version":%s,"environment_id":"%s"}' "$key" "$agent_id" "$agent_version" "$environment_id" \
-  | "$DRIVE" ssh sudo node "$GUEST" install 2>/dev/null || stop "couldn't write the cabinet's config."
+# The pipe is inside the loop, so each try sends it again. Installing twice is harmless.
+installed=no
+for _ in $(seq 1 "${ARCADE_CONNECT_TRIES:-60}"); do
+  printf '{"anthropic_api_key":"%s","agent_id":"%s","agent_version":%s,"environment_id":"%s"}' "$key" "$agent_id" "$agent_version" "$environment_id" \
+    | "$DRIVE" ssh sudo node "$GUEST" install 2>/dev/null
+  rc="${PIPESTATUS[1]}"
+  if [ "$rc" = 0 ]; then installed=yes; break; fi
+  [ "$rc" = 255 ] || break
+  sleep "${ARCADE_CONNECT_WAIT_S:-5}"
+done
+[ "$installed" = yes ] || stop "couldn't write the cabinet's config. Run this again; the apply won't repeat its work."
 
 # 7. A pasted key shouldn't stay on the clipboard.
 if [ "$REAPPLY" = no ] && [ "$(pbpaste 2>/dev/null || true)" = "$key" ]; then
@@ -126,7 +150,7 @@ fi
 key=""
 
 sleep 3
-active="$("$DRIVE" ssh systemctl is-active arcade-launcher 2>/dev/null || true)"
+active="$(on_cabinet systemctl is-active arcade-launcher 2>/dev/null || true)"
 [ "$active" = active ] || stop "the cabinet service didn't come back up. On the cabinet: sudo journalctl -u arcade-launcher -n 20"
 echo
 echo "Done. The cabinet is live in workspace $workspace, with agent $agent_id version $agent_version."

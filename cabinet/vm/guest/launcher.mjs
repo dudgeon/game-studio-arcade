@@ -3,8 +3,10 @@
 //
 //   node launcher.mjs state                    screen, phase, sel, Studio phase, boxes, faults as JSON
 //   node launcher.mjs wait SCREEN [PHASE] [MS] wait for that screen (default 180 s); exit 1 if it never comes
-//   node launcher.mjs say                      feed the speech stub the text on stdin (D184)
+//   node launcher.mjs say [ID]                 feed the speech stub the text on stdin (D184), once for each ID (D195)
 //   node launcher.mjs errors                   print page errors as they happen, until killed
+import fs from "node:fs";
+
 const DEVTOOLS = "http://127.0.0.1:9222";
 const SERVICE = "http://127.0.0.1:8330";
 
@@ -52,6 +54,8 @@ async function read(c) {
 
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "say") {
+  const mark = args[0] ? `/tmp/arcade-say-${args[0].replace(/[^A-Za-z0-9]/g, "")}` : null;
+  if (mark && fs.existsSync(mark)) process.exit(0);
   let text = "";
   for await (const chunk of process.stdin) text += chunk;
   const r = await fetch(`${SERVICE}/api/speech/feed`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text.trim() }) });
@@ -59,6 +63,7 @@ if (cmd === "say") {
     console.error(`say: ${await r.text()}`);
     process.exit(1);
   }
+  if (mark) fs.writeFileSync(mark, "");
   process.exit(0);
 }
 

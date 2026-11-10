@@ -115,6 +115,7 @@ step_bundle() {
     mv "$release.tmp" "$release"
   fi
   ln -sfn "$release" "$ARCADE_HOME/current"
+  RELEASE_NAME="$(basename "$release")"
 }
 
 step_carts() {
@@ -168,5 +169,6 @@ step_carts
 hw_late
 step_services
 install -d /etc/arcade
-sed -n 's/.*"provision_version": *"\([^"]*\)".*/\1/p' "$SELF_DIR/lock.json" > /etc/arcade/provisioned-version
+echo "$RELEASE_NAME" > /etc/arcade/provisioned-version
+[ ! -f "$PAYLOAD/commit" ] || install -m 0644 "$PAYLOAD/commit" /etc/arcade/provisioned-commit
 log "done"
