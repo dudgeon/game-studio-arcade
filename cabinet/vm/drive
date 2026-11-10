@@ -29,11 +29,17 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.
 # ARCADE_SSH_CONTROL reuses a connection flow.mjs holds open, so a key takes milliseconds.
 # ServerAlive gives up on a dead connection after about 2 minutes, longer than a usual gap (D156).
+# ARCADE_SSH_TIMEOUT_S, if set, is a hard limit on one attempt: an SSH call once sat stuck for 29 hours.
+# A timed-out attempt exits 255, like any other SSH failure: the command may or may not have run.
 cabinet() {
+  local rc=0
+  ${ARCADE_SSH_TIMEOUT_S:+perl -e 'alarm shift; exec @ARGV' "$ARCADE_SSH_TIMEOUT_S"} \
   ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
     -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$VM_ROOT/ssh/known_hosts" \
-    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@"
+    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@" || rc=$?
+  [ "$rc" = 142 ] && return 255
+  return "$rc"
 }
 
 keycode() {
@@ -98,11 +104,16 @@ ride() {
   done
 }
 
-# Sends a key command, exactly once: the daemon ignores an id it has already done.
+# Sends a key command, exactly once: the daemon ignores an id it has already done. Each attempt is limited to
+# 60 s plus however long the keys take, so a stuck one is cut off and asked again by id.
 keys() {
-  local id
+  local id extra=0
   id="$(uuidgen | tr -d -)"
-  ride cabinet sudo arcade-keyd "id=$id" "$@"
+  case "$1" in
+    tap) extra=$(( ${2:-0} / 1000 )) ;;
+    seq) extra=$(( ($# - 1) / 10 )) ;;
+  esac
+  ARCADE_SSH_TIMEOUT_S=$(( 60 + extra )) ride cabinet sudo arcade-keyd "id=$id" "$@"
 }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
@@ -118,7 +129,7 @@ case "$cmd" in
     ;;
   screenshot)
     out="$1"
-    grab() { cabinet sudo arcade-screenshot > "$out.tmp"; }
+    grab() { ARCADE_SSH_TIMEOUT_S=60 cabinet sudo arcade-screenshot > "$out.tmp"; }
     ride grab
     size="$(file -b "$out.tmp")"
     case "$size" in
@@ -129,6 +140,7 @@ case "$cmd" in
   playtest) cabinet sudo -u arcade node /opt/arcade/current/cabinet/vm/guest/playtest-virtual.mjs ;;
   apt-lock)
     names="$(grep -vE '^[[:space:]]*(#|$)' "$REPO/cabinet/provision/apt.lock" | cut -d= -f1 | tr '\n' ' ')"
+    # shellcheck disable=SC2086
     cabinet "dpkg-query -W -f='\${Package}=\${Version}\n' $names"
     ;;
   status)

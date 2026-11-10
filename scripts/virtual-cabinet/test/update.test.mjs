@@ -83,3 +83,38 @@ test("arcade-keyd: a repeated id presses nothing, and no id always presses", () 
   assert.equal(log.filter((l) => / one tap /.test(l)).length, 1, "the log shows one pressed once");
   assert.equal(log.filter((l) => / one ALREADY-DONE/.test(l)).length, 1, "and the repeat as a repeat");
 });
+
+// drive itself: SSH failing after the command ran is the case where a key's outcome is unknown (D195).
+// The stand-in ssh keeps the daemon's rule (an id it has done is a repeat), and every first try runs, then fails as SSH.
+const STUB = "#!/bin/bash\nfor a in \"$@\"; do case \"$a\" in id=*) id=\"${a#id=}\" ;; esac; done\n[ -n \"$id\" ] || exit 9\nif grep -qx \"$id\" \"DIR/done\" 2>/dev/null; then echo \"$id repeat\" >> \"DIR/log\"; exit 0; fi\necho \"$id\" >> \"DIR/done\"; echo \"$id pressed\" >> \"DIR/log\"\nexit 255\n";
+
+test("drive: when SSH fails after a key landed, it asks again by id, and nothing is pressed twice", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drive-"));
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "ssh"), STUB.replaceAll("DIR", dir), { mode: 0o755 });
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GSA_VM_DIR: dir, ARCADE_HOST: "stand-in", ARCADE_RIDE_S: "30" };
+  for (const args of [["press", "a"], ["hold", "left", "500"], ["type", "Hi!"], ["down", "a"], ["up", "a"]]) {
+    execFileSync(path.join(REPO, "cabinet/vm/drive"), args, { env, stdio: "ignore" });
+  }
+  const log = fs.readFileSync(path.join(dir, "log"), "utf8").trim().split("\n");
+  assert.equal(log.filter((l) => l.endsWith("pressed")).length, 5, "each key pressed once");
+  assert.equal(log.filter((l) => l.endsWith("repeat")).length, 5, "each asked again after SSH failed, and recognised");
+  const ids = log.filter((l) => l.endsWith("pressed")).map((l) => l.split(" ")[0]);
+  assert.equal(new Set(ids).size, 5, "a fresh id for each key");
+});
+
+test("drive: gives up after ARCADE_RIDE_S, exit 255, if the cabinet never answers", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drive-"));
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "ssh"), "#!/bin/bash\nexit 255\n", { mode: 0o755 });
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GSA_VM_DIR: dir, ARCADE_HOST: "stand-in", ARCADE_RIDE_S: "4" };
+  let code = 0;
+  try {
+    execFileSync(path.join(REPO, "cabinet/vm/drive"), ["press", "a"], { env, stdio: "ignore" });
+  } catch (e) {
+    code = e.status;
+  }
+  assert.equal(code, 255);
+});

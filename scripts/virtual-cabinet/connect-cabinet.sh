@@ -34,6 +34,8 @@ stop() { echo "Stopped: $*" >&2; exit 1; }
 
 # The cabinet over SSH, waiting out a gap (D156). SSH exits 255 only when SSH itself failed, and every
 # command here is safe to repeat. A gap mustn't cost Geoff his pasted key, which the Console shows once.
+# Each try is limited, so a stuck connection can't hang the script with Geoff waiting.
+export ARCADE_SSH_TIMEOUT_S="${ARCADE_SSH_TIMEOUT_S:-120}"
 on_cabinet() {
   local rc i
   for i in $(seq 1 "${ARCADE_CONNECT_TRIES:-60}"); do

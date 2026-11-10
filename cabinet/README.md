@@ -11,7 +11,7 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 | `provision/profiles/` | The hardware layer of each profile |
 | `provision/files/` | Services and helpers it installs |
 | `vm/drive` | The driver: press, hold, type, screenshot over SSH, no window |
-| `../scripts/virtual-cabinet/` | Generates the UTM VM (`build.mjs`), starts it (`up.sh`), checks it (`verify.sh`) |
+| `../scripts/virtual-cabinet/` | Generates the UTM VM (`build.mjs`), starts it (`up.sh`), updates it (`update-cabinet.mjs`), checks it (`verify.sh`) |
 
 ## Connect the virtual cabinet to Claude
 
@@ -33,11 +33,23 @@ Until this is done, the virtual cabinet replays a recorded make and spends nothi
 
 The soak (`soak.sh`, D156) restarts the VM while it runs. If one is going, tell Claude first: a restart in the middle of step 4 would make it fail, though running it again is safe.
 
-To undo: on **API keys**, disable or delete the key. The cabinet's Make stops working, and nothing else changes. Rebuilding the VM also removes the key from it, so run step 4 again after a rebuild.
+Geoff does this once. Later fixes use the update below, which keeps the key, carts and logs. The Console shows a key only once, and a rebuild removes it from the cabinet, so after a rebuild this needs a new key.
+
+To undo: on **API keys**, disable or delete the key. The cabinet's Make stops working, and nothing else changes.
 
 If the script says it can't reach the cabinet or can't write its config, the mini's path to the VM has dropped (D156). These gaps usually last under a minute, and running it again is safe, so wait a minute and try again. If it still can't, restart the VM: `/Applications/UTM.app/Contents/MacOS/utmctl stop arcade-virtual`, then `scripts/virtual-cabinet/up.sh`, and run step 4 again.
 
 After the Studio agent changes: `scripts/virtual-cabinet/connect-cabinet.sh --reapply`, which reuses the key on the cabinet.
+
+## Update the cabinet
+
+```sh
+node scripts/virtual-cabinet/update-cabinet.mjs    # from a clean checkout of main
+```
+
+This is how fixes reach a running cabinet (D195). Its carts, logs and key stay as they are, the version moves, and the old release is kept. A game being played is interrupted when the service restarts, and it refuses while a make is running. The cabinet checks carts, logs and config before and after, and rolls back if the service doesn't return.
+
+To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`.
 
 ## Bring up the virtual cabinet
 
@@ -52,7 +64,7 @@ If bridging on Wi-Fi fails: `scripts/virtual-cabinet/rebuild.sh --yes-destroy-th
 
 A boot that never reaches SSH: stop the VM, then `hdiutil attach` its disk and read `seed/provision.log`, or rebuild with `build.mjs --replace --serial-console` and read it with `serial.sh`. Never leave a serial build unread: it freezes (D148).
 
-To rebuild from scratch and prove it's reproducible: `scripts/virtual-cabinet/rebuild.sh --yes-destroy-this-vm`. **That destroys the VM's disk, carts and logs (D129).** Only use it on a VM with nothing to keep.
+**Rebuilding isn't how to ship a fix.** `scripts/virtual-cabinet/rebuild.sh --yes-destroy-this-vm` destroys the VM's disk, carts, logs and key (D129). Use it only for a broken VM with nothing to keep, or to prove the build is reproducible.
 
 After a good boot, pin the packages: `cabinet/vm/drive apt-lock`, put the output in `provision/apt.lock`, and commit.
 
@@ -70,6 +82,8 @@ cabinet/vm/drive run my-script.sh    # run a local script on the cabinet
 
 Keys travel kernel → libinput → compositor → Chromium, as the Picade's do (D144). Screenshots are the compositor's real 1024×768 output.
 
+The mini can lose the cabinet for about 40 seconds at a time (D156). `drive` and `flow.mjs` wait that out, for up to `ARCADE_RIDE_S` seconds (default 300). Each key has an id, so it lands exactly once (D195), and steps can finish late. `drive ssh` and `drive run` don't repeat.
+
 ## Running a whole flow
 
 ```sh
@@ -80,7 +94,9 @@ node cabinet/vm/flow.mjs --script cabinet/vm/flows/typing.drive --out /tmp/typin
 node cabinet/vm/flow.mjs --script cabinet/vm/flows/play.drive --out /tmp/play      # any time
 ```
 
-Same verbs as `cabinet/service/scripts/drive.js`, plus `expect TEXT`. It reports fit faults, cut text and page errors, and exits non-zero on any fault or error.
+Same verbs as `cabinet/service/scripts/drive.js`, plus `expect TEXT`, `expect-sel N`, `home` and `repeat N` ... `end`. It reports fit faults, cut text, page errors and how the keys added up, and exits non-zero on any fault, error or mismatch.
+
+`cabinet/vm/flows/gap-walk.drive` is a long walk where every press is checked against the screen, for proving the driver across gaps.
 
 ## Tests
 
@@ -89,4 +105,6 @@ Same verbs as `cabinet/service/scripts/drive.js`, plus `expect TEXT`. It reports
 Run by hand, because they need the cabinet:
 - `scripts/virtual-cabinet/test/connect-vm.sh`: the connect path on a real cabinet. **It leaves a fake key, so rebuild afterwards.**
 - `scripts/virtual-cabinet/verify.sh`: the whole cabinet, safe to repeat.
+- `scripts/virtual-cabinet/test/update-vm.sh`: the in-place update on a real cabinet, with a stand-in key, cleaning up after itself.
 - `scripts/virtual-cabinet/soak.sh`: bridged network reachability from both sides (D156), restarting but never rebuilding.
+- `scripts/virtual-cabinet/gap-measure.sh`: where the gaps live, and whether a held connection rides them. Changes nothing.

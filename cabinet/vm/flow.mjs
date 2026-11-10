@@ -44,18 +44,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RIDE_MS = Number(process.env.ARCADE_RIDE_S ?? 300) * 1000;
 const SSH_FAILED = 255;
 const master = () => run("ssh", [...sshArgs, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=8", "-M", "-N", "-f", target], { timeout: 20000 });
+// Every call has a limit: one SSH call once sat stuck for 29 hours. A call cut off is treated as SSH failing.
+const LIMIT = { check: 10000, read: 60000, wait: 200000, drive: RIDE_MS + 120000 };
+const transport = (e) => e.code === SSH_FAILED || e.killed || e.signal;
 
-/** The held connection, opened again if it has died. A gap can stop this working for a while. */
+/** The held connection, opened again if it has died. One that's stuck is killed first. */
 async function ensureMaster() {
-  const alive = await run("ssh", [...sshArgs, "-O", "check", target]).then(() => true, () => false);
-  if (!alive) await master().catch(() => {});
+  const alive = await run("ssh", [...sshArgs, "-O", "check", target], { timeout: LIMIT.check }).then(() => true, () => false);
+  if (alive) return;
+  await run("pkill", ["-f", `-S ${CONTROL} -o ServerAliveInterval`]).catch(() => {});
+  await master().catch(() => {});
 }
 
 let keysSent = 0;
 const drive = async (...a) => {
   await ensureMaster();
   if (["press", "hold", "down", "up", "type"].includes(a[0])) keysSent++;
-  return run(DRIVE, a, { env, maxBuffer: 2 ** 26 });
+  return run(DRIVE, a, { env, maxBuffer: 2 ** 26, timeout: LIMIT.drive });
 };
 
 /** What the key daemon has done: presses, and repeats it recognised and didn't press. */
@@ -71,9 +76,9 @@ async function readOnly(command) {
   const until = Date.now() + RIDE_MS;
   for (;;) {
     try {
-      return await run("ssh", [...sshArgs, target, command], { maxBuffer: 2 ** 26 });
+      return await run("ssh", [...sshArgs, target, command], { maxBuffer: 2 ** 26, timeout: LIMIT.read });
     } catch (e) {
-      if (e.code !== SSH_FAILED || Date.now() > until) throw e;
+      if (!transport(e) || Date.now() > until) throw e;
       await sleep(3000);
       await ensureMaster();
     }
@@ -85,9 +90,9 @@ async function guest(...a) {
   const until = Date.now() + RIDE_MS;
   for (;;) {
     try {
-      return await run("ssh", [...sshArgs, target, "sudo", "-u", "arcade", "node", GUEST, ...a], { maxBuffer: 2 ** 26 });
+      return await run("ssh", [...sshArgs, target, "sudo", "-u", "arcade", "node", GUEST, ...a], { maxBuffer: 2 ** 26, timeout: a[0] === "wait" ? LIMIT.wait : LIMIT.read });
     } catch (e) {
-      if (e.code !== SSH_FAILED || Date.now() > until) throw e;
+      if (!transport(e) || Date.now() > until) throw e;
       await sleep(3000);
       await ensureMaster();
     }
@@ -152,7 +157,9 @@ async function step(s, out, shots) {
       for (;;) {
         const child = spawn("ssh", [...sshArgs, target, "sudo", "-u", "arcade", "node", GUEST, "say", id], { stdio: ["pipe", "ignore", "inherit"] });
         child.stdin.end(rest);
-        const code = await new Promise((r) => child.on("close", r));
+        const cut = setTimeout(() => child.kill(), LIMIT.read);
+        const code = await new Promise((r) => child.on("close", (c, signal) => r(signal ? SSH_FAILED : c)));
+        clearTimeout(cut);
         if (code === 0) return;
         if (code !== SSH_FAILED || Date.now() > until) throw new Error("say failed");
         await sleep(3000);

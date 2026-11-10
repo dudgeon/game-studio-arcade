@@ -30,7 +30,8 @@ const SSH_FAILED = 255;
 /** Over the cabinet's own SSH, retrying while the path is down. Exit 255 only ever means SSH itself failed. */
 function cabinet(command, { input, tries = 72 } = {}) {
   for (let i = 0; ; i++) {
-    const r = spawnSync(DRIVE, ["ssh", command], { input, encoding: input && typeof input !== "string" ? "buffer" : "utf8", maxBuffer: 2 ** 26 });
+    // Each try is limited: a stuck connection exits 255 like any other SSH failure.
+    const r = spawnSync(DRIVE, ["ssh", command], { input, encoding: input && typeof input !== "string" ? "buffer" : "utf8", maxBuffer: 2 ** 26, env: { ...process.env, ARCADE_SSH_TIMEOUT_S: "120" } });
     if (r.status !== SSH_FAILED) return r;
     if (i >= tries) stop(`can't reach the cabinet after ${tries * 5} s. Is it running? scripts/virtual-cabinet/up.sh`);
     if (i === 0) say("waiting for the cabinet to answer");

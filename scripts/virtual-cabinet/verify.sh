@@ -15,7 +15,8 @@ check() {
   local name="$1"; shift
   if "$@" > "$OUT/$name.log" 2>&1; then echo "PASS $name"; else echo "FAIL $name (see $OUT/$name.log)"; fails=$((fails + 1)); fi
 }
-# These only look, so they can repeat while SSH itself is failing (exit 255, D156).
+# These only look, so they can repeat while SSH itself is failing (exit 255, D156). Each try is limited.
+export ARCADE_SSH_TIMEOUT_S="${ARCADE_SSH_TIMEOUT_S:-120}"
 guest() {
   local rc i
   for i in $(seq 1 60); do
@@ -87,7 +88,7 @@ sleep 1
 playtest_virtual() {
   local rc i
   for i in $(seq 1 60); do
-    "$D" playtest > "$OUT/playtest-virtual.json" 2> "$OUT/playtest-virtual.err"; rc=$?
+    ARCADE_SSH_TIMEOUT_S=900 "$D" playtest > "$OUT/playtest-virtual.json" 2> "$OUT/playtest-virtual.err"; rc=$?
     [ "$rc" = 255 ] || return "$rc"
     sleep 5
   done
