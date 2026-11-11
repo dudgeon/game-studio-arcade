@@ -10,7 +10,8 @@ import { LINE_STAGE, progressFor, progressGate, tellStage } from "./progress.js"
  * @typedef {import("./answers.js").Answerer} Answerer
  *
  * @typedef {object} Ui
- * @property {(text: string) => void} progress   one kid-language line
+ * @property {(text: string, stage?: number | null) => void} progress   one kid-language line, with its D198 stage when known
+ * @property {(usage: any) => void} [usage]      the session's usage so far, as it streams (the cabinet's live coin count)
  * @property {(text: string) => void} [debug]
  *
  * @typedef {object} Turn                         a §9.5 turn
@@ -101,7 +102,8 @@ export async function runSession(o) {
     const shown = gate(text, stage ?? LINE_STAGE[text] ?? null);
     if (shown) {
       lastProgress = shown;
-      ui.progress(shown);
+      const st = stage ?? LINE_STAGE[text] ?? null;
+      ui.progress(shown, typeof st === "number" ? st : null);
     }
   };
 
@@ -169,6 +171,7 @@ export async function runSession(o) {
       }
       case "session.usage":
         usage = ev.usage ?? usage;
+        if (ev.usage) ui.usage?.(ev.usage);
         return false;
       case "session.error":
         errors.push(ev.error ?? ev);

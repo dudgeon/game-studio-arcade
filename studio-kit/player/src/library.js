@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { rulesOf } from "@game-studio-arcade/spec";
+import { parseSpec } from "@game-studio-arcade/spec";
 
 /** Same data folder as the CLI (D14): `GSA_DATA_DIR` or ~/game-studio-data. */
 export function dataDir(env = process.env) {
@@ -24,6 +24,10 @@ export function dataDir(env = process.env) {
  *   with: string | null,
  *   players: number | null,
  *   parent: string | null,
+ *   family: string | null,
+ *   branch: string | null,
+ *   pitch: string | null,
+ *   controls: string[],
  *   session_id: string | null,
  *   created: string | null,
  *   commit: string | null,
@@ -70,7 +74,10 @@ export function readCart(root, id, source = "library") {
     meta = JSON.parse(readText(path.join(dir, "cart.json")) ?? "{}") ?? {};
   } catch {}
   const spec = readText(path.join(dir, "spec.md"));
-  const rules = spec ? rulesOf(spec) : [];
+  const parsed = spec ? parseSpec(spec) : null;
+  const rules = parsed ? parsed.rules.map(({ id, kind, text }) => ({ id, kind, text })) : [];
+  /** @param {string} h */
+  const body = (h) => parsed?.sections.find((s) => s.heading === h)?.body ?? null;
   const titleLine = spec?.match(/^#\s+(.+)$/m)?.[1]?.trim();
   const v = Number(meta.version);
   return {
@@ -83,6 +90,15 @@ export function readCart(root, id, source = "library") {
     with: meta.with ?? null,
     players: Number.isInteger(meta.players) ? meta.players : null,
     parent: meta.parent ?? null,
+    // A change's game and line (D206). The cabinet works these out from parent when they're missing.
+    family: typeof meta.family === "string" ? meta.family : null,
+    branch: typeof meta.branch === "string" ? meta.branch : null,
+    pitch: body("Pitch")?.replace(/\s+/g, " ").trim() || null,
+    // The Controls section's lines, for "how to play" before every game (G0).
+    controls: (body("Controls") ?? "")
+      .split("\n")
+      .map((l) => l.replace(/^\s*[-*]\s*/, "").trim())
+      .filter((l) => l && !/★|cabinet's button/i.test(l)),
     session_id: meta.session_id ?? null,
     created: meta.created ?? null,
     commit: source === "library" ? commitOf(root, id) : null,

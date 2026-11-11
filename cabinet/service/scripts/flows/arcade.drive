@@ -1,0 +1,160 @@
+# The arcade's main boards on the replay (D201, the handoff's §3): the shelf, the
+# coin pot, a make from the coin check to play, the post-game screen, a fix as a
+# change, its result on the shelf, the game's card, and someone else's version.
+# Run: node scripts/drive.js --script scripts/flows/arcade.drive --out DIR --replay ../../studio-kit/cli/fixtures/penguin-catch
+#seed seeds/family.json
+wait S1
+shot S1-shelf
+# The coin pot: COIN on the shelf (A1), then what it paid for (A2).
+press coin
+wait A1
+shot A1-coin-pot
+press a
+wait A2
+shot A2-coin-history
+press esc
+wait A1
+press esc
+wait S1
+# Make a new game.
+press a
+wait M1
+shot M1-whos-making
+down a
+up a
+wait M3
+shot M3-coin-check
+# Any button but COIN does nothing here (D205).
+press a
+press b
+wait M3
+press coin
+wait M4
+shot M4-tell-me
+say I want a game where a penguin catches fish that fall from the sky, and if you miss three fish you lose, and sometimes a boot falls and you should NOT catch the boot
+down a
+wait say listening
+shot M5-listening
+up a
+wait M6
+shot M6-is-this-right
+press a
+wait M7
+shot M7-claude-asks
+press a
+wait question
+press down
+press a
+wait question
+press down
+press down
+shot M7-something-else-lit
+press a
+wait M8
+shot M8-something-else
+say slides left and right but really slippery like on ice
+hold q 300
+wait say confirm
+press a
+wait M9
+shot M9-plan
+press right
+wait reader
+shot M9-all-the-rules
+press esc
+wait M9
+press a
+wait M10
+shot M10-making-it
+sleep 2500
+shot M10-making-it-later
+wait M11
+shot M11-ready
+press a
+wait G0
+shot G0-how-to-play
+press a
+wait play
+sleep 1500
+shot G1-playing-title
+press a
+sleep 800
+hold left 400
+shot G1-playing
+press esc
+wait G2
+shot G2-you-check-1
+press down
+press a
+wait check
+shot G2-you-check-2
+press a
+wait G3
+shot G3-something-is-off
+# Fix that: a change by the game's maker.
+press a
+wait R1
+shot R1-whos-changing
+press a
+wait R3
+shot R3-coin-check-change
+press coin
+wait R4
+shot R4-what-to-change
+press a
+wait R5
+shot R5-claude-asks
+press a
+wait R6
+shot R6-what-changes
+press a
+wait R7
+shot R7-changing-it
+wait R8
+shot R8-version-2-ready
+press down
+press a
+wait S1
+shot R9-shelf-with-version-2
+# The game's card: every version, and Change this game.
+press down
+press right
+wait S3
+shot S3-game-card
+# Someone else's change is their own version (D206).
+press down
+press down
+press a
+wait R1
+press down
+press a
+wait R2
+shot R2-someone-elses-game
+press a
+wait R3
+press coin
+wait R4
+press down
+press a
+wait R4-plan
+shot R4-look-at-the-plan
+press esc
+wait R4
+press up
+press a
+wait say idle
+say make the boots green
+hold a 300
+wait say confirm
+press a
+wait R5
+press a
+wait R6
+press a
+wait R8
+shot R8-owens-own-version
+press down
+press a
+wait S1
+press down
+shot R9-shelf-with-owens-version

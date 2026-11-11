@@ -13,6 +13,6 @@
   },
   "howToPlay": {
     "goal": "Fill whole rows with falling blocks to clear them.",
-    "controls": ["Stick: move, down to drop faster", "Stick up: drop it all the way", "A or B: turn", "X: keep a block for later", "START: pause"]
+    "controls": ["Stick: move. Up drops it all the way", "A or B: turn it", "X: keep a block for later", "START: pause"]
   }
 }

@@ -34,19 +34,43 @@ function resumePoint(recorded, answered) {
   return at;
 }
 
-/** Outputs as an agent leaves them: the cart, its spec, the report and DONE.json (D19). @param {string} dir */
-export function outputsFrom(dir) {
+/**
+ * The usage a replay's session ends with: the recording's last, so a replay is
+ * charged what the real session cost (D202). `cents` overrides it, for the screens
+ * no recording has reached yet (a make over the pot, or over its usual cost).
+ * @param {string} dir @param {number | null} [cents]
+ */
+export function usageOf(dir, cents = null) {
+  let last = null;
+  const file = path.join(dir, "events.jsonl");
+  if (fs.existsSync(file)) {
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      if (!line.includes('"session.usage"')) continue;
+      try {
+        last = JSON.parse(line).usage ?? last;
+      } catch {}
+    }
+  }
+  const base = last ?? { list_cost: { amount: "0", currency: "USD" }, active_seconds: 0 };
+  return cents == null ? base : { ...base, list_cost: { amount: String(Math.round(cents)), currency: "USD" } };
+}
+
+/** Outputs as an agent leaves them: the cart, its spec, the report and DONE.json (D19). @param {string} dir @param {{ noCart?: boolean }} [opts] */
+export function outputsFrom(dir, opts = {}) {
   const cart = path.join(dir, "cart");
   const tgz = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "gsa-replay-")), "cart.tgz");
   execFileSync("tar", ["-czf", tgz, "-C", cart, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   /** @type {Record<string, Buffer>} */
+  /** @type {Record<string, Buffer>} */
   const files = { "spec.md": fs.readFileSync(path.join(cart, "spec.md")), "report.json": fs.readFileSync(path.join(dir, "report.json")), "cart.tgz": fs.readFileSync(tgz) };
+  // A make that came back with no game (E3).
+  if (opts.noCart) delete files["cart.tgz"];
   const manifest = { files: Object.entries(files).map(([name, b]) => ({ name, size: b.length })) };
   return { ...files, "DONE.json": Buffer.from(JSON.stringify(manifest)) };
 }
 
 /**
- * @param {{ dir?: string, script?: {steps: any[]}, outputs?: Record<string, Buffer>, paceMs?: number, usage?: any, appliedAgent?: any, archiveRefusals?: number, resume?: {answered?: number} }} o
+ * @param {{ dir?: string, script?: {steps: any[]}, outputs?: Record<string, Buffer>, paceMs?: number, usage?: any, appliedAgent?: any, archiveRefusals?: number, resume?: {answered?: number}, noCart?: boolean, sessionId?: string }} o
  *   dir: a fixture folder with events.jsonl, report.json and cart/.
  *   paceMs: wait this long before each tool event or message, so a person or a
  *     screenshot can see each progress line. Thinking and spans don't count.
@@ -59,8 +83,8 @@ export function replayApi(o) {
   const script = o.script ?? stepsFrom(recorded.slice(cut));
   const def = readAgentDef();
   const m = mockApi(script, {
-    outputs: o.outputs ?? (o.dir ? outputsFrom(o.dir) : {}),
-    sessionId: "sesn_replay",
+    outputs: o.outputs ?? (o.dir ? outputsFrom(o.dir, { noCart: o.noCart }) : {}),
+    sessionId: o.sessionId ?? "sesn_replay",
     usage: o.usage ?? { list_cost: { amount: "0", currency: "USD" }, active_seconds: 0 },
     timeoutMs: 24 * 3600 * 1000, // a kid can think as long as they like
     appliedAgent: o.appliedAgent ?? { version: 1, system: def.system, tools: def.tools },

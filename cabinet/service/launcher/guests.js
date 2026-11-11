@@ -2,6 +2,7 @@
 // playing one opens its page full screen in an iframe on the guest port, with
 // focus, so the game reads the keys itself. The guest page's escape script
 // (served by the service) posts {gsa: "star"} on Escape, and the play ends.
+import { COLORS as C } from "../../../runtime/src/palette.js";
 
 /** The guests, as shelf entries shaped like carts (`guest: true`). Never throws: no guests is fine. */
 export async function fetchGuests() {
@@ -62,5 +63,33 @@ export function createGuestHost(opts) {
       iframe.remove();
       window.focus();
     },
+  };
+}
+
+// ---------- guests on the arcade boards (D201; the proposal in docs/falling-blocks.md §5) ----------
+
+/** S1: a guest's shelf row: "by <author>", a "free game" tag, no card (guests have no versions). @param {any} g */
+export function guestRow(g) {
+  return { kind: "cart", cart: g, title: g.title, by: g.by ? `by ${g.by}` : undefined, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false };
+}
+
+/** G0: how to play, from guest.json's howToPlay. @param {any} g */
+export function guestHowto(g) {
+  const h = g.howToPlay ?? {};
+  const controls = Array.isArray(h.controls) && h.controls.length ? h.controls : ["Stick and buttons: try them and see!"];
+  return { screen: "howto", cart: g, title: g.title, by: g.by ? `by ${g.by}` : "", goal: h.goal ?? null, controls };
+}
+
+/** After a guest game: play again or back to the shelf. No change, no coins (D230). @param {any} g */
+export function guestPostGame(g) {
+  return {
+    screen: "board",
+    board: "G6",
+    title: "Done playing",
+    right: g.title,
+    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, { text: "Playing is always free.", rows: 1, onCut: "never" }],
+    tiles: [{ text: "Play again", note: "free" }, { text: "Back to the shelf", hue: C.green }],
+    sel: 1,
+    post: ["again", "shelf"],
   };
 }

@@ -102,13 +102,13 @@ test("the guest port serves play/ only, puts the escape script first in pages, a
 test("the API lists guests with their guest-port URL, and logs plays from the launcher only", async () => {
   const logsDir = tmp();
   const guests = createGuests({ dirs: [REPO_GUESTS], logsDir, now: () => new Date("2026-11-11T12:00:00Z") });
-  guests.port = 8331;
+  guests.port = 8340;
   const api = /** @type {any} */ (await apiServer(guests));
   try {
     const host = new URL(api.url).host;
     const listed = JSON.parse(/** @type {any} */ (await request(`${api.url}/api/guests`)).body.toString()).guests;
     const teti = listed.find((/** @type {any} */ g) => g.id === "teti");
-    assert.equal(teti.url, "http://127.0.0.1:8331/teti/index.html?cabinet");
+    assert.equal(teti.url, "http://127.0.0.1:8340/teti/index.html?cabinet");
     assert.equal(teti.guest, true);
     assert.equal(teti.plays, 0);
 
@@ -118,7 +118,7 @@ test("the API lists guests with their guest-port URL, and logs plays from the la
     const [record] = fs.readFileSync(path.join(logsDir, "guest_play.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     assert.deepEqual(record, { id: "pl_1", guest_id: "teti", guest_version: "1.4.4-cabinet.1", origin: "cabinet", started_at: "2026-11-11T11:58:00.000Z", duration_s: 95.4, ended: "star", errors: 0, logged_at: "2026-11-11T12:00:00.000Z" });
 
-    const fromGuest = /** @type {any} */ (await request(`${api.url}/api/guest-plays`, { method: "POST", headers: { origin: "http://127.0.0.1:8331" }, body: JSON.stringify(play) }));
+    const fromGuest = /** @type {any} */ (await request(`${api.url}/api/guest-plays`, { method: "POST", headers: { origin: "http://127.0.0.1:8340" }, body: JSON.stringify(play) }));
     assert.equal(fromGuest.status, 403, "a guest page can't write the cabinet's logs (D232)");
     const unknown = /** @type {any} */ (await request(`${api.url}/api/guest-plays`, { method: "POST", body: JSON.stringify({ ...play, guest_id: "nobody" }) }));
     assert.equal(unknown.status, 404);

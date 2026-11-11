@@ -1,9 +1,11 @@
 // `studio make`: one new cart from a request, end to end (phase-0 task 8, D43).
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { runSession, listCostUsd } from "./driver.js";
 import { downloadOutputs, extractCart, readJsonIfExists } from "./outputs.js";
-import { commitNewCart, specTitle } from "./library.js";
+import { commitNewCart, specTitle, slugify } from "./library.js";
 import { appendLog, newSpecDiff } from "./log.js";
 import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
 import { addYouCheckRules, questionsFor } from "./untested.js";
@@ -19,7 +21,7 @@ import { readAgentDef } from "./config.js";
  * @property {string} [model]
  * @property {number} budgetCents
  * @property {import("./answers.js").Answerer} answerer
- * @property {{progress: (s: string) => void, info: (s: string) => void, debug?: (s: string) => void}} ui
+ * @property {{progress: (s: string, stage?: number | null) => void, info: (s: string) => void, debug?: (s: string) => void, usage?: (u: any) => void}} ui
  * @property {import("./checks.js").Checker} checker
  * @property {ReturnType<typeof import("./config.js").dataPaths>} paths
  * @property {{agentId: string, agentVersion?: number, environmentId: string}} lock
@@ -32,10 +34,70 @@ import { readAgentDef } from "./config.js";
  * @property {{sessionId: string, kitHash?: string|null}} [resume]   collect a session a restart cut off, rather than start one (D191)
  * @property {boolean} [allowStaleBrief]   run the applied agent even if it differs from the repo (D173)
  * @property {{system: string, tools: any[]}} [repoBrief]   what the applied agent should match; default agents/studio.md
+ * @property {Parent} [parent]   a change to this game, rather than a new one (§8.2, D206)
  * @property {string} [recordFile]     also write the answers here
  * @property {() => Date} [now]
  * @property {{tries?: number, waitMs?: number, sleep?: (ms: number) => Promise<void>}} [outputs]
  */
+
+/**
+ * The game a change starts from (§8.2, D206). The maker's own change is the next
+ * version of the same game; anyone else's is their own version, a new branch.
+ * @typedef {{ id: string, dir: string, version: number, maker: string | null, family?: string | null, branch?: string | null, title: string, session_id?: string | null }} Parent
+ */
+
+/** Where the parent cart is mounted in the session (agents/studio.md, Forks). */
+export const PARENT_MOUNT = "/mnt/session/uploads/parent.tgz";
+
+/**
+ * The version a change makes, and the line it's on.
+ * @param {Parent} parent @param {string} maker
+ * @returns {{ version: number, ownVersion: boolean, family: string, branch: string | null }}
+ *   branch null: this change starts a new branch, whose id is the new cart's own.
+ */
+export function changeTarget(parent, maker) {
+  const family = parent.family ?? parent.id;
+  const own = parent.maker != null && parent.maker === maker;
+  return own ? { version: parent.version + 1, ownVersion: true, family, branch: parent.branch ?? parent.id } : { version: 1, ownVersion: false, family, branch: null };
+}
+
+/** The message that starts a change: the brief's Forks section reads it. @param {{request: string, maker: string, withPlayer?: string|null, parent: Parent, target: ReturnType<typeof changeTarget>}} o */
+export function changeMessage(o) {
+  const lines = [
+    "Change request from the cabinet: this is a fork.",
+    `Parent cart: ${o.parent.id}, version ${o.parent.version}, "${o.parent.title}"${o.parent.maker ? ` by ${o.parent.maker}` : " (a starter game)"}.`,
+    `The parent cart is mounted at ${PARENT_MOUNT}: extract it with \`mkdir -p /workspace/cart && tar -xzf ${PARENT_MOUNT} -C /workspace/cart\`. Its earlier questions and answers, if any, are in earlier-turns.json there; delete that file from /workspace/cart before packing.`,
+    o.target.ownVersion
+      ? `This makes version ${o.target.version} of the same game, by the same maker. Add a Changelog line under v${o.target.version}.`
+      : `This makes the maker's own version: a new game that starts from the parent's spec. Keep the parent's rules unless the change says otherwise. Add a Changelog line under v1 saying it started from ${o.parent.id} v${o.parent.version}.`,
+    `Maker: ${o.maker}${o.withPlayer ? ` (with ${o.withPlayer})` : ""}`,
+    "What the player wants changed (speech-to-text transcript, their own words):",
+    `"${o.request}"`,
+  ];
+  return { type: "user.message", content: [{ type: "text", text: lines.join("\n") }] };
+}
+
+/** Pack the parent for the session: its folder, plus its earlier turns. @param {Parent} parent @param {string} sessionsDir */
+function packParent(parent, sessionsDir) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-parent-"));
+  const stage = path.join(tmp, "cart");
+  fs.cpSync(parent.dir, stage, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
+  const answers = parent.session_id ? path.join(sessionsDir, parent.session_id, "answers.json") : null;
+  if (answers && fs.existsSync(answers)) fs.copyFileSync(answers, path.join(stage, "earlier-turns.json"));
+  const tgz = path.join(tmp, "parent.tgz");
+  execFileSync("tar", ["-czf", tgz, "-C", stage, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
+  return tgz;
+}
+
+/** The spec lines a change removed and added, for the record. @param {string|null} before @param {string|null} after */
+function specChange(before, after) {
+  if (after == null) return null;
+  const a = String(before ?? "").replace(/\n$/, "").split("\n");
+  const b = String(after).replace(/\n$/, "").split("\n");
+  const inA = new Set(a);
+  const inB = new Set(b);
+  return [`--- parent/spec.md`, `+++ spec.md`, ...a.filter((l) => !inB.has(l)).map((l) => `-${l}`), ...b.filter((l) => !inA.has(l)).map((l) => `+${l}`)].join("\n");
+}
 
 /** A turn as a replayable answer (D47): the question and the answer's words, not just a letter. */
 function recordedAnswer(t) {
@@ -58,6 +120,13 @@ export async function makeCart(o) {
     }
   }
   const kit = o.resume ? { fileId: "", hash: o.resume.kitHash ?? null } : await o.kit();
+  const target = o.parent ? changeTarget(o.parent, o.maker) : null;
+  /** @type {{fileId: string, mountPath: string}[]} */
+  const extraFiles = [];
+  if (o.parent && !o.resume) {
+    const up = await o.api.uploadFile(packParent(o.parent, o.paths.sessions), "parent.tgz");
+    extraFiles.push({ fileId: up.id, mountPath: PARENT_MOUNT });
+  }
 
   // D44: fetch the frozen snapshot as the first playtest starts, so nothing the
   // agent writes later can change the baseline. It's written well before then.
@@ -87,12 +156,14 @@ export async function makeCart(o) {
       environmentId: o.lock.environmentId,
       model: o.model,
       kitFileId: kit.fileId,
+      ...(extraFiles.length ? { extraFiles } : {}),
       skills: o.skills,
       ...(o.brief ? { system: o.brief.system, tools: o.brief.tools } : {}),
       budgetCents: o.budgetCents,
-      title: `make: ${o.request.slice(0, 60)}`,
-      metadata: { maker: o.maker, origin: o.origin ?? "cabinet", via: "studio-cli" },
+      title: `${o.parent ? `change ${o.parent.id}` : "make"}: ${o.request.slice(0, 60)}`,
+      metadata: { maker: o.maker, origin: o.origin ?? "cabinet", via: "studio-cli", ...(o.parent ? { parent: `${o.parent.id}@${o.parent.version}` } : {}) },
     },
+    ...(o.parent && target ? { message: changeMessage({ request: o.request, maker: o.maker, withPlayer: o.withPlayer, parent: o.parent, target }) } : {}),
     request: o.request,
     maker: o.maker,
     withPlayer: o.withPlayer ?? null,
@@ -135,6 +206,7 @@ export async function makeCart(o) {
     cartDir = extractCart(path.join(dl.dir, "cart.tgz"), path.join(sessionDir, "cart"));
     spec = fs.existsSync(path.join(cartDir, "spec.md")) ? fs.readFileSync(path.join(cartDir, "spec.md"), "utf8") : null;
     cartJson = readJsonIfExists(path.join(cartDir, "cart.json"));
+    fs.rmSync(path.join(cartDir, "earlier-turns.json"), { force: true });
   } else if (dl.files.includes("spec.md")) {
     spec = fs.readFileSync(path.join(dl.dir, "spec.md"), "utf8");
   }
@@ -180,28 +252,35 @@ export async function makeCart(o) {
   /** @type {{id: string, dir: string, commit: string}|null} */
   let committed = null;
   const created = now().toISOString();
+  const version = target?.version ?? 1;
+  const parentRef = o.parent ? `${o.parent.id}@${o.parent.version}` : null;
   if (commit && cartDir) {
-    const title = cartJson?.title || specTitle(spec) || "cart";
+    const title = cartJson?.title || specTitle(spec) || o.parent?.title || "cart";
+    // A version is a new folder; the parent is never touched (D5, D206).
+    const wantedId = o.parent && target?.ownVersion ? `${slugify(target.branch ?? o.parent.id).replace(/-v\d+$/, "")}-v${version}` : o.parent ? title : cartJson?.id || title;
     committed = commitNewCart({
       root: o.paths.carts,
       cartDir,
       cartJson: {
         ...(cartJson ?? {}),
+        id: wantedId,
         title,
-        version: 1,
+        version,
         maker: o.maker,
         with: o.withPlayer ?? null,
-        parent: null,
+        parent: parentRef,
+        // A new branch is its own line: whatever the parent's cart.json said goes (undefined is left out).
+        family: target?.family, branch: target?.branch ?? undefined,
         session_id: result.sessionId,
         origin: o.origin ?? "cabinet",
         created,
       },
-      message: `make {id} v1 (${result.sessionId}${passed ? "" : ", checks not passing"})`,
+      message: `${o.parent ? `change ${parentRef} ->` : "make"} {id} v${version} (${result.sessionId}${passed ? "" : ", checks not passing"})`,
     });
     appendLog(o.paths.logs, "cart_version", {
       cart_id: committed.id,
-      version: 1,
-      parent: null,
+      version,
+      parent: parentRef,
       session_id: result.sessionId,
       commit: committed.commit,
       created,
@@ -222,7 +301,9 @@ export async function makeCart(o) {
     plan_turns: result.planTurns,
     questions: result.turns.filter((t) => !t.auto).length,
     ended_by: result.endedBy,
-    spec_diff: newSpecDiff(spec),
+    kind: o.parent ? "change" : "new",
+    parent: parentRef,
+    spec_diff: o.parent ? specChange(readTextIfExists(path.join(o.parent.dir, "spec.md")), spec) : newSpecDiff(spec),
     context_pack: o.contextPack ?? "tarball",
     started_from: typeof report?.started_from === "string" ? report.started_from : null,
     brief: o.brief ? "file-override" : "applied-agent",
@@ -257,7 +338,7 @@ export async function makeCart(o) {
     stop_reason: result.stopReason,
     outcome,
     cart_id: committed?.id ?? null,
-    cart_version: committed ? 1 : null,
+    cart_version: committed ? version : null,
     commit: committed?.commit ?? null,
     outputs_complete: dl.complete,
     missing_outputs: dl.missing,

@@ -28,7 +28,7 @@ This file says what each screen shows and does, and the coin rules and their num
 | Usual costs | settings (`usual_cost_new` 6, `usual_cost_change` 3), not constants; 3 is a guess until a change is measured | D203 |
 | Overrun | a started make always finishes; the pot can go negative until the 1st | D203 |
 | Per-make cap | the session budget stays about $3 (§3.2, D157); it isn't tied to the pot | D204 |
-| Real limit | cabinet workspace spend limit $13 (Geoff sets it in the Console) | D204 |
+| Real limit | cabinet workspace spend limit $15 (Geoff sets it in the Console) | D204, D211 |
 | Who adds coins | grown-ups only, in the Cabinet Manager, each with a reason the kids see | D205 |
 | Spending starts | only with COIN on the coin check | D205 |
 
@@ -109,7 +109,7 @@ Each board id is on the canvas. "Today" names the existing screen in `screens.js
 
 ### Cabinet Manager: Coin pot page
 - A new tab, "Coin pot", next to Activity and Health. It shows the month: coins left, dollars spent of $10, a bar, the refill date, and per-maker totals with their number of makes.
-- **Add coins or reset:** pick add or reset, the coins (for add), and a reason (required, shown to the kids in A2). A confirm shows the dollar amount. Warn when this month's total would pass the workspace limit ($13).
+- **Add coins or reset:** pick add or reset, the coins (for add), and a reason (required, shown to the kids in A2). A confirm shows the dollar amount. Warn when this month's total would pass the workspace limit ($15, D211).
 - History: the ledger, with real cost, outcome and pot after. Rules, read-only: the numbers in §2.
 - Through the Manager API (§9.4), paired as today. Nothing here is at the cabinet.
 
@@ -118,7 +118,7 @@ Each board id is on the canvas. "Today" names the existing screen in `screens.js
 - **The Studio brief (agent):** the plan the agent shows must lead with the idea, the controls, and the four most important rules, and mark which rules the kid will check (D201). You-check rules are at most two per play and must be visible in one play, with nothing about sound for now (D207). Apply it like D190 and D200 (the director's call, after a dry run).
 - **makeCart and the service:** the coin check gate (D203), the charge at the end (D202), ledger entries, the live coin count (if feasible), and the version and branch rules for changes (D206; `studio fork` isn't built yet, D183).
 - **D187's tile wording** changes to "Claude is waiting for <name>" (D201).
-- **Geoff, once:** raise the cabinet workspace's limit to $13 in the Claude Console (D204).
+- **Geoff, once:** raise the cabinet workspace's limit to $15 in the Claude Console (D204, D211).
 
 ## 5. Done when
 

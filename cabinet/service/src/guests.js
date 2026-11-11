@@ -3,7 +3,7 @@
 // On the service's own port (the launcher's origin):
 //   GET  /api/guests        the guest list, with plays from the logs
 //   POST /api/guest-plays   a finished play, logged to logs/guest_play.jsonl
-// On the guest port (127.0.0.1:8331 on the cabinet; its own origin, D232):
+// On the guest port (127.0.0.1:8340 by default; its own origin, D232):
 //   GET  /<id>/<file>       the guest's play/ folder; its HTML pages get the escape script first
 //   GET  /__cabinet/escape.js
 //

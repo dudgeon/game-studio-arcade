@@ -1,0 +1,29 @@
+# L3: a make that costs more than the pot holds finishes anyway, and the pot goes negative.
+#seed seeds/pot-7.json
+#! --replay-cost 140
+wait S1
+
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a penguin catching fish
+hold a 300
+wait M6
+press a
+wait question
+press down
+press down
+press down
+press a
+wait plan
+press a
+
+wait L3
+shot L3-went-over-the-pot
+press down
+press a
+wait S1
+shot S1-pot-below-zero

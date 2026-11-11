@@ -1,0 +1,10 @@
+# B4: the first visit after the 1st, with last month's per-maker totals.
+#seed seeds/new-month.json
+wait B4
+shot B4-pot-is-full
+press a
+wait S1
+shot S1-after-new-month
+press coin
+wait A1
+shot A1-a-fresh-month

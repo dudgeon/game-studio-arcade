@@ -1,0 +1,25 @@
+{
+  "makers": [
+    "Owen",
+    "Alina"
+  ],
+  "state": "new-month",
+  "ledger": [
+    {
+      "kind": "refill",
+      "last_month": true
+    },
+    {
+      "kind": "charge",
+      "who": "owen",
+      "cost_cents": 640,
+      "last_month": true
+    },
+    {
+      "kind": "charge",
+      "who": "alina",
+      "cost_cents": 412,
+      "last_month": true
+    }
+  ]
+}

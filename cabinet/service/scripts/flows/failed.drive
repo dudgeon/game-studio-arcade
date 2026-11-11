@@ -1,0 +1,35 @@
+# E3: a make that didn't come out right: Claude's slip, the idea kept, the cost shown.
+# Try again goes back to the coin check with the idea filled in.
+#seed seeds/family.json
+#! --replay-fail
+wait S1
+
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a penguin catching fish
+hold a 300
+wait M6
+press a
+wait question
+press down
+press down
+press down
+press a
+wait plan
+press a
+
+wait E3
+shot E3-make-failed
+press a
+wait M3
+shot M3-try-again
+press coin
+wait M6
+shot M6-same-idea
+press esc
+wait S1
+shot S1-after-a-failed-make

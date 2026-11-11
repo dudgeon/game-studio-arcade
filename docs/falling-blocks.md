@@ -102,7 +102,7 @@ Geoff picked teti, cleaned up. Decisions D230–D233. It was built and tested lo
   - `NOTICE.md` lists every file's origin and licence.
 - **Guest games in the service and launcher**
   - The code is in its own files (`src/guests.js`, `launcher/guests.js`), with one hook in `server.js` and three in `app.js`.
-  - **This changes the plan in §1 and §6:** guests play on their **own origin** (`127.0.0.1:8331`), not the launcher's. A downloaded game can't call the cabinet's APIs, and Escape still works: the service puts a small script first in the guest's page, and it hands Escape to the launcher (D232).
+  - **This changes the plan in §1 and §6:** guests play on their **own origin** (`127.0.0.1:8340` by default, `guest_port` in the cabinet config), not the launcher's. A downloaded game can't call the cabinet's APIs, and Escape still works: the service puts a small script first in the guest's page, and it hands Escape to the launcher (D232).
   - Plays go to `logs/guest_play.jsonl`.
 - **Tests:** `test/guests.test.js` and `test/guests.browser.test.js`. The service suite passes: 73 of 73. The virtual-cabinet script tests pass too: 29 of 29.
 

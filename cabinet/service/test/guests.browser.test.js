@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { openBrowser, startServiceProcess } from "../scripts/drive.js";
+import { openBrowser, plantSeed, startServiceProcess } from "../scripts/drive.js";
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures/penguin-catch");
 
@@ -39,6 +39,7 @@ async function press(page, key) {
 
 test("teti: on the shelf, played with the stick and buttons, Escape back to the shelf, play logged", { skip: skip || false, timeout: 120_000 }, async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guest-flow-"));
+  plantSeed(data, { state: "seen" }); // past the first-ever boot's screens (B2, B3)
   const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10 }));
   const { browser, page, problems } = await openBrowser(service.url);
   const launcher = (/** @type {string} */ f) => page.evaluate((/** @type {string} */ f) => /** @type {any} */ (window).launcher[f](), f);
@@ -48,7 +49,23 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
     const titles = () => page.evaluate(() => /** @type {any} */ (window).launcher.boxes().filter((/** @type {any} */ b) => /^shelf-title-/.test(b.id)).map((/** @type {any} */ b) => b.lines.map((/** @type {any} */ l) => l.text).join(" ")));
     await until(page, async () => (await titles()).some((/** @type {string} */ t) => /teti/.test(t)), "teti on the shelf");
 
-    await press(page, "ArrowDown");
+    // teti's row: "by TitanPlayz100" and a "free game" tag; the stick moves down to it.
+    const boxText = (/** @type {RegExp} */ id) => page.evaluate((/** @type {string} */ src) => /** @type {any} */ (window).launcher.boxes().filter((/** @type {any} */ b) => new RegExp(src).test(b.id)).map((/** @type {any} */ b) => b.lines.map((/** @type {any} */ l) => l.text).join(" ")), id.source);
+    assert.ok((await boxText(/^shelf-by-/)).some((/** @type {string} */ t) => /by TitanPlayz100/.test(t)));
+    assert.ok((await boxText(/^shelf-tag-/)).some((/** @type {string} */ t) => /free game/.test(t)));
+    for (let i = 0; i < 10; i++) {
+      const sel = await launcher("sel");
+      const lit = await page.evaluate((/** @type {number} */ n) => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === `shelf-title-${n}`), sel);
+      if (lit && /teti/.test(lit.lines.map((/** @type {any} */ l) => l.text).join(" "))) break;
+      await press(page, "ArrowDown");
+    }
+    await press(page, "ArrowRight");
+    assert.equal(await launcher("screen"), "shelf", "a guest has no card (no versions)");
+
+    // G0 from guest.json, then the game.
+    await press(page, "z");
+    await until(page, async () => (await launcher("board")) === "G0", "how to play (G0)");
+    assert.ok((await boxText(/^howto-goal/)).some((/** @type {string} */ t) => /rows/.test(t)), "the goal from guest.json");
     await press(page, "z");
     await until(page, async () => (await launcher("screen")) === "play", "play");
     const frame = async () => page.frames().find((/** @type {any} */ f) => f.url().includes("/teti/"));
@@ -68,10 +85,16 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
     await press(page, "Enter");
     assert.equal((await state()).kind, "pause", "START pauses");
 
-    // Escape: never the game's; back to the shelf, with the play logged.
+    // Escape: never the game's. The guest post-game: Play again or Back to the shelf, no coins.
     await press(page, "Escape");
-    await until(page, async () => (await launcher("screen")) === "shelf", "back to the shelf");
+    await until(page, async () => (await launcher("board")) === "G6", "the guest post-game board");
     assert.equal(await frame(), undefined, "the game is gone");
+    const tiles = (await boxText(/tile/)).join(" | ");
+    assert.match(tiles, /Play again/);
+    assert.match(tiles, /Back to the shelf/);
+    assert.doesNotMatch(tiles, /[Cc]hange|coin/, "nothing to change, nothing to spend");
+    await press(page, "z"); // "Back to the shelf" is lit
+    await until(page, async () => (await launcher("screen")) === "shelf", "back to the shelf");
     const logFile = path.join(data, "logs", "guest_play.jsonl");
     await until(page, async () => fs.existsSync(logFile), "the play log");
     const [play] = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));

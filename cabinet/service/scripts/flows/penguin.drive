@@ -1,4 +1,5 @@
 # The whole Studio flow against the recorded Penguin Catch session (D186).
+#seed seeds/seen.json
 wait shelf
 shot shelf-first-time
 press a
@@ -9,6 +10,12 @@ wait say typing
 type alina
 shot new-name-typing
 press enter
+wait say confirm
+shot new-name-confirm
+press a
+wait M3
+shot coin-check
+press coin
 wait say idle
 shot tell-me
 say I want a game where a penguin catches fish that fall from the sky, and if you miss three fish you lose, and sometimes a boot falls and you should NOT catch the boot
@@ -54,8 +61,11 @@ wait progress
 shot progress-early
 sleep 3000
 shot progress-later
-wait result
+wait M11
 shot your-game-is-ready
+press a
+wait G0
+shot how-to-play
 press a
 wait play
 sleep 1500
@@ -70,7 +80,9 @@ shot you-check-1
 press a
 press down
 press a
-shot you-check-3
+wait G3
+shot post-game-fix-it
+press down
 press down
 press down
 press a
