@@ -97,6 +97,8 @@ function boardsWith(s) {
     "R4 with a fix": whatToChange({ noRule: { text: s }, makerName: s }),
     "R4": whatToChange({ makerName: s }),
     "M9": plan,
+    "M9 re-shown mid-build": { ...plan, changes: [{ id: "R2", text: s }], rightCoin: true, right: "12 used" },
+    "M7 with coins used": { screen: "question", question: s, option_a: s, option_b: s, maker: "123 used", makerCoin: true, sel: 0 },
     "M9 without the new fields": { ...plan, controls: undefined, top_rules: undefined, cartControls: [s] },
     "R6": { ...plan, mode: "change", parentVersion: 12, changes: [{ id: "R2", text: s }] },
     "R6 from changes only": { ...plan, mode: "change", rules: rules.map(({ was, ...r }) => r), changes: [{ id: "R2", text: s }] },

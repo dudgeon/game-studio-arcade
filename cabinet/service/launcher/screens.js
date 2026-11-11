@@ -265,6 +265,13 @@ function say(p, v) {
 /** @param {Painter} p @param {any} v */
 function question(p, v) {
   p.header("Claude asks", v.maker);
+  // The coins used so far, with a coin before them (M7).
+  if (v.makerCoin && v.maker) {
+    const rightW = Math.min(14, clean(v.maker).length) * ADVANCE;
+    const x = W - M - rightW - 8;
+    p.fb.circfill(x + 3, 6, 3, C.yellow);
+    p.fb.circ(x + 3, 6, 3, C.orange);
+  }
   const words = questionWords(v);
   // Double size when it fits: most questions are short, and easier to read big.
   const big = wrap(words.question, colsFor(Math.floor(INNER / 2))).length <= BIG_ROWS;

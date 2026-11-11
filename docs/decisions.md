@@ -907,3 +907,16 @@ Geoff, 2026-11-10: "please have a worker build claude design artifacts to show m
 **D213. The boards are driven on the virtual cabinet beside the kiosk, not in it.** *(Claude; the director agreed the plan, 2026-11-11.)*
 - The virtual cabinet is live (D154), and a replay's carts, sessions and logs mustn't be in its data (D150). So `cabinet/vm/replay-boards.sh` runs a second cabinet service from the installed release on port 8341 (8331 is the guest games' port on the tetris-like branch, its D232), with its data in `/tmp/arcade-replay/<flow>`, and the cabinet's own Chromium headless beside it. The mini drives that Chromium over an SSH tunnel (Playwright's `connectOverCDP`), so the drive scripts, the board ids and the fit report are the same as on the mini. The kiosk on 8330 and `/var/lib/arcade` are untouched, and both are stopped at the end whatever happens.
 - The cabinet has no Playwright package, only `/usr/bin/chromium`; this needs nothing installed there.
+
+## 2026-11-11 — The first live make and change through the new screens
+
+Director's go: one new game and one change by "Tester", $3 at most. Screens are in `~/game-studio-data/vm/verify/arcade-ux-2026-11-11/live/`.
+
+**D214. A change's parent upload is an input, never an output; the mock API now behaves like the real one.** *(Claude; from the live change.)*
+- **The new game** (Log Hopper, `sesn_01FThJ8JHr5FVrhSTtrkCnqa`) cost 54c: 2 questions (A, then Make it now) and 1 fix round. The ledger charged 54c / 5 coins, the pot went from 1000 to 946c, and the result screen said so. The new brief led the plan with four rules, two "you check", and the play after asked exactly those two.
+- **The change** (Tester's v2, `sesn_01AGtT9A5sdoUx5QYdSDBqxA`) built, validated and passed its playtest in the sandbox, at 9c with one question. Then the cabinet failed to bring it home. The API lists files mounted into a session among its files, and refuses to download an uploaded one (`400 file_not_downloadable`). `INPUT_NAMES` skipped only `studio-kit.tgz`, so `parent.tgz` was taken for an output. The kid saw E3 and was charged 9c (D202: no refunds), as designed.
+- **Fix:** `parent.tgz` is an input name. The mock API now lists every uploaded file and refuses to download it, as the real API does, so the change tests failed without the fix and pass with it.
+- **Two screen fixes from the same run:**
+  - The header's coins-used read "Tester: 0..." cut; it's now "N used" with a coin.
+  - A new game's plan re-shown mid-build (a rule change after testing, brief step 7) now says what changed first, and leaves out how to play, which the first plan showed.
+- **usual_cost_change:** the one measured change cost 9c (about 1 coin), a one-number change with one question. The proposal is 2, pending the director and more samples. It stays a setting (config `pot.usual_cost_change`); the code's default is still 3.

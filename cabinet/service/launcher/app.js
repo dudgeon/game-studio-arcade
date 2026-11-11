@@ -274,12 +274,12 @@ function followStudio() {
   const p = studio.pending && !answered.has(studio.pending.id) ? studio.pending : null;
   // The coins used so far, in the header (M7, M9).
   const usedCoins = Math.round((studio.used_cents ?? 0) / 10);
-  const right = `${studio.maker_name ?? ""}: ${usedCoins} coin${usedCoins === 1 ? "" : "s"}`;
+  const right = `${usedCoins} used`; // with a coin before it; the maker is on the screens before
   if (p) {
     if (view.pendingId === p.id) return;
     const change = studio.kind === "change";
-    if (p.kind === "question") show({ screen: "question", board: change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, sel: 0 });
-    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, usual: usual(), parentVersion: studio.parent?.version, cartControls: [], flowed: planLines(p), sel: 0 });
+    if (p.kind === "question") show({ screen: "question", board: change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, makerCoin: true, sel: 0 });
+    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, rightCoin: true, usual: usual(), parentVersion: studio.parent?.version, cartControls: [], flowed: planLines(p), sel: 0 });
     return;
   }
   if (studio.phase === "running") {

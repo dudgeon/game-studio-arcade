@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 export const EXPECTED = ["report.json", "cart.tgz"];
 export const MARKER = "DONE.json";
 /** Session inputs also show up in files.list({scope_id}) (D19); never treat them as outputs. */
-export const INPUT_NAMES = ["studio-kit.tgz"];
+export const INPUT_NAMES = ["studio-kit.tgz", "parent.tgz"]; // parent.tgz: a change's parent game (D209); the API refuses to download it
 
 /**
  * @param {{api: import("./api.js").StudioApi, sessionId: string, dir: string,

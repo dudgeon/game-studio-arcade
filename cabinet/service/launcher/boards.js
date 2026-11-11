@@ -422,8 +422,11 @@ function plan(p, v) {
     blocks.push({ text: `Version ${v.parentVersion ?? 1} stays saved.`, color: C.mint, rows: 1, onCut: "never" });
   } else {
     blocks.push({ text: v.summary, rows: 2, after: 3 });
+    // Re-shown mid-build because a rule had to change (the brief's step 7): what changed comes first.
+    if (v.changes?.length) blocks.push({ text: "What changed", color: C.yellow, rows: 1, after: 1 }, { text: clean(v.changes[0].text), color: C.peach, rows: 2 });
     const controls = v.controls || (v.cartControls ?? []).map(controlWords).join(" ");
-    if (controls) blocks.push({ text: "How to play", color: C.yellow, rows: 1, after: 1 }, { text: controls, color: C.ice, rows: 2 });
+    // A plan re-shown mid-build leaves out how to play: the kid saw it on the first one.
+    if (controls && !v.changes?.length) blocks.push({ text: "How to play", color: C.yellow, rows: 1, after: 1 }, { text: controls, color: C.ice, rows: 2 });
     blocks.push({ text: "What happens", color: C.yellow, rows: 1, after: 1 });
     topRules(v).forEach((/** @type {any} */ r, /** @type {number} */ i) => blocks.push({ text: `${i + 1} ${clean(r.text)}`, rows: 2, after: 1, color: i % 2 ? C.white : C.ice, tag: r.kind === "you-check" ? "you check" : undefined }));
     const more = (v.rules ?? []).length - topRules(v).length;
