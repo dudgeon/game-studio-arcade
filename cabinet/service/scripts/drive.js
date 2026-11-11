@@ -77,7 +77,11 @@ export async function openBrowser(url, cdp) {
   const problems = [];
   page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
   page.on("console", (m) => {
-    if (m.type() === "error" && !/favicon/.test(m.text())) problems.push(`console error: ${m.text()}`);
+    // A failed load is reported below with its URL; the console's copy doesn't name it.
+    if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) problems.push(`console error: ${m.text()}`);
+  });
+  page.on("response", (/** @type {any} */ r) => {
+    if (r.status() >= 400 && !/favicon\.ico$/.test(r.url())) problems.push(`HTTP ${r.status()}: ${r.url()}`);
   });
   await page.goto(url);
   await page.waitForFunction(() => /** @type {any} */ (window).launcher);

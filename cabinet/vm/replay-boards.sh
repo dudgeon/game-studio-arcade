@@ -1,6 +1,6 @@
 #!/bin/bash
 # Drives the arcade's boards on the virtual cabinet itself, against a replay (D186, D213):
-# the cabinet's own service, its own launcher files and its own Chromium, on port 8331
+# the cabinet's own service, its own launcher files and its own Chromium, on port 8341
 # with a data folder in /tmp, so nothing touches /var/lib/arcade or the kiosk on 8330.
 # The mini drives it over an SSH tunnel to Chromium's DevTools port; screenshots land here.
 #
@@ -30,26 +30,28 @@ start_service() {
   local flow="$1" args seed
   args="$(grep '^#!' "$REPO/cabinet/service/scripts/flows/$flow.drive" | sed 's/^#!//' | tr '\n' ' ')"
   seed="$(grep '^#seed ' "$REPO/cabinet/service/scripts/flows/$flow.drive" | sed 's/^#seed //')"
-  on "pkill -f 'cabinet-service.js --port 8331' ; sleep 0.3; rm -rf /tmp/arcade-replay/$flow; mkdir -p /tmp/arcade-replay/$flow"
+  on "pkill -f 'cabinet-service.js --port 834[1]' ; sleep 0.3; rm -rf /tmp/arcade-replay/$flow; mkdir -p /tmp/arcade-replay/$flow"
   if [ -n "$seed" ]; then
     on "cd $APP/cabinet/service && node -e 'const fs=require(\"fs\");import(\"./scripts/drive.js\").then(m=>m.plantSeed(\"/tmp/arcade-replay/$flow\", JSON.parse(fs.readFileSync(0,\"utf8\"))))'" < "$REPO/cabinet/service/scripts/flows/$seed"
   fi
   # The restart command for `restart` steps: the same service, the same data, after DOWN_MS.
   on "cat > /tmp/arcade-replay/$flow.run" <<EOF
 #!/bin/bash
-cd $APP && exec node cabinet/service/bin/cabinet-service.js --port 8331 --data /tmp/arcade-replay/$flow --replay $FIX --pace 20 --manager-token drive-manager-token $args
+cd $APP && exec node cabinet/service/bin/cabinet-service.js --port 8341 --data /tmp/arcade-replay/$flow --replay $FIX --pace 20 --manager-token drive-manager-token $args
 EOF
   on "chmod +x /tmp/arcade-replay/$flow.run; nohup /tmp/arcade-replay/$flow.run > /tmp/arcade-replay/$flow.log 2>&1 < /dev/null & for i in \$(seq 1 50); do grep -q 'cabinet service on' /tmp/arcade-replay/$flow.log && exit 0; sleep 0.2; done; cat /tmp/arcade-replay/$flow.log; exit 1"
 }
 
 cleanup() {
   [ -n "${TUNNEL:-}" ] && kill "$TUNNEL" 2>/dev/null
-  on "pkill -f 'cabinet-service.js --port 8331'; pkill -f 'remote-debugging-port=9222'; true" >/dev/null 2>&1
+  on "pkill -f 'cabinet-service.js --port 834[1]'; pkill -f 'user-data-dir=/tmp/arcade-replay-chrom[e]'; true" >/dev/null 2>&1
 }
 trap cleanup EXIT
 
-on "pkill -f 'remote-debugging-port=9222'; rm -rf /tmp/arcade-replay-chrome; nohup chromium --headless=new --no-first-run --remote-debugging-port=9222 --user-data-dir=/tmp/arcade-replay-chrome --window-size=1024,768 about:blank > /tmp/arcade-replay-chrome.log 2>&1 < /dev/null & sleep 2; curl -s http://127.0.0.1:9222/json/version | head -3" || { echo "no Chromium on the cabinet"; exit 1; }
-ssh "${SSHO[@]}" -N -L 8331:127.0.0.1:8331 -L 9222:127.0.0.1:9222 "cabinet@$HOST" &
+# Kill a leftover first, in its own call: a command line naming the folder would match its own shell.
+on "pkill -f 'user-data-dir=/tmp/arcade-replay-chrom[e]'; true"
+on "rm -rf /tmp/arcade-replay-chrome; nohup chromium --headless=new --no-first-run --remote-debugging-port=9341 --user-data-dir=/tmp/arcade-replay-chrome --window-size=1024,768 about:blank > /tmp/arcade-replay-chrome.log 2>&1 < /dev/null & for i in \$(seq 1 40); do curl -sf http://127.0.0.1:9341/json/version >/dev/null && exit 0; sleep 0.5; done; exit 1" || { echo "no Chromium on the cabinet"; exit 1; }
+ssh "${SSHO[@]}" -N -L 8341:127.0.0.1:8341 -L 9341:127.0.0.1:9341 "cabinet@$HOST" &
 TUNNEL=$!
 sleep 2
 
@@ -57,10 +59,10 @@ mkdir -p "$OUT"
 status=0
 for flow in "${FLOWS[@]}"; do
   if ! start_service "$flow"; then echo "FAIL $flow: the service didn't start"; status=1; continue; fi
-  restart="perl -e 'alarm shift; exec @ARGV' 120 ssh ${SSHO[*]} cabinet@$HOST \"pkill -9 -f 'cabinet-service.js --port 8331'; sleep \\\$((\$DOWN_MS / 1000)); nohup /tmp/arcade-replay/$flow.run >> /tmp/arcade-replay/$flow.log 2>&1 < /dev/null & sleep 2\""
+  restart="perl -e 'alarm shift; exec @ARGV' 120 ssh ${SSHO[*]} cabinet@$HOST \"pkill -9 -f 'cabinet-service.js --port 834[1]'; sleep \\\$((\$DOWN_MS / 1000)); nohup /tmp/arcade-replay/$flow.run >> /tmp/arcade-replay/$flow.log 2>&1 < /dev/null & sleep 2\""
   rm -rf "$OUT/$flow"
   if GSA_MANAGER_TOKEN=drive-manager-token node "$REPO/cabinet/service/scripts/drive.js" --script "$REPO/cabinet/service/scripts/flows/$flow.drive" --out "$OUT/$flow" \
-      --url http://127.0.0.1:8331 --cdp http://127.0.0.1:9222 --restart-cmd "$restart" > "$OUT/$flow.log" 2>&1; then
+      --url http://127.0.0.1:8341 --cdp http://127.0.0.1:9341 --restart-cmd "$restart" > "$OUT/$flow.log" 2>&1; then
     echo "PASS $flow ($(grep -o 'Boards: .*' "$OUT/$flow.log" | cut -c9-))"
   else
     echo "FAIL $flow: $(tail -1 "$OUT/$flow.log")"
