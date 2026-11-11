@@ -5,6 +5,8 @@
 //   node service-config.mjs key       print the installed key to stdout (for --reapply, over SSH)
 //   node service-config.mjs install   read {anthropic_api_key, agent_id, agent_version, environment_id}
 //                                     from stdin, write service.json owned by arcade, mode 0600, go live
+//   node service-config.mjs groq      read {groq_api_key} from stdin into service.json: Groq first (D263).
+//                                     An empty key turns Groq off; Moonshine carries on alone.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -64,6 +66,32 @@ if (cmd === "check") {
   }
   const before = fs.existsSync(CONFIG) ? JSON.parse(fs.readFileSync(CONFIG, "utf8")) : {};
   const config = { ...DEFAULTS, ...before, ...input };
+  writeConfig(config);
+  fs.writeFileSync(ENV_FILE, `ARCADE_SERVICE_ARGS=--config ${CONFIG}\n`);
+  if (!process.env.ARCADE_NO_RESTART) execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
+  const mode = (fs.statSync(CONFIG).mode & 0o777).toString(8);
+  console.log(`service.json written, mode ${mode}; agent ${config.agent_id} version ${config.agent_version ?? "?"}; budget ${config.budget_cents} cents a make`);
+} else if (cmd === "groq") {
+  if (!fs.existsSync(CONFIG)) fail("This cabinet has no config yet. Connect it first: scripts/virtual-cabinet/connect-cabinet.sh");
+  let input;
+  try {
+    input = JSON.parse(fs.readFileSync(0, "utf8"));
+  } catch {
+    fail("The input on stdin wasn't JSON."); // never quote it: it holds the key
+  }
+  if (typeof input.groq_api_key !== "string") fail("The input on stdin has no groq_api_key.");
+  const config = JSON.parse(fs.readFileSync(CONFIG, "utf8"));
+  if (input.groq_api_key) config.groq_api_key = input.groq_api_key;
+  else delete config.groq_api_key;
+  writeConfig(config);
+  if (!process.env.ARCADE_NO_RESTART) execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
+  console.log(input.groq_api_key ? "Groq is on: it transcribes first, and Moonshine answers when it can't." : "Groq is off: Moonshine transcribes on the cabinet.");
+} else {
+  fail("usage: service-config.mjs check | key | install | groq", 2);
+}
+
+/** service.json, owned by arcade, mode 0600, replaced in one step. @param {any} config */
+function writeConfig(config) {
   const { uid, gid } = fs.statSync(path.join(DATA, "carts"));
   const temp = `${CONFIG}.new`;
   fs.rmSync(temp, { force: true });
@@ -73,10 +101,4 @@ if (cmd === "check") {
   fs.fsyncSync(fd);
   fs.closeSync(fd);
   fs.renameSync(temp, CONFIG);
-  fs.writeFileSync(ENV_FILE, `ARCADE_SERVICE_ARGS=--config ${CONFIG}\n`);
-  if (!process.env.ARCADE_NO_RESTART) execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
-  const mode = (fs.statSync(CONFIG).mode & 0o777).toString(8);
-  console.log(`service.json written, mode ${mode}; agent ${config.agent_id} version ${config.agent_version ?? "?"}; budget ${config.budget_cents} cents a make`);
-} else {
-  fail("usage: service-config.mjs check | key | install", 2);
 }
