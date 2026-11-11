@@ -10,6 +10,7 @@ import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
+import { createGuests, startGuestServer } from "../src/guests.js";
 
 const { values } = parseArgs({
   options: {
@@ -21,6 +22,9 @@ const { values } = parseArgs({
     pace: { type: "string", default: "150" },
     "question-timeout": { type: "string" },
     examples: { type: "boolean", default: false },
+    // Guest games (D230-D232): their own port, and the folders they live in.
+    "guest-port": { type: "string", default: "8331" },
+    guests: { type: "string", multiple: true },
   },
 });
 
@@ -91,7 +95,14 @@ const studio = createStudio({
   },
 });
 
+// The guests that ship in the repo (D231), then any in the data folder.
+const guestDirs = values.guests ?? [path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../guests"), path.join(paths.root, "guests")];
+const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs });
+const guestServer = await startGuestServer(guests, { port: Number(values["guest-port"]), host: values.host });
+guests.port = guestServer.port;
+
 const s = await startService({
+  guests,
   studio,
   makers,
   speech,
@@ -104,8 +115,9 @@ const s = await startService({
   host: values.host,
 });
 console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
+console.log(`guest games on ${guestServer.url}: ${guests.list("").map((g) => g.id).join(", ") || "none"}`);
 console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : `Managed Agents, with the key in ${values.config} (D131)`);
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
 studio.collectLeft();
 
-for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => s.close().then(() => process.exit(0)));
+for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => Promise.all([s.close(), guestServer.close()]).then(() => process.exit(0)));

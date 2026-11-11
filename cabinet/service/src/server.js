@@ -16,6 +16,7 @@
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
 //   POST /api/speech/feed        {text} or {wav}: the stub only
+//   GET  /api/guests, POST /api/guest-plays  guest games (D230-D232, src/guests.js)
 //   everything else              createPlayerHandler (/api/carts, /api/plays, /api/you-check, /runtime/…, /carts/…)
 import fs from "node:fs";
 import http from "node:http";
@@ -66,6 +67,7 @@ function readJson(req) {
  *   speech: import("./speech.js").Speech,
  *   libraryDir: string, logsDir: string,
  *   players?: number, consoleName?: string, examples?: boolean,
+ *   guests?: ReturnType<typeof import("./guests.js").createGuests>,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -171,6 +173,7 @@ export function createServiceHandler(o) {
     if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) return sendFile(res, path.join(LAUNCHER, "index.html"));
     const m = /^\/launcher\/([A-Za-z0-9_-]+\.(?:js|css|html))$/.exec(pathname);
     if (req.method === "GET" && m) return sendFile(res, path.join(LAUNCHER, m[1]));
+    if (o.guests?.api(req, res, pathname)) return;
     if (!OURS.has(pathname)) return player(req, res);
     if (req.method === "GET") {
       if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind });

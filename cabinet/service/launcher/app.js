@@ -3,6 +3,7 @@
 // service. Drawing and fitting are in screens.js and text.js. Keys are D82's, so
 // the Picade, the virtual cabinet's keyboard and a script all drive it the same way.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
+import { createGuestHost, fetchGuests } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { H, W, check } from "./text.js";
 import { CHECK_TILES, LEAVE_TILES, Painter, draw, flow, planLines, questionText } from "./screens.js";
@@ -76,11 +77,12 @@ async function showShelf() {
   let carts = [];
   try {
     carts = (await get("/api/carts")).carts;
+    carts = [...carts, ...(await fetchGuests())]; // guest games after the carts (D230)
     const makers = (await get("/api/makers")).makers;
     const nameOf = (/** @type {string} */ id) => makers.find((/** @type {any} */ m) => m.id === id)?.name ?? id;
     // Make, then how makes ended until someone has seen (D192), then the games.
     const ended = (studio.results ?? []).map((/** @type {any} */ r) => ({ kind: "result", result: r, title: r.ok ? "New game ready!" : "A new game didn't finish", by: r.maker_name ?? r.maker, note: r.ok ? r.title : undefined, urgent: true }));
-    const items = [makeTile(), ...ended, ...carts.map((/** @type {any} */ c) => ({ kind: "cart", cart: c, title: c.title, by: c.maker ? nameOf(c.maker) : undefined, note: toCheck(c) }))];
+    const items = [makeTile(), ...ended, ...carts.map((/** @type {any} */ c) => ({ kind: "cart", cart: c, title: c.title, by: c.maker ? nameOf(c.maker) : (c.by ?? undefined), note: toCheck(c) }))];
     // The highlight stays on what it was on, whatever arrives above it.
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : "tile");
     const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
@@ -218,7 +220,7 @@ function startPlay(cart) {
   stage.hidden = false;
   canvas.hidden = true;
   const startedAt = new Date().toISOString();
-  const host = createHost({
+  const host = (cart.guest ? createGuestHost : createHost)({
     container: stage,
     cartUrl: cart.url,
     players: config.players,
@@ -248,7 +250,8 @@ async function endPlay(ended) {
   stage.hidden = true;
   stage.replaceChildren();
   canvas.hidden = false;
-  post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors }).catch(() => {});
+  if (p.cart.guest) post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors }).catch(() => {});
+  else post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors }).catch(() => {});
   if (p.failed) {
     show({ screen: "result", ok: false, message: `"${p.cart.title}" wouldn't start. It's saved, and a grown-up can look at it.`, tiles: ["Back to the shelf"], sel: 0, afterPlay: true });
     return;

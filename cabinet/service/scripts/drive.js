@@ -45,7 +45,7 @@ const keyOf = (name) => {
  */
 export function startServiceProcess(o) {
   const bin = path.join(HERE, "../bin/cabinet-service.js");
-  const child = spawn(process.execPath, [bin, "--port", String(o.port ?? 0), "--data", o.data, "--replay", o.replay, "--pace", String(o.pace ?? 150), ...(o.questionTimeout ? ["--question-timeout", String(o.questionTimeout)] : [])], { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, [bin, "--port", String(o.port ?? 0), "--guest-port", "0", "--data", o.data, "--replay", o.replay, "--pace", String(o.pace ?? 150), ...(o.questionTimeout ? ["--question-timeout", String(o.questionTimeout)] : [])], { stdio: ["ignore", "pipe", "pipe"] });
   let err = "";
   child.stderr.on("data", (d) => (err += d));
   return new Promise((resolve, reject) => {

@@ -1,0 +1,18 @@
+{
+  "id": "teti",
+  "title": "teti",
+  "by": "TitanPlayz100",
+  "version": "1.4.4-cabinet.1",
+  "kind": "web",
+  "entry": "index.html?cabinet",
+  "players": 1,
+  "upstream": {
+    "source": "https://github.com/TitanPlayz100/teti",
+    "commit": "1de7944ecee0a9e0420349f3da190a385f52a227",
+    "licence": "MIT"
+  },
+  "howToPlay": {
+    "goal": "Fill whole rows with falling blocks to clear them.",
+    "controls": ["Stick: move, down to drop faster", "Stick up: drop it all the way", "A or B: turn", "X: keep a block for later", "START: pause"]
+  }
+}

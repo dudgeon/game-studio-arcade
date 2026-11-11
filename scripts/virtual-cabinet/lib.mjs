@@ -5,7 +5,7 @@ import { basename, dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
 /** What goes to a cabinet, for a build's seed and for an update (D195). */
-export const BUNDLE_PATHS = ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest"];
+export const BUNDLE_PATHS = ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest", "guests"];
 
 const NO_MAC_FILES = { ...process.env, COPYFILE_DISABLE: "1" };
 // The same files make the same archive, byte for byte: no gzip timestamp, no owner names, plain ustar.

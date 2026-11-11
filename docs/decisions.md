@@ -864,3 +864,27 @@ Geoff, 2026-11-10: "please have a worker build claude design artifacts to show m
 
 **D207. At most two you-check questions after a play, about things you can see.** *(Geoff, answer 14, as a default rather than a question.)*
 - After a play of a made game, the cabinet asks at most two you-check questions, chosen from rules a kid can judge in one play. Sound isn't asked about while the cabinet has none to hear. The rest wait for later plays. The live make asked three, including one about holes that only appear later and one about sound.
+
+<!-- D208–D229 are reserved for the arcade UX build (director, 2026-11-11). -->
+
+**D230. Downloaded games reach the shelf as web games in the kiosk ("guest games").** *(Geoff asked for the stack to be chosen first and for games Claude can change cheaply, 2026-11-11; the choice is Claude's. Report: docs/falling-blocks.md.)*
+- One way in for every downloaded game: an HTML5 page played in the kiosk's Chromium. TIC-80 and PICO-8 carts come in through their web players or exports. Native players (RetroArch, LÖVE, PICO-8 native) come later, and only for a must-have game with no web build. This settles "guest players" in §3.1 and D183's "Stubbed or not here" for web games.
+- Why: nothing new takes over the screen; Escape, logging and the kiosk lockdown are solved once; and the Studio's Playwright tools can drive and check a guest game the way they check a cart.
+- Games are judged by hackability tier: **A**, edit and reload (plain JS, fantasy-console carts); **B**, edit and rebuild (C/C++ to WebAssembly); **C**, binary only (not picked). Tier A is preferred where the game is good enough.
+- A downloaded game costs no coins to play (playing is always free, D202).
+
+**D231. A guest game is a folder, like a cart.** *(Claude; follows D230.)*
+- `guest.json` (id, title, by, version, upstream source and commit, entry page, how to play, players), `play/` (exactly what is served), `NOTICE.md` (every file's origin and licence, and whether it uses the Tetris name or look), the upstream licence, and any tools that make its assets.
+- Guests that ship with the cabinet live in the repo's `guests/` and update with the service; nothing in a guest's folder is ever deleted, and a new version is a new `version` in `guest.json` with the old one in git. A licence that isn't checked is a reason not to ship the file.
+
+**D232. Guest games play on their own origin, and Escape still goes back to the shelf.** *(Claude; follows D88, D230.)*
+- The service serves guests on a second port, `127.0.0.1:8331`, never the launcher's origin, so a downloaded game can't call the cabinet's APIs (cross-origin writes are refused) and keeps its own storage.
+- The launcher plays a guest in a full-screen iframe that has focus, so the game reads the keys itself. The service puts a small script at the top of the guest's page: it takes Escape before the game sees it and tells the launcher, which ends the play (D88). F1 and F2 stay launcher-only by convention; a guest never gets Escape.
+- Plays are logged like a cart's, to `logs/guest_play.jsonl` (guest id and version instead of a cart's).
+
+**D233. The first guest is teti, cleaned up for the cabinet.** *(Geoff's pick, 2026-11-11; the cleanup is Claude's.)*
+- teti (TitanPlayz100/teti, MIT, pinned to commit 1de7944), tier A: about 6.5k lines of plain JS, no build step.
+- Its sounds (TETR.IO's), music (commercial Touhou arrangements), skins and icons are replaced by assets this repo generates (`guests/teti/tools/make-assets.mjs`); pixi.js 8.23.0 (MIT) and GSAP 3.15.1 are vendored at pinned versions; fonts are OFL and local. Nothing loads from the network.
+- **GSAP isn't open source:** its Standard "No Charge" licence allows use and copying in a game but bars no-code animation tools. Fine for a game on the cabinet; replacing it is a cheap tier-A change if that ever matters.
+- Cabinet changes, all in plain JS: Marathon (a level every 10 lines, faster each level, to 20) and Zen (nothing falls on its own); a game picker, pause and game-over screens driven by stick and buttons (`src/cabinet.js`, loaded with `?cabinet`); the D82 keys (stick moves, up drops, A/B turn, X holds, Y turns twice, START pauses).
+- It keeps guideline-style piece colours; it has no Tetris name. That's acceptable for a downloaded game (D230); a kid's change to it may count as a Studio-made game, and that question is open.
