@@ -1,0 +1,1091 @@
+{
+ "id": "arcade-ux-2026-11",
+ "title": "The arcade, end to end",
+ "subtitle": "Decision walkthrough · 10 Nov 2026 · narrated by Duo's house voice",
+ "posterLine": "The whole cabinet experience in five short chapters, then five decisions. Tap play and listen; it stops when it needs you.",
+ "footer": "Built with the decision-walkthrough skill from docs/design/arcade-ux-walkthrough/spec.json in game-studio-arcade. Answers are saved in this page and sent to director-game-studio-arcade.",
+ "source": {
+  "label": "Arcade UX canvas (55 boards)",
+  "url": "https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA"
+ },
+ "director": "director-game-studio-arcade",
+ "sendPrefix": "Arcade UX walkthrough",
+ "voice": "house",
+ "styles": "scenes.css",
+ "out": "page",
+ "assets": {
+  "plan": "assets/live-plan.jpg"
+ },
+ "said": {
+  "Q11": "question eleven",
+  "Q13": "question thirteen",
+  "Q15": "question fifteen",
+  "Q16": "question sixteen",
+  "Q17": "question seventeen"
+ },
+ "chapters": [
+  {
+   "id": "why",
+   "title": "What you asked for",
+   "short": "Your ask",
+   "sceneFile": "scenes/why.html",
+   "lines": [
+    {
+     "text": "This is the arcade design, for the cabinet in the basement that makes its own games.",
+     "cues": [
+      {
+       "on": "cabinet",
+       "do": "focus",
+       "sel": "#why-cab, #why-cab-scr",
+       "soft": true
+      }
+     ]
+    },
+    {
+     "text": "You asked for three things. The whole experience, a screen after each game asking about changes, and a fun but honest limit on making.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "at": 0,
+       "do": "show",
+       "sel": "#why-lead"
+      },
+      {
+       "on": "whole experience",
+       "do": "show",
+       "sel": "#why-ask1"
+      },
+      {
+       "on": "after each game",
+       "do": "show",
+       "sel": "#why-ask2"
+      },
+      {
+       "on": "honest limit",
+       "do": "show",
+       "sel": "#why-ask3"
+      }
+     ]
+    },
+    {
+     "text": "It's all drawn on one canvas, fifty-five boards at the cabinet's real size. This walks you through the idea, then asks for five decisions.",
+     "cues": [
+      {
+       "on": "one canvas",
+       "do": "show",
+       "sel": "#why-canvas"
+      },
+      {
+       "on": "one canvas",
+       "do": "focus",
+       "sel": "#why-canvas"
+      },
+      {
+       "on": "five decisions",
+       "do": "show",
+       "sel": "#why-five"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "loop",
+   "title": "The loop the kids live in",
+   "short": "The loop",
+   "sceneFile": "scenes/loop.html",
+   "lines": [
+    {
+     "text": "Here's the loop the kids live in. It starts on the shelf.",
+     "cues": [
+      {
+       "on": "shelf",
+       "do": "show",
+       "sel": "#loop-shelf, #loop-n-shelf"
+      }
+     ]
+    },
+    {
+     "text": "They pick Make, say their idea, and answer Claude's questions with the joystick.",
+     "cues": [
+      {
+       "on": "pick Make",
+       "do": "show",
+       "sel": "#loop-a1"
+      },
+      {
+       "on": "say their idea",
+       "do": "show",
+       "sel": "#loop-make, #loop-n-make"
+      },
+      {
+       "on": "questions",
+       "do": "focus",
+       "sel": "#loop-make"
+      }
+     ]
+    },
+    {
+     "text": "A few minutes later the game is ready, and they play it.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "ready",
+       "do": "show",
+       "sel": "#loop-a2, #loop-play, #loop-n-play"
+      },
+      {
+       "on": "play it",
+       "do": "state",
+       "value": "move"
+      }
+     ]
+    },
+    {
+     "text": "When they press escape, the cabinet asks them to check a rule or two, then asks if they want to change anything.",
+     "cues": [
+      {
+       "on": "escape",
+       "do": "show",
+       "sel": "#loop-a3"
+      },
+      {
+       "on": "check",
+       "do": "show",
+       "sel": "#loop-check, #loop-n-check"
+      },
+      {
+       "on": "change anything",
+       "do": "show",
+       "sel": "#loop-a4, #loop-change, #loop-n-change"
+      },
+      {
+       "on": "change anything",
+       "do": "focus",
+       "sel": "#loop-check, #loop-change"
+      }
+     ]
+    },
+    {
+     "text": "A change makes a new version. Nothing is ever deleted.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "new version",
+       "do": "show",
+       "sel": "#loop-v2, #loop-a5"
+      },
+      {
+       "on": "new version",
+       "do": "focus",
+       "sel": "#loop-v2"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "live",
+   "title": "What today's live games taught us",
+   "short": "Live games",
+   "sceneFile": "scenes/live.html",
+   "lines": [
+    {
+     "text": "Two real games were made through these screens today, and they shaped the design.",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#live-cap"
+      }
+     ]
+    },
+    {
+     "text": "Each one cost about fifty-five cents and took six to eight minutes.",
+     "cues": [
+      {
+       "on": "fifty-five",
+       "do": "show",
+       "sel": "#live-cost"
+      },
+      {
+       "on": "six to eight",
+       "do": "show",
+       "sel": "#live-time"
+      }
+     ]
+    },
+    {
+     "text": "The plan ran to nineteen rules over six screens, so the new plan fits on one.",
+     "cues": [
+      {
+       "on": "nineteen",
+       "do": "show",
+       "sel": "#live-caplab"
+      },
+      {
+       "on": "nineteen",
+       "do": "focus",
+       "sel": "#live-cap"
+      },
+      {
+       "on": "fits on one",
+       "do": "show",
+       "sel": "#live-plannew"
+      },
+      {
+       "on": "fits on one",
+       "do": "focus",
+       "sel": "#live-plannew"
+      }
+     ]
+    },
+    {
+     "text": "Games now open with how to play, a typed idea waits for you to confirm it, and progress only moves forward.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "how to play",
+       "do": "show",
+       "sel": "#live-f1"
+      },
+      {
+       "on": "confirm",
+       "do": "show",
+       "sel": "#live-f2"
+      },
+      {
+       "on": "forward",
+       "do": "show",
+       "sel": "#live-f3"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pot",
+   "title": "Settled: the family coin pot",
+   "short": "Coin pot",
+   "sceneFile": "scenes/pot.html",
+   "lines": [
+    {
+     "text": "Then the coins. You've already settled most of this.",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#pot-jar"
+      }
+     ]
+    },
+    {
+     "text": "There's one family pot. A hundred coins, which is ten real dollars, filled on the first of each month.",
+     "cues": [
+      {
+       "on": "A hundred",
+       "do": "state",
+       "value": "full"
+      },
+      {
+       "on": "A hundred",
+       "do": "show",
+       "sel": "#pot-num"
+      },
+      {
+       "on": "ten real dollars",
+       "do": "show",
+       "sel": "#pot-lab100"
+      },
+      {
+       "on": "first",
+       "do": "show",
+       "sel": "#pot-cal"
+      }
+     ]
+    },
+    {
+     "text": "A make is charged what it really cost, about six coins, and everyone can see who used what.",
+     "cues": [
+      {
+       "on": "six coins",
+       "do": "state",
+       "value": "spend"
+      },
+      {
+       "on": "six coins",
+       "do": "text",
+       "sel": "#pot-num",
+       "value": "62 coins"
+      },
+      {
+       "on": "who used",
+       "do": "show",
+       "sel": "#pot-kids"
+      },
+      {
+       "on": "who used",
+       "do": "focus",
+       "sel": "#pot-kids"
+      }
+     ]
+    },
+    {
+     "text": "Spending starts only when a kid presses the coin button.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "coin button",
+       "do": "show",
+       "sel": "#pot-coinkey"
+      },
+      {
+       "on": "coin button",
+       "do": "tap",
+       "sel": "#pot-coinkey"
+      }
+     ]
+    },
+    {
+     "text": "A make that runs over still finishes. The pot goes negative until the first, and there are no refunds.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "cursor-off"
+      },
+      {
+       "on": "runs over",
+       "do": "state",
+       "value": "neg"
+      },
+      {
+       "on": "runs over",
+       "do": "text",
+       "sel": "#pot-num",
+       "value": "-2 coins"
+      },
+      {
+       "on": "runs over",
+       "do": "show",
+       "sel": "#pot-negbox"
+      },
+      {
+       "on": "until the first",
+       "do": "show",
+       "sel": "#pot-reset"
+      },
+      {
+       "on": "no refunds",
+       "do": "show",
+       "sel": "#pot-norefund"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "change",
+   "title": "Settled: changing games",
+   "short": "Changes",
+   "sceneFile": "scenes/change.html",
+   "lines": [
+    {
+     "text": "Changing games is settled too.",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#change-v1"
+      }
+     ]
+    },
+    {
+     "text": "Anyone can change any game. When Alina changes hers, it becomes the next version, and the old one is kept.",
+     "cues": [
+      {
+       "on": "next version",
+       "do": "show",
+       "sel": "#change-ar1, #change-v2"
+      },
+      {
+       "on": "next version",
+       "delay": 0.8,
+       "do": "show",
+       "sel": "#change-ar2, #change-v3"
+      },
+      {
+       "on": "kept",
+       "do": "show",
+       "sel": "#change-kept"
+      }
+     ]
+    },
+    {
+     "text": "When Owen changes it, he gets his own version, and Alina's stays the same.",
+     "cues": [
+      {
+       "on": "own version",
+       "do": "show",
+       "sel": "#change-line, #change-line2, #change-lava"
+      },
+      {
+       "on": "own version",
+       "do": "focus",
+       "sel": "#change-lava"
+      },
+      {
+       "on": "stays the same",
+       "do": "focus",
+       "sel": "#change-lava, #change-v3"
+      }
+     ]
+    },
+    {
+     "text": "The change screen shows after every game, starters too, with at most two quick checks first.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "change screen",
+       "do": "show",
+       "sel": "#change-post"
+      },
+      {
+       "on": "two quick checks",
+       "do": "show",
+       "sel": "#change-checks"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "q11-shelf",
+   "kind": "decision",
+   "q": "Q11",
+   "title": "How versions show on the shelf",
+   "short": "Shelf",
+   "ask": "How should versions show on the shelf?",
+   "why": "You asked to see the options first. Same games in all four.",
+   "look": [
+    {
+     "label": "Canvas · Q11 Shelf versions: 4 options",
+     "url": "https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA"
+    }
+   ],
+   "sceneFile": "scenes/q11.html",
+   "lines": [
+    {
+     "text": "First decision. How versions show on the shelf.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "show",
+       "sel": "#q11-la, #q11-lb, #q11-lc, #q11-ld"
+      },
+      {
+       "at": 0.2,
+       "do": "show",
+       "sel": "#q11-pa, #q11-pb, #q11-pc, #q11-pd"
+      }
+     ]
+    },
+    {
+     "text": "All four hold the same games: Alina's penguin game on version three, and Owen's version built on it.",
+     "cues": [
+      {
+       "on": "same games",
+       "do": "show",
+       "sel": "#q11-legend"
+      }
+     ]
+    },
+    {
+     "text": "I recommend family rows.",
+     "cues": [
+      {
+       "on": "family rows",
+       "do": "focus",
+       "sel": "#q11-pa"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "id": "family-rows",
+     "label": "A. Family rows",
+     "desc": "Newest version one press to play; others' versions indented under it.",
+     "recommended": true,
+     "lines": [
+      {
+       "text": "Family rows. The newest is one press to play, and Owen's version sits under Alina's. Remixes make the shelf longer.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q11-pa"
+        },
+        {
+         "on": "Remixes",
+         "do": "show",
+         "sel": "#q11-ta"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "folders",
+     "label": "B. Folders",
+     "desc": "One row per game family; open it to play.",
+     "lines": [
+      {
+       "text": "Folders. One row per game, and you open it to play. The shortest shelf, one more press.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q11-pb"
+        },
+        {
+         "on": "shortest",
+         "do": "show",
+         "sel": "#q11-tb"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "tiles",
+     "label": "C. Big tiles",
+     "desc": "Art first, six a screen, stacked cards for versions.",
+     "lines": [
+      {
+       "text": "Big tiles. Art first, six games a screen, stacked cards for versions. The names get small.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q11-pc"
+        },
+        {
+         "on": "names",
+         "do": "show",
+         "sel": "#q11-tc"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "flat",
+     "label": "D. Flat list",
+     "desc": "Every version its own row, newest first.",
+     "lines": [
+      {
+       "text": "A flat list, newest first. Simplest, but related games drift apart.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q11-pd"
+        },
+        {
+         "on": "drift",
+         "do": "show",
+         "sel": "#q11-td"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "q13-plan",
+   "kind": "decision",
+   "q": "Q13",
+   "title": "How much of the plan a kid sees",
+   "short": "Plan",
+   "ask": "How much of the plan should a kid see before building?",
+   "why": "Today's live plan was 19 rules over 6 screens. The full rules stay one press away in every option.",
+   "look": [
+    {
+     "label": "Canvas · Q13 Plan screen: 3 options",
+     "url": "https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA"
+    }
+   ],
+   "sceneFile": "scenes/q13.html",
+   "lines": [
+    {
+     "text": "Second. How much of the plan a kid sees before building.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "show",
+       "sel": "#q13-la, #q13-lb, #q13-lc"
+      },
+      {
+       "at": 0.2,
+       "do": "show",
+       "sel": "#q13-pa, #q13-pb, #q13-pc"
+      }
+     ]
+    },
+    {
+     "text": "Every option keeps the full rules one press away. I recommend one screen.",
+     "cues": [
+      {
+       "on": "full rules",
+       "do": "show",
+       "sel": "#q13-live"
+      },
+      {
+       "on": "one screen",
+       "do": "focus",
+       "sel": "#q13-pa"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "id": "one-screen",
+     "label": "A. One screen",
+     "desc": "The idea, how to play, and the top four rules.",
+     "recommended": true,
+     "lines": [
+      {
+       "text": "One screen. The idea, how to play, and the four rules that matter most, so a kid can spot a wrong one before coins are spent.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q13-pa"
+        },
+        {
+         "on": "spot a wrong one",
+         "do": "show",
+         "sel": "#q13-ta"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "pages",
+     "label": "B. Three pages",
+     "desc": "The idea, how to play, what happens; one page each.",
+     "lines": [
+      {
+       "text": "Three short pages, like a story. Bigger words, but three presses before building.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q13-pb"
+        },
+        {
+         "on": "three presses",
+         "do": "show",
+         "sel": "#q13-tb"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "check-only",
+     "label": "C. Just what you'll check",
+     "desc": "The idea, the controls, and the rules you'll be asked about.",
+     "lines": [
+      {
+       "text": "Just the rules they'll check. The shortest, but the score and the lives stay a surprise.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "focus",
+         "sel": "#q13-pc"
+        },
+        {
+         "on": "surprise",
+         "do": "show",
+         "sel": "#q13-tc"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "q15-limit",
+   "kind": "decision",
+   "q": "Q15",
+   "title": "The real spend limit and overruns",
+   "short": "Limit",
+   "ask": "How should the real account limit work with overruns?",
+   "why": "The pot is $10 and the cabinet's workspace limit (D157) is also $10, so an overrun would be cut off.",
+   "look": [
+    {
+     "label": "Canvas · Open questions",
+     "url": "https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA"
+    }
+   ],
+   "sceneFile": "scenes/q15.html",
+   "lines": [
+    {
+     "text": "Third, a question your answers raised.",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#q15-potbar"
+      }
+     ]
+    },
+    {
+     "text": "The pot is ten dollars, and the real limit on the cabinet's account is ten dollars too.",
+     "cues": [
+      {
+       "on": "real limit",
+       "do": "show",
+       "sel": "#q15-lim, #q15-limlab"
+      },
+      {
+       "on": "real limit",
+       "do": "focus",
+       "sel": "#q15-lim"
+      }
+     ]
+    },
+    {
+     "text": "So a make that runs over would hit it and stop halfway, which you said shouldn't happen.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "unfocus"
+      },
+      {
+       "on": "runs over",
+       "do": "show",
+       "sel": "#q15-over"
+      },
+      {
+       "on": "stop halfway",
+       "do": "show",
+       "sel": "#q15-cut"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "id": "raise-13",
+     "label": "A. Raise the account limit to $13",
+     "desc": "The pot stays 100 coins; any make can finish.",
+     "recommended": true,
+     "lines": [
+      {
+       "text": "I recommend raising the account limit to thirteen dollars. The pot stays a hundred coins, and every make can finish.",
+       "cues": [
+        {
+         "on": "thirteen",
+         "do": "state",
+         "value": "oA"
+        },
+        {
+         "on": "every make",
+         "do": "show",
+         "sel": "#q15-okA"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "stop-94",
+     "label": "B. Keep $10; no new makes after 94 coins",
+     "desc": "Leaves room for one overrun to finish.",
+     "lines": [
+      {
+       "text": "Or keep ten dollars, and stop new makes at ninety-four coins, leaving room to finish.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oB"
+        },
+        {
+         "on": "ninety-four",
+         "do": "show",
+         "sel": "#q15-stop, #q15-stoplab"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "accept-cut",
+     "label": "C. Keep $10 and accept a rare cut-off",
+     "desc": "The kids see the Studio-resting screen.",
+     "lines": [
+      {
+       "text": "Or keep ten dollars and accept that a rare one gets cut off.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oC"
+        },
+        {
+         "on": "cut off",
+         "do": "focus",
+         "sel": "#q15-over"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "q16-start",
+   "kind": "decision",
+   "q": "Q16",
+   "title": "When the pot is too low to start",
+   "short": "Too low",
+   "ask": "When is the pot too low to start a make?",
+   "why": "You said the cabinet won't start a make the pot can't cover, but the real cost is only known at the end.",
+   "look": [
+    {
+     "label": "Canvas · L1 Pot too low for a new game",
+     "url": "https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA"
+    }
+   ],
+   "sceneFile": "scenes/q16.html",
+   "lines": [
+    {
+     "text": "Fourth. When is the pot too low to start?",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#q16-jar, #q16-jarlab"
+      },
+      {
+       "at": 0.3,
+       "do": "show",
+       "sel": "#q16-onew, #q16-ochg"
+      }
+     ]
+    },
+    {
+     "text": "The cabinet won't start what the pot can't cover, but the real cost is only known at the end.",
+     "cues": [
+      {
+       "on": "won't start",
+       "do": "show",
+       "sel": "#q16-rule"
+      },
+      {
+       "on": "only known",
+       "do": "show",
+       "sel": "#q16-unknown"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "id": "usual",
+     "label": "A. The usual cost: 6 new, 3 change",
+     "desc": "With 5 coins left, a change can start but a new game can't.",
+     "recommended": true,
+     "lines": [
+      {
+       "text": "I recommend the usual cost. With five coins left, a change can start, but a new game can't.",
+       "cues": [
+        {
+         "on": "usual cost",
+         "do": "state",
+         "value": "oA"
+        },
+        {
+         "on": "change can start",
+         "do": "focus",
+         "sel": "#q16-ochg"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "above-zero",
+     "label": "B. Anything above zero",
+     "desc": "More makes; more overruns.",
+     "lines": [
+      {
+       "text": "Or anything above zero. More makes, and more overruns.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oB"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "worst-case",
+     "label": "C. The worst case: 30 coins",
+     "desc": "No overruns; the end of the month goes quiet.",
+     "lines": [
+      {
+       "text": "Or wait for thirty coins, the most a make can cost. No overruns, but the end of each month goes quiet.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oC"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "q17-leftover",
+   "kind": "decision",
+   "q": "Q17",
+   "title": "Leftover coins on the 1st",
+   "short": "Leftovers",
+   "ask": "What happens to unused coins when a new month starts?",
+   "why": "The canvas assumes the pot fills back to 100, so it always matches $10.",
+   "sceneFile": "scenes/q17.html",
+   "lines": [
+    {
+     "text": "Last, an assumption to check. When a month ends with coins left over, what happens?",
+     "cues": [
+      {
+       "at": 0.1,
+       "do": "show",
+       "sel": "#q17-nov"
+      },
+      {
+       "on": "left over",
+       "do": "show",
+       "sel": "#q17-arr, #q17-dec"
+      },
+      {
+       "on": "what happens",
+       "do": "show",
+       "sel": "#q17-note"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "id": "reset-100",
+     "label": "A. The pot fills back to 100",
+     "desc": "Always matches $10 a month.",
+     "recommended": true,
+     "lines": [
+      {
+       "text": "I drew it filling back to a hundred, so the pot always matches ten real dollars.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oA"
+        },
+        {
+         "on": "a hundred",
+         "do": "focus",
+         "sel": "#q17-dec"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "carry",
+     "label": "B. Leftovers carry over",
+     "desc": "Saving is rewarded; a month can cost more than $10.",
+     "lines": [
+      {
+       "text": "Or leftovers carry over, so twelve unused coins make December a hundred and twelve. Saving pays, but a month can cost more than ten dollars.",
+       "cues": [
+        {
+         "at": 0,
+         "do": "state",
+         "value": "oB"
+        },
+        {
+         "on": "a hundred and twelve",
+         "do": "focus",
+         "sel": "#q17-dec"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "wrap",
+   "title": "That's all five",
+   "final": true,
+   "sceneFile": "scenes/wrap.html",
+   "lines": [
+    {
+     "text": "That's all five. Your answers go to the director, and the canvas gets updated to match.",
+     "cues": [
+      {
+       "at": 0,
+       "do": "show",
+       "sel": "#wrap-done"
+      },
+      {
+       "at": 0.2,
+       "do": "show",
+       "sel": "#wrap-list"
+      }
+     ]
+    },
+    {
+     "text": "Every screen is on the canvas if you want to click through it.",
+     "cues": [
+      {
+       "at": 0.2,
+       "do": "show",
+       "sel": "#wrap-next"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

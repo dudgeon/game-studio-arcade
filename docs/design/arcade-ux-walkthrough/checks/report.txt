@@ -1,0 +1,40 @@
+desktop after play: {"cur":0,"t":3.977777,"mode":"intro","cap":"This is the arcade design, for the cabinet in the basement that makes its own games."}
+desktop option playing: {"mode":"option","t":2.424699}
+desktop saved: Saved on this page. Copy decisions sends it by hand.
+desktop after save, chapter 6
+desktop copy button: Copied
+desktop clipboard:
+Arcade UX walkthrough · all decisions (arcade-ux-2026-11)
+For director-game-studio-arcade. Saved in this page's db under answers/<id>.
+
+Q11 (q11-shelf) How versions show on the shelf: A. Family rows [family-rows] (recommended)
+  Comment: check run: a comment
+Q13 (q13-plan) How much of the plan a kid sees: not answered
+Q15 (q15-limit) The real spend limit and overruns: not answered
+Q16 (q16-start) When the pot is too low to start: not answered
+Q17 (q17-leftover) Leftover coins on the 1st: not answered
+
+Research: https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA
+desktop horizontal overflow px: 0
+desktop targets under 40px: ["● Leftovers 29x44"]
+desktop errors: []
+phone after play: {"cur":0,"t":3.961396,"mode":"intro","cap":"This is the arcade design, for the cabinet in the basement that makes its own games."}
+phone option playing: {"mode":"option","t":2.419962}
+phone saved: Saved on this page. Copy decisions sends it by hand.
+phone after save, chapter 6
+phone copy button: Copied
+phone clipboard:
+Arcade UX walkthrough · all decisions (arcade-ux-2026-11)
+For director-game-studio-arcade. Saved in this page's db under answers/<id>.
+
+Q11 (q11-shelf) How versions show on the shelf: A. Family rows [family-rows] (recommended)
+  Comment: check run: a comment
+Q13 (q13-plan) How much of the plan a kid sees: not answered
+Q15 (q15-limit) The real spend limit and overruns: not answered
+Q16 (q16-start) When the pot is too low to start: not answered
+Q17 (q17-leftover) Leftover coins on the 1st: not answered
+
+Research: https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA
+phone horizontal overflow px: 0
+phone targets under 40px: ["Your ask 37x30","The loop 40x30","Live games 38x30","Coin pot 46x30","Changes 35x30","● Shelf 23x30","● Plan 17x30","● Limit 25x30","● Too low 16x30","● Leftovers 11x30","That's all five 16x30"]
+phone errors: []

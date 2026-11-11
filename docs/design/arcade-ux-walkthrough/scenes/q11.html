@@ -1,0 +1,47 @@
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+.sh { width: 148px; height: 200px; top: 70px; }
+.sh .bd { gap: 3px; }
+.sh .r { padding: 1px 4px; font-size: 14px; }
+#q11-pa { left: 8px; } #q11-pb { left: 166px; } #q11-pc { left: 324px; } #q11-pd { left: 482px; }
+.pl { top: 40px; width: 148px; font-size: 15px; font-weight: 600; }
+#q11-la { left: 8px; } #q11-lb { left: 166px; } #q11-lc { left: 324px; } #q11-ld { left: 482px; }
+.tr { top: 282px; width: 148px; font-size: 13px; line-height: 18px; color: #5b636d; }
+#q11-ta { left: 8px; } #q11-tb { left: 166px; } #q11-tc { left: 324px; } #q11-td { left: 482px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.tile { height: 40px; position: relative; }
+.tile.sel { outline: 2px solid #f4f4f4; }
+.tile.stk { box-shadow: 3px -3px 0 #566c86, 6px -6px 0 #94b0c2; }
+#q11-legend { left: 8px; top: 352px; width: 620px; }
+</style>
+<div class="pl" id="q11-la" data-in="fade">A. Family rows</div>
+<div class="pl" id="q11-lb" data-in="fade">B. Folders</div>
+<div class="pl" id="q11-lc" data-in="fade">C. Big tiles</div>
+<div class="pl" id="q11-ld" data-in="fade">D. Flat list</div>
+<div class="scr sh" id="q11-pa" data-in="up" data-f><div class="bar">Shelf<b></b></div><div class="bd">
+  <div class="r">+ Make</div>
+  <div class="r on"><span class="ic ic-p"></span>Penguin<span class="vt">v3</span></div>
+  <div class="r ind"><span class="ic ic-l"></span>Lava<span class="vt">v2</span></div>
+  <div class="r"><span class="ic ic-r"></span>Rocket</div>
+  <div class="r"><span class="ic ic-a"></span>Apple</div></div></div>
+<div class="scr sh" id="q11-pb" data-in="up" data-f><div class="bar">Shelf<b></b></div><div class="bd">
+  <div class="r">+ Make</div>
+  <div class="r on"><span class="ic ic-p"></span>Penguin &gt;<span class="vt">5</span></div>
+  <div class="r"><span class="ic ic-r"></span>Rocket</div>
+  <div class="r"><span class="ic ic-a"></span>Apple</div></div></div>
+<div class="scr sh" id="q11-pc" data-in="up" data-f><div class="bar">Shelf<b></b></div><div class="bd"><div class="grid">
+  <div class="tile ic-m"></div><div class="tile ic-p stk sel"></div>
+  <div class="tile ic-l stk"></div><div class="tile ic-r"></div>
+  <div class="tile ic-a"></div><div class="tile" style="background: #333c57"></div></div>
+  <div class="m">Penguin v3 · Alina</div></div></div>
+<div class="scr sh" id="q11-pd" data-in="up" data-f><div class="bar">Shelf<b></b></div><div class="bd">
+  <div class="r">+ Make</div>
+  <div class="r on"><span class="ic ic-l"></span>Lava</div>
+  <div class="r"><span class="ic ic-p"></span>Penguin</div>
+  <div class="r"><span class="ic ic-r"></span>Rocket</div>
+  <div class="r"><span class="ic ic-a"></span>Apple</div></div></div>
+<div class="tr" id="q11-ta" data-in="fade">One press plays newest; remixes add rows</div>
+<div class="tr" id="q11-tb" data-in="fade">Shortest; one more press to play</div>
+<div class="tr" id="q11-tc" data-in="fade">Art first; names get small</div>
+<div class="tr" id="q11-td" data-in="fade">Simplest; related games drift apart</div>
+<div class="s" id="q11-legend" data-in="up">Same games in all four: Alina's Penguin Catch on v3, Owen's Lava Penguin built on it.</div>
