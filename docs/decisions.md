@@ -864,3 +864,28 @@ Geoff, 2026-11-10: "please have a worker build claude design artifacts to show m
 
 **D207. At most two you-check questions after a play, about things you can see.** *(Geoff, answer 14, as a default rather than a question.)*
 - After a play of a made game, the cabinet asks at most two you-check questions, chosen from rules a kid can judge in one play. Sound isn't asked about while the cabinet has none to hear. The rest wait for later plays. The live make asked three, including one about holes that only appear later and one about sound.
+
+
+## 2026-11-11 — Building the arcade UX (worker, to the handoff)
+
+**D208. The coin pot is a ledger in the logs, and the balance is only what the ledger says.** *(Claude; carries out D202-D205 and the handoff's §2.)*
+- `logs/coin_ledger.jsonl`, beside `studio_session.jsonl`, one line per charge, refill, top-up or reset: who (a maker id, `cabinet` or `grown-up` with `by`), what, the game and version, the session id (the join to `studio_session`, §9.5), the change in cents, a make's exact cost, the coins it shows as, the outcome, the reason, and the pot before and after. Append only (D5); under `logs/` so an update proves it only grew (D196). There's no separate balance file to disagree with it.
+- **The refill is lazy:** the first read of the pot in a new local month appends the refill, set to 100 whatever was there. Nothing can see the pot without reading it, so this is the same as a midnight job and can't be missed by a cabinet that was off.
+- **The gate compares whole coins, as shown:** 56c is 6 coins and lets a new game start, because that's what the kid sees. Rounding is to nearest, the same either side of zero (-56c is -6). At 0 or below it's "empty" (L2), under the usual cost "low" (L1).
+- **A charge is once per session id**, so a restart that collects a make can't charge it twice. A make with no session (refused before it started, stale brief, no Wi-Fi) costs nothing and leaves no line.
+- **Every ending is charged** (D202): on the shelf, didn't finish, stopped, walked away, restart. The cost is the session's `usage.list_cost` (whole cents, the API's own rounding, D19). A session the API no longer has (D191's 404) is charged 0 with `cost_known: false`, rather than a guess.
+- **The live meter is cheap:** the stream's `session.usage` events carry the session's running list cost, so the driver passes them to the cabinet as they arrive (a new `ui.usage`). Coins used so far count up during the build; the charge at the end uses the session object's usage (D43).
+- **The workspace limit (L5)** is recognised by the session refusing to start with a spend-limit error. That wording is a guess (no limit has been hit yet); when it matches, `cabinet-state.json` marks the month as resting and Make refuses until the 1st.
+- **The Manager's side is built, the Manager isn't:** `/api/manager/pot` (pot, ledger, rules), `/pot/preview` (the $13 warning), `/pot/topup` and `/pot/reset`, each needing a reason, behind a pairing token in the cabinet config (`manager_token`). With no token configured, they don't exist (404). The launcher has no token, so a kid can't add coins (D205). The Manager's page, pairing and the token's delivery are still to build.
+- The numbers are settings under the config's `pot` (`usual_cost_new`, `usual_cost_change`, `monthly_coins`, `cents_per_coin`, the usual minutes, `over_usual` 1.5, `workspace_limit_cents` 1300).
+
+**D209. A change is a new cart folder; its version and line are in cart.json.** *(Claude; carries out D206 and §8.2, with `studio fork` still unbuilt.)*
+- `makeCart` takes a `parent`. The parent's folder is packed (with its earlier answers as `earlier-turns.json`) and mounted at `/mnt/session/uploads/parent.tgz`, and the first message says it's a fork, as the brief's Forks section already expects.
+- **The maker's own change** is the next version: folder `<line>-v<n>` (`penguin-catch-v2`), `version: n`, `parent: "penguin-catch@1"`, `family` (the first game) and `branch` (the line's first cart). **Anyone else's** is version 1 of a new line, `family` the same, no `branch` (its own id is its line). The parent folder is never touched; old versions are folders, so any of them can be played from the game's card.
+- A cart with no `family` is its own family, so every cart already on a cabinet reads the same as before. Nothing is migrated.
+- The record gets `kind: "change"`, `parent`, and a `spec_diff` against the parent's spec.
+- **The replay needs a change to replay:** `studio-kit/cli/fixtures/penguin-catch-change/` is hand-written by `cabinet/service/scripts/make-change-fixture.js` from the real make (a red scarf; R12 changes; 31c, a guess until a live change is measured). Its cart validates and passes its playtest, so the replay commits it. Replace it with a recorded change after the live one.
+
+**D210. The plan tool carries the controls, the four rules, and a change's old words.** *(Claude; carries out D201's one-screen plan and D207. A brief change: the director reapplies it.)*
+- `show_plan` gains `controls` (how to play, in kid words), `top_rules` (the ids of the four that matter most, every you-check among them), and per rule `was` (a change's old words) and `new`. The launcher falls back to the first four rules and the cart's Controls when an older agent leaves them out.
+- The brief says: at most two `(you check)` rules, each visible in one play, nothing about sound (D207); the plan's new fields; and in a fork, `was`, `new` and `changes`.

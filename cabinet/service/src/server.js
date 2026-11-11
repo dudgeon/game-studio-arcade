@@ -8,7 +8,7 @@
 //   POST /api/makers             {name}: the new-name slot
 //   GET  /api/studio             Studio state
 //   GET  /api/studio/events      the same, as server-sent events
-//   POST /api/studio/start       {maker, request}
+//   POST /api/studio/start       {maker, request, parent?}: parent makes it a change (D206); refused by the pot's gate (D203)
 //   POST /api/studio/answer      {id, choice, said?}
 //   POST /api/studio/result-seen {id}: someone has seen how a make ended (D192)
 //   POST /api/studio/still-here  a key was pressed: the walk-away clock starts again (D188)
@@ -16,13 +16,23 @@
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
 //   POST /api/speech/feed        {text} or {wav}: the stub only
+//   GET  /api/pot                the family coin pot and its ledger, newest first (D202, A1, A2)
+//   GET  /api/boot               first-ever boot and new-month screens still to show (B2-B4)
+//   POST /api/boot/seen          {what: "intro" | "month"}
+//   The Cabinet Manager's, with its token (D205; the Manager isn't built yet, D208):
+//   GET  /api/manager/pot        the pot, the ledger, the rules
+//   GET  /api/manager/pot/preview?coins=N   what a top-up would do, and whether it passes the workspace limit (D204)
+//   POST /api/manager/pot/topup  {coins, reason, by?}
+//   POST /api/manager/pot/reset  {reason, by?}
 //   everything else              createPlayerHandler (/api/carts, /api/plays, /api/you-check, /runtime/…, /carts/…)
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlayerHandler } from "@game-studio-arcade/player";
-import { StudioBusy, StudioGone } from "./studio.js";
+import { timingSafeEqual } from "node:crypto";
+import { StudioBusy, StudioGone, StudioRefused } from "./studio.js";
+import { PotError } from "./pot.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -66,6 +76,9 @@ function readJson(req) {
  *   speech: import("./speech.js").Speech,
  *   libraryDir: string, logsDir: string,
  *   players?: number, consoleName?: string, examples?: boolean,
+ *   pot?: ReturnType<typeof import("./pot.js").potStore>,
+ *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
+ *   managerToken?: string | null,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -119,7 +132,8 @@ export function createServiceHandler(o) {
       if (!maker) throw new HttpError(400, "no such maker");
       const request = typeof body.request === "string" ? body.request.trim() : "";
       if (!request || request.length > MAX_WORDS) throw new HttpError(400, "the request must be some words");
-      o.studio.start({ maker: maker.id, request });
+      const parent = typeof body.parent === "string" && body.parent ? body.parent : null;
+      o.studio.start({ maker: maker.id, request, parent });
       return json(res, 200, { ok: true, state: o.studio.state() });
     }
     if (pathname === "/api/studio/answer") {
@@ -143,6 +157,12 @@ export function createServiceHandler(o) {
       o.studio.dismissNotice(body.id);
       return json(res, 200, { ok: true });
     }
+    if (pathname === "/api/boot/seen") {
+      if (body.what === "intro") o.cabinet?.introSeen();
+      else if (body.what === "month") o.cabinet?.monthSeen();
+      else throw new HttpError(400, "seen what?");
+      return json(res, 200, { ok: true });
+    }
     if (pathname === "/api/speech/start") {
       o.speech.start();
       return json(res, 200, { ok: true });
@@ -159,14 +179,57 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed"]);
+  /** The pot as the screens show it, with names for maker ids. */
+  const potView = (/** @type {number} */ limit) => {
+    if (!o.pot) return { pot: null, history: [] };
+    const name = (/** @type {string} */ id) => o.makers.get(id)?.name ?? id;
+    const pot = o.pot.state();
+    const named = (/** @type {any[]} */ list) => list.map((m) => ({ ...m, name: name(m.maker) }));
+    return {
+      pot: { ...pot, makers: named(pot.makers), last_month: pot.last_month ? { ...pot.last_month, makers: named(pot.last_month.makers) } : null },
+      history: o.pot.history({ limit }).map((e) => ({ ...e, name: e.who === "cabinet" || e.who === "grown-up" ? null : name(e.who) })),
+    };
+  };
+
+  /** Only the Manager, with its pairing token. No token configured: there's no Manager yet. @param {http.IncomingMessage} req */
+  const managerOk = (req) => {
+    if (!o.managerToken) throw new HttpError(404, "no Cabinet Manager is paired with this cabinet");
+    const got = Buffer.from(String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""));
+    const want = Buffer.from(o.managerToken);
+    if (got.length !== want.length || !timingSafeEqual(got, want)) throw new HttpError(401, "the Manager's token is needed");
+  };
+
+  /** @param {http.IncomingMessage} req @param {http.ServerResponse} res @param {string} pathname @param {URL} url */
+  const manager = async (req, res, pathname, url) => {
+    managerOk(req);
+    if (!o.pot) throw new HttpError(404, "this cabinet has no coin pot");
+    if (req.method === "GET" && pathname === "/api/manager/pot") return json(res, 200, { ...potView(0), rules: o.pot.settings });
+    if (req.method === "GET" && pathname === "/api/manager/pot/preview") return json(res, 200, o.pot.preview(Number(url.searchParams.get("coins") ?? 0)));
+    if (req.method !== "POST") throw new HttpError(405, "method not allowed");
+    const body = await readJson(req);
+    const by = typeof body.by === "string" ? body.by.slice(0, 40) : null;
+    if (pathname === "/api/manager/pot/topup") {
+      const preview = o.pot.preview(Number(body.coins));
+      const entry = o.pot.topUp({ coins: body.coins, reason: body.reason, by });
+      return json(res, 200, { ok: true, entry, warning: preview.over_limit ? `This month could now spend $${(preview.month_total_cents / 100).toFixed(2)}, past the workspace's $${(preview.workspace_limit_cents / 100).toFixed(2)} limit.` : null });
+    }
+    if (pathname === "/api/manager/pot/reset") return json(res, 200, { ok: true, entry: o.pot.reset({ reason: body.reason, by }) });
+    throw new HttpError(404, "no such endpoint");
+  };
+
+  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
+    let url;
     try {
-      pathname = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
+      url = new URL(req.url ?? "/", "http://x");
+      pathname = decodeURIComponent(url.pathname);
     } catch {
       return void res.writeHead(400).end("bad url");
+    }
+    if (pathname.startsWith("/api/manager/")) {
+      return void manager(req, res, pathname, url).catch((e) => json(res, e instanceof HttpError ? e.status : e instanceof PotError ? 400 : 500, { ok: false, error: e.message }));
     }
     if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) return sendFile(res, path.join(LAUNCHER, "index.html"));
     const m = /^\/launcher\/([A-Za-z0-9_-]+\.(?:js|css|html))$/.exec(pathname);
@@ -175,14 +238,16 @@ export function createServiceHandler(o) {
     if (req.method === "GET") {
       if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind });
       if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list() });
+      if (pathname === "/api/pot") return json(res, 200, potView(60));
+      if (pathname === "/api/boot") return json(res, 200, o.cabinet?.boot() ?? { intro: false, new_month: false });
       if (pathname === "/api/studio") return json(res, 200, o.studio.state());
       if (pathname === "/api/studio/events") return events(res);
       return json(res, 405, { ok: false, error: "method not allowed" });
     }
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "method not allowed" });
     post(req, res, pathname).catch((e) => {
-      const status = e instanceof HttpError ? e.status : e instanceof StudioBusy || e instanceof StudioGone ? 409 : 400;
-      json(res, status, { ok: false, error: e.message });
+      const status = e instanceof HttpError ? e.status : e instanceof StudioBusy || e instanceof StudioGone || e instanceof StudioRefused ? 409 : 400;
+      json(res, status, { ok: false, error: e.message, ...(e instanceof StudioRefused ? { why: e.why } : {}) });
     });
   };
 }
