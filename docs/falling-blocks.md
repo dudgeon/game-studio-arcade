@@ -1,97 +1,98 @@
-# A downloaded falling-blocks game for the cabinet: shortlist
+# Downloaded games on the cabinet: the stack, then a falling-blocks pick
 
 Phase 1 of `tasks/ship-a-high-quality-tetris-like-game-on-the-cabinet.md`. Researched and run 2026-11-11. Nothing was installed on either cabinet, and the virtual cabinet's VM was left alone.
 
-The house rule "inspired-by, no Tetris name or look" covers games the Studio makes. For a downloaded game, this report states each one's licence and whether it uses the Tetris name or trade dress.
+Geoff's steer (2026-11-11):
+- The cabinet OS needs an easy way to add existing games.
+- Where possible, the games should be modifiable in a token-efficient way.
+- So the third-party game stack gets chosen first, and the games are judged on fit and hackability after that.
 
-## How each was run
+The house rule "inspired-by, no Tetris name or look" covers games the Studio makes. For a downloaded game, this report states its licence and whether it uses the Tetris name or trade dress. **One open question:** if a kid forks a downloaded game in the Studio, is the result a Studio-made game? That would bring it under the house rule.
 
-- **Web builds** ran in headless Chromium (Playwright 1.56.0) at 1024×768, driven with the D82 keys. That's the kiosk route.
-- **Native arm64 builds** ran in a throwaway Debian 13.7 trixie arm64 VM. It was qemu with HVF, headless, with no window on the mini's screen, and is not the virtual cabinet. Each game ran under Xvfb at 1024×768, with keys sent by `xdotool` and screenshots taken with `import`. That covers the same OS and architecture as the Pi. It doesn't cover the Pi's GPU or speed: rendering was software (llvmpipe).
-- **Not checked:** sound output (audio went to a dummy device in every run), and anything on a real Pi 5.
+## 1. The third-party stack
 
-## Shortlist
+| Stack | Adding a game | Escape → shelf | Hackability | Licence and bundling | Fit |
+|---|---|---|---|---|---|
+| **Web game in the kiosk** (HTML5/JS, plus WebAssembly builds) | Drop a folder and a manifest. The cabinet service serves it, and the launcher opens it in an iframe on the same origin. | One fix covers every game: a capture-phase listener on the iframe's window. | Plain JS: edit and reload. WebAssembly: edit the C/C++ source and rebuild. | Per game | Same Chromium the house runtime and launcher already use; no second program on the screen |
+| **TIC-80** (MIT) | Drop a `.tic` file. TIC-80's own web player can run in the kiosk, or the native arm64 player. | Web: as above. Native: needs an evdev-level grab. | The whole game is one small text file of Lua or JS (64 KB of code per bank) | Player can be bundled | Good; few strong falling-blocks carts exist |
+| **PICO-8** (Geoff's licence) | Drop a `.p8` or `.p8.png` file, then run it in native PICO-8, or export HTML with PICO-8 and serve it in the kiosk | Native: PICO-8 drops to its console on Escape, so the launcher must take over. Web: as above. | The whole game is one text file, capped at 8,192 PICO-8 tokens and 65,535 characters, so roughly 20k model tokens at most | Personal licence: never in the image (platform-notes), and by the same reasoning never uploaded to a Managed Agents sandbox. Exporting needs Geoff's copy. | Huge library (BBS carts default to CC BY-NC-SA) |
+| **Native Linux** (LÖVE, SDL) | Drop a binary or `.love`; the launcher hands over the screen | Needs an evdev-level grab | LÖVE: Lua source, but big games are big. SDL binaries: rebuild. | Per game | Second program on the screen; Pi GPU differences |
+| **RetroArch / libretro** (GBA or NES homebrew) | Drop a ROM | Escape quits RetroArch, so it's recoverable | ROMs are compiled: rebuild with retro toolchains, or no source at all | Cores vary | Easy to add, worst to modify |
 
-### 1. Apotris (recommended)
+**Choice: web games in the kiosk are the one way downloaded games reach the shelf.** TIC-80 and PICO-8 carts come in through their web players or exports. Native players come later, and only if a must-have game has no web build. The reasons:
 
-![Apotris web build: mode list, Marathon setup, start, play with ghost piece, pause menu](falling-blocks/apotris-web.png)
-![Apotris native arm64 build on trixie](falling-blocks/apotris-arm64-trixie.png)
+- **One way in.** The launcher, Escape, play logging and kiosk lockdown are solved once, inside the Chromium that already runs the house runtime. Nothing new takes over the screen, and cabinet independence is unchanged.
+- **The Studio's tools already work on it.** The playtest harness and `scripts/drive.js` drive and screenshot headless Chromium. So when Claude changes a guest game, it can check the change the same way it checks a cart. That's what makes changes cheap to verify, not just cheap to write.
+- **Adding a game stays a file drop.** A guest game would be a folder shaped like a cart:
+  - `guest.json`: title, source URL, version, licences, Tetris-dress note and key map;
+  - `play/`: what gets served;
+  - `src/`: editable source, or the source tarball for a compiled game;
+  - a build recipe, if it has one.
+  
+  Versions are appended, never deleted, as with carts.
 
-- **What it is:** the most polished open-source block stacker found. It began on the Game Boy Advance and now also runs on PC and web. It has 14 modes (Marathon, Sprint, Dig, Ultra, Blitz, Zen and others) and a CPU Battle. It plays with a modern feel: hold, a 5-piece next queue, a ghost piece, and configurable rotation and handling. It has tracker music and sound effects, a skin and colour editor, and pixel art that suits a 4:3 cabinet.
-- **Source:** gitea.com/akouzoukos/apotris. Downloads are at akouzoukos.com/apotris/downloads. The latest is **v4.2.0**, with the last commit on 2026-10-20.
-- **Licence:**
-  - **Code:** AGPL-3.0.
-  - **Libraries:** SDL2, Tilengine, SoLoud, libopenmpt and others; their licence files ship in the release's `license/` folder.
-  - **Music:** tracker modules from The Mod Archive, credited to their composers. I didn't check each track's licence. Mod Archive modules carry their own terms, and many have none stated.
-- **Tetris name and look:** the name ends in "-tris", and the pieces use the guideline colours (cyan I, yellow O, purple T and so on). **Tetris Holding's counsel filed a DMCA takedown against it on itch.io on 2023-05-05** (itch.io/takedowns/1499978): a copyright claim that it "reproduces copyrightable expression" from Tetris. The developer has said the GitHub repository was taken down too. The project now lives on Gitea and its own site, and it's still actively developed. On a private home cabinet the practical risk is small. It is still a game the Tetris owners have challenged, which is Geoff's call.
-- **Seen running:**
-  - **Web build:** the title screen, menus, Marathon setup, play (ghost, hold box, next queue, score and timer) and its pause menu.
-  - **Native `Apotris` binary, Linux arm64:** on trixie it needed nothing beyond the base system, with no missing libraries per `ldd`. It reached the title screen and Marathon play. The README asks for glibc 2.38 or later, and trixie has 2.41.
-- **How it would run on the cabinet:** either route works.
-  - **(a) Web build in the kiosk:** `Apotris.js` plus its wasm and data, served locally by the cabinet service.
-  - **(b) Native arm64 binary:** launched in place of the kiosk.
-  - (a) fits the launcher as it is today. (b) means a second program on the screen.
-- **Input:**
-  - **Defaults:** the web build's menus use W A S D, with Return to confirm and Backspace to cancel. In play, W A S D moved and rotated pieces; I didn't map every default.
-  - **Remapping needed:** the arrows, then Z/X to rotate, C to hold, ↑ to hard drop, Enter to pause, and a cancel key on one of the buttons. Apotris has in-game key binding and keeps it in its save. So it's set once and shipped as a starting save, with no code change.
-  - **Escape:** it opens Apotris's own pause menu. The launcher must catch Escape first (see below).
-- **Two players:** up to five online, and GBA link-cable play. No same-screen two-player. Turns work: each kid plays a Marathon or Sprint and compares the score.
-- **Kid suitability:** nothing unsuitable seen. It's abstract. Some modes (Master, Death) are very hard, but they're labelled.
+**Hackability tiers** for judging games on this stack:
+- **A, edit and reload:** plain JS/HTML, TIC-80 and PICO-8 carts. Claude reads only the files it needs, and the whole game fits in context.
+- **B, edit and rebuild:** C/C++ to WebAssembly (Emscripten), or LÖVE through love.js. Needs a toolchain and a big codebase. Data-level changes (skins, music, settings) may still be cheap.
+- **C, binary only:** don't pick these.
 
-### 2. Tera: Mind Over Matter (PICO-8)
+## 2. How the games were run
 
-![Tera: title, then play with hold, ghost and next queue](falling-blocks/tera-pico8.png)
+- **Web builds** ran in headless Chromium (Playwright 1.56.0) at 1024×768, driven with D82 keys.
+- **Native arm64 builds** ran in a throwaway Debian 13.7 trixie arm64 VM. It was qemu with HVF, headless, and is not the virtual cabinet. Each game ran under Xvfb at 1024×768, with keys from `xdotool` and screenshots from `import`. That checks the OS, the architecture and the libraries (glibc 2.41). It doesn't check the Pi's GPU or speed: rendering was software (llvmpipe).
+- **Not checked:** sound output (audio went to a dummy device every time), and anything on a real Pi 5.
+- **Source sizes** were measured from each project's source. Model tokens are estimated at 3.5 characters per token.
 
-- **What it is:** a PICO-8 cart by tesselode with its own name, look and music. It has hold (Z+X), a ghost piece, a 3-piece next queue, lock delay and a timer. It's small and charming, with one main mode, and less depth than Apotris.
-- **Source:** lexaloffle.com/bbs/?pid=161139 (cart `teramom`). Last updated v1.2, 2019-03-06.
-- **Licence:** CC BY-NC-SA 4.0, the BBS default, covering the code and assets in the cart. Non-commercial use is fine for a home cabinet.
-- **Tetris name and look:** neither. It has its own name and style, and blue and navy pixel art.
-- **Seen running:** in the BBS web player in headless Chromium, through its title, options and play. It was not run in PICO-8 itself.
-- **How it would run on the cabinet:** in Geoff's PICO-8 (the guest player planned in platform-notes), or as an HTML export served locally in the kiosk.
-- **Input:** PICO-8's keys are already the cabinet's P1 keys: arrows, Z and X. Hold is Z+X. Escape stops PICO-8 and drops to its console, so the launcher has to take over there (already noted in platform-notes).
-- **Two players:** no.
-- **Kid suitability:** fine.
+## 3. The games, on this stack
 
-### 3. Techmino
+| | Apotris | teti | Tera: Mind Over Matter | Techmino |
+|---|---|---|---|---|
+| Web build | Yes, official | Yes, plain JS | Yes, via PICO-8 export or BBS player | No |
+| Hackability | **B**: 51k lines of C++ in `source/` plus 58k in `include/`, about 1M tokens in all. Rebuild with Emscripten 3.1.51 or later and Meson. Skins, colours, music and key bindings change in its settings with no code. | **A**: 6.5k lines of plain JS, about 67k tokens in all, no build step | **A**: one PICO-8 cart, at most about 20k tokens | B/C: 67k lines of Lua, about 690k tokens; native LÖVE only |
+| Feel | Modern: hold, 5-piece next, ghost, 14 modes including Marathon with levels | Modern: SRS+, hold, 5-piece next, ghost, lock indicator, Sprint, Blitz, Dig, Survival and others. **No rising gravity yet** (on its own to-do list). | Hold (Z+X), ghost, 3-piece next, lock delay; one main mode | Huge |
+| Look for a 10-year-old | Bright pixel art, made for 4:3 | Plain, dark, competitive-player look (PPS/APM readouts) | Charming pixel art | Busy; 16:9 cut off at 4:3 |
+| Licence | Code AGPL-3.0. Music from The Mod Archive, credited, each track's licence not checked. | Code MIT. **Sounds are TETR.IO's and music is commercial Touhou arrangements**, so both would need replacing. Loads pixi.js and GSAP from a CDN at `@latest`, so those would need vendoring for offline play. | CC BY-NC-SA 4.0 (changes allowed, share-alike, non-commercial) | LGPL-3.0 |
+| Tetris name or look | "-tris" name, guideline colours. **Tetris Holding sent it a DMCA takedown (itch.io, 2023-05-05).** | Guideline colours; skins named after TETR.IO and Jstris | Neither | Guideline colours; says it is "not a fan game of Tetris" |
+| Seen running | Web build (menus, Marathon, play, pause) and the arm64 binary on trixie | Locally served in headless Chromium: Sprint, with hold, ghost and next | BBS player: title, play | `.love` on trixie's `love` 11.5: menus need a pointer, and the AI library is missing on arm64 |
+| Two players | Online and GBA link only | No | No | Online and vs AI |
+| Last update | v4.2.0; commit 2026-10-20 | Push 2026-06-03 | v1.2, 2019-03-06 | v0.17.21; push 2026-11-10 |
 
-![Techmino on arm64 trixie: language screen, an error box about its AI library, play](falling-blocks/techmino-arm64-trixie.png)
+Screenshots:
+- Apotris web: ![Apotris web](falling-blocks/apotris-web.png)
+- Apotris arm64: ![Apotris arm64](falling-blocks/apotris-arm64-trixie.png)
+- teti: ![teti](falling-blocks/teti-web.png)
+- Tera: ![Tera](falling-blocks/tera-pico8.png)
+- Techmino: ![Techmino](falling-blocks/techmino-arm64-trixie.png)
 
-- **What it is:** the most feature-rich open-source stacker. It has dozens of modes, puzzles and battles against an AI, and online play. It's built on LÖVE.
-- **Source:** github.com/26F-Studio/Techmino. Latest release v0.17.21 (2024-08-08), last push 2026-11-10.
-- **Licence:** LGPL-3.0 for the game and code (`legals.md`), with fonts under the SIL OFL. Its music is by the studio and contributors; I didn't check each track.
-- **Tetris name and look:** its legal notice says it is "not a fan game of Tetris". It uses guideline-style colours.
-- **Seen running:** `Techmino_Bare.love` on trixie's own `love` 11.5. It reached the language screen, the main menu and play.
-- **Why it ranks third:**
-  - **Menus need a pointer.** The language screen ignored the arrows and Enter, and clicks from `xdotool` didn't register under Xvfb either.
-  - **Its 16:9 layout is cut off on the left at 1024×768.**
-  - **The `.love` lacks the arm64 build of its AI library.** It shows an error box ("architecture: unknown").
-  - **It's dense, with many menus, which is a lot for a 10-year-old with a stick.**
+**Dropped earlier:**
+- **Cambridge:** MIT code, but its own `SOURCES.md` lists unlicensed placeholder backgrounds and music, including "Black Death Village". It's TGM-hard.
+- **Quadrapassel:** a GTK desktop app with no hold, and it crashed under Xvfb.
+- **Extreme Tetrom:** built to be extremely hard.
+- **Tetr.js:** no licence.
+- **TIC-80:** no strong falling-blocks cart found.
 
-## Looked at and dropped
+## 4. Recommendation
 
-| Game | Why not |
-|---|---|
-| teti (MIT, web) | Code is MIT, but its sounds are TETR.IO's and its music is commercial Touhou arrangements (its own `info.md`). Its site sits behind a Cloudflare bot check. |
-| Cambridge (MIT, LÖVE) | Its `SOURCES.md` says many backgrounds and all of its music are unlicensed placeholders. Some backgrounds are "Black Death Village" and battle paintings. It's TGM-style and hard. |
-| Quadrapassel (GPL-2+, Debian package) | It installs from apt, but it's a desktop GTK app with no hold. It crashed under Xvfb after the first key. |
-| Extreme Tetrom (PICO-8, GPL-2/CC BY-NC-SA) | Built to be extremely hard. |
-| Tetr.js | No licence stated. |
+**Stack: web games in the kiosk**, as above.
 
-## What the cabinet lacks to shelve a downloaded game
+**Game: it depends which matters more, and that's Geoff's call:**
+- **Apotris** for the best game today. It's tier B: changes to its look, music and controls are cheap through its settings, skin editor and music folder, but changes to how it plays mean C++ and an Emscripten build. It also carries the DMCA history.
+- **teti** for the most hackable modern game. It's tier A: 6.5k lines of plain JS, with no build step. Before it ships it needs a cleanup pass:
+  - replace its sounds and music with CC0 or our own;
+  - vendor pixi.js and GSAP at pinned versions;
+  - add rising-gravity Marathon;
+  - a kid-friendly skin;
+  - D82 keys.
+  
+  All of that is cheap in tier A, and every later change stays cheap.
+- **Tera** is the clean, small tier-A choice, if one mode is enough.
 
-Guest players aren't built (decisions.md, "Stubbed or not here"). Today the shelf only lists house carts, and the launcher plays a cart through `createHost`. That host runs the cart in a sandboxed iframe while the launcher keeps focus and forwards input, which is how Escape always reaches the launcher. A downloaded web game reads the keyboard itself, so focus has to be inside its page, and the launcher would never see Escape.
+## 5. What the cabinet lacks, and the smallest way in
 
-**The smallest way to get Apotris onto the shelf (Phase 2):**
+Guest players aren't built (decisions.md, "Stubbed or not here"). The shelf lists only house carts. `createHost` (`runtime/src/host.js`) keeps focus on the launcher and forwards input into a sandboxed iframe, which is how Escape always reaches the launcher. A downloaded web game reads the keyboard itself, so focus has to be inside its page.
 
-1. **Shelf entry:** a guest entry kind, for example `kind: "web"`, with a title and a local folder. It lists alongside carts, and a play is logged the same way: `/api/plays`, with the end recorded as "star" or "back".
-2. **Files:** the Apotris web build is placed under the cabinet's data by the provisioning script, pinned to v4.2.0 by checksum, with its AGPL source tarball alongside it. Under the AGPL, the source has to be on offer. The cabinet service serves the folder same-origin.
-3. **Launcher:** for a web entry, it opens the page in a full-screen iframe on the same origin. Before the game's scripts run, it adds a capture-phase `keydown` listener on the iframe's window. That listener swallows Escape and ends the play, back to the shelf. Same-origin is what makes this possible without changing the game.
-4. **Controls:** a starting save with the D82 key bindings, made once in Apotris's own settings.
-
-That's one entry kind, one static route, one launcher branch and a data file. Native players (PICO-8, the native Apotris binary) are a bigger job (the launcher handing the screen to another program), and aren't needed for this game.
-
-## Recommendation
-
-**Apotris, through its web build in the kiosk.** It's the best of the three on everything the brief asked for: modern feel, sound, modes that grow with Owen and Alina, and a 4:3 pixel look. It also fits the launcher's existing web path with the least new code. The one thing to weigh is that the Tetris owners have issued a takedown against it before.
-
-**If that's a no, Tera** has clean licensing and its own look, but it's a smaller game.
+The smallest way, for any web game (Phase 2):
+1. **Shelf entry:** a guest entry kind (`guest.json`) listed beside carts, with plays logged through `/api/plays` as now.
+2. **Files:** the cabinet service serves the game's `play/` folder on the same origin. Provisioning pins the version by checksum, with source kept alongside, which the AGPL needs for Apotris.
+3. **Launcher:** for a guest entry, it opens a full-screen iframe on the same origin. A capture-phase `keydown` listener on its window, added before the game's scripts run, swallows Escape and ends the play.
+4. **Controls:** the key map lives in the game's settings. It's a shipped starting save for Apotris, and a one-line default for teti or Tera.
