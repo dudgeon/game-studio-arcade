@@ -47,7 +47,7 @@ After the Studio agent changes: `scripts/virtual-cabinet/connect-cabinet.sh --re
 node scripts/virtual-cabinet/update-cabinet.mjs    # from a clean checkout of main
 ```
 
-This is how fixes reach a running cabinet (D195). Its carts, logs and key stay as they are, the version moves, and the old release is kept. A game being played is interrupted when the service restarts, and it refuses while a make is running. The cabinet checks carts, logs and config before and after, and rolls back if the service doesn't return.
+This is how fixes reach a running cabinet (D195). Its data and key stay as they are, the version moves, and the old release is kept. A game being played is interrupted when the service restarts. It refuses while a make is running or one is still to be collected. The cabinet checks every data file and the config before and after (D196): logs may only grow, everything else must be byte-identical. It rolls back if the service doesn't return.
 
 To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`.
 

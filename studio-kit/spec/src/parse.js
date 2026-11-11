@@ -12,7 +12,9 @@ const KIND_TEXT = { auto: 'auto', 'you-check': 'you check' };
 
 const RULE_RE = /^- (R(\d+)) \((auto|you check)\): (.*)$/;
 const ASSUMPTION_RE = /^- (A(\d+)): (.*)$/;
-const CHANGE_RE = /^- (v(\d+)): (.*)$/;
+// A dotted version (v1.1) counts as its whole number: a changelog line is history,
+// and a kid's working game is never refused over one (D197).
+const CHANGE_RE = /^- (v(\d+)(?:\.\d+)?): (.*)$/;
 
 // Item kinds for the structured sections.
 const LISTS = {

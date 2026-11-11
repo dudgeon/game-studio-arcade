@@ -97,6 +97,8 @@ const toCheck = (/** @type {any} */ c) => (c.youCheck?.length && !c.answered ? `
 
 /** The Make tile, or the way back to a game being made (D87, D187). */
 function makeTile() {
+  // A make a restart cut off is still being finished: one at a time (D199).
+  if (studio.phase === "idle" && studio.collecting) return { kind: "busy", title: "Make a new game", note: "Finishing the last game first" };
   if (studio.phase === "idle") return { kind: "make", title: "Make a new game", note: studio.notice?.short ?? "Tell Claude your idea", urgent: !!studio.notice };
   const asking = !!studio.pending;
   return { kind: "back", title: "Back to your game", note: asking ? "Claude has a question for you!" : "Still making it...", urgent: asking };
@@ -175,7 +177,7 @@ function showGone() {
 function leaveMessage(v) {
   if (v.noticeId) {
     post("/api/studio/notice-seen", { id: v.noticeId }).catch(() => {});
-    studio = { phase: studio.phase };
+    studio = { ...studio, notice: undefined };
   }
   showShelf();
 }
@@ -330,6 +332,7 @@ function onButton() {
         following = true;
         followStudio();
       } else if (it.kind === "result") showResult(it.result);
+      else if (it.kind === "busy") show({ screen: "result", ok: false, message: "The last game is still being finished. You can make a new one when it's done!", tiles: ["Back to the shelf"], sel: 0, afterPlay: true });
       else startPlay(it.cart);
       break;
     }

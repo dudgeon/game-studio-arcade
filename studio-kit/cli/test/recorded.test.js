@@ -49,5 +49,6 @@ test("the recorded penguin-catch stream relays the same turns, plan and ending",
   assert.equal(r.turns[2].said, "slides left and right but really slippery like on ice");
   assert.deepEqual(r.planTurns.map((p) => [p.choice, p.rules.length]), [["build", 14]]);
   assert.equal(r.usage.list_cost.amount, "68", "the last session.usage on the stream");
-  assert.ok(progress.includes("All done! Your penguin game is ready to play"));
+  assert.ok(!progress.includes("All done! Your penguin game is ready to play"), "not before the cabinet's checks (D198)");
+  assert.equal(new Set(progress).size, progress.length, "no line twice");
 });

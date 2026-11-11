@@ -9,7 +9,7 @@ import { liveAnswerer, loadAnswers, overlap, replayAnswerer } from "../src/answe
 import { sessionCreateBody } from "../src/api.js";
 import { MANAGED_AGENT_DIR, readAgentDef, readLock, readSkillLock, STUDIO_TOOLSET } from "../src/config.js";
 import { freeId, slugify, specTitle } from "../src/library.js";
-import { progressFor } from "../src/progress.js";
+import { LINE_STAGE, progressFor, progressGate, tellStage } from "../src/progress.js";
 import { judgeReport } from "../src/checks.js";
 import { downloadOutputs, extractCart } from "../src/outputs.js";
 import { createClient } from "../src/client.js";
@@ -124,6 +124,45 @@ test("progress lines are kid language", () => {
   assert.equal(progressFor({ name: "write", input: { file_path: "/workspace/cart/game.js" } }), "Writing the game");
   assert.equal(progressFor({ name: "edit", input: { file_path: "/workspace/cart/game.js" } }), "Fixing the game");
   assert.equal(progressFor({ name: "mystery" }), null);
+  // Make 1's lines on the virtual cabinet, in the order they came (live report, 2026-11-10): only forward, never twice (D198).
+  const gate = progressGate();
+  const came = [
+    ["Reading your idea", LINE_STAGE["Reading your idea"]],
+    ["Getting the game workshop ready", tellStage("setup")],
+    ["Getting my tools out", LINE_STAGE["Getting my tools out"]],
+    ["Reading up", LINE_STAGE["Reading up"]],
+    ["Writing down the rules for your balloon game", tellStage("spec")],
+    ["Writing down the rules", LINE_STAGE["Writing down the rules"]],
+    ["Building the balloon and the clouds", tellStage("building")],
+    ["Checking your game", LINE_STAGE["Checking your game"]],
+    ["Playing your game to test it", LINE_STAGE["Playing your game to test it"]],
+    ["Playtesting the game against the rules", tellStage("testing")],
+    ["One rule failed the test. Fixing it", tellStage("fixing")],
+    ["Fixing the game", LINE_STAGE["Fixing the game"]],
+    ["Playing your game to test it", LINE_STAGE["Playing your game to test it"]],
+    ["Reading up", LINE_STAGE["Reading up"]],
+    ["Packing up your game", LINE_STAGE["Packing up your game"]],
+    ["All done! Your balloon game is ready to play", tellStage("done")],
+    ["A line with no stage", tellStage("somewhere")],
+  ];
+  assert.deepEqual(came.map(([t, s]) => gate(/** @type {string} */ (t), /** @type {any} */ (s))).filter(Boolean), [
+    "Reading your idea",
+    "Getting the game workshop ready",
+    "Getting my tools out",
+    "Reading up",
+    "Writing down the rules for your balloon game",
+    "Writing down the rules",
+    "Building the balloon and the clouds",
+    "Checking your game",
+    "Playing your game to test it",
+    "Playtesting the game against the rules",
+    "One rule failed the test. Fixing it",
+    "Packing up your game",
+    "A line with no stage",
+  ]);
+  assert.equal(progressFor({ name: "bash", input: { command: "python3 - <<'EOF'\nprint(1)\nEOF" } }), null, "no meaningless line (D198)");
+  assert.equal(progressFor({ name: "bash", input: { command: "cp /workspace/cart/spec.md /mnt/session/outputs/spec.md" } }), null, "copying the spec isn't packing");
+  assert.equal(progressFor({ name: "bash", input: { command: "tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart ." } }), "Packing up your game");
   assert.equal(progressFor({ name: "bash", input: { command: "cd /workspace/kit; cat studio-kit/playtest/README.md" } }), "Reading up");
   assert.equal(progressFor({ name: "bash", input: { command: "node /workspace/kit/studio-kit/spec/bin/validate-cart.js /workspace/cart" } }), "Checking your game");
 });

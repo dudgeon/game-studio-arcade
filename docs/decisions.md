@@ -784,6 +784,7 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 - **Updating:** `scripts/virtual-cabinet/update-cabinet.mjs` ships a checkout's cabinet software to a running cabinet. A rebuild destroys carts and logs and removes the key, and Geoff's key is shown only once, so a rebuild is for a broken or throwaway cabinet, not for a fix.
 - **The cabinet updates itself:** the mini sends the bundle, then `update-on-cabinet.sh` runs there in its own systemd unit, so a dropped connection can't stop it halfway. It runs the newer `provision.sh` over the cabinet as it stands, and compares before and after: every cart file by hash, each log still starting with what it held, the config's hash, mode and owner. If the script fails or the service doesn't return, it relinks the previous release and says so. It refuses while a make is running.
 - **Versions:** `/etc/arcade/provisioned-version` now names the release, version plus bundle hash, so it moves with any change. The bundle is built the same way each time (no gzip timestamp, fixed owners), so the same checkout gives the same hash, and updating twice doesn't make a second release. `provisioned-commit` records the commit. Old releases are kept, like everything else (D5).
+- **What the update proves about the data is widened by D196.**
 - **Not taken:** D129's UTM snapshot before each update. Copying a running VM's disk isn't safe, and stopping the VM would cut off a game. The kept release covers software, and the update doesn't touch data. Worth revisiting for updates that change data formats, which this doesn't handle.
 - **Keys:** a held SSH connection doesn't reliably ride out a gap (D156: it survived one and died in the next). So each key has an id, and `arcade-keyd` remembers the ids it has done. When SSH fails, the driver can't tell whether a key landed, so it asks again with the same id. The daemon checks, presses only if it hasn't, and logs the repeat. Reads just repeat. `drive ssh` and `drive run` don't, because their commands may not be safe to repeat.
 - **Every SSH attempt has a hard limit.** A screenshot during the gap phase once sat on one stuck attempt for 29 hours, because nothing bounded a single try. Now `drive` cuts an attempt off after 60 seconds plus the keys' own time, `flow.mjs` limits each of its calls, and `verify.sh`, `connect-cabinet.sh` and `update-cabinet.mjs` limit each try to 120 seconds. A cut-off attempt counts as SSH failing, so keys settle by id and reads repeat. A stuck held connection is killed and opened again.
@@ -792,3 +793,36 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
   - None of those gaps cut a connection, so no key needed settling on the VM. That case, SSH failing after a key landed, is proven by `update.test.mjs` against a stand-in `ssh`: every key was asked again by id and pressed once.
   - The real gaps didn't come back while this was tested (D156).
 - **A late key is still in order.** Steps run one at a time, and a `hold` is one command on the cabinet, so its length is right however late it arrives. A `down` and `up` pair can be held longer than asked, if a gap falls between them.
+
+**D196. An update proves every piece of the cabinet's data came through, not only carts and logs.** *(Claude; the director asked, following D5, once the first live makes left a failed make's record in `sessions/`.)*
+- Before provisioning, `data-check.mjs` records every file under `/var/lib/arcade`, except `chromium/`, which is the kiosk's browser cache. The record holds each file's size, hash and mode, never its contents. That includes carts and the library's git history, `sessions/`, `makers.json`, `studio-results.json`, `studio-left.json` and `kit-uploads.json`. After provisioning, and after a rollback or a failure too, the update compares.
+- Under `logs/`, files only grow: each must still start with exactly what it held, and a new log is fine. Everything else must be byte-identical, and a new file outside `logs/` fails. No update migrates data yet. One that does will have to say which files it changes, and how.
+- **The update now also waits when makes cut off by a restart are left to collect (`studio-left.json`).** On start, the service picks those up, which can commit a cart and rewrite that file and the shelf's results (D191). Those are real changes, but they'd look like data loss. It already waited for a running make.
+- A kid looking at a new result on the shelf during an update stamps `studio-results.json`. The check would report that as a change, so it errs on the side of saying so.
+
+## 2026-11-10 — Fixes from the first live makes on the virtual cabinet
+
+From `~/game-studio-data/vm/verify/live-make-2026-11-10/REPORT.md` (director). Make 1, Cloud Popper, landed for $0.56. Make 2 proved walk-away, restart, re-attach, collect and archive live, but its game was lost to the first fix below.
+
+**D197. A changelog line can't cost a kid a working game.** *(Director's instruction; Claude's choice of how.)*
+- Make 2 passed all 10 auto rules, then local validate refused `- v1.1: Birds enter from the side…`, a line the agent wrote after changing a rule post-playtest. The cart was thrown away as "didn't pass its tests".
+- **Both fixes.** `parseSpec` now accepts a dotted changelog version (`v1.1`), counted as its whole number (1) for ordering and the next free version. A changelog line is history for people; nothing reads its decimals, so refusing one protects nothing. The spec guides still show whole numbers as the form.
+- **The brief** now says changelog versions are whole numbers, and that after any edit to `spec.md` (and before packing) the agent runs validate again, packing only a cart that validates.
+- Other spec form errors still fail, on purpose: those are rules or sections the playtest and the kid's plan depend on. The re-validate line is what keeps those from reaching the cabinet.
+
+**D198. Progress only moves forward.** *(Director's instruction; the order is Claude's, the wording and look are the design worker's.)*
+- In make 1 the list went backwards and repeated: "Packing up" and "Putting it together" before building, "Playing your game to test it" twice, "Reading up" after "Writing the rules", and "All done!" before the cabinet's own checks.
+- Each line now has a stage: getting started, the spec, building, testing (fixing is part of testing), packing. The driver shows a line only if its stage is at or after the last one shown, and never shows the same words twice. `tell_player` lines take their stage from the tool's own `stage`; the built-in lines from a fixed table. The cabinet's own lines after the session ("Bringing your game home", "Checking your game here at home") come last anyway.
+- Lines that told nothing or misled are gone: a shell command with no meaning no longer says "Putting it together", and "Packing up" means making `cart.tgz` or `DONE.json`, not copying the spec to outputs before the build.
+- The agent's "done" line isn't shown. It said "ready" before the cabinet had checked the game; the result screen says that, truthfully.
+- Recorded streams keep their lines; this decides which reach the screen.
+
+**D199. Make stays busy while a restarted make is being collected, and the journal says so.** *(Director's instruction; Claude. Closes the gap D191 left against D183.)*
+- While `studio-left.json` lists any session, including while an attach is waiting to retry, `start` refuses (409) and the shelf's first tile says the last game is being finished. Pressing it explains and goes back. When the list is empty, Make is Make again. One paid session at a time holds across a restart.
+- The service writes a journal line when it finds a make a restart cut off, when it re-attaches to a session, and when it collects it, with the outcome and whether the archive succeeded. A failed attempt already logged an error line.
+- The trade: if the cabinet can't reach the API for a long time, Make stays busy for that long. It couldn't make a game without the API anyway.
+
+**D200. The brief asks for visible feedback and a title that says how to play.** *(Director's instruction; Claude.)*
+- Cloud Popper's dart was a 1-pixel dot gone in about 0.2 s: the playtest passed it, but a kid would think A did nothing. Its title screen said only "CLOUD POPPER / BEST 0".
+- Two lines in the build step: every player action shows on screen straight away, big enough and long enough to see (at least 3 pixels across and about half a second); and the title screen says how to play in a line or two: what the buttons do and the goal, within 40 characters a line.
+- Kept to two lines: the brief's length is a cost on every build (D164).
