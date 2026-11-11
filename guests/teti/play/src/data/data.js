@@ -1,6 +1,6 @@
 export const cleartypes = { 0: "", 1: "Single", 2: "Double", 3: "Triple", 4: "Quad", 5: "Teti-tris" };
 
-export const defaultSkins = ['tetrio', 'jstris', 'plain', 'tgm_c', 'tgm_w'];
+export const defaultSkins = ['cabinet'];
 
 export const scoringTable = {
     "": 0,
@@ -123,20 +123,10 @@ export const statsSecondary = {
 // const combo = await fetch("https://api.github.com/repos/titanplayz100/teti/contents/assets/sfx/combo")
 // const songs = await fetch("https://api.github.com/repos/titanplayz100/teti/contents/assets/songs")
 // manually remove type: dir
-export const songsobj = [
+export const songsobj = [ // cabinet: our own loop, from guests/teti/tools/make-assets.mjs
     {
-        "name": "Cafe de Touhou 3 - The Girl's Secret Room.mp3",
-        "path": "assets/songs/Cafe de Touhou 3 - The Girl's Secret Room.mp3",
-        "type": "file"
-    },
-    {
-        "name": "ShibayanRecords - Acoustic Image.mp3",
-        "path": "assets/songs/ShibayanRecords - Acoustic Image.mp3",
-        "type": "file"
-    },
-    {
-        "name": "ShibayanRecords - Close to your Mind.mp3",
-        "path": "assets/songs/ShibayanRecords - Close to your Mind.mp3",
+        "name": "Brick Parade.wav",
+        "path": "assets/music/brick-parade.wav",
         "type": "file"
     }
 ];

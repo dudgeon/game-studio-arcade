@@ -21,6 +21,9 @@ window["modal"] = Game.modals;
 window["songs"] = Game.sounds;
 window["Game"] = Game;
 
+// cabinet: the arcade cabinet's controls and screens (src/cabinet.js)
+if (new URLSearchParams(location.search).has("cabinet")) import("./cabinet.js").then((m) => m.start(Game));
+
 window.addEventListener("keydown", event => {
     if (event.key == undefined) return;
     let key = event.key.length > 1 ? event.key : event.key.toLowerCase(); // 1 letter words are lowercase

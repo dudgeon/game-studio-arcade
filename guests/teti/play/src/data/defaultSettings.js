@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS = {
         "particles":true,
         "particleVolume": 60,
         "particleSize":1,
-        "skin":"tetrio",
+        "skin":"cabinet",
         "actionText": true,
         "showIndicators": true,
         "pauseNoFocus": true

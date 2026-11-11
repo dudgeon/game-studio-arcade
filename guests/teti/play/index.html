@@ -5,19 +5,17 @@
     <title>teti</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/x-icon" href="./assets/titanicon.ico">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+    <!-- cabinet: everything local, nothing from the network (fonts, libraries pinned in ./vendor) -->
+    <style>@font-face { font-family: "Montserrat"; src: url(./styles/Montserrat-latin-400.woff2) format("woff2"); }</style>
     <link rel="stylesheet" href="./styles/style.css">
     <link rel="stylesheet" href="./styles/boards.css">
     <link rel="preload" href="./styles/menus.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="./styles/miscmenus.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="./styles/settings.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <script defer src="https://cdn.jsdelivr.net/npm/pixi.js@latest/dist/pixi.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/gsap@latest/dist/gsap.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/gsap@latest/dist/PixiPlugin.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/gsap@latest/dist/CustomEase.min.js"></script>
+    <script defer src="./vendor/pixi-8.23.0.min.js"></script>
+    <script defer src="./vendor/gsap-3.15.1.min.js"></script>
+    <script defer src="./vendor/gsap-PixiPlugin-3.15.1.min.js"></script>
+    <script defer src="./vendor/gsap-CustomEase-3.15.1.min.js"></script>
     <script defer src="./src/main.js" type="module"></script>
 </head>
 <body id="body">

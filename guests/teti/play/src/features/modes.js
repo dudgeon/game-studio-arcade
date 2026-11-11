@@ -138,6 +138,20 @@ export class Modes {
     }
 
     // GAMEMODE SPECIFIC FUNCTIONS
+    // cabinet: Marathon. A level every 10 lines, up to 20; each falls faster (ms per row).
+    marathonGravity(level) {
+        return Math.max(16, Math.round(1000 * Math.pow(0.8 - (level - 1) * 0.007, level - 1)));
+    }
+
+    marathonCheckLevel() {
+        if (Game.settings.game.gamemode != "marathon") return;
+        const level = Math.min(20, Math.floor(Game.stats.clearlines / 10) + 1);
+        if (level == Game.stats.level) return;
+        Game.stats.level = level;
+        Game.settings.game.gravitySpeed = this.marathonGravity(level);
+        Game.sounds.playSound("levelup");
+    }
+
     diggerAddGarbage(removed) {
         if (Game.stats.getRemainingGarbage() > 10 && Game.settings.game.gamemode == "digger") {
             for (let i = 0; i < removed; i++) Game.mechanics.addGarbage(1);

@@ -12,6 +12,7 @@ export class GameStats {
     tspins = [0, 0, 0, 0];
     allspins = 0;
     tgm_level = 0;
+    level = 1; // cabinet: Marathon level
     altitude = 0;
     floorTime = [30, 60, 90, 120, 150, 180, 210, 240, 270]
     floor = 1;
@@ -116,6 +117,7 @@ export class GameStats {
     incrementStats(score, count, damage, isPC, isTspin, isAllspin, garb) {
         this.score += score;
         this.clearlines += count;
+        Game.modes.marathonCheckLevel(); // cabinet
         this.attack += damage;
         this.quads += count >= 4 ? 1 : 0;
         this.pcs += isPC ? 1 : 0;

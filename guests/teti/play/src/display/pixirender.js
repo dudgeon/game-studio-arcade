@@ -175,11 +175,11 @@ export class PixiRender {
             texture = await PIXI.Assets.load(url);
             if (texture == null) {
                 console.error("Error with texture")
-                texture = await PIXI.Assets.load('./assets/skins/tetrio.png');
+                texture = await PIXI.Assets.load('./assets/skins/cabinet.png');
             }
         } catch (error) {
             console.error(error)
-            texture = await PIXI.Assets.load('./assets/skins/tetrio.png');
+            texture = await PIXI.Assets.load('./assets/skins/cabinet.png');
         }
         const spritesheet = new PIXI.Spritesheet(texture, blocksprites);
         await spritesheet.parse();

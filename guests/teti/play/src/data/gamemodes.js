@@ -33,6 +33,29 @@ export const GAMEMODES = {
         "startBoard": "",
         "effects": []
     },
+    "marathon": { // cabinet: classic levels, falling faster every 10 lines (see Modes.marathonCheckLevel)
+        "displayName": "Marathon",
+        "objectiveText": "Lines",
+        "goalStat": "clearlines",
+        "target": "requiredLines",
+        "result": "score",
+        "settings": {
+            "requiredLines": 150,
+            "gravitySpeed": 1000,
+            "sidebar": ["level", "score", "time"]
+        }
+    },
+    "zen": { // cabinet: no gravity, no goal
+        "displayName": "Zen",
+        "objectiveText": "Lines",
+        "goalStat": "clearlines",
+        "target": "gameEnd",
+        "result": "score",
+        "settings": {
+            "gravitySpeed": 1001,
+            "sidebar": ["clearlines", "score", "time"]
+        }
+    },
     "custom": {
         "displayName": "Zen / Custom"
     },
