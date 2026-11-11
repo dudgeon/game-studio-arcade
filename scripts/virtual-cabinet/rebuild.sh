@@ -16,7 +16,7 @@ NETWORK=Bridged
 # Ask utmctl only while UTM is running: a utmctl call would launch it, and that can show its window.
 state() {
   local s
-  s="$("$(dirname "$0")/vm-state.sh")"
+  s="$("$(dirname "$0")/vm-state.sh" || true)"
   [ "$s" = utm-not-running ] && s=stopped
   echo "$s"
 }
