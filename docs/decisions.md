@@ -931,3 +931,35 @@ Geoff, 2026-11-10: "please have a worker build claude design artifacts to show m
 - Cabinet changes, all in plain JS: Marathon (a level every 10 lines, faster each level, to 20) and Zen (nothing falls on its own); a game picker, pause and game-over screens driven by stick and buttons (`src/cabinet.js`, loaded with `?cabinet`); the D82 keys (stick moves, up drops, A/B turn, X holds, Y turns twice, START pauses).
 - The board is bigger on the cabinet: teti's own Board Size at 130, the top of its slider, so the board is 580 px of the 768 (from 460). That needed one upstream fix: texts shared style objects, so their font size compounded at any size but 100. The in-game info page is ours, crediting only what ships (director, 2026-11-11).
 - It keeps guideline-style piece colours; it has no Tetris name. That's acceptable for a downloaded game (D230); a kid's change to it may count as a Studio-made game, and that question is open.
+
+**D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
+- **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.
+- **Not the guest's lease.** It's 24 hours from the router, so renewals come every 12 hours.
+- **The path between the mini and its own VM is what fails, in both directions.** In the D156 gap data (2026-11-09), during each gap the guest's ARP entry for the mini went DELAY, PROBE, FAILED, while its pings to the router and to another home device all got through. The mini's pings to the same two did too. Today's drops show the mini's half of the same thing: its ARP for the guest is incomplete.
+- **The bridge rewrites MACs.** macOS bridges a VM onto Wi-Fi with MAC NAT (`bridge100`: `vmenet0` plus `en1`, flagged `MACNAT`), because a Wi-Fi client can't send frames from a MAC that isn't its own. Traffic between the mini's own stack and the VM goes through that translation. The likely cause is that this local path gets lost, and today it stayed lost instead of coming back after about 40 seconds. Reports from other hypervisors describe the same failure on Wi-Fi bridges.
+- **Traffic alone doesn't keep the path open.** In the D156 soak the guest pinged the router every 5 seconds and the gaps came anyway.
+- **What isn't known:** the exact mechanism inside macOS's bridge (watching it needs root packet capture), and whether the guest could still reach the internet during today's drops. Its journal was in memory only, so the restarts erased it. D242 fixes that.
+
+**D241. The mini reaches the virtual cabinet over a second, private network card. The bridged card stays (D152).** *(Claude; for the director, and for Geoff only if it changes what he chose.)* The VM gets a second virtio card in UTM's Shared mode (macOS's private NAT network, 192.168.64.0/24, with the mini at .1), with a fixed MAC `5a:47:41:43:41:43`.
+- **What stays the same:** the bridged card is still the cabinet's network. It has the default route and DNS, uses the home router, and keeps its address and `arcade-virtual.local`, so home devices still see it the way Geoff chose.
+- **What the private card does:** it only lets the mini in. It has no default route, no DNS and no IPv6 (an NetworkManager keyfile matched by its MAC). The firewall refuses new connections out to 192.168.64.0/24 apart from DHCP, mDNS and DNS (D124). The cabinet uses none of the mini's resources: its internet still goes through the home router.
+- **What changes for the mini:** `up.sh` finds the card's address in the mini's DHCP table (`vm-addr.mjs`) and writes it to `~/game-studio-data/vm/host`, so `drive`, `flow.mjs`, `update-cabinet.mjs` and `connect-cabinet.sh` use it without being told. With no lease it falls back to `arcade-virtual.local`.
+- **Why this way:** host-to-guest traffic on the private network never goes through Wi-Fi or MAC NAT. Lima and Tart default to that NAT mode for this reason. Shared mode alone (the D124 fallback) would drop the home-network visibility Geoff chose; two cards keep both.
+- **Builds and the live VM:** new builds get both cards (`--network Both`, now the default). The VM that exists gets the card from `mini-link.sh`. That script edits only UTM's `config.plist`, after keeping a copy. It doesn't touch the disk, the key or the carts, so it isn't a rebuild. It needs the VM stopped and UTM quit, because UTM caches the config (D148).
+- **Unproven:** that UTM 5.0.8's Apple backend starts a VM with two cards. Virtualization.framework takes a list of network devices, and UTM's config holds a list, but UTM's docs don't say. The first start after `mini-link.sh` proves it either way, and the config copy undoes it.
+
+**D242. The virtual cabinet keeps its journal on disk and records its own network paths.** *(Claude.)*
+- **The journal** is persistent on the virtual profile only, capped at 200 MB. The Picade's SD card keeps the default.
+- **`arcade-netwatch`** runs every 15 seconds. It pings the router on the bridged card, and sends an ARP probe to the mini on each card. ARP isn't a connection, so the probe stays inside D124.
+- **Its log:** a `CHANGE` line when any path changes, and a `COUNT` line every 10 minutes.
+- **On the bridged card it also nudges.** It sends a gratuitous ARP every round. When the mini has been unreachable there for two rounds, it forgets the mini's ARP entry once and announces itself three times, logged as `NUDGE`. Whether that helps is for the soak (D243) to show. It isn't relied on.
+
+**D243. The soak that shows D241 holds.** *(Claude; run when the director frees the cabinet.)*
+- **Steps:**
+  1. In-place update (D195) for D242 and the guest half of D241. No restart is needed.
+  2. Stop the VM, quit UTM, run `mini-link.sh`, then `up.sh`.
+  3. Run `verify.sh`, including its new checks: the firewall refuses the mini on the private card, netwatch is recording, the journal is on disk.
+  4. Run `path-soak.sh OUT 24`: every 5 seconds from the mini, a new SSH connection on each path, plus a command through a connection held over the private card. At the end it copies netwatch's record.
+- **Passes if** over 24 hours that include build-worker use, the private path is up for at least 99.9% of probes and the held connection never dies, whatever the bridged path does.
+- **What the bridged path shows:** if it drops in that time, netwatch's record says whether the guest still reached the router, and whether the nudge brought the bridged path back.
+- **If the private path fails too,** the next step is Ethernet for the mini (D156), and that's Geoff's call.

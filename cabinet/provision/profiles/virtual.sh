@@ -12,8 +12,65 @@ hw_early() {
 }
 
 hw_late() {
+  step_journal
+  step_mini_link
   step_firewall
   step_keys
+  step_netwatch
+}
+
+# D242: keep the journal across restarts, so a lost network leaves its evidence. Capped, and only here:
+# the Picade's SD card keeps the default.
+step_journal() {
+  install -d /etc/systemd/journald.conf.d
+  printf '[Journal]\nStorage=persistent\nSystemMaxUse=200M\n' > /etc/systemd/journald.conf.d/arcade-virtual.conf
+  install -d /var/log/journal
+  systemd-tmpfiles --create --prefix /var/log/journal
+  systemctl restart systemd-journald
+  journalctl --flush || true
+}
+
+# D241: the second network card is the mini's own way in, on the Mac's private shared network. It never
+# carries the cabinet's traffic: no default route, no DNS from it, no IPv6. The bridged card stays the
+# cabinet's network (D152). Matched by its fixed MAC, so nothing here applies until the card exists.
+MINI_LINK_MAC=5A:47:41:43:41:43
+# The shared network macOS gives its VMs unless told otherwise; the mini is .1 on it.
+LINK_NET=192.168.64.0/24
+mini_link_keyfile() {
+  cat <<NM
+[connection]
+id=arcade-mini-link
+type=ethernet
+autoconnect-priority=10
+
+[ethernet]
+mac-address=$MINI_LINK_MAC
+
+[ipv4]
+method=auto
+never-default=true
+ignore-auto-dns=true
+ignore-auto-routes=true
+
+[ipv6]
+method=disabled
+NM
+}
+step_mini_link() {
+  local f=/etc/NetworkManager/system-connections/arcade-mini-link.nmconnection
+  install -d -m 0700 /etc/NetworkManager/system-connections
+  mini_link_keyfile > "$f"
+  chmod 0600 "$f"
+  nmcli connection reload || true
+}
+
+# D242: the cabinet's own record of its network paths.
+step_netwatch() {
+  install -m 0755 "$SELF_DIR/files/arcade-netwatch" /usr/local/bin/arcade-netwatch
+  install -m 0644 "$SELF_DIR/files/arcade-netwatch.service" /etc/systemd/system/arcade-netwatch.service
+  systemctl daemon-reload
+  systemctl enable arcade-netwatch
+  systemctl restart arcade-netwatch
 }
 
 # D124: refuse new connections to the mini; replies to its own requests still flow.
@@ -28,6 +85,14 @@ step_firewall() {
     v4="$(grep -E '^[0-9.]+$' /etc/arcade/mini-addrs | paste -sd, - || true)"
     v6="$(grep ':' /etc/arcade/mini-addrs | paste -sd, - || true)"
   fi
+  firewall_rules "$v4" "$v6" > /etc/nftables.conf
+  systemctl enable nftables
+  systemctl restart nftables
+}
+
+# The ruleset, for the mini's IPv4 and IPv6 addresses (comma-separated; either may be empty).
+firewall_rules() {
+  local v4="$1" v6="$2"
   {
     echo '#!/usr/sbin/nft -f'
     echo 'table inet arcade_isolation'
@@ -35,6 +100,11 @@ step_firewall() {
     echo 'table inet arcade_isolation {'
     echo '  chain out {'
     echo '    type filter hook output priority 0; policy accept;'
+    # The shared network (D241, and D124's fallback): the mini connects in; the cabinet doesn't connect out,
+    # apart from DHCP, mDNS, and DNS, which only a shared-only VM uses (Both ignores the link's DNS).
+    echo "    ip daddr $LINK_NET udp dport { 53, 67, 5353 } accept"
+    echo "    ip daddr $LINK_NET tcp dport 53 accept"
+    echo "    ip daddr $LINK_NET ct state new counter reject"
     if [ -n "$v4" ]; then
       # Shared networking's gateway is the mini too, and DNS has to reach it there.
       echo "    ip daddr { $v4 } udp dport { 53, 67, 5353 } accept"
@@ -48,9 +118,7 @@ step_firewall() {
     fi
     echo '  }'
     echo '}'
-  } > /etc/nftables.conf
-  systemctl enable nftables
-  systemctl restart nftables
+  }
 }
 
 # D144: the driver's keys go in through uinput, the way the Picade overlay's do.

@@ -2,7 +2,7 @@
 # The one command that starts the virtual cabinet: builds the VM if there isn't
 # one, starts it headless and waits for its first-boot provisioning to finish.
 #
-#   scripts/virtual-cabinet/up.sh [--network Bridged|Shared]
+#   scripts/virtual-cabinet/up.sh [--network Both|Bridged|Shared]
 #
 # First run on a Mac: UTM must have been opened once (D146), and `utmctl` may raise
 # one "control UTM" Automation prompt. Geoff needs to be there for that.
@@ -12,7 +12,7 @@ VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
 PACKAGE="$VM_ROOT/arcade-virtual.utm"
 UTM=/Applications/UTM.app
 UTMCTL="$UTM/Contents/MacOS/utmctl"
-NETWORK=Bridged
+NETWORK=Both # bridged for the home network, shared for the mini (D241)
 [ "${1:-}" = "--network" ] && NETWORK="$2"
 
 # macOS keeps the attribute after approval and sets the 0x40 flag: 0181 is unapproved, 01c1 approved.
@@ -79,17 +79,20 @@ elif lsof -c UTM 2>/dev/null | grep -q /dev/ptmx; then
   exit 1
 fi
 
+# A VM built or changed for D241 has the mini's own card second, whatever --network said.
+[ "$(plutil -extract Network.1.MacAddress raw -o - "$PACKAGE/config.plist" 2>/dev/null)" = 5a:47:41:43:41:43 ] && NETWORK=Both
+# A shared card's fixed MAC finds its lease in the mini's DHCP table.
+lease() { for _ in $(seq 1 60); do node "$REPO/scripts/virtual-cabinet/vm-addr.mjs" "$1" && return 0; sleep 5; done; return 1; }
 case "$NETWORK" in
   Bridged) export ARCADE_HOST="${ARCADE_HOST:-arcade-virtual.local}" ;;
-  Shared)
-    # The fixed MAC finds its lease in the mini's DHCP table. macOS drops leading zeros in that file.
-    for _ in $(seq 1 60); do
-      ip="$(awk '/ip_address=/{split($0,a,"=");i=a[2]} /hw_address=/{if($0 ~ /5a:47:41:43:41:42/){print i;exit}}' /var/db/dhcpd_leases 2>/dev/null || true)"
-      [ -n "$ip" ] && break
-      sleep 5
-    done
-    [ -n "${ip:-}" ] || { echo "no DHCP lease for the VM" >&2; exit 1; }
-    export ARCADE_HOST="$ip"
+  Shared) ARCADE_HOST="$(lease 5a:47:41:43:41:42)" || { echo "no DHCP lease for the VM" >&2; exit 1; }; export ARCADE_HOST ;;
+  Both)
+    # The mini drives the cabinet over its private card; the home network still sees it bridged (D241).
+    if ip="$(lease 5a:47:41:43:41:43)"; then export ARCADE_HOST="$ip"
+    else
+      echo "no lease yet for the mini's private card: using the bridged address for now" >&2
+      export ARCADE_HOST=arcade-virtual.local
+    fi
     ;;
 esac
 echo "$ARCADE_HOST" > "$VM_ROOT/host"

@@ -84,6 +84,17 @@ Keys travel kernel → libinput → compositor → Chromium, as the Picade's do 
 
 The mini can lose the cabinet for about 40 seconds at a time (D156). `drive` and `flow.mjs` wait that out, for up to `ARCADE_RIDE_S` seconds (default 300). Each key has an id, so it lands exactly once (D195), and steps can finish late. `drive ssh` and `drive run` don't repeat.
 
+Bridged on Wi-Fi, that path can also stay lost until a restart (D240). So the mini drives the cabinet over a second, private card on macOS's shared network (D241), and the home network still sees it bridged. `up.sh` writes that card's address to `~/game-studio-data/vm/host`, and everything here uses it. To give the existing VM that card without rebuilding it:
+
+```sh
+scripts/virtual-cabinet/mini-link.sh --check   # "has it" or "doesn't have it"
+# stop the VM and quit UTM, then:
+scripts/virtual-cabinet/mini-link.sh           # edits only UTM's config, keeping a copy beside it
+scripts/virtual-cabinet/up.sh
+```
+
+The cabinet records its own paths (D242): `sudo journalctl -u arcade-netwatch` on it, kept across restarts.
+
 ## Running a whole flow
 
 ```sh
@@ -108,3 +119,6 @@ Run by hand, because they need the cabinet:
 - `scripts/virtual-cabinet/test/update-vm.sh`: the in-place update on a real cabinet, with a stand-in key, cleaning up after itself.
 - `scripts/virtual-cabinet/soak.sh`: bridged network reachability from both sides (D156), restarting but never rebuilding.
 - `scripts/virtual-cabinet/gap-measure.sh`: where the gaps live, and whether a held connection rides them. Changes nothing.
+- `scripts/virtual-cabinet/path-soak.sh OUT HOURS`: the private card against the bridged path, every 5 s, plus the cabinet's own record (D243). Changes nothing.
+
+`link.test.mjs` covers the private card's config, lease lookup, `mini-link.sh`, and the profile's keyfile and firewall. `netwatch.test.mjs` runs `arcade-netwatch` against stand-ins for `ip`, `arping` and `ping`.
