@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
-import { openBrowser, parseScript, runSteps, startServiceProcess } from "../scripts/drive.js";
+import { openBrowser, parseScript, plantSeed, runSteps, startServiceProcess } from "../scripts/drive.js";
 import { writeStressFixture } from "../test-support/stress.js";
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures/penguin-catch");
@@ -27,6 +27,8 @@ try {
 /** @param {string} replay @param {(c: {service: any, page: any, url: string, data: string, problems: string[], run: (s: string) => Promise<any>, faults: () => Promise<string[]>}) => Promise<void>} body */
 async function withCabinet(replay, body, options = {}) {
   const data = tmp();
+  // Past the first-ever boot's screens (B2, B3): first-boot.drive covers those.
+  plantSeed(data, { state: "seen" });
   const service = /** @type {any} */ (await startServiceProcess({ replay, data, pace: 10, ...options }));
   const { browser, page, problems } = await openBrowser(service.url);
   try {
@@ -51,8 +53,9 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
     const { shots } = await run(script);
     assert.deepEqual(await faults(), [], "nothing overran, on any frame");
     assert.deepEqual(problems, []);
-    const cuts = shots.flatMap((/** @type {any} */ s) => s.boxes.filter((/** @type {any} */ b) => b.cut));
-    assert.deepEqual(cuts, [], "on this ordinary session, nothing even needed cutting");
+    // The one-screen plan shortens rules on purpose; every word is a stick-press away (D201).
+    const cuts = shots.filter((/** @type {any} */ s) => s.screen !== "plan").flatMap((/** @type {any} */ s) => s.boxes.filter((/** @type {any} */ b) => b.cut));
+    assert.deepEqual(cuts, [], "on this ordinary session, nothing else even needed cutting");
 
     const logs = path.join(data, "logs");
     const [session, ...more] = readLog(path.join(logs, "studio_session.jsonl"));
@@ -86,7 +89,7 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
     assert.equal(check.cart_id, cartId);
     assert.equal(check.checker, "alina");
     assert.equal(check.play_id, play.id);
-    assert.deepEqual(check.answers.map((/** @type {any} */ a) => a.answer), ["yes", "no", "not_sure"]);
+    assert.deepEqual(check.answers.map((/** @type {any} */ a) => a.answer), ["yes", "no"], "two at most, none about sound (D207)");
 
     const makers = JSON.parse(fs.readFileSync(path.join(data, "makers.json"), "utf8"));
     assert.deepEqual(makers.map((/** @type {any} */ m) => [m.id, m.name, m.guest]), [["alina", "Alina", true]]);
@@ -119,10 +122,19 @@ test("a button still held from the last screen doesn't open the mic; silence and
       wait say typing
       type owen
       press enter
+      wait say confirm
+      press a
+      wait M3
+      press coin
       wait say idle
       press esc
+      wait M3
+      press esc
       wait who
+      press a
+      wait M3
       down a
+      press coin
       wait say idle
       sleep 100
     `);
@@ -155,21 +167,27 @@ test("ESC mid-make goes to the shelf, and the tile goes back to the same questio
       wait say typing
       type alina
       press enter
+      wait say confirm
+      press a
+      wait M3
+      press coin
       wait say idle
       press f1
       wait say typing
       type a penguin game
       press enter
+      wait say confirm
+      press a
       wait question
       press esc
-      wait leave
+      wait E8
       press down
       press a
       wait shelf
       shot shelf-question-waiting
     `);
     const firstTitle = await page.evaluate(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-title-0").text);
-    assert.equal(firstTitle, "Back to your game");
+    assert.equal(firstTitle, "Claude is waiting for Alina", "D201's wording");
     const note = await page.evaluate(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-by-0").text);
     assert.match(note, /question/);
     await page.goto(url);
@@ -200,11 +218,17 @@ test("an answer's response landing after the next question doesn't lose the ques
       wait say typing
       type alina
       press enter
+      wait say confirm
+      press a
+      wait M3
+      press coin
       wait say idle
       press f1
       wait say typing
       type a penguin game
       press enter
+      wait say confirm
+      press a
       wait question
       press a
       wait question
@@ -224,11 +248,17 @@ const TO_FIRST_QUESTION = `
   wait say typing
   type alina
   press enter
+  wait say confirm
+  press a
+  wait M3
+  press coin
   wait say idle
   press f1
   wait say typing
   type a penguin game
   press enter
+  wait say confirm
+  press a
   wait question
 `;
 const boxText = (/** @type {any} */ page, /** @type {string} */ id) => page.evaluate((/** @type {string} */ i) => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === i)?.text, id);
@@ -240,10 +270,10 @@ test("walking away: warned, then a message, then the shelf with Make free, and i
       await run(TO_FIRST_QUESTION);
       await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "hint")?.text.startsWith("Still there"), null, { timeout: 10_000 });
       await run(`
-        wait result
+        wait gone
         shot walked-away
       `);
-      assert.match(await boxText(page, "result-message"), /away for a while/);
+      assert.match(await boxText(page, "gone-0"), /away for a while/);
       await run(`
         press a
         wait shelf
@@ -256,6 +286,8 @@ test("walking away: warned, then a message, then the shelf with Make free, and i
         press a
         wait who
         press a
+        wait M3
+        press coin
         wait say idle
       `);
       assert.deepEqual(await faults(), []);
@@ -270,16 +302,16 @@ test("the way back: ESC on a question asks; keep going returns; stop frees Make 
     await run(TO_FIRST_QUESTION);
     await run(`
       press esc
-      wait leave
+      wait E8
       shot leave
       press a
       wait question
       press esc
-      wait leave
+      wait E8
       press esc
       wait question
       press esc
-      wait leave
+      wait E8
       press down
       press down
       press a
@@ -304,14 +336,14 @@ test("the service restarts mid-question: a moment's notice, then a message, then
     const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, port: Number(new URL(url).port) }));
     try {
       await run(`
-        wait result
+        wait E5
         shot after-restart
       `);
-      assert.match(await boxText(page, "result-message"), /restarted/);
+      assert.match(await boxText(page, "E5-0"), /restarted/);
       const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
       assert.equal(rec.outcome, "service_restarted");
       assert.equal(rec.session_left_running, true);
-      assert.equal(rec.id, "sesn_replay");
+      assert.match(rec.id, /^sesn_replay/);
       await run(`
         press a
         wait shelf
@@ -324,11 +356,15 @@ test("the service restarts mid-question: a moment's notice, then a message, then
         press a
         wait who
         press a
+        wait M3
+        press coin
         wait say idle
         press f1
         wait say typing
         type a penguin game
         press enter
+        wait say confirm
+        press a
         wait question
       `);
       assert.deepEqual(await faults(), []);
@@ -345,11 +381,14 @@ test("a restart with a game being played leaves the game alone; the message wait
     await run(TO_FIRST_QUESTION);
     await run(`
       press esc
-      wait leave
+      wait E8
       press down
       press a
-      wait shelf
+      wait S2
       press down
+      press down
+      press a
+      wait G0
       press a
       wait play
       sleep 300
@@ -362,6 +401,8 @@ test("a restart with a game being played leaves the game alone; the message wait
       await run(`
         sleep 3500
         press esc
+        wait G5
+        press a
         wait shelf
       `);
       assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
@@ -393,10 +434,10 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
       const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 1500, port: Number(new URL(url).port) }));
       try {
         await run(`
-          wait result
+          wait E6
           shot restarted-while-building
         `);
-        assert.match(await boxText(page, "result-message"), /may still finish/);
+        assert.match(await boxText(page, "E6-0"), /may still finish/);
         await run(`
           press a
           wait shelf
@@ -406,7 +447,7 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
         assert.equal(await boxText(page, "shelf-by-0"), "Finishing the last game first");
         await run(`
           press a
-          wait result
+          wait busy
           press a
           wait shelf
         `);
@@ -417,17 +458,21 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
         await run(`
           press down
           press a
-          wait result
+          wait M11
           shot collected-after-restart
         `);
-        assert.match(await boxText(page, "result-note"), /finished while the cabinet was restarting/);
+        assert.match(await boxText(page, "M11-note"), /finished while the cabinet was restarting/);
         await run(`
+          press a
+          wait G0
           press a
           wait play
           sleep 400
           press esc
           wait check
           press up
+          press a
+          wait G4
           press a
           wait shelf
           sleep 200
@@ -457,9 +502,9 @@ test("someone else's result is its own entry, and Make stays Make (D192)", { ski
       press a
       wait progress
       press esc
-      wait shelf
+      wait S2
     `);
-    assert.equal(await boxText(page, "shelf-title-0"), "Back to your game", "while it's running");
+    assert.equal(await boxText(page, "shelf-title-0"), "Making Alina's game", "while it's running");
     await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
     await run("shot shelf-with-result");
     assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
@@ -472,7 +517,7 @@ test("someone else's result is its own entry, and Make stays Make (D192)", { ski
       wait shelf
       press down
       press a
-      wait result
+      wait M11
       press down
       press a
       wait shelf
@@ -493,23 +538,31 @@ test("a starter game has no label and asks nothing after a play; a made game has
     await run("sleep 100");
     // The made game sorts first: it has a created date, and the starter doesn't.
     assert.equal(await boxText(page, "shelf-title-1"), "Penguin Catch");
-    assert.equal(await boxText(page, "shelf-by-1"), "by A - 3 to check");
+    assert.equal(await boxText(page, "shelf-by-1"), "by A");
+    assert.equal(await boxText(page, "shelf-tag-1-0"), "NEW", "made and not played yet");
     assert.equal(await boxText(page, "shelf-title-2"), "Apple Catch");
-    assert.equal(await boxText(page, "shelf-by-2"), undefined, "no maker and no label");
+    assert.equal(await boxText(page, "shelf-by-2"), "starter game");
+    assert.equal(await boxText(page, "shelf-tag-2-0"), "starter", "no checks label (D193)");
     await run(`
       shot shelf-starter-and-made
       press down
       press down
       press a
+      wait G0
+      press a
       wait play
       sleep 400
       press esc
+      wait G5
+      press a
       wait shelf
       sleep 200
     `);
     assert.equal(readLog(path.join(data, "logs", "play.jsonl"))[0].cart_id, "apple-catch");
     await run(`
       press up
+      press a
+      wait G0
       press a
       wait play
       sleep 400
@@ -534,22 +587,22 @@ test("back from a game, the shelf stays on it; a game that's gone falls back to 
     const toShelf = "wait shelf\nsleep 200";
 
     // ESC, from a starter: no you-check on the way. Items: Make, Penguin, Apple, Comet.
-    await run("sleep 100\npress down\npress down\npress a\nwait play\nsleep 300\npress esc");
+    await run("sleep 100\npress down\npress down\npress a\nwait G0\npress a\nwait play\nsleep 300\npress esc\nwait G5\npress a");
     await run(toShelf);
     assert.equal(await litTitle(), "Apple Catch");
 
     // Playing it again is one press.
-    await run("press a\nwait play\nsleep 300\npress esc");
+    await run("press a\nwait G0\npress a\nwait play\nsleep 300\npress esc\nwait G5\npress a");
     await run(toShelf);
     assert.equal(await litTitle(), "Apple Catch");
 
     // Through every you-check question, answered.
-    await run("press up\npress a\nwait play\nsleep 300\npress esc\nwait check\npress a\npress a\npress a");
+    await run("press up\npress a\nwait G0\npress a\nwait play\nsleep 300\npress esc\nwait check\npress a\npress a\nwait G4\npress a");
     await run(toShelf);
     assert.equal(await litTitle(), "Penguin Catch");
 
     // It stays while the shelf refreshes, and moving on works from there.
-    await run("press down\npress a\nwait play\nsleep 300\npress esc");
+    await run("press down\npress a\nwait G0\npress a\nwait play\nsleep 300\npress esc\nwait G5\npress a");
     await run(toShelf);
     assert.equal(await litTitle(), "Apple Catch");
 
@@ -562,9 +615,9 @@ test("back from a game, the shelf stays on it; a game that's gone falls back to 
     assert.deepEqual(problems, []);
 
     // The game goes away while it's being played. (Its play can't be logged: a 404 here, expected.)
-    await run("press down\npress down\npress down\npress a\nwait play\nsleep 300");
+    await run("press down\npress down\npress down\npress a\nwait G0\npress a\nwait play\nsleep 300");
     fs.rmSync(path.join(carts, "comet-dodge"), { recursive: true });
-    await run("press esc");
+    await run("press esc\nwait G5\npress a");
     await run(toShelf);
     assert.equal(await sel(), 0);
     assert.equal(await litTitle(), "Make a new game");
@@ -585,7 +638,9 @@ test("a game that won't start says so, and doesn't strand the kid", { skip: skip
       sleep 100
       press down
       press a
-      wait result
+      wait G0
+      press a
+      wait wont-start
       shot wont-start
       press a
       wait shelf

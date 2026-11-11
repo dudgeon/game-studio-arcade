@@ -1,22 +1,62 @@
 {
   "type": "custom",
   "name": "show_plan",
-  "description": "Show the player \"Here's the plan\": a one-line summary and every rule in spec.md in plain words. Call it after the questions, once spec.md is written and before any game code. The player either says build, or asks to change something. After a change, update spec.md (the rules and the Changelog) and call show_plan again with the new rules. Also call it again, with `changes`, if what a rule means has to change during the build. A check bug that leaves the rule's meaning alone doesn't come here. Rule text must be plain words a 10-year-old understands, never code. The result is JSON text: {\"choice\":\"build\"} or {\"choice\":\"change\",\"said\":\"<what the player wants changed>\"}.",
+  "description": "Show the player \"Here's the plan\" on one screen: a one-line summary, how to play, and the four rules that matter most, with every rule in spec.md one stick-press away. Call it after the questions, once spec.md is written and before any game code. The player either says build, or asks to change something. After a change, update spec.md (the rules and the Changelog) and call show_plan again with the new rules. Also call it again, with `changes`, if what a rule means has to change during the build. A check bug that leaves the rule's meaning alone doesn't come here. Rule text must be plain words a 10-year-old understands, never code. The result is JSON text: {\"choice\":\"build\"} or {\"choice\":\"change\",\"said\":\"<what the player wants changed>\"}.",
   "input_schema": {
     "type": "object",
     "properties": {
-      "summary": { "type": "string", "description": "One sentence: what the game is." },
+      "summary": {
+        "type": "string",
+        "description": "One sentence: what the game is."
+      },
+      "controls": {
+        "type": "string",
+        "description": "How to play, from the spec's Controls: what the stick and buttons do, in kid words, at most 80 characters. Example: \"Stick: slide. A: jump.\""
+      },
+      "top_rules": {
+        "type": "array",
+        "description": "The ids of the four rules that matter most to the player, in the order to show them. Include every rule the player will check (you-check).",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 4
+      },
       "rules": {
         "type": "array",
         "description": "Every rule in spec.md, in order.",
         "items": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Rule id from the spec, e.g. R3." },
-            "kind": { "type": "string", "enum": ["auto", "you-check"], "description": "auto: the playtest proves it. you-check: the player checks it on first play." },
-            "text": { "type": "string", "description": "The rule in plain words." }
+            "id": {
+              "type": "string",
+              "description": "Rule id from the spec, e.g. R3."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "you-check"
+              ],
+              "description": "auto: the playtest proves it. you-check: the player checks it on first play."
+            },
+            "text": {
+              "type": "string",
+              "description": "The rule in plain words."
+            },
+            "was": {
+              "type": "string",
+              "description": "Only for a change to an existing game: the rule's words before this change. Leave it out for a rule that stays the same or is new."
+            },
+            "new": {
+              "type": "boolean",
+              "description": "Only for a change: true for a rule this change adds."
+            }
           },
-          "required": ["id", "kind", "text"]
+          "required": [
+            "id",
+            "kind",
+            "text"
+          ]
         }
       },
       "changes": {
@@ -25,13 +65,25 @@
         "items": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Rule id, e.g. R3." },
-            "text": { "type": "string", "description": "What changed and why, in plain words." }
+            "id": {
+              "type": "string",
+              "description": "Rule id, e.g. R3."
+            },
+            "text": {
+              "type": "string",
+              "description": "What changed and why, in plain words."
+            }
           },
-          "required": ["id", "text"]
+          "required": [
+            "id",
+            "text"
+          ]
         }
       }
     },
-    "required": ["summary", "rules"]
+    "required": [
+      "summary",
+      "rules"
+    ]
   }
 }

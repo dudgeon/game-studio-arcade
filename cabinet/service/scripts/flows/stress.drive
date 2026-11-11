@@ -1,5 +1,6 @@
 # Every long string Claude or a kid might send (D181). Run with a fixture from
 # scripts/make-stress-fixture.js.
+#seed seeds/seen.json
 wait shelf
 press a
 wait who
@@ -8,6 +9,11 @@ wait say typing
 type bartholomew-maximilian-the-third extra words here
 shot name-too-long
 press enter
+wait say confirm
+shot name-confirm
+press a
+wait M3
+press coin
 wait say idle
 say Make me a game about a penguin that slides across the whole of Antarctica collecting every single fish in the ocean while a giant boot chases it and the ice melts and the music gets faster and faster and there are ninety nine levels and a secret boss at the end who is also a penguin but evil, and it should also have a shop where you buy hats, and the hats give you powers, and one of the powers is that you can fly, and then the boot can fly too, and you have to save your friends who are stuck in ice cubes, and when you save them they help you, and the final level is on the moon
 hold a 200
@@ -54,22 +60,26 @@ wait say typing
 type slippery
 shot typing-answer
 press enter
+wait say confirm
+press a
 wait plan
 shot plan-long
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-press down
-shot plan-long-scrolled
 press right
+wait reader
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+press down
+shot plan-reader-scrolled
+press esc
+wait plan
+press down
 shot plan-change-lit
 press a
 wait say idle
@@ -80,11 +90,14 @@ press a
 wait progress
 shot progress-long
 press esc
-wait shelf
+wait S2
 shot shelf-while-making
 press a
-wait result
+wait M11
 shot result-long-title
+press a
+wait G0
+shot how-to-play-long
 press a
 wait play
 sleep 800
@@ -99,6 +112,9 @@ wait check
 press down
 press down
 press down
+press a
+wait G4
+shot post-game-long-title
 press a
 wait shelf
 shot shelf-long-title

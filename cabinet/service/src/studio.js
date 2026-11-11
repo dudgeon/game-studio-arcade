@@ -3,6 +3,8 @@
 // kid sees comes from `state()`, in kid language; the rest goes to the logs.
 // A make nobody answers is released (D188); one a restart cut off is logged (D189)
 // and picked back up to collect its cart (D191). How a make ended is a shelf entry (D192).
+// Every make and change is gated on the family coin pot and charged its real cost
+// at its end, however it ended (D202, D203); a change starts from its parent (D206).
 import fs from "node:fs";
 import path from "node:path";
 import { makeCart } from "@game-studio-arcade/studio-cli/src/make.js";
@@ -30,6 +32,30 @@ const MESSAGES = {
 
 const FINISHED_AFTER_RESTART = "It finished while the cabinet was restarting.";
 
+/** A D198 stage as one of the track's steps: Plan, Build (or Change), Test, Done (D201). @param {number} stage */
+const stepOf = (stage) => (stage <= 1 ? 0 : stage === 2 ? 1 : 2);
+
+/** The workspace's real limit refusing a session (D204, L5). Unverified against the live API: no limit has been hit yet. */
+export const SPEND_LIMIT = /spend(ing)?[ _-]?limit|usage[ _-]?limit|credit balance|billing/i;
+
+/** Why a make cost more than usual, in kid words, from its record (L4). @param {any} record */
+export function whyMore(record) {
+  const fixes = Number(record?.playtest?.sandbox?.fix_rounds ?? 0);
+  if (fixes >= 2) return `Claude had to fix it ${fixes} times before every rule worked.`;
+  const asked = Number(record?.questions ?? 0);
+  if (asked >= 5) return `Claude asked ${asked} questions and wrote lots of rules.`;
+  return "Claude needed extra tries to make every rule work.";
+}
+
+/** How a charge's make ended, for the ledger. @param {any} record */
+const outcomeOf = (record) => (record?.outcome === "committed" || record?.outcome === "committed_failing" ? "on the shelf" : "didn't finish");
+
+/** Whole cents from a usage, or null. @param {any} usage */
+const centsOf = (usage) => {
+  const n = Number(usage?.list_cost?.amount);
+  return usage?.list_cost?.amount != null && Number.isFinite(n) ? n : null;
+};
+
 const NOTICES = {
   timed_out: { message: "You were away for a while, so I stopped making this game. Tell me your idea again any time!", short: "Your last game was put away" },
   restarted: { message: "Sorry! The cabinet restarted, so your game didn't get finished. Tell me your idea again!", short: "Your last game didn't finish" },
@@ -45,7 +71,7 @@ export function kidMessage(record) {
 
 /**
  * @typedef {{
- *   api: (resume?: {answered?: number}) => Promise<import("@game-studio-arcade/studio-cli/src/api.js").StudioApi> | import("@game-studio-arcade/studio-cli/src/api.js").StudioApi,
+ *   api: (resume?: {answered?: number}, what?: {kind: string}) => Promise<import("@game-studio-arcade/studio-cli/src/api.js").StudioApi> | import("@game-studio-arcade/studio-cli/src/api.js").StudioApi,
  *   paths: ReturnType<typeof import("@game-studio-arcade/studio-cli/src/config.js").dataPaths>,
  *   lock: () => {agentId: string, agentVersion?: number, environmentId: string},
  *   kit: (api: any) => Promise<{fileId: string, hash: string}>,
@@ -56,6 +82,10 @@ export function kidMessage(record) {
  *   nameOf?: (makerId: string) => string,
  *   titleOf?: (cartId: string) => string | null,
  *   onStart?: (makerId: string) => void,
+ *   pot?: ReturnType<typeof import("./pot.js").potStore>,
+ *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
+ *   findCart?: (cartId: string) => import("@game-studio-arcade/studio-cli/src/make.js").Parent | null,
+ *   online?: () => boolean,
  *   questionTimeoutMs?: number,
  *   warningMs?: number,
  *   recheckMs?: number,
@@ -66,6 +96,14 @@ export function kidMessage(record) {
 
 export class StudioBusy extends Error {}
 export class StudioGone extends Error {}
+/** The pot can't cover the usual cost (D203), the Studio is resting (L5), or there's no Wi-Fi (E2). */
+export class StudioRefused extends Error {
+  /** @param {string} why @param {string} message */
+  constructor(why, message) {
+    super(message);
+    this.why = why;
+  }
+}
 /** Thrown into the driver to stop it when a make is released (D188). */
 class Released extends Error {}
 /** Thrown into the driver when a picked-up session asks something (D191). */
@@ -126,15 +164,28 @@ export function createStudio(o) {
     const shelf = unviewed();
     const ended = shelf.length ? { results: shelf } : {};
     const busy = toCollect ? { collecting: true } : {};
-    if (!run) return notice ? { phase: "idle", notice, ...ended, ...busy } : { phase: "idle", ...ended, ...busy };
+    const extra = {
+      ...(o.pot ? { pot: o.pot.state() } : {}),
+      ...(o.cabinet?.resting() ? { resting: true } : {}),
+      ...(o.online && !o.online() ? { offline: true } : {}),
+    };
+    if (!run) return notice ? { phase: "idle", notice, ...ended, ...busy, ...extra } : { phase: "idle", ...ended, ...busy, ...extra };
+    const waited = run.waitMs + (run.pendingSince ? Date.now() - run.pendingSince : 0);
     return {
       phase: "running",
       run_id: run.id,
       ...ended,
+      ...extra,
+      kind: run.kind,
+      parent: run.parent ? { id: run.parent.id, title: run.parent.title, version: run.parent.version, maker: run.parent.maker } : null,
       maker: run.maker,
       maker_name: run.makerName,
       lines: run.lines.slice(-KEEP_LINES),
-      pending: run.pending ? { ...run.pending.shown, warn: run.warn } : null,
+      step: run.step,
+      used_cents: run.usedCents,
+      // Working time so far: the clock stops while Claude waits on the kid (M10's time left).
+      working_s: Math.max(0, Math.round((Date.now() - run.t0 - waited) / 1000)),
+      pending: run.pending ? { ...run.pending.shown, warn: run.warn, ...(run.warn ? { warn_until: run.warnUntil } : {}) } : null,
     };
   };
   const changed = () => {
@@ -155,6 +206,8 @@ export function createStudio(o) {
       answered: current.answered,
       waiting: Boolean(current.pending),
       kit_hash: current.kitHash ?? null,
+      kind: current.kind ?? "new",
+      parent: current.parent ?? null,
       lock: current.lock ?? null,
       started_at: current.startedAt,
     });
@@ -211,11 +264,12 @@ export function createStudio(o) {
     const base = { maker: item.maker, makerName: item.maker_name ?? o.nameOf?.(item.maker) ?? item.maker };
     try {
       log(`re-attaching to session ${item.session_id} (D191)`);
-      api = await o.api({ answered: item.answered ?? 0 });
+      api = await o.api({ answered: item.answered ?? 0 }, { kind: item.kind ?? "new" });
       const { record, committed } = await makeCart({
         api,
         request: item.request ?? "",
         maker: item.maker,
+        ...(item.parent ? { parent: item.parent } : {}),
         model: o.model,
         budgetCents: o.budgetCents ?? 300,
         answerer: { question: askNobody, plan: askNobody },
@@ -227,22 +281,25 @@ export function createStudio(o) {
         resume: { sessionId: item.session_id, kitHash: item.kit_hash },
         ui: { progress: () => {}, info: () => {} },
       });
+      const cost = charge({ ...base, kind: item.kind, sessionId: item.session_id }, centsOf(record.usage), committed ? "restart, on the shelf" : "restart, didn't finish", { cart_id: committed?.id ?? null, cart_version: record.cart_version ?? null });
       addResult(
         committed
-          ? { ...shelfEntry(base), ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
-          : { ...shelfEntry(base), ok: false, message: kidMessage(record), session_id: record.id },
+          ? { ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
+          : { ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: false, message: kidMessage(record), session_id: record.id },
       );
       const archived = await archive(api, item.session_id);
       logArchive(item.session_id, "collected after a service restart (D191)", archived);
       log(`collected session ${item.session_id}: ${record.outcome}${committed ? ` (${committed.id})` : ""}; archive ${archived.ok ? "ok" : `failed: ${archived.error}`}`);
     } catch (/** @type {any} */ e) {
       if (e instanceof NoOneToAnswer) {
-        await finishRelease({ api, sessionId: item.session_id, maker: item.maker, request: item.request, turns: item.turns ?? [], released: "no_one_to_answer", startedAt: item.started_at });
+        const cost = await finishRelease({ api, sessionId: item.session_id, maker: item.maker, makerName: base.makerName, kind: item.kind, request: item.request, turns: item.turns ?? [], released: "no_one_to_answer", startedAt: item.started_at });
         // Already told, if it was waiting at the restart.
-        if (!item.waiting) addResult({ ...shelfEntry(base), ok: false, message: MESSAGES.no_one_to_answer, session_id: item.session_id });
+        if (!item.waiting) addResult({ ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: false, message: MESSAGES.no_one_to_answer, session_id: item.session_id });
         log(`collected session ${item.session_id}: it was waiting on a question nobody can answer, so it was released (D191)`);
       } else if (e?.status === 404) {
         appendLog(o.paths.logs, "studio_session_correction", { corrects: item.session_id, why: "the API no longer has this session, so nothing could be collected (D191)", at: now().toISOString() });
+        // Its cost can't be read any more: the ledger says so rather than guess (D202).
+        charge({ ...base, kind: item.kind, sessionId: item.session_id }, null, "restart, gone from the API");
         log(`session ${item.session_id} is gone from the API; nothing to collect (D191)`);
       } else throw e;
     }
@@ -281,6 +338,7 @@ export function createStudio(o) {
       setTimeout(() => {
         if (run?.pending) {
           run.warn = true;
+          run.warnUntil = Date.now() + warningMs;
           changed();
         }
       }, timeoutMs - warningMs),
@@ -295,14 +353,48 @@ export function createStudio(o) {
   const ask = (current, shown) =>
     new Promise((resolve, reject) => {
       current.pending = { shown: { id: nextId++, ...shown }, resolve, reject };
+      current.pendingSince = Date.now();
       current.warn = false;
       writeJournal(current);
       armTimers();
       changed();
     });
 
-  /** A result entry's shared fields. @param {{maker: string, makerName: string, id?: number}} current */
-  const shelfEntry = (current) => ({ run_id: current.id ?? null, maker: current.maker, maker_name: current.makerName });
+  /** A result entry's shared fields. @param {{maker: string, makerName: string, id?: number, kind?: string, parent?: any}} current */
+  const shelfEntry = (current) => ({
+    run_id: current.id ?? null,
+    maker: current.maker,
+    maker_name: current.makerName,
+    kind: current.kind ?? "new",
+    ...(current.parent ? { parent: { id: current.parent.id, title: current.parent.title, version: current.parent.version, maker: current.parent.maker } } : {}),
+  });
+
+  /**
+   * The real cost, whatever happened (D202: no refunds), and what the result screen says about it.
+   * @param {{ maker: string, kind?: string, sessionId?: string | null }} current @param {number | null} cents @param {string} outcome @param {{cart_id?: string|null, cart_version?: number|null}} [cart]
+   */
+  const charge = (current, cents, outcome, cart = {}) => {
+    if (!o.pot || !current.sessionId) return {};
+    const kind = current.kind === "change" ? "change" : "new";
+    try {
+      const e = o.pot.charge({ maker: current.maker, what: kind, session_id: current.sessionId, cost_cents: cents, outcome, ...cart });
+      const entry = e ?? o.pot.history().find((x) => x.kind === "charge" && x.session_id === current.sessionId);
+      if (!entry) return {};
+      const cost = entry.cost_cents ?? 0;
+      return {
+        cost_cents: cost,
+        cost_known: entry.cost_known !== false,
+        coins: entry.coins,
+        pot_before_cents: entry.pot_before_cents,
+        pot_after_cents: entry.pot_after_cents,
+        over_pot: entry.pot_after_cents < 0,
+        over_usual: o.pot.overUsual(cost, kind),
+      };
+    } catch (/** @type {any} */ e) {
+      log(`charging session ${current.sessionId} failed: ${e?.message ?? e}`);
+      return {};
+    }
+  };
 
   // ---------- letting go of a make (D188) ----------
 
@@ -354,11 +446,15 @@ export function createStudio(o) {
       }
       archived = await archive(api, current.sessionId);
     }
+    const cents = centsOf(usage) ?? (current.usedCents || null);
+    const cost = charge(current, cents, current.released === "stopped" ? "stopped" : current.released === "timed_out" ? "walked away" : "restart, nobody to answer");
     appendLog(o.paths.logs, "studio_session", {
       id: current.sessionId ?? null,
       origin: "cabinet",
       maker: current.maker,
       with: null,
+      kind: current.kind ?? "new",
+      parent: current.parent ? `${current.parent.id}@${current.parent.version}` : null,
       request: current.request,
       turns: current.turns,
       outcome: "abandoned",
@@ -370,6 +466,7 @@ export function createStudio(o) {
       started_at: current.startedAt,
       ended_at: now().toISOString(),
     });
+    return cost;
   };
 
   /** @param {"timed_out" | "stopped"} reason */
@@ -382,10 +479,23 @@ export function createStudio(o) {
     current.released = reason;
     current.pending = null;
     run = null; // Make is free now, whatever the API does next.
-    notice = reason === "timed_out" ? { id: nextId++, kind: reason, ...NOTICES.timed_out } : null;
+    notice = reason === "timed_out" ? { id: nextId++, kind: reason, ...NOTICES.timed_out, used_cents: current.usedCents } : null;
     p.reject(new Released(reason));
     changed();
   }
+
+  /** The kid answered: the time-left clock runs again. @param {any} current */
+  const stopWaiting = (current) => {
+    if (current.pendingSince) current.waitMs += Date.now() - current.pendingSince;
+    current.pendingSince = 0;
+  };
+
+  /** What a change changed, in a line (R8): the plan's own words when it gave them, else the kid's. @param {any} record @param {string} request */
+  const changedLine = (record, request) => {
+    const plan = (record?.plan_turns ?? []).at(-1);
+    const ch = plan?.changes?.[0]?.text ?? plan?.rules?.find((/** @type {any} */ r) => r.was)?.text;
+    return String(ch ?? request).slice(0, 200);
+  };
 
   /** A failure before or outside makeCart's own record still leaves one (D183). */
   const logFailure = (current, e) => {
@@ -396,6 +506,8 @@ export function createStudio(o) {
       with: null,
       request: current.request,
       turns: current.turns,
+      kind: current.kind ?? "new",
+      parent: current.parent ? `${current.parent.id}@${current.parent.version}` : null,
       outcome: "error",
       error: String(e?.message ?? e),
       started_at: current.startedAt,
@@ -410,11 +522,21 @@ export function createStudio(o) {
       listeners.add(f);
       return () => listeners.delete(f);
     },
-    /** @param {{ maker: string, request: string }} a */
-    start({ maker, request }) {
+    /** @param {{ maker: string, request: string, parent?: string | null }} a */
+    start({ maker, request, parent: parentId }) {
       if (run) throw new StudioBusy("a game is already being made");
       // One paid session at a time holds across a restart too (D183, D199).
       if (toCollect) throw new StudioBusy("the last game is still being finished");
+      const parent = parentId ? (o.findCart?.(parentId) ?? null) : null;
+      if (parentId && !parent) throw new StudioGone("that game isn't on the shelf");
+      const kind = parent ? "change" : "new";
+      if (o.online && !o.online()) throw new StudioRefused("offline", "Claude can't be reached right now");
+      if (o.cabinet?.resting()) throw new StudioRefused("resting", "the Studio is resting until the 1st");
+      // The start gate (D203): only what the pot can cover, in its usual cost.
+      if (o.pot) {
+        const g = o.pot.gate(kind);
+        if (!g.ok) throw new StudioRefused(/** @type {string} */ (g.why), `the pot has ${g.coins} coins and ${kind === "change" ? "a change" : "a new game"} needs about ${g.need}`);
+      }
       /** @type {any} */
       const current = {
         id: nextId++,
@@ -427,6 +549,13 @@ export function createStudio(o) {
         turns: [],
         answered: 0,
         startedAt: now().toISOString(),
+        kind,
+        parent,
+        step: 0,
+        usedCents: 0,
+        t0: Date.now(),
+        waitMs: 0,
+        pendingSince: 0,
       };
       run = current;
       notice = null;
@@ -436,6 +565,7 @@ export function createStudio(o) {
       const answerer = {
         question: async (q) => {
           const a = /** @type {any} */ (await ask(current, { kind: "question", ...q }));
+          stopWaiting(current);
           // For the records of a make that doesn't reach makeCart's own (D188, D189).
           current.turns.push({ ...q, choice: a.choice, said: a.said ?? null });
           current.answered++;
@@ -444,20 +574,31 @@ export function createStudio(o) {
         },
         plan: async (p) => {
           const a = /** @type {any} */ (await ask(current, { kind: "plan", ...p }));
+          stopWaiting(current);
           current.answered++;
           writeJournal(current);
           return a;
         },
       };
       const ui = {
-        progress: (/** @type {string} */ s) => {
+        progress: (/** @type {string} */ s, /** @type {number | null | undefined} */ stage) => {
           current.lines.push(s);
+          // The track only moves forward (D198, D201). The cabinet's own lines after the session are testing.
+          const step = typeof stage === "number" ? stepOf(stage) : current.sessionDone ? 2 : current.step;
+          current.step = Math.max(current.step, step);
           changed();
+        },
+        usage: (/** @type {any} */ u) => {
+          const c = centsOf(u);
+          if (c != null && c !== current.usedCents) {
+            current.usedCents = c;
+            changed();
+          }
         },
         info: () => {}, // Test changes and the library path are for the log, not a kid's screen (D183).
       };
       (async () => {
-        const base = await o.api();
+        const base = await o.api(undefined, { kind });
         current.api = base;
         const api = {
           ...base,
@@ -471,9 +612,22 @@ export function createStudio(o) {
         };
         current.lock = o.lock();
         const { record, committed } = await makeCart({
-          api,
+          api: {
+            ...api,
+            // The session is over once its usage is final: what's left is the cabinet's own checks.
+            retrieveSession: async (/** @type {string} */ id) => {
+              const r = await api.retrieveSession(id);
+              current.sessionDone = true;
+              current.step = Math.max(current.step, 2);
+              const c = centsOf(r?.usage);
+              if (c != null) current.usedCents = c;
+              changed();
+              return r;
+            },
+          },
           request,
           maker,
+          ...(parent ? { parent } : {}),
           model: o.model,
           budgetCents: o.budgetCents ?? 300,
           answerer,
@@ -489,17 +643,32 @@ export function createStudio(o) {
           repoBrief: o.repoBrief,
           ui,
         });
+        const cost = charge(current, centsOf(record.usage) ?? current.usedCents, outcomeOf(record), { cart_id: committed?.id ?? null, cart_version: record.cart_version ?? null });
+        const more = cost.over_usual ? { why_more: whyMore(record) } : {};
         addResult(
           committed
-            ? { ...shelfEntry(current), ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id }
-            : { ...shelfEntry(current), ok: false, message: kidMessage(record), session_id: record.id },
+            ? { ...shelfEntry(current), ...cost, ...more, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, title: o.titleOf?.(committed.id) ?? committed.id, changed: changedLine(record, request), session_id: record.id }
+            : { ...shelfEntry(current), ...cost, ok: false, failed: true, request, message: kidMessage(record), session_id: record.id },
         );
       })()
         .catch(async (e) => {
-          if (e instanceof Released) return finishRelease(current);
+          if (e instanceof Released) return void (await finishRelease(current));
           logFailure(current, e);
           const stale = /doesn't match agents\/studio\.md/.test(String(e?.message));
-          addResult({ ...shelfEntry(current), ok: false, message: stale ? MESSAGES.stale : MESSAGES.error, session_id: current.sessionId ?? null });
+          // No session, nothing spent; the workspace limit means resting until the 1st (D204, L5).
+          if (!current.sessionId && SPEND_LIMIT.test(String(e?.message ?? ""))) {
+            o.cabinet?.rest();
+            log("the workspace's spend limit refused a session: the Studio rests until the 1st (L5)");
+            return void addResult({ ...shelfEntry(current), ok: false, resting: true, message: "The Studio is resting until the 1st. Playing games still works!", session_id: null });
+          }
+          let cents = current.usedCents || null;
+          if (current.sessionId) {
+            try {
+              cents = centsOf((await current.api?.retrieveSession(current.sessionId))?.usage) ?? cents;
+            } catch {}
+          }
+          const cost = charge(current, cents, "didn't finish");
+          addResult({ ...shelfEntry(current), ...cost, ok: false, failed: !stale, request, message: stale ? MESSAGES.stale : MESSAGES.error, session_id: current.sessionId ?? null });
         })
         .catch((e) => console.error(`cabinet-service: logging a make that ended: ${e?.message ?? e}`))
         .finally(() => {

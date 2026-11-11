@@ -1,0 +1,25 @@
+# L4: a make that cost more than 1.5 times its usual cost says so, and why.
+#seed seeds/family.json
+#! --replay-cost 120
+wait S1
+
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a penguin catching fish
+hold a 300
+wait M6
+press a
+wait question
+press down
+press down
+press down
+press a
+wait plan
+press a
+
+wait L4
+shot L4-more-than-usual

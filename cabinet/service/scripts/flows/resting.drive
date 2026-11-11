@@ -1,0 +1,21 @@
+# L5: the workspace's real limit refuses a session; the Studio rests until the 1st.
+#seed seeds/family.json
+#! --replay-limit
+wait S1
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a penguin game
+hold a 300
+wait M6
+press a
+wait L5
+shot L5-the-studio-is-resting
+press a
+wait S1
+shot S1-studio-resting
+press a
+wait L5

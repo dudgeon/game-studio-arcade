@@ -5,7 +5,10 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { dataDir, dataPaths, MANAGED_AGENT_DIR } from "@game-studio-arcade/studio-cli/src/config.js";
 import { defaultChecker } from "@game-studio-arcade/studio-cli/src/checks.js";
-import { readCart } from "@game-studio-arcade/player/src/library.js";
+import dns from "node:dns/promises";
+import { readCart, listCarts } from "@game-studio-arcade/player/src/library.js";
+import { potStore } from "../src/pot.js";
+import { cabinetState } from "../src/cabinet-state.js";
 import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
@@ -20,6 +23,13 @@ const { values } = parseArgs({
     replay: { type: "string" },
     pace: { type: "string", default: "150" },
     "question-timeout": { type: "string" },
+    // Replay only (D186, D208): the fixture a change replays, and states no recording has.
+    "replay-change": { type: "string" },
+    "replay-cost": { type: "string" },
+    "replay-fail": { type: "boolean", default: false },
+    "replay-limit": { type: "boolean", default: false },
+    offline: { type: "boolean", default: false },
+    "manager-token": { type: "string" },
     examples: { type: "boolean", default: false },
   },
 });
@@ -53,6 +63,23 @@ if (values.config) {
 }
 
 const makers = makersStore({ file: path.join(paths.root, "makers.json") });
+// The family coin pot (D202-D205): its numbers are settings, config.pot overrides them.
+const pot = potStore({ logsDir: paths.logs, settings: config.pot ?? {} });
+const cabinet = cabinetState({ root: paths.root });
+const EXAMPLES = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../runtime/examples");
+const roots = [{ root: paths.carts, source: /** @type {const} */ ("library") }, ...(values.examples ? [{ root: EXAMPLES, source: /** @type {const} */ ("example") }] : [])];
+
+// Can Claude be reached? Checked now and then, never in the play path (E1, E2).
+let online = !values.offline;
+if (!replaying && !values.offline) {
+  const check = () =>
+    dns.lookup("api.anthropic.com").then(
+      () => (online = true),
+      () => (online = false),
+    );
+  check();
+  setInterval(check, 20_000).unref();
+}
 const speech = stubSpeech(); // D184: real speech is Phase 3.
 
 /** @type {any} */
@@ -67,12 +94,27 @@ const studio = createStudio({
   nameOf: (id) => makers.get(id)?.name ?? id,
   titleOf: (id) => readCart(paths.carts, id)?.title ?? null,
   onStart: (id) => makers.touch(id),
+  pot,
+  cabinet,
+  online: () => online,
+  findCart: (id) => {
+    const c = listCarts(roots).find((x) => x.id === id);
+    return c ? { id: c.id, dir: c.dir, version: c.version, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id } : null;
+  },
   recheckMs: config.recheck_s ? config.recheck_s * 1000 : undefined,
-  api: async (resume) => {
+  api: async (resume, what) => {
     if (replaying) {
       // A fresh replay for each make; one picked up after a restart starts part way through (D191).
-      const { replayApi } = await import("../test-support/replay-api.js");
-      return replayApi({ dir: path.resolve(/** @type {string} */ (values.replay)), paceMs: Number(values.pace), resume }).api;
+      const { replayApi, usageOf } = await import("../test-support/replay-api.js");
+      const base = path.resolve(/** @type {string} */ (values.replay));
+      const changeDir = values["replay-change"] ? path.resolve(values["replay-change"]) : `${base}-change`;
+      const dir = what?.kind === "change" && fs.existsSync(changeDir) ? changeDir : base;
+      const usage = usageOf(dir, values["replay-cost"] != null ? Number(values["replay-cost"]) : null);
+      // Each replayed make is its own session, as live, so each is charged once (D208). A pick-up keeps its id.
+      const sessionId = resume ? undefined : `sesn_replay_${Date.now().toString(36)}`;
+      const r = replayApi({ dir, paceMs: Number(values.pace), resume, usage, noCart: values["replay-fail"], sessionId }).api;
+      if (values["replay-limit"]) r.createSession = async () => Promise.reject(new Error("400 invalid_request_error: this workspace has reached its spend limit"));
+      return r;
     }
     if (!api) {
       const { sdkApi } = await import("@game-studio-arcade/studio-cli/src/api.js");
@@ -97,6 +139,10 @@ const s = await startService({
   speech,
   libraryDir: paths.carts,
   logsDir: paths.logs,
+  pot,
+  cabinet,
+  // The Cabinet Manager's pairing token (D205, D208). None: the Manager endpoints are off.
+  managerToken: values["manager-token"] ?? config.manager_token ?? null,
   players: config.players,
   consoleName: config.console_name,
   examples: values.examples,

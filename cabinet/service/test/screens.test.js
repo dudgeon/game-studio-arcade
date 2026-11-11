@@ -7,6 +7,8 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
+import { bootBoard, cardView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { familyOfCart, gameRows } from "../launcher/shelf.js";
 
 const STRINGS = Object.entries(LONG);
 
@@ -47,6 +49,72 @@ function viewsWith(s) {
     "notice": { screen: "notice", title: s, message: s, hint: "ESC: back to the shelf" },
     "leave": { screen: "leave", sel: 2 },
     "question, near the timeout": { screen: "question", ...q, maker: s, sel: 0, warn: true },
+    "question, counting down": { screen: "question", ...q, maker: s, sel: 0, warn: true, warnLeft: 59 },
+    ...boardsWith(s),
+  };
+}
+
+/** The arcade's boards (D201) with one string in every slot it can reach. @param {string} s */
+function boardsWith(s) {
+  const makers = [{ maker: "owen", name: s, coins: 19, cents: 193, makes: 3 }, { maker: "alina", name: s, coins: 6, cents: 56, makes: 1 }, { maker: "sam", name: s, coins: 3, cents: 31, makes: 1 }, { maker: "zed", name: s, coins: 1, cents: 9, makes: 1 }];
+  const pot = (/** @type {number} */ coins) => ({ coins, cents: coins * 10 + 1, month: "2026-11", refill_on: "2026-12-01", full_coins: 100, makers, last_month: { month: "2026-10", makers, ended_cents: -52, ended_coins: -5 }, usual: { new: 6, change: 3 }, minutes: { new: 7, change: 4 }, over_usual: 1.5 });
+  const cart = { id: "penguin-catch", title: s, version: 2, maker: "alina", parent: "penguin-catch@1", family: "penguin-catch", branch: "penguin-catch", plays: 0, pitch: s, controls: [s, s, s, s, s], youCheck: [{ id: "R12", text: s }], created: "2026-11-11T10:00:00Z" };
+  const carts = [
+    { ...cart, version: 1, id: "penguin-catch", branch: null, family: null, parent: null, created: "2026-11-10T10:00:00Z" },
+    cart,
+    { ...cart, id: "owens", version: 1, maker: "owen", branch: null, created: "2026-11-11T11:00:00Z" },
+    { id: "starter", title: s, version: 1, maker: null, parent: null, plays: 3 },
+  ];
+  const nameOf = () => s;
+  const fam = /** @type {any} */ (familyOfCart(/** @type {any} */ (carts), "penguin-catch"));
+  const result = { id: 1, ok: true, kind: "new", title: s, maker: "alina", maker_name: s, cost_cents: 68, coins: 7, pot_before_cents: 850, pot_after_cents: 782, note: s };
+  const change = { ...result, kind: "change", version: 3, changed: s, parent: { id: "penguin-catch", title: s, version: 2, maker: "alina" } };
+  const rules = [1, 2, 3, 4, 5, 6].map((n) => ({ id: `R${n}`, kind: n > 4 ? "you-check" : "auto", text: s, ...(n === 2 ? { was: s } : {}) }));
+  const plan = { screen: "plan", summary: s, controls: s, top_rules: ["R1", "R2", "R5", "R6"], rules, right: s, usual: { new: 6, change: 3 }, sel: 0 };
+  return {
+    "B1 power on": { screen: "boot", console: s, tick: 30 },
+    "B2": bootBoard("controls", pot(100)),
+    "B3": bootBoard("pot", pot(100)),
+    "B4": bootBoard("month", pot(100)),
+    "S1 family rows": { screen: "shelf", console: s, pot: -12, sel: 2, items: [{ kind: "make", title: "Make a new game", note: s, cost: 6 }, ...gameRows(/** @type {any} */ (carts), nameOf).map((r) => ({ ...r, hasCard: true }))] },
+    "S1 tags": { screen: "shelf", console: s, pot: 100, sel: 1, items: [{ kind: "make", title: "Make a new game", cost: 6 }, { kind: "cart", title: s, by: s, version: "v12", tags: [{ text: "NEW", kind: "new" }, { text: "2 to check", kind: "check" }], hasCard: true, cart }] },
+    "S2 waiting": { screen: "shelf", console: s, pot: 50, sel: 0, items: [{ kind: "back", title: `Claude is waiting for ${s}`, note: s, urgent: true }, { kind: "waiting", title: "Make a new game", note: `After ${s}'s game is done` }] },
+    "E1": { screen: "shelf", console: s, offline: true, sel: 0, items: [{ kind: "offline", title: "Make a new game", note: "Needs Wi-Fi right now", urgent: true }] },
+    "S3": cardView({ cart, family: fam.family, line: fam.line, nameOf, usual: { change: 3 } }),
+    "A1": { screen: "pot", pot: pot(62) },
+    "A1 nobody yet": { screen: "pot", pot: { ...pot(100), makers: [] } },
+    "A1 negative": { screen: "pot", pot: pot(-12) },
+    "A2": { screen: "history", flowed: historyLines([{ kind: "charge", at: "2026-11-11T10:00:00Z", who: "alina", name: s, what: "new game", title: s, coins: 7, cost_cents: 68, outcome: "didn't finish" }, { kind: "topup", at: "2026-11-10T10:00:00Z", cents: 200, reason: s }, { kind: "reset", at: "2026-11-09T10:00:00Z", reason: s }, { kind: "refill", at: "2026-11-01T00:00:00Z", pot_after_cents: 1000 }]), top: 0 },
+    "G0": howtoView(cart, nameOf),
+    "G3": postGame({ cart, noRule: { id: "R12", text: s }, versions: 3, usual: { change: 3 } }),
+    "G4": postGame({ cart, noRule: null, versions: 3, usual: { change: 3 } }),
+    "G5": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 3 } }),
+    "M1": whoView({ makers: Array.from({ length: 12 }, (_, i) => ({ id: `m${i}`, name: s })), pot: pot(40) }),
+    "R1": whoView({ makers: [{ id: "alina", name: s }, { id: "owen", name: s }], pot: pot(40), change: { cart } }),
+    "R2": notYours({ cart, makerName: s, ownerName: s }),
+    "M3": coinCheck({ kind: "new", pot: pot(100), maker: s }),
+    "R3": coinCheck({ kind: "change", pot: pot(-5), maker: s, parentVersion: 12 }),
+    "R4 with a fix": whatToChange({ noRule: { text: s }, makerName: s }),
+    "R4": whatToChange({ makerName: s }),
+    "M9": plan,
+    "M9 without the new fields": { ...plan, controls: undefined, top_rules: undefined, cartControls: [s] },
+    "R6": { ...plan, mode: "change", parentVersion: 12, changes: [{ id: "R2", text: s }] },
+    "R6 from changes only": { ...plan, mode: "change", rules: rules.map(({ was, ...r }) => r), changes: [{ id: "R2", text: s }] },
+    "M10": { screen: "progress", kind: "new", lines: [s, s], maker: s, step: 2, used_cents: 46, usual: 6, minutesLeft: 3, tick: 3 },
+    "R7 over usual": { screen: "progress", kind: "change", lines: [s], maker: s, step: 3, used_cents: 300, usual: 3, minutesLeft: -2 },
+    "M11": resultView(result, pot(78)),
+    "L4": resultView({ ...result, cost_cents: 140, coins: 14, over_usual: true, why_more: s }, pot(60)),
+    "L3": resultView({ ...result, cost_cents: 140, coins: 14, over_pot: true, pot_before_cents: 70, pot_after_cents: -70 }, pot(-7)),
+    "R8": resultView(change, pot(70)),
+    "R8 own version": resultView({ ...change, version: 1 }, pot(70)),
+    "E3": resultView({ ...result, ok: false, failed: true, request: s, message: s }, pot(70)),
+    "failed, no request": resultView({ ...result, ok: false, message: s }, pot(70)),
+    "L1": potLimit({ kind: "new", pot: pot(5), why: "low" }),
+    "L2": potLimit({ kind: "new", pot: pot(-3), why: "empty" }),
+    "L2 for a change": potLimit({ kind: "change", pot: pot(2), why: "low" }),
+    "L5": resting(),
+    "E2": offlineMake(),
+    "E8": leaveView({ usedCents: 123 }),
   };
 }
 

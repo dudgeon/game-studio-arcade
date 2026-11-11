@@ -1,0 +1,72 @@
+# S2 and the make's edges: ESC at a question (E8), the shelf while a make waits (S2),
+# walking away (E7), didn't hear (E9), a restart on a question (E4, E5) and while
+# building (E6), and its game arriving on the shelf.
+#seed seeds/family.json
+#! --question-timeout 8
+wait S1
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+hold a 300
+wait say silence
+shot E9-didnt-hear
+say a penguin catching fish
+hold a 300
+wait M6
+press a
+wait M7
+press esc
+wait E8
+shot E8-leave-this-game
+press down
+press a
+wait S2
+shot S2-claude-is-waiting
+press a
+wait M7
+sleep 5000
+shot E7-still-there
+press down
+press a
+wait question
+restart 3500
+wait E4
+shot E4-restarting
+wait E5
+shot E5-restarted-on-a-question
+press a
+wait S1
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a penguin catching fish
+hold a 300
+wait M6
+press a
+wait question
+press a
+wait question
+press a
+wait question
+press a
+wait plan
+press a
+wait M10
+press esc
+wait S2
+shot S2-building
+press a
+wait M10
+restart 3500
+wait E6
+shot E6-restarted-while-building
+press a
+wait S1
+sleep 6000
+shot S1-finished-after-restart
