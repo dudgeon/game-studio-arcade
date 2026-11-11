@@ -25,7 +25,7 @@ This file says what each screen shows and does, and the coin rules and their num
 | Rounding | the ledger keeps exact cents; screens show whole coins, rounded to nearest (56c shows as 6) | D202 |
 | Refunds | none: failed, stopped, abandoned and restart-cut makes are all charged what they cost | D202 |
 | Start gate | a make starts only if the pot (in coins) is at least the usual cost: **6** for a new game, **3** for a change | D203 |
-| Usual costs | settings (`usual_cost_new` 6, `usual_cost_change` 3), not constants; 3 is a guess until a change is measured | D203 |
+| Usual costs | settings (`usual_cost_new` 6, `usual_cost_change` 2), not constants; the change's was a guess of 3 until the first live change measured 9c | D203, D214 |
 | Overrun | a started make always finishes; the pot can go negative until the 1st | D203 |
 | Per-make cap | the session budget stays about $3 (§3.2, D157); it isn't tied to the pot | D204 |
 | Real limit | cabinet workspace spend limit $15 (Geoff sets it in the Console) | D204, D211 |

@@ -31,7 +31,7 @@ The config file, created on the cabinet by Geoff, never in git (D131, D185):
 ```json
 { "anthropic_api_key": "...", "agent_id": "...", "agent_version": 2, "environment_id": "...",
   "budget_cents": 300, "question_timeout_s": 600, "recheck_s": 60, "players": 1, "console_name": "Quarter Deck", "model": null,
-  "pot": { "usual_cost_new": 6, "usual_cost_change": 3 }, "manager_token": "..." }
+  "pot": { "usual_cost_new": 6, "usual_cost_change": 2 }, "manager_token": "..." }
 ```
 
 `agent_id` and `environment_id` come from `ant apply` in the **cabinet's own workspace**, because a workspace-scoped key can't reach what `claude-lock.json` names. It won't start with a config others can read, or one missing a key or an agent.
@@ -62,7 +62,7 @@ A flow's first lines can carry its own service flags (`#! --replay-cost 140`) an
 
 ## The family coin pot (D202-D205, D208, D211)
 
-One pot per cabinet: 100 coins = $10 a month, set back to 100 on the 1st. A make starts only if the pot, in whole coins, holds its usual cost (6 new, 3 change), only the COIN button (F2) starts it, and it's charged its session's real list cost at the end, however it ended. Everything is in `logs/coin_ledger.jsonl`, append only, beside `studio_session.jsonl` and joined to it by session id. `src/pot.js`; the rules' tests are `test/pot.test.js`.
+One pot per cabinet: 100 coins = $10 a month, set back to 100 on the 1st. A make starts only if the pot, in whole coins, holds its usual cost (6 new, 2 change since D214), only the COIN button (F2) starts it, and it's charged its session's real list cost at the end, however it ended. Everything is in `logs/coin_ledger.jsonl`, append only, beside `studio_session.jsonl` and joined to it by session id. `src/pot.js`; the rules' tests are `test/pot.test.js`.
 
 The Cabinet Manager's endpoints, behind its token (`Authorization: Bearer ...`):
 
@@ -121,11 +121,15 @@ Make is free in every case, except while a make a restart cut off is still being
 
 Files in the data folder: `studio-run.json` exists only while a make runs, and is how a restart finds the make it cut off. `studio-left.json` lists sessions still to collect. `studio-results.json` holds the entries; viewing one stamps it.
 
+## Guest games (D230–D233)
+
+Downloaded web games sit on the shelf after the carts. Each is a folder in the repo's `guests/` (or `<data>/guests/`) with `guest.json`, `play/` and a `NOTICE.md` of every file's licence (D231). The service serves them on their own origin, `guest_port` in the cabinet config or `--guest-port` (default 8340), with a script that turns Escape into "back to the shelf" before the game sees it (D232). The launcher plays one in a focused full-screen iframe and logs the play to `logs/guest_play.jsonl`. Code: `src/guests.js`, `launcher/guests.js`; tests: `test/guests*.test.js`. The first guest is teti (`guests/teti`, D233).
+
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** request screening (Phase 3, so E10 can't be reached), launcher sound, gamepads in the launcher's menus, guest players, MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
+- **Not built:** request screening (Phase 3, so E10 can't be reached), launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 

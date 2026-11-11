@@ -72,14 +72,15 @@ test("the pot starts at 100 coins = $10, one for the whole cabinet (D202)", () =
 
 // ---------- the start gate (D203) ----------
 
-test("start gate: 6 for a new game, 3 for a change; with 5 coins a change starts and a new game doesn't", () => {
+test("start gate: 6 for a new game, 2 for a change (D214); with 5 coins a change starts and a new game doesn't", () => {
   assert.equal(potAt(60).pot.gate("new").ok, true, "6 coins: a new game starts");
   assert.equal(potAt(56).pot.gate("new").ok, true, "56c shows as 6, and 6 is enough");
   const five = potAt(50).pot;
   assert.deepEqual(five.gate("new"), { ok: false, why: "low", coins: 5, need: 6 });
   assert.equal(five.gate("change").ok, true, "5 coins: a change starts");
   assert.equal(potAt(30).pot.gate("change").ok, true);
-  assert.deepEqual(potAt(20).pot.gate("change"), { ok: false, why: "low", coins: 2, need: 3 });
+  assert.equal(potAt(20).pot.gate("change").ok, true, "2 coins: a change starts (D214)");
+  assert.deepEqual(potAt(10).pot.gate("change"), { ok: false, why: "low", coins: 1, need: 2 });
   assert.equal(potAt(0).pot.gate("change").why, "empty");
   assert.equal(potAt(-40).pot.gate("new").why, "empty");
 });
@@ -266,14 +267,14 @@ test("with 5 coins a change starts: the maker's own change is version 2 of the s
   assert.equal(r.ok, true);
   assert.equal(r.kind, "change");
   assert.equal(r.version, 2);
-  assert.equal(r.cost_cents, 31);
+  assert.equal(r.cost_cents, 9, "the replay ends at the live change's measured cost (D214)");
   const cart = JSON.parse(fs.readFileSync(path.join(paths.carts, r.cart_id, "cart.json"), "utf8"));
   assert.equal(r.cart_id, "penguin-catch-v2");
   assert.equal(cart.parent, "penguin-catch@1");
   assert.equal(cart.family, "penguin-catch");
   assert.equal(cart.branch, "penguin-catch");
   assert.equal(cart.maker, "alina");
-  assert.equal(pot.state().cents, 50 - 31);
+  assert.equal(pot.state().cents, 50 - 9);
   const charge = pot.history().find((e) => e.session_id === "sesn_replay");
   assert.equal(charge?.what, "change");
   assert.equal(charge?.cart_version, 2);

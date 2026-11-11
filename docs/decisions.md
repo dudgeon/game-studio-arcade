@@ -919,4 +919,28 @@ Director's go: one new game and one change by "Tester", $3 at most. Screens are 
 - **Two screen fixes from the same run:**
   - The header's coins-used read "Tester: 0..." cut; it's now "N used" with a coin.
   - A new game's plan re-shown mid-build (a rule change after testing, brief step 7) now says what changed first, and leaves out how to play, which the first plan showed.
-- **usual_cost_change:** the one measured change cost 9c (about 1 coin), a one-number change with one question. The proposal is 2, pending the director and more samples. It stays a setting (config `pot.usual_cost_change`); the code's default is still 3.
+- **usual_cost_change is now 2** (the director, 2026-11-11). The one measured change cost 9c (about 1 coin), a one-number change with one question; 2 leaves headroom until more are measured. It stays a setting (config `pot.usual_cost_change`). The change fixture now ends at 9c too, so the replayed change reads "about usual" against 2, and the screens say "about 2" for a change wherever they said "about 3"; the handoff's coin table says so.
+
+## 2026-11-11 — Downloaded games on the shelf (worker; D208–D229 are the arcade UX build's)
+
+**D230. Downloaded games reach the shelf as web games in the kiosk ("guest games").** *(Geoff asked for the stack to be chosen first and for games Claude can change cheaply, 2026-11-11; the choice is Claude's. Report: docs/falling-blocks.md.)*
+- One way in for every downloaded game: an HTML5 page played in the kiosk's Chromium. TIC-80 and PICO-8 carts come in through their web players or exports. Native players (RetroArch, LÖVE, PICO-8 native) come later, and only for a must-have game with no web build. This settles "guest players" in §3.1 and D183's "Stubbed or not here" for web games.
+- Why: nothing new takes over the screen; Escape, logging and the kiosk lockdown are solved once; and the Studio's Playwright tools can drive and check a guest game the way they check a cart.
+- Games are judged by hackability tier: **A**, edit and reload (plain JS, fantasy-console carts); **B**, edit and rebuild (C/C++ to WebAssembly); **C**, binary only (not picked). Tier A is preferred where the game is good enough.
+- A downloaded game costs no coins to play (playing is always free, D202).
+
+**D231. A guest game is a folder, like a cart.** *(Claude; follows D230.)*
+- `guest.json` (id, title, by, version, upstream source and commit, entry page, how to play, players), `play/` (exactly what is served), `NOTICE.md` (every file's origin and licence, and whether it uses the Tetris name or look), the upstream licence, and any tools that make its assets.
+- Guests that ship with the cabinet live in the repo's `guests/` and update with the service; nothing in a guest's folder is ever deleted, and a new version is a new `version` in `guest.json` with the old one in git. A licence that isn't checked is a reason not to ship the file.
+
+**D232. Guest games play on their own origin, and Escape still goes back to the shelf.** *(Claude; follows D88, D230.)*
+- The service serves guests on a second port, `127.0.0.1:8340` by default (`guest_port` in the cabinet config, or `--guest-port`; 0 picks a free one, as the tests and the D213 replay do), never the launcher's origin, so a downloaded game can't call the cabinet's APIs (cross-origin writes are refused) and keeps its own storage.
+- The launcher plays a guest in a full-screen iframe that has focus, so the game reads the keys itself. The service puts a small script at the top of the guest's page: it takes Escape before the game sees it and tells the launcher, which ends the play (D88). F1 and F2 stay launcher-only by convention; a guest never gets Escape.
+- Plays are logged like a cart's, to `logs/guest_play.jsonl` (guest id and version instead of a cart's).
+
+**D233. The first guest is teti, cleaned up for the cabinet.** *(Geoff's pick, 2026-11-11; the cleanup is Claude's.)*
+- teti (TitanPlayz100/teti, MIT, pinned to commit 1de7944), tier A: about 6.5k lines of plain JS, no build step.
+- Its sounds (TETR.IO's), music (commercial Touhou arrangements), skins and icons are replaced by assets this repo generates (`guests/teti/tools/make-assets.mjs`); pixi.js 8.23.0 (MIT) is vendored at a pinned version; fonts are OFL and local. Nothing loads from the network.
+- **No GSAP** (director, 2026-11-11). Upstream teti animates with GSAP, whose Standard "No Charge" licence isn't open source: it bars use in no-code animation tools that compete with Webflow's, and lets Webflow end the licence. So the cabinet's teti has its own small tween helper, `play/src/tween.js`, with GSAP's names, so teti's 31 call sites are unchanged. Everything teti ships is open source (MIT, OFL) or this repo's, and the Studio can change all of it.
+- Cabinet changes, all in plain JS: Marathon (a level every 10 lines, faster each level, to 20) and Zen (nothing falls on its own); a game picker, pause and game-over screens driven by stick and buttons (`src/cabinet.js`, loaded with `?cabinet`); the D82 keys (stick moves, up drops, A/B turn, X holds, Y turns twice, START pauses).
+- It keeps guideline-style piece colours; it has no Tetris name. That's acceptable for a downloaded game (D230); a kid's change to it may count as a Studio-made game, and that question is open.

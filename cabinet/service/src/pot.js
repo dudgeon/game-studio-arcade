@@ -15,7 +15,7 @@ export const POT_DEFAULTS = {
   cents_per_coin: 10,
   /** The start gate (D203). */
   usual_cost_new: 6,
-  usual_cost_change: 3,
+  usual_cost_change: 2, // D214: the first live change cost 9c; 2 until more are measured
   /** About how long each takes, for the coin check and the time left (M3, R3). */
   usual_minutes_new: 7,
   usual_minutes_change: 4,

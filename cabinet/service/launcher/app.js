@@ -5,6 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
+import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRow } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
 import { H, W, check } from "./text.js";
@@ -51,6 +52,8 @@ let config = { console: "Arcade", players: 1, speech: "stub" };
 let makers = [];
 /** @type {any[]} */
 let carts = [];
+/** Downloaded games (D230), after the carts on the shelf. @type {any[]} */
+let guests = [];
 /** Follow the Studio's state on screen? Off once ESC has gone to the shelf (D187). */
 let following = false;
 /** @type {number | null} */
@@ -99,6 +102,7 @@ const usual = () => pot()?.usual ?? { new: 6, change: 3 };
 async function refresh() {
   carts = (await get("/api/carts")).carts;
   makers = (await get("/api/makers")).makers;
+  guests = await fetchGuests();
 }
 
 // ---------- moving between screens ----------
@@ -122,7 +126,7 @@ async function showShelf() {
     await refresh();
     const ended = (studio.results ?? []).map((/** @type {any} */ r) => ({ kind: "result", result: r, title: r.ok ? (r.kind === "change" ? "A change is ready!" : "New game ready!") : r.failed ? "Sorry! It didn't come out right" : "A new game didn't finish", by: `by ${r.maker_name ?? r.maker}`, note: r.ok ? r.title : r.failed && r.cost_cents != null ? `used ${Math.round(r.cost_cents / 10)} coins` : undefined, urgent: true }));
     const games = gameRows(carts, nameOf).map((r) => ({ ...r, hasCard: true }));
-    const items = [...makeTiles(), ...ended, ...games];
+    const items = [...makeTiles(), ...ended, ...games, ...guests.map(guestRow)];
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : it.kind === "waiting" ? "waiting" : "tile");
     const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
     returnTo = null;
@@ -331,7 +335,7 @@ const newId = () => `pl_${Date.now().toString(36)}${Math.random().toString(36).s
 
 /** G0: how to play, before every game. @param {any} cart */
 function showHowTo(cart) {
-  show({ ...howtoView(cart, nameOf), board: "G0" });
+  show({ ...(cart.guest ? guestHowto(cart) : howtoView(cart, nameOf)), board: "G0" });
 }
 
 /** @param {any} cart */
@@ -340,7 +344,7 @@ function startPlay(cart) {
   stage.hidden = false;
   canvas.hidden = true;
   const startedAt = new Date().toISOString();
-  const host = createHost({
+  const host = (cart.guest ? createGuestHost : createHost)({
     container: stage,
     cartUrl: cart.url,
     players: config.players,
@@ -370,7 +374,8 @@ async function endPlay(ended) {
   stage.hidden = true;
   stage.replaceChildren();
   canvas.hidden = false;
-  post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors }).catch(() => {});
+  if (p.cart.guest) post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors }).catch(() => {});
+  else post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors }).catch(() => {});
   if (p.failed) {
     showBoard({ screen: "board", board: "wont-start", title: "That didn't work", blocks: [{ text: `"${p.cart.title}" wouldn't start. It's saved, and a grown-up can look at it.`, rows: 5 }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["shelf"]);
     return;
@@ -395,6 +400,10 @@ async function finishCheck() {
 
 /** After every game (D201). @param {any} cart @param {any} noRule */
 async function showPostGame(cart, noRule) {
+  if (cart.guest) {
+    const g = guestPostGame(cart);
+    return showBoard(g, g.post, { cart, noRule: null });
+  }
   try {
     await refresh();
   } catch {}
@@ -465,7 +474,7 @@ function onStick(dir) {
   switch (v.screen) {
     case "shelf":
       if (ud) v.sel = Math.max(0, Math.min(v.items.length - 1, v.sel + ud));
-      else if (dir === "right" && v.items[v.sel]?.kind === "cart") showCard(v.items[v.sel].cart);
+      else if (dir === "right" && v.items[v.sel]?.kind === "cart" && v.items[v.sel].hasCard) showCard(v.items[v.sel].cart);
       break;
     case "who":
       if (ud) v.sel = Math.max(0, Math.min(v.rows.length - 1, v.sel + ud));

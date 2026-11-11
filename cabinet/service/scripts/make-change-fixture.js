@@ -81,9 +81,9 @@ push({ type: "session.status_running" });
 push({ type: "user.message", content: [{ type: "text", text: "(the change request)" }] });
 custom("tell_player", { message: "Opening your game", stage: "setup" }, '{"ok":true}');
 tool("bash", { command: "mkdir -p /workspace/kit && tar -xzf /mnt/session/uploads/studio-kit.tgz -C /workspace/kit && mkdir -p /workspace/cart && tar -xzf /mnt/session/uploads/parent.tgz -C /workspace/cart" });
-usage(4);
+usage(2);
 custom("ask_player", { question: "What color should the scarf be?", option_a: "Red, like a fire truck", option_b: "Blue, like the ice" }, '{"choice":"A"}');
-usage(9);
+usage(4);
 tool("edit", { file_path: "/workspace/cart/spec.md", old_string: OLD_R12, new_string: NEW_R12 });
 const rules = plan.rules.map((/** @type {any} */ r) => (r.id === "R12" ? { ...r, text: "The penguin wears a red scarf you can see while it slides.", was: r.text } : r));
 custom(
@@ -97,16 +97,16 @@ custom(
   },
   '{"choice":"build"}',
 );
-usage(14);
+usage(5);
 custom("tell_player", { message: "Adding the scarf", stage: "building" }, '{"ok":true}');
 tool("edit", { file_path: "/workspace/cart/game.js", old_string: "g.spr(spr.peng", new_string: "g.spr(spr.peng" });
-usage(20);
+usage(6);
 custom("tell_player", { message: "Playing your game to check every rule", stage: "testing" }, '{"ok":true}');
 tool("bash", { command: "cd /workspace/kit; node studio-kit/spec/bin/validate-cart.js /workspace/cart" });
 tool("bash", { command: "cd /workspace/kit; node studio-kit/playtest/bin/gsa-playtest.js /workspace/cart --driver node" });
-usage(27);
+usage(8);
 tool("bash", { command: "tar -czf /mnt/session/outputs/cart.tgz -C /workspace/cart . && echo '{}' > /mnt/session/outputs/DONE.json" });
-usage(31);
+usage(9);
 custom("tell_player", { message: "Done! The scarf is on", stage: "done" }, '{"ok":true}');
 push({ type: "agent.message", content: [{ type: "text", text: "Changed R12 and added a red scarf to the penguin. Every rule passes." }] });
 push({ type: "session.status_idle", stop_reason: { type: "end_turn" } });
@@ -114,6 +114,6 @@ push({ type: "session.status_idle", stop_reason: { type: "end_turn" } });
 fs.writeFileSync(path.join(OUT, "events.jsonl"), ev.map((e) => JSON.stringify(e)).join("\n") + "\n");
 fs.writeFileSync(
   path.join(OUT, "README.md"),
-  `# penguin-catch-change\n\nHand-written by \`cabinet/service/scripts/make-change-fixture.js\`, not recorded: a change (fork) of Penguin Catch, version 2, by its maker. One question, a plan with R12 changed, the parent's cart with a red scarf. It ends at ${cost}¢ of list cost, a guess until a live change is measured (D203). Replace it with a recorded change once one has run.\n`,
+  `# penguin-catch-change\n\nHand-written by \`cabinet/service/scripts/make-change-fixture.js\`, not recorded: a change (fork) of Penguin Catch, version 2, by its maker. One question, a plan with R12 changed, the parent's cart with a red scarf. It ends at ${cost}¢ of list cost, what the first live change cost (D214: 9c, one question, a one-number change). Replace it with a recorded change once one has come home.\n`,
 );
 console.log(`wrote ${OUT}: ${ev.length} events, ends at ${cost}c`);
