@@ -46,7 +46,8 @@ export function metaData(instanceId) {
  * runcmd overwrites this file, so the PSK lives only in /etc/netplan on the cabinet (D251).
  */
 export function networkConfig({ ssid, psk, country }) {
-  if (!/^[0-9a-f]{64}$/.test(psk)) throw new Error("the PSK must be 64 hex digits");
+  // A 64-hex WPA key, or (--wpa3: WPA3's SAE can't use a precomputed key) the passphrase itself.
+  if (!/^[0-9a-f]{64}$/.test(psk) && !/^[\x20-\x7e]{8,63}$/.test(psk)) throw new Error("the PSK must be 64 hex digits, or an 8-63 character passphrase");
   if (!/^[A-Z]{2}$/.test(country)) throw new Error("the Wi-Fi country is a two-letter code, such as US");
   return [
     "# Written by scripts/cabinet-card (D251). Replaced on first boot, once cloud-init has applied it.",

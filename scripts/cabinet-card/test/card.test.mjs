@@ -56,7 +56,8 @@ test("network-config holds the WPA key, never the password, and quotes any netwo
   const nameLine = text.split("\n").find((l) => l.endsWith(":") && l.trim().startsWith('"'));
   assert.equal(JSON.parse(nameLine.trim().slice(0, -1)), ssid, "the name survives quoting");
   assert.match(text, new RegExp(`password: "${psk}"`));
-  assert.throws(() => networkConfig({ ssid, psk: "notakey", country: "US" }), /64 hex/);
+  assert.throws(() => networkConfig({ ssid, psk: "short", country: "US" }), /64 hex/);
+  assert.match(networkConfig({ ssid, psk: "a WPA3 passphrase", country: "US" }), /password: "a WPA3 passphrase"/, "--wpa3");
   assert.throws(() => networkConfig({ ssid, psk, country: "usa" }), /two-letter/);
 });
 

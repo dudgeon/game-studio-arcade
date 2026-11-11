@@ -8,7 +8,8 @@
 //   node scripts/cabinet-card/flash.mjs --list          the disks it could write, and why the others are refused
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
 //
-// Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8.
+// Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
+// --wpa3 for a WPA3-only network: its passphrase goes on the card instead of the WPA key (still erased at first boot).
 //
 //   node scripts/cabinet-card/flash.mjs --image-file OUT.img
 //
@@ -119,16 +120,22 @@ function ask(prompt, { secret = false } = {}) {
   return r.stdout;
 }
 
+/** The WPA key, or with --wpa3 the checked passphrase itself: WPA3-only networks can't use a precomputed key. */
+function keyFor(ssid, pass) {
+  const psk = wifiPsk(ssid, pass);
+  return flag("--wpa3") ? pass : psk;
+}
+
 function wifiFromTerminal() {
   const ssid = ask("Home Wi-Fi network name: ");
   const pass = ask("Its password (nothing will show): ", { secret: true });
-  return { ssid, psk: wifiPsk(ssid, pass) };
+  return { ssid, psk: keyFor(ssid, pass) };
 }
 
 function wifiFromStdin() {
   const [ssid, pass] = readFileSync(0, "utf8").split("\n");
   if (!ssid || pass === undefined) stop("with no terminal, stdin must hold the Wi-Fi name and password, one per line");
-  return { ssid, psk: wifiPsk(ssid, pass) };
+  return { ssid, psk: keyFor(ssid, pass) };
 }
 
 function miniTimezone() {
