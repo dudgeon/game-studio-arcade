@@ -1,0 +1,34 @@
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+.pp { width: 196px; height: 220px; top: 70px; }
+.pp .bd { gap: 3px; font-size: 14px; line-height: 16px; }
+#q13-pa { left: 8px; } #q13-pb { left: 222px; } #q13-pc { left: 436px; }
+.pl { top: 40px; width: 196px; font-size: 15px; font-weight: 600; }
+#q13-la { left: 8px; } #q13-lb { left: 222px; } #q13-lc { left: 436px; }
+.tr { top: 300px; width: 196px; font-size: 13px; line-height: 18px; color: #5b636d; }
+#q13-ta { left: 8px; } #q13-tb { left: 222px; } #q13-tc { left: 436px; }
+.eye { background: #73eff7; color: #1a1c2c; padding: 0 3px; }
+.btn2 { margin-top: auto; background: #38b764; text-align: center; padding: 2px; }
+.dots { display: flex; gap: 4px; justify-content: center; margin-top: auto; }
+.dots span { width: 8px; height: 8px; background: #566c86; } .dots span.on { background: #ffcd75; }
+#q13-live { left: 8px; top: 356px; width: 620px; }
+</style>
+<div class="pl" id="q13-la" data-in="fade">A. One screen</div>
+<div class="pl" id="q13-lb" data-in="fade">B. Three pages</div>
+<div class="pl" id="q13-lc" data-in="fade">C. Just what you'll check</div>
+<div class="scr pp" id="q13-pa" data-in="up" data-f><div class="bar">The plan<b></b></div><div class="bd">
+  <div>Slide, catch fish, dodge boots.</div><div class="y">How to play</div><div>Stick slide. Button jump.</div>
+  <div class="y">What happens</div><div>1 Fish: 10 points</div><div>2 Boot: lose a life</div><div>3 You slide <span class="eye">check</span></div><div>4 Miss 3: game over</div>
+  <div class="btn2">Build it!</div></div></div>
+<div class="scr pp" id="q13-pb" data-in="up" data-f><div class="bar">The plan<b>1 of 3</b></div><div class="bd">
+  <div class="y">The idea</div><div style="font-size: 20px; line-height: 21px">You're a penguin on ice. Catch the fish. Dodge the boots!</div>
+  <div class="dots"><span class="on"></span><span></span><span></span></div></div></div>
+<div class="scr pp" id="q13-pc" data-in="up" data-f><div class="bar">The plan<b></b></div><div class="bd">
+  <div>Slide, catch fish, dodge boots.</div><div>Stick slide. Button jump.</div>
+  <div class="y">You'll check:</div><div><span class="eye">check</span> You slide after letting go</div>
+  <div class="m">Claude handles 9 more rules.</div>
+  <div class="btn2">Build it!</div></div></div>
+<div class="tr" id="q13-ta" data-in="fade">Enough to catch a wrong rule; small text</div>
+<div class="tr" id="q13-tb" data-in="fade">Big words; three presses before building</div>
+<div class="tr" id="q13-tc" data-in="fade">Shortest; scoring and lives are a surprise</div>
+<div class="s" id="q13-live" data-in="up">Today's live plan: 19 rules over 6 screens. Every option keeps the full rules one press away.</div>

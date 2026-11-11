@@ -1,0 +1,31 @@
+<style>
+#pot-jar { left: 40px; top: 60px; width: 150px; height: 230px; border: 3px solid #1f2328; border-top-width: 8px; border-radius: 10px 10px 26px 26px; background: #ffffff; overflow: hidden; }
+#pot-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: #ffcd75; transition: height 1.2s cubic-bezier(.45,0,.2,1), background-color .6s; }
+[data-state~="full"] #pot-fill { height: 100%; }
+[data-state~="spend"] #pot-fill { height: 62%; }
+[data-state~="neg"] #pot-fill { height: 0%; }
+#pot-num { left: 40px; top: 300px; width: 156px; text-align: center; font-size: 22px; line-height: 28px; font-weight: 700; }
+#pot-lab100 { left: 210px; top: 66px; }
+#pot-cal { left: 210px; top: 110px; }
+#pot-kids { left: 210px; top: 160px; width: 260px; display: flex; flex-direction: column; gap: 8px; }
+.kb { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+.kb span:first-child { width: 48px; }
+.kb i { display: block; height: 12px; background: #73c7d0; border-radius: 3px; }
+#pot-coinkey { left: 500px; top: 70px; width: 96px; height: 96px; border-radius: 50%; background: #ffcd75; border: 5px solid #ef7d57; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+#pot-negbox { left: 210px; top: 270px; }
+#pot-norefund { left: 400px; top: 270px; }
+#pot-reset { left: 210px; top: 320px; }
+</style>
+<div id="pot-jar" data-in="up" data-f><div id="pot-fill"></div></div>
+<div id="pot-num" data-in="fade">100 coins</div>
+<div class="stamp" id="pot-lab100" data-in="left" data-f>100 coins = $10 a month</div>
+<div class="chip" id="pot-cal" data-in="left" data-f>Filled on the 1st</div>
+<div id="pot-kids" data-in="left" data-f>
+  <div class="kb"><span>Alina</span><i style="width: 95px"></i><span>19</span></div>
+  <div class="kb"><span>Owen</span><i style="width: 80px"></i><span>16</span></div>
+  <div class="kb"><span>Sam</span><i style="width: 15px"></i><span>3</span></div>
+</div>
+<div id="pot-coinkey" data-in="scale" data-f>COIN</div>
+<div class="chip bad" id="pot-negbox" data-in="up" data-f>Over? It finishes. Pot: -2</div>
+<div class="chip" id="pot-norefund" data-in="up" data-f>No refunds</div>
+<div class="s" id="pot-reset" data-in="up">The negative is wiped on the 1st.</div>
