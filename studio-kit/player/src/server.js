@@ -115,7 +115,17 @@ export function createPlayerHandler(opts = {}) {
   const cartList = () => {
     const checks = readLog(path.join(logsDir, "you_check.jsonl"));
     const plays = readLog(path.join(logsDir, "play.jsonl"));
-    return carts().map(({ dir, ...c }) => {
+    const all = carts();
+    // Best score per game line: a game's versions by its maker (D206, D215). Plays log a cart id; its line is its branch, or itself.
+    const lineOf = new Map(all.map((c) => [c.id, c.branch ?? c.id]));
+    /** @type {Map<string, number>} */
+    const bestOf = new Map();
+    for (const p of plays) {
+      if (!Number.isInteger(p.score)) continue;
+      const line = lineOf.get(p.cart_id) ?? p.cart_id;
+      bestOf.set(line, Math.max(bestOf.get(line) ?? 0, p.score));
+    }
+    return all.map(({ dir, ...c }) => {
       const mine = checks.filter((r) => r.cart_id === c.id && r.cart_version === c.version);
       const last = mine[mine.length - 1];
       return {
@@ -123,6 +133,8 @@ export function createPlayerHandler(opts = {}) {
         url: `/carts/${encodeURIComponent(c.id)}/game.js`,
         answered: last ? { at: last.answered_at, by: last.checker ?? null, answers: last.answers } : null,
         plays: plays.filter((p) => p.cart_id === c.id).length,
+        // The best round score ever on this game's line, or null if it has never reported one (D215).
+        best: bestOf.has(c.branch ?? c.id) ? bestOf.get(c.branch ?? c.id) : null,
       };
     });
   };
@@ -154,7 +166,15 @@ export function createPlayerHandler(opts = {}) {
       early_quit: duration < EARLY_QUIT_S,
       ended,
       errors: Number.isInteger(b.errors) && b.errors >= 0 ? b.errors : 0,
+      // D215: the round scores the game reported with g.score(), and this play's best of them; none if it reported nothing.
+      ...scoresOf(b.scores),
     };
+  };
+
+  /** A play's round scores: whole numbers from 0 to 999,999,999, at most 200 of them. @param {unknown} raw */
+  const scoresOf = (raw) => {
+    const list = Array.isArray(raw) ? raw.filter((n) => Number.isInteger(n) && n >= 0 && n <= 999_999_999).slice(0, 200) : [];
+    return list.length ? { scores: list, score: Math.max(...list) } : {};
   };
 
   /** @param {any} b */

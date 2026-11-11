@@ -701,17 +701,29 @@ export function resultView(r, pot) {
 /** @param {number} c */
 const coinsOfCents = (c) => Math.sign(c) * Math.round(Math.abs(c) / 10);
 
-/** The post-game screen, after every game (D201): G3, G4, G5. @param {{ cart: any, noRule?: any, versions: number, usual: {change: number} }} o */
+/**
+ * This play's score and the best ever, for a game that reports one (D215). Nothing for one that doesn't.
+ * @param {{ score?: number | null, best?: number | null, bestBefore?: number | null }} o
+ */
+export function scoreLine(o) {
+  if (o.score == null) return [];
+  const best = Math.max(o.best ?? 0, o.score);
+  const record = o.score > 0 && (o.bestBefore == null || o.score > o.bestBefore);
+  return [{ id: "score", text: record ? `Score: ${o.score}. A new best!` : `Score: ${o.score}. Best: ${best}.`, color: C.lime, rows: 1, after: 3, onCut: "never" }];
+}
+
+/** The post-game screen, after every game (D201): G3, G4, G5. @param {{ cart: any, noRule?: any, versions: number, usual: {change: number}, score?: number | null, best?: number | null, bestBefore?: number | null }} o */
 export function postGame(o) {
   const c = o.cart;
   const change = o.usual.change;
+  const score = scoreLine(o);
   if (!c.maker) {
     return {
       screen: "board",
       board: "G5",
       title: "Done playing",
       right: c.title,
-      blocks: [{ text: "Make it yours?", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, { text: "Change anything you like. This one stays the same for everyone.", rows: 3, onCut: "never" }],
+      blocks: [{ text: "Make it yours?", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, ...score, { text: "Change anything you like. This one stays the same for everyone.", rows: 3, onCut: "never" }],
       tiles: [{ text: "Make my own version", note: `about ${change}`, noteCoin: true }, { text: "Play again", note: "free" }, { text: "Back to the shelf", hue: C.green }],
       sel: 2,
       post: ["change", "again", "shelf"],
@@ -725,6 +737,7 @@ export function postGame(o) {
       right: c.title,
       blocks: [
         { text: "Fix it?", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" },
+        ...score,
         { text: "You said this wasn't true:", color: C.silver, rows: 1, after: 1, onCut: "never" },
         { text: o.noRule.text, rows: 4, color: C.peach },
       ],
@@ -743,7 +756,7 @@ export function postGame(o) {
     board: "G4",
     title: "Done playing",
     right: c.title,
-    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, { text: "Want to change anything?", rows: 1, onCut: "never" }],
+    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, ...score, { text: "Want to change anything?", rows: 1, onCut: "never" }],
     tiles: [
       { text: "Play again", note: "free" },
       { text: "Change this game", note: `about ${change}`, noteCoin: true },

@@ -1,0 +1,27 @@
+{
+  "request": "a frog hops across a river on floating logs. Three lives. Get to the other side to score.",
+  "maker": "tester",
+  "questions": [
+    {
+      "question": "How does the frog move?",
+      "option_a": "One hop at a time: each stick push is one hop",
+      "option_b": "Smooth sliding: hold the stick to glide",
+      "choice": "A",
+      "answer": "One hop at a time: each stick push is one hop"
+    },
+    {
+      "question": "What is in the river besides logs?",
+      "option_a": "Just logs: miss one and you splash",
+      "option_b": "Logs plus sneaky gators that you must avoid",
+      "choice": "D"
+    }
+  ],
+  "plan": [
+    {
+      "choice": "build"
+    },
+    {
+      "choice": "build"
+    }
+  ]
+}

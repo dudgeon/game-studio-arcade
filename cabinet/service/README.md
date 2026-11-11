@@ -20,7 +20,7 @@ node cabinet/service/bin/cabinet-service.js --data /var/lib/arcade --config /etc
 | `--port N`, `--host H` | default 127.0.0.1:8330, which the kiosk opens |
 | `--examples` | also shelve `runtime/examples/*` |
 | `--manager-token T` | the Cabinet Manager's pairing token, or `manager_token` in the config; without one the Manager endpoints are off (D208) |
-| `--replay-change DIR` | replay: the fixture a change replays; default `<replay>-change` (D209) |
+| `--replay-change DIR` | replay: the fixture a change replays; default `<replay>-change`, else the recorded `log-hopper-change` (D209, D219) |
 | `--replay-cost CENTS` | replay: what each session ends up costing, for the pot's edges (L3, L4) |
 | `--replay-fail` | replay: no game comes back (E3) |
 | `--replay-limit` | replay: the workspace's spend limit refuses the session (L5) |
@@ -72,6 +72,10 @@ The Cabinet Manager's endpoints, behind its token (`Authorization: Bearer ...`):
 | `GET /api/manager/pot/preview?coins=N` | what a top-up would do, and whether the month could pass the workspace's $15 limit |
 | `POST /api/manager/pot/topup` | `{coins, reason, by?}`: the reason is shown to the kids in A2 |
 | `POST /api/manager/pot/reset` | `{reason, by?}`: back to 100 |
+
+## Score and best (D215)
+
+A game reports a round's final score with `g.score(n)`, which the starter library's `score.commit` does for it. The launcher sends the play's scores with its play record. The post-game screen shows "Score: 120. Best: 340." (or "A new best!"), with the best taken from the play log for the game's line. A game that reports nothing shows no score line.
 
 ## Changes (D206, D209)
 

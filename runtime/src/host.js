@@ -122,6 +122,7 @@ export function createHost(opts) {
     poke: (o) => call("poke", [o]),
     frame: () => call("frame", []),
     sounds: () => call("sounds", []),
+    scores: () => call("scores", []),
     warnings: () => call("warnings", []),
     reset: (o) => call("reset", [o]),
   };
@@ -146,6 +147,8 @@ export function createHost(opts) {
     displayHz: 0,
     /** Live ticks run so far. */
     ticks: 0,
+    /** Round scores the cart reported with g.score(), in order (D215). @type {number[]} */
+    scores: [],
     paused: test,
     pause() {
       arcade.paused = true;
@@ -189,6 +192,8 @@ export function createHost(opts) {
           }
         }
         for (const w of msg.warnings ?? []) arcade.warnings.push(w);
+        // D215: round scores, for the player's post-game screen. Only whole numbers in range get this far.
+        for (const n of msg.scores ?? []) if (Number.isInteger(n) && n >= 0) arcade.scores.push(n);
         if (msg.save !== undefined && persist) {
           try {
             localStorage.setItem(saveKey, msg.save);

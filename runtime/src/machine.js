@@ -10,6 +10,8 @@ import { createRng } from "./rng.js";
 import { SFX, Voices, toneToSegment } from "./sound.js";
 
 export const SAVE_LIMIT = 4096;
+/** The biggest score g.score() takes (D215). */
+export const SCORE_MAX = 999_999_999;
 
 /**
  * @typedef {import("./sound.js").SoundCommand} SoundCommand
@@ -52,6 +54,9 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
   /** @type {SoundCommand[]} */
   const soundLog = [];
   let saveDirty = false;
+  /** Round scores reported with g.score(), in order (D215). @type {number[]} */
+  const scores = [];
+  let scoresOut = [];
   /** @type {{ frame: number, message: string }[]} */
   const warnings = [];
   /** @type {{ frame: number, message: string }[]} */
@@ -168,6 +173,13 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       saveDirty = true;
     },
     load: () => (saved === null ? null : JSON.parse(saved)),
+
+    // D215: a round's final score, for the cabinet's post-game screen. Call it once when a round ends.
+    score: (n) => {
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > SCORE_MAX) throw new Error(`g.score() needs a whole number from 0 to ${SCORE_MAX} (got ${String(n)})`);
+      scores.push(n);
+      scoresOut.push(n);
+    },
   };
   Object.freeze(g);
 
@@ -225,6 +237,16 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       const out = audioOut;
       audioOut = [];
       return out;
+    },
+    /** Scores reported since the last call (D215). */
+    drainScores() {
+      const out = scoresOut;
+      scoresOut = [];
+      return out;
+    },
+    /** Every score reported this run, in order. */
+    get scores() {
+      return [...scores];
     },
     /** The saved JSON text if it changed since the last call, else undefined. */
     drainSave() {

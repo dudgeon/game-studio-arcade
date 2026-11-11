@@ -18,7 +18,8 @@ import { replayApi, REPLAY_LOCK, usageOf } from "../test-support/replay-api.js";
 
 const FIXTURES = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures");
 const MAKE = path.join(FIXTURES, "penguin-catch");
-const CHANGE = path.join(FIXTURES, "penguin-catch-change");
+// Recorded: Tester's live change to Log Hopper (D214, D215).
+const CHANGE = path.join(FIXTURES, "log-hopper-change");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-pot-"));
 const passing = {
   async validate() {
@@ -261,20 +262,20 @@ test("the gate refuses a new game under 6 coins, before anything starts or is sp
 test("with 5 coins a change starts: the maker's own change is version 2 of the same game (D203, D206)", async () => {
   const { studio, runThrough, carts, paths, pot } = studioWith({ potCents: 50 });
   carts.set("penguin-catch", { id: "penguin-catch", dir: path.join(MAKE, "cart"), version: 1, maker: "alina", title: "Penguin Catch", session_id: null });
-  studio.start({ maker: "alina", request: "give the penguin a red scarf", parent: "penguin-catch" });
+  studio.start({ maker: "alina", request: "make the logs float a bit faster", parent: "penguin-catch" });
   assert.equal(studio.state().kind, "change");
   const r = await runThrough();
   assert.equal(r.ok, true);
   assert.equal(r.kind, "change");
   assert.equal(r.version, 2);
-  assert.equal(r.cost_cents, 9, "the replay ends at the live change's measured cost (D214)");
+  assert.equal(r.cost_cents, 14, "what the recorded live change cost (D214)");
   const cart = JSON.parse(fs.readFileSync(path.join(paths.carts, r.cart_id, "cart.json"), "utf8"));
   assert.equal(r.cart_id, "penguin-catch-v2");
   assert.equal(cart.parent, "penguin-catch@1");
   assert.equal(cart.family, "penguin-catch");
   assert.equal(cart.branch, "penguin-catch");
   assert.equal(cart.maker, "alina");
-  assert.equal(pot.state().cents, 50 - 9);
+  assert.equal(pot.state().cents, 50 - 14);
   const charge = pot.history().find((e) => e.session_id === "sesn_replay");
   assert.equal(charge?.what, "change");
   assert.equal(charge?.cart_version, 2);
@@ -287,7 +288,7 @@ test("someone else's change is their own version: a new line, version 1, the ori
   fs.cpSync(path.join(MAKE, "cart"), parentDir, { recursive: true });
   const before = fs.readFileSync(path.join(parentDir, "spec.md"), "utf8");
   carts.set("penguin-catch", { id: "penguin-catch", dir: parentDir, version: 1, maker: "alina", title: "Penguin Catch", session_id: null });
-  studio.start({ maker: "owen", request: "give the penguin a red scarf", parent: "penguin-catch" });
+  studio.start({ maker: "owen", request: "make the logs float a bit faster", parent: "penguin-catch" });
   const r = await runThrough();
   assert.equal(r.version, 1);
   const cart = JSON.parse(fs.readFileSync(path.join(paths.carts, r.cart_id, "cart.json"), "utf8"));
@@ -308,6 +309,22 @@ test("no refunds: a make that fails is charged what it cost (D202)", async () =>
   assert.equal(r.cost_cents, 68);
   assert.equal(r.request, "a penguin game", "the idea is kept, for Try again (E3)");
   assert.equal(pot.state().cents, 932);
+  assert.equal(pot.history()[0].outcome, "didn't finish");
+});
+
+test("a make that fails on the cabinet's side after its session ran is charged and archived (D214, D219)", async () => {
+  const made = replayApi({ dir: MAKE, usage: usageOf(MAKE) });
+  // As the live change did: the session ends, then bringing it home fails.
+  made.api.listOutputs = async () => Promise.reject(new Error("400 file_not_downloadable"));
+  const { studio, runThrough, pot, paths } = studioWith({ api: made.api });
+  studio.start({ maker: "alina", request: "a penguin game" });
+  const r = await runThrough();
+  assert.equal(r.ok, false);
+  assert.equal(r.cost_cents, 68, "charged what it cost (D202)");
+  for (let i = 0; i < 100 && !made.mock.calls.includes("archiveSession"); i++) await new Promise((res) => setTimeout(res, 10));
+  assert.ok(made.mock.calls.includes("archiveSession"), "archived, never deleted");
+  const corrections = readLog(path.join(paths.logs, "studio_session_correction.jsonl"));
+  assert.equal(corrections.at(-1)?.archive?.ok, true);
   assert.equal(pot.history()[0].outcome, "didn't finish");
 });
 

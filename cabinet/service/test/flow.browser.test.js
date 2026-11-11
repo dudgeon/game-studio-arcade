@@ -626,6 +626,54 @@ test("back from a game, the shelf stays on it; a game that's gone falls back to 
   });
 });
 
+test("score and best: a game's reported score shows after the play, and the best stays (D215)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
+    // A starter that ends a round on A with 42 points the first play, then 7.
+    const dir = path.join(data, "carts", "scorer");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "game.js"), `export default {
+  init: (g) => ({ round: (g.load() ?? { plays: 0 }).plays, done: false }),
+  update(g, s) { if (!s.done && g.btnp("a")) { s.done = true; g.score(s.round === 0 ? 42 : 7); g.save({ plays: s.round + 1 }); } },
+  draw(g, s) { g.cls(1); g.text(s.done ? "OVER" : "PRESS A", 10, 10, 7); },
+};
+`);
+    fs.writeFileSync(path.join(dir, "cart.json"), JSON.stringify({ title: "Scorer" }));
+    await page.reload();
+    await page.waitForFunction(() => /** @type {any} */ (window).launcher?.screen() === "shelf");
+    const words = () => page.evaluate(() => /** @type {any} */ (window).launcher.boxes().flatMap((/** @type {any} */ b) => b.lines.map((/** @type {any} */ l) => l.text)).join(" | "));
+    await run(`
+      sleep 100
+      press down
+      press a
+      wait G0
+      press a
+      wait play
+      sleep 500
+      press a
+      sleep 300
+      press esc
+      wait G5
+      shot first-score
+    `);
+    assert.match(await words(), /Score: 42\. A new best!/);
+    await run(`
+      press up
+      press a
+      wait play
+      sleep 500
+      press a
+      sleep 300
+      press esc
+      wait G5
+    `);
+    assert.match(await words(), /Score: 7\. Best: 42\./);
+    const plays = readLog(path.join(data, "logs", "play.jsonl"));
+    assert.deepEqual(plays.map((/** @type {any} */ p) => p.score), [42, 7], "each play's score is in the play log");
+    assert.deepEqual(plays[0].scores, [42]);
+    assert.deepEqual(await faults(), []);
+  });
+});
+
 test("a game that won't start says so, and doesn't strand the kid", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
     const dir = path.join(data, "carts", "broken");

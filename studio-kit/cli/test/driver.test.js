@@ -169,6 +169,17 @@ test("an extra plan during a replay is noted as a re-plan, not as running out", 
   assert.ok(!r.notes.includes("replay_exhausted"));
 });
 
+test("the plan reaches the player whole: how to play and the four rules that matter (D210, D215)", async () => {
+  const input = { summary: "s", controls: "Stick: hop. A: start.", top_rules: ["R2", "R1"], rules: [{ id: "R1", kind: "auto", text: "t" }, { id: "R2", kind: "you-check", text: "u", was: "old" }], changes: [{ id: "R2", text: "c" }] };
+  const m = mockApi({ steps: [{ await_message: true }, toolUse("p1", "show_plan", input), { await_result: "p1", expect: { choice: "build" } }, idle("i", "end_turn")] });
+  /** @type {any[]} */
+  const shown = [];
+  const { r } = await run(m.api, { async question() { return /** @type {const} */ ({ choice: "D" }); }, async plan(p) { shown.push(p); return /** @type {const} */ ({ choice: "build" }); } });
+  assert.deepEqual(shown, [input], "nothing the agent sent is dropped");
+  assert.equal(r.planTurns[0].controls, "Stick: hop. A: start.");
+  assert.deepEqual(r.planTurns[0].top_rules, ["R2", "R1"]);
+});
+
 test("an unknown custom tool gets an error result instead of hanging", async () => {
   const m = mockApi({ steps: [{ await_message: true }, toolUse("x1", "launch_rocket", {}), { await_result: "x1" }, idle("i", "end_turn")] });
   const { r } = await run(m.api, replayAnswerer({}));

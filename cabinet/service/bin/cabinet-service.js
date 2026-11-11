@@ -66,6 +66,18 @@ if (values.config) {
   }
 }
 
+/** The Manager's pairing token from its file, if there is one: a function, so a new pairing works without a restart. @param {string} file */
+function tokenFile(file) {
+  return () => {
+    try {
+      const t = fs.readFileSync(file, "utf8").trim();
+      return t.length >= 32 ? t : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
 const makers = makersStore({ file: path.join(paths.root, "makers.json") });
 // The family coin pot (D202-D205): its numbers are settings, config.pot overrides them.
 const pot = potStore({ logsDir: paths.logs, settings: config.pot ?? {} });
@@ -111,7 +123,8 @@ const studio = createStudio({
       // A fresh replay for each make; one picked up after a restart starts part way through (D191).
       const { replayApi, usageOf } = await import("../test-support/replay-api.js");
       const base = path.resolve(/** @type {string} */ (values.replay));
-      const changeDir = values["replay-change"] ? path.resolve(values["replay-change"]) : `${base}-change`;
+      // A change replays its own fixture: <replay>-change if there is one, else the recorded live change (D215).
+      const changeDir = values["replay-change"] ? path.resolve(values["replay-change"]) : fs.existsSync(`${base}-change`) ? `${base}-change` : path.join(path.dirname(base), "log-hopper-change");
       const dir = what?.kind === "change" && fs.existsSync(changeDir) ? changeDir : base;
       const usage = usageOf(dir, values["replay-cost"] != null ? Number(values["replay-cost"]) : null);
       // Each replayed make is its own session, as live, so each is charged once (D208). A pick-up keeps its id.
@@ -153,7 +166,8 @@ const s = await startService({
   pot,
   cabinet,
   // The Cabinet Manager's pairing token (D205, D208). None: the Manager endpoints are off.
-  managerToken: values["manager-token"] ?? config.manager_token ?? null,
+  // D215: or the pairing file beside the config, made on the cabinet by scripts/coin.mjs pair, read on each request.
+  managerToken: values["manager-token"] ?? config.manager_token ?? (values.config ? tokenFile(path.join(path.dirname(values.config), "manager-token")) : null),
   players: config.players,
   consoleName: config.console_name,
   examples: values.examples,

@@ -7,7 +7,7 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
-import { bootBoard, cardView, coinsWord, resultItem, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { bootBoard, cardView, coinsWord, resultItem, scoreLine, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame } from "../launcher/guests.js";
 
@@ -91,6 +91,9 @@ function boardsWith(s) {
     "G6 guest": guestPostGame({ id: "teti", guest: true, title: s, by: s }),
     "G3": postGame({ cart, noRule: { id: "R12", text: s }, versions: 3, usual: { change: 3 } }),
     "G4": postGame({ cart, noRule: null, versions: 3, usual: { change: 3 } }),
+    "G4 with a score": postGame({ cart, noRule: null, versions: 3, usual: { change: 2 }, score: 999_999_999, best: 999_999_999, bestBefore: 5 }),
+    "G3 with a score": postGame({ cart, noRule: { id: "R12", text: s }, versions: 3, usual: { change: 2 }, score: 120, best: 340, bestBefore: 340 }),
+    "G5 with a score": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 2 }, score: 120, best: 340, bestBefore: 340 }),
     "G5": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 3 } }),
     "M1": whoView({ makers: Array.from({ length: 12 }, (_, i) => ({ id: `m${i}`, name: s })), pot: pot(40) }),
     "R1": whoView({ makers: [{ id: "alina", name: s }, { id: "owen", name: s }], pot: pot(40), change: { cart } }),
@@ -312,4 +315,13 @@ test("a guest's G0, from its real guest.json: nothing cut, and no author in the 
   assert.doesNotMatch(words, /\bby\b/, "the header has no author; the shelf row says who made it");
   assert.match(words, /Fill whole rows/);
   assert.equal(p.boxes.filter((b) => /^howto-control-/.test(b.id)).length, 4, "all four control lines show");
+});
+
+test("score and best after a play (D215): this play's score, the best ever, a new best said so; nothing for no score", () => {
+  assert.deepEqual(scoreLine({ score: null, best: 340 }), [], "a game that reports nothing shows no score line");
+  assert.equal(scoreLine({ score: 120, best: 340, bestBefore: 340 })[0].text, "Score: 120. Best: 340.");
+  assert.equal(scoreLine({ score: 400, best: 400, bestBefore: 340 })[0].text, "Score: 400. A new best!");
+  assert.equal(scoreLine({ score: 50, best: 50, bestBefore: null })[0].text, "Score: 50. A new best!", "the first score is the best so far");
+  assert.equal(scoreLine({ score: 0, best: 0, bestBefore: null })[0].text, "Score: 0. Best: 0.", "zero isn't a record");
+  assert.equal(scoreLine({ score: 120, best: null, bestBefore: 340 })[0].text, "Score: 120. Best: 120.", "a best not yet logged still reads sensibly");
 });

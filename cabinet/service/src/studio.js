@@ -669,6 +669,11 @@ export function createStudio(o) {
           }
           const cost = charge(current, cents, "didn't finish");
           addResult({ ...shelfEntry(current), ...cost, ok: false, failed: !stale, request, message: stale ? MESSAGES.stale : MESSAGES.error, session_id: current.sessionId ?? null });
+          // A session that failed here (the cabinet's side, D214) is archived like a released one, never deleted (D5, D188).
+          if (current.sessionId && current.api) {
+            const archived = await archive(current.api, current.sessionId);
+            logArchive(current.sessionId, "the make failed outside makeCart's record; archived (D219)", archived);
+          }
         })
         .catch((e) => console.error(`cabinet-service: logging a make that ended: ${e?.message ?? e}`))
         .finally(() => {

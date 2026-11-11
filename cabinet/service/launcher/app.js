@@ -72,6 +72,8 @@ const faults = new Set();
 /** @type {any} */
 let playing = null;
 const answered = new Set();
+/** The last play of each game: its score, the best before it, and its play record's post (D215). @type {Map<string, any>} */
+const scoreOf = new Map();
 /** The game just played: the next shelf opens on it, once (D194). @type {string | null} */
 let returnTo = null;
 /** Boards shown so far, for scripts and the report. @type {string[]} */
@@ -375,8 +377,15 @@ async function endPlay(ended) {
   stage.hidden = true;
   stage.replaceChildren();
   canvas.hidden = false;
-  if (p.cart.guest) post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors }).catch(() => {});
-  else post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors }).catch(() => {});
+  if (p.cart.guest) void post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors }).catch(() => {});
+  // This play's round scores go with its record, which the best comes from (D215). Logged before the post-game screen reads it.
+  const scores = [...(p.host.scores ?? [])];
+  p.score = scores.length ? Math.max(...scores) : null;
+  p.bestBefore = carts.find((c) => c.id === p.cart.id)?.best ?? p.cart.best ?? null;
+  const logged = p.cart.guest
+    ? null
+    : post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors, scores }).catch(() => {});
+  scoreOf.set(p.cart.id, { score: p.score, bestBefore: p.bestBefore, logged });
   if (p.failed) {
     showBoard({ screen: "board", board: "wont-start", title: "That didn't work", blocks: [{ text: `"${p.cart.title}" wouldn't start. It's saved, and a grown-up can look at it.`, rows: 5 }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["shelf"]);
     return;
@@ -405,12 +414,15 @@ async function showPostGame(cart, noRule) {
     const g = guestPostGame(cart);
     return showBoard(g, g.post, { cart, noRule: null });
   }
+  const played = scoreOf.get(cart.id);
+  await played?.logged;
   try {
     await refresh();
   } catch {}
   const fam = familyOfCart(carts, cart.id);
   const versions = fam ? [fam.family.main, ...fam.family.others].reduce((n, l) => n + l.carts.length, 0) : 1;
-  const v = postGame({ cart, noRule, versions, usual: usual() });
+  const best = carts.find((c) => c.id === cart.id)?.best ?? null;
+  const v = postGame({ cart, noRule, versions, usual: usual(), score: played?.score ?? null, best, bestBefore: played?.bestBefore ?? null });
   showBoard(v, v.post, { cart, noRule });
 }
 
