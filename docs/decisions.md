@@ -978,3 +978,10 @@ Director's go: one new game and one change by "Tester", $3 at most. Screens are 
 - **Passes if** over 24 hours that include build-worker use, the private path is up for at least 99.9% of probes and the held connection never dies, whatever the bridged path does.
 - **What the bridged path shows:** if it drops in that time, netwatch's record says whether the guest still reached the router, and whether the nudge brought the bridged path back.
 - **If the private path fails too,** the next step is Ethernet for the mini (D156), and that's Geoff's call.
+
+**D244. Cabinets don't wait 2 minutes for networkd at boot.** *(Claude, at the director's ask, 2026-11-11; both profiles.)*
+- **The problem:** NetworkManager runs Pi OS Lite's network. On first boot, though, systemd's presets also enable `systemd-networkd` and `systemd-networkd-wait-online`. On the virtual cabinet the symlinks date from its first boot, 2026-11-10 23:32:58, before provisioning began at 23:35. With nothing for networkd to manage, the wait runs its full 2 minutes and fails on every boot. That holds `network-online.target` and everything after it: `systemd-analyze` showed the launcher starting 1 min 27 s into boot.
+- **Same on the Picade:** it boots the same pinned image with the same first-boot presets, so it would sit through the same 2 minutes on every power-on. This is inferred from the image; it can't be checked until the hardware arrives.
+- **The fix:** `provision.sh` masks `systemd-networkd-wait-online` for both profiles (`boot-wait.sh`), but only where NetworkManager is enabled and `/etc` or `/run` has no `.network` file for networkd. A mask outlasts any later preset run. networkd itself stays as it is: it manages nothing, so it costs nothing.
+- **How it's checked:** `boot-wait.test.mjs`, plus `verify.sh`. `boot-not-held` checks the mask is in place and that `network-online` was reached within 30 seconds of boot, and `no-failed-units` no longer excuses the wait.
+- **Proving it** needs one restart after the update.

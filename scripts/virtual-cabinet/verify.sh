@@ -46,8 +46,9 @@ check devtools-local-only guest '! ss -ltn | grep ":9222" | grep -qv "127.0.0.1"
 check console-not-on-serial guest '! grep -q hvc /proc/consoles'
 check swap-as-on-pi guest 'grep -q zram /proc/swaps'
 check sound-out guest 'sudo runuser -u arcade -- aplay -l | grep -q virtio-snd && head -c 96000 /dev/zero | sudo runuser -u arcade -- aplay -q -D hw:0 -f S16_LE -r 48000 -c 2 -t raw -'
-# Pi OS enables networkd's wait-online too, but NetworkManager runs the network, so that unit always times out.
-check no-failed-units guest 'test -z "$(systemctl --failed --no-legend --plain | grep -vE "systemd-networkd-wait-online" )" || { systemctl --failed --no-legend --plain; false; }'
+check no-failed-units guest 'test -z "$(systemctl --failed --no-legend --plain)" || { systemctl --failed --no-legend --plain; false; }'
+# D244: nothing holds boot behind networkd's wait-online. Proven only by a boot since the fix: online within 30 s.
+check boot-not-held guest 'test "$(systemctl is-enabled systemd-networkd-wait-online 2>&1)" = masked && t=$(systemctl show -p ActiveEnterTimestampMonotonic --value network-online.target) && echo "network-online at $((t / 1000000)) s" && test "$t" -gt 0 && test "$t" -lt 30000000'
 
 check no-utm-window swift "$REPO/scripts/virtual-cabinet/windows.swift"
 

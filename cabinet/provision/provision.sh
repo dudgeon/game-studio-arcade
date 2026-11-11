@@ -28,6 +28,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 
 # shellcheck source=/dev/null
 . "$SELF_DIR/profiles/$PROFILE.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/boot-wait.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
@@ -167,6 +169,7 @@ step_node
 step_bundle
 step_carts
 hw_late
+step_boot_wait
 step_services
 install -d /etc/arcade
 echo "$RELEASE_NAME" > /etc/arcade/provisioned-version
