@@ -1,0 +1,26 @@
+<style>
+#q15-axis { left: 40px; top: 200px; width: 560px; height: 4px; background: #8b939c; }
+.tk { top: 212px; font-size: 14px; color: #5b636d; }
+#q15-t0 { left: 34px; } #q15-t5 { left: 230px; } #q15-t10 { left: 442px; } #q15-t13 { left: 544px; }
+#q15-potbar { left: 40px; top: 150px; width: 392px; height: 34px; background: #ffcd75; border-radius: 4px; font-size: 15px; line-height: 34px; padding-left: 10px; font-weight: 600; box-sizing: border-box; }
+#q15-lim { left: 431px; top: 110px; width: 4px; height: 130px; background: #b3261e; transition: left .9s cubic-bezier(.45,0,.2,1); }
+#q15-limlab { left: 360px; top: 84px; color: #b3261e; font-weight: 600; font-size: 15px; transition: left .9s cubic-bezier(.45,0,.2,1); }
+[data-state~="oA"] #q15-lim { left: 549px; } [data-state~="oA"] #q15-limlab { left: 480px; }
+#q15-over { left: 360px; top: 260px; width: 150px; height: 30px; background: #41a6f6; border-radius: 4px; color: #ffffff; font-size: 14px; line-height: 30px; padding-left: 8px; box-sizing: border-box; }
+#q15-cut { left: 438px; top: 296px; color: #b3261e; font-size: 15px; font-weight: 600; }
+#q15-stop { left: 408px; top: 140px; width: 3px; height: 100px; background: #1f2328; }
+#q15-stoplab { left: 300px; top: 246px; }
+[data-state~="oB"] #q15-over { left: 300px; width: 130px; }
+[data-state~="oA"] #q15-cut, [data-state~="oB"] #q15-cut { opacity: 0; }
+#q15-okA { left: 40px; top: 340px; }
+</style>
+<div id="q15-axis"></div>
+<div class="tk" id="q15-t0">$0</div><div class="tk" id="q15-t5">$5</div><div class="tk" id="q15-t10">$10</div><div class="tk" id="q15-t13">$13</div>
+<div id="q15-potbar" data-in="grow" data-f>The pot: 100 coins = $10</div>
+<div id="q15-lim" data-in="fade" data-f></div>
+<div id="q15-limlab" data-in="fade">Real account limit</div>
+<div id="q15-over" data-in="left" data-f>A make running over</div>
+<div id="q15-cut" data-in="fade">Cut off here</div>
+<div id="q15-stop" data-in="fade" data-f></div>
+<div class="s" id="q15-stoplab" data-in="fade">No new makes after 94</div>
+<div class="chip good" id="q15-okA" data-in="up" data-f>Every make finishes</div>

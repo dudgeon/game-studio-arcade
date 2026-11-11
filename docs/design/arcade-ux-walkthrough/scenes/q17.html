@@ -1,0 +1,18 @@
+<style>
+.mo { top: 70px; width: 230px; height: 230px; border: 1.5px solid #1f2328; border-radius: 10px; background: #ffffff; }
+#q17-nov { left: 50px; } #q17-dec { left: 360px; }
+.mo .nm { position: absolute; left: 14px; top: 10px; font-size: 18px; font-weight: 600; }
+.mo .bar2 { position: absolute; left: 30px; bottom: 30px; width: 60px; background: #ffcd75; border-radius: 4px 4px 0 0; transition: height 1s cubic-bezier(.45,0,.2,1); }
+.mo .val { position: absolute; left: 110px; bottom: 30px; font-size: 26px; font-weight: 700; }
+#q17-nb { height: 22px; }
+#q17-db { height: 150px; }
+[data-state~="oB"] #q17-db { height: 168px; }
+#q17-dv100, #q17-dv112 { transition: opacity .5s; }
+#q17-dv112 { opacity: 0; } [data-state~="oB"] #q17-dv112 { opacity: 1; } [data-state~="oB"] #q17-dv100 { opacity: 0; }
+#q17-arr { left: 292px; top: 160px; font-size: 40px; color: #8b939c; }
+#q17-note { left: 50px; top: 320px; width: 540px; }
+</style>
+<div class="mo" id="q17-nov" data-in="up" data-f><span class="nm">Nov 30</span><span class="bar2" id="q17-nb"></span><span class="val">12 left</span></div>
+<div id="q17-arr" data-in="fade">&#8594;</div>
+<div class="mo" id="q17-dec" data-in="up" data-f><span class="nm">Dec 1</span><span class="bar2" id="q17-db"></span><span class="val" id="q17-dv100">100</span><span class="val" id="q17-dv112">112</span></div>
+<div class="s" id="q17-note" data-in="up">A negative pot is always wiped on the 1st (decided).</div>

@@ -1,0 +1,40 @@
+/* Scenes for the arcade UX walkthrough. World 640x400. Page chrome is Duo's; the cabinet bits use the
+   house runtime's palette (D180): navy ground, blue bar, yellow titles, green picks. */
+.cam { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #1f2328; }
+.cam > * { position: absolute; }
+.h { font-size: 26px; line-height: 32px; font-weight: 600; }
+.t { font-size: 18px; line-height: 25px; }
+.s { font-size: 15px; line-height: 21px; color: #5b636d; }
+.lab { font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #5b636d; }
+.stamp { background: #1f2328; color: #ffffff; padding: 7px 13px; border-radius: 7px; font-size: 16px; line-height: 22px; font-weight: 600; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid #8b939c; border-radius: 7px; background: #ffffff; font-size: 15px; white-space: nowrap; }
+.good { background: #e7f5e9; border-color: #2f8a3e; color: #1d5a28; }
+.bad { background: #fdecea; border-color: #b3261e; color: #8a1c16; }
+
+/* A cabinet screen: 4:3, the runtime's palette, a pixel-ish mono font. */
+.scr { background: #1a1c2c; color: #f4f4f4; font-family: "VT323", ui-monospace, "SF Mono", Menlo, monospace; font-size: 15px; line-height: 17px; border-radius: 6px; overflow: hidden; box-shadow: 0 8px 22px rgba(31,35,40,.22); }
+.scr .bar { position: absolute; left: 0; right: 0; top: 0; height: 20px; background: #29366f; color: #ffcd75; padding: 0 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.scr .bar b { color: #f4f4f4; font-weight: 400; }
+.scr .bd { position: absolute; left: 6px; right: 6px; top: 26px; bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
+.scr .r { background: #333c57; padding: 2px 6px; border: 1.5px solid #333c57; white-space: nowrap; overflow: hidden; display: flex; gap: 6px; align-items: center; transition: background-color .6s, border-color .6s; }
+.scr .r.on { background: #38b764; border-color: #f4f4f4; }
+.scr .r.qa { background: #3b5dc9; border-color: #f4f4f4; }
+.scr .r i { font-style: normal; color: #94b0c2; }
+.scr .r.on i { color: #f4f4f4; }
+.scr .r .ic { width: 14px; height: 14px; flex: none; }
+.scr .y { color: #ffcd75; } .scr .m { color: #94b0c2; } .scr .g { color: #a7f070; } .scr .o { color: #ef7d57; }
+.scr .vt { margin-left: auto; background: #566c86; color: #f4f4f4; padding: 0 3px; font-size: 13px; }
+.scr .ind { margin-left: 14px; }
+.cap { object-fit: cover; object-position: top left; border-radius: 6px; box-shadow: 0 8px 22px rgba(31,35,40,.22); }
+.coin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ffcd75; border: 2px solid #ef7d57; vertical-align: -1px; }
+.arrow { font-size: 22px; line-height: 22px; color: #8b939c; }
+.ic-p { background: #41a6f6; border-bottom: 4px solid #f4f4f4; box-sizing: border-box; }
+.ic-l { background: #41a6f6; border-bottom: 4px solid #b13e53; box-sizing: border-box; }
+.ic-r { background: #b13e53; border-top: 5px solid #29366f; box-sizing: border-box; }
+.ic-a { background: #a7f070; border: 3px solid #257179; box-sizing: border-box; }
+.ic-m { background: #f4f4f4; }
+
+.ans-row { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #e3e6ea; font-size: 16px; line-height: 22px; }
+.ans-row .q { width: 200px; flex: none; font-weight: 600; }
+.ans-row .a { color: #5b636d; }
+.ans-row.done .a { color: #1f2328; }

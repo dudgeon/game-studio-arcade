@@ -1,0 +1,26 @@
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+.sc { width: 168px; height: 126px; }
+#loop-shelf { left: 16px; top: 40px; } #loop-make { left: 236px; top: 40px; } #loop-play { left: 456px; top: 40px; }
+#loop-check { left: 456px; top: 230px; } #loop-change { left: 236px; top: 230px; }
+.nm { width: 168px; text-align: center; }
+#loop-n-shelf { left: 16px; top: 172px; } #loop-n-make { left: 236px; top: 172px; } #loop-n-play { left: 456px; top: 172px; }
+#loop-n-check { left: 456px; top: 362px; } #loop-n-change { left: 236px; top: 362px; }
+#loop-a1 { left: 196px; top: 92px; } #loop-a2 { left: 416px; top: 92px; } #loop-a3 { left: 530px; top: 196px; } #loop-a4 { left: 416px; top: 282px; } #loop-a5 { left: 24px; top: 300px; font-size: 18px; }
+#loop-v2 { left: 24px; top: 236px; width: 180px; }
+#loop-play .field { position: absolute; left: 0; right: 0; top: 20px; bottom: 0; background: #29366f; }
+#loop-play .ice { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: #f4f4f4; }
+#loop-play .peng { position: absolute; left: 70px; bottom: 22px; width: 18px; height: 22px; background: #1a1c2c; transition: left 1.2s; }
+#loop-play .fish { position: absolute; left: 40px; top: 40px; width: 14px; height: 6px; background: #41a6f6; }
+[data-state~="move"] #loop-play .peng { left: 120px; }
+[data-state~="q"] #loop-make .r.qa { background: #3b5dc9; }
+</style>
+<div class="scr sc" id="loop-shelf" data-in="scale" data-f><div class="bar">Quarter Deck<b>Pot 62</b></div><div class="bd"><div class="r on"><span class="ic ic-m"></span>Make a new game</div><div class="r"><span class="ic ic-p"></span>Penguin Catch</div><div class="r"><span class="ic ic-r"></span>Rocket Ramp</div></div></div>
+<div class="scr sc" id="loop-make" data-in="scale" data-f><div class="bar">Claude asks<b>Alina</b></div><div class="bd"><div>What if you catch a boot?</div><div class="r qa">A Lose a life</div><div class="r">B Lose points</div><div class="r">C Something else</div></div></div>
+<div class="scr sc" id="loop-play" data-in="scale" data-f><div class="bar">SCORE 120<b>Penguin Catch</b></div><div class="field"></div><div class="fish"></div><div class="ice"></div><div class="peng"></div></div>
+<div class="scr sc" id="loop-check" data-in="scale" data-f><div class="bar">You check<b>1 of 2</b></div><div class="bd"><div>Does the penguin slide?</div><div class="r">Yes</div><div class="r on">No</div></div></div>
+<div class="scr sc" id="loop-change" data-in="scale" data-f><div class="bar">Done playing<b></b></div><div class="bd"><div class="y">Fix it?</div><div class="r on">Fix that <i>about 3</i></div><div class="r">Play again</div></div></div>
+<div class="s nm" id="loop-n-shelf" data-in="fade">Shelf</div><div class="s nm" id="loop-n-make" data-in="fade">Make</div><div class="s nm" id="loop-n-play" data-in="fade">Play</div>
+<div class="s nm" id="loop-n-check" data-in="fade">Check</div><div class="s nm" id="loop-n-change" data-in="fade">Change it?</div>
+<div class="arrow" id="loop-a1" data-in="fade">&#8594;</div><div class="arrow" id="loop-a2" data-in="fade">&#8594;</div><div class="arrow" id="loop-a3" data-in="fade">&#8595;</div><div class="arrow" id="loop-a4" data-in="fade">&#8592;</div><div class="arrow" id="loop-a5" data-in="fade">&#8593; back to the shelf</div>
+<div class="stamp" id="loop-v2" data-in="up" data-f>Penguin Catch v2</div>

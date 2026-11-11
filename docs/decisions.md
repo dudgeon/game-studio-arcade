@@ -596,7 +596,7 @@ Decided by Claude (the V0 worker) unless marked. Results are in D147–D149 and 
 
 **D156. Bridged stays (D152), with its Wi-Fi gaps handled, not hidden.** *(Claude; the finding is for Geoff.)* Measured 2026-11-08: see platform-notes.md. `up.sh` restarts a VM that's silent for 10 minutes, once. The cabinet plays on its own through a gap, because its service and kiosk are inside the VM. A gap stops the mini reaching it: the driver, SSH, and later the Manager and MCP. The 3-hour soak showed the guest's own internet staying up through 28 short gaps, so a live make shouldn't feel them. Long lockouts and long-lived streams weren't measured. What does feel them is anything the mini drives: gaps of about 40 seconds every 3½ minutes. Shared networking is the documented fallback (D124), and Geoff would lose the home-network visibility he chose.
 
-**D157. `cabinet-virtual`'s spend limit is $10 a month.** *(Geoff.)* With the cabinet's cap of about $3 a make, that's about three makes at worst. Measured builds cost 30–60¢, so more like 15–30 in practice.
+**D157. `cabinet-virtual`'s spend limit is $10 a month.** *(Geoff.)* With the cabinet's cap of about $3 a make, that's about three makes at worst. Measured builds cost 30–60¢, so more like 15–30 in practice. *(D204, 2026-11-11: raised to $13, so a make that runs past the family pot can finish.)*
 
 **D158. The cabinet's key: a service account's if the Console offers one, otherwise Geoff's, scoped to `cabinet-virtual`, expiring never.** *(Geoff. Supersedes D131's "workspace-scoped key" only where that means an ownerless key.)*
 - The docs now call ownerless workspace keys legacy, and a new key has an owner. D131's other terms stand: one key per cabinet, a dedicated workspace with its own spend limit (D157), stored only on that cabinet.
@@ -826,3 +826,41 @@ From `~/game-studio-data/vm/verify/live-make-2026-11-10/REPORT.md` (director). M
 - Cloud Popper's dart was a 1-pixel dot gone in about 0.2 s: the playtest passed it, but a kid would think A did nothing. Its title screen said only "CLOUD POPPER / BEST 0".
 - Two lines in the build step: every player action shows on screen straight away, big enough and long enough to see (at least 3 pixels across and about half a second); and the title screen says how to play in a line or two: what the buttons do and the goal, within 40 characters a line.
 - Kept to two lines: the brief's length is a cost on every build (D164).
+
+## 2026-11-11 — The arcade experience and the family coin pot (Geoff)
+
+Geoff, 2026-11-10: "please have a worker build claude design artifacts to show me the full arcade ux ... there should also be a post game screen asking if the user wants to make any revisions. we likely also need a mechanism to rate limit game creations; maybe an allowance that shows the running total cost, cost per revision, and remaining budget; it should feel fun and arcade-y, but be transparent about cost and limits." The design is the Claude Design canvas https://claude.ai/artifact/M8ndK7LnLr1vYo266rovJA (55 boards). Geoff answered its questions through the director (2026-11-10) and through the narrated walkthrough https://claude.ai/artifact/VTPQrXr9TXRN92r1qRMjd7 (2026-11-11, all five option A). The build handoff is [design/arcade-ux-handoff.md](design/arcade-ux-handoff.md).
+
+**D201. The arcade's screens are the canvas's, end to end.** *(Geoff's ask; design by Claude; the choices below are Geoff's.)*
+- The canvas covers boot (first-ever and normal), the shelf, play, the post-game screen, the whole make flow, the change (revision) flow, the coin pot and its limits, errors, and the Cabinet Manager's coin pot page. Where it differs from today's launcher, the canvas wins, within the decisions below.
+- **After every game, starters included, a "change anything?" screen shows** (Geoff, answer 10). It follows any you-check questions, offers a fix for a rule the kid just said No to, and has Play again and Back to the shelf. Starters still ask no you-check questions (D193); their post-game screen offers "Make my own version".
+- **The plan is one screen** (walkthrough Q13, option A of three): the idea in a line, how to play, and the four rules that matter most, with a "you check" key. The full rules are one stick-press away, and the spec stays the source of truth. Not chosen: three short pages; only the rules the kid will check.
+- From the live makes (2026-11-10): a "how to play" screen before every game; a typed idea gets the same confirm step as a spoken one, so Enter can't start a build early; progress is a four-step track (Plan, Build, Test, Done) that only moves forward, with coins used and time left (the look D198 left to design).
+- D187's tile wording changes: while a make waits on the kid, the first tile says "Claude is waiting for <name>", not "Back to your game".
+
+**D202. One family coin pot, and a make is charged its real cost.** *(Geoff, answers 1 to 7, 2026-11-10; walkthrough Q17, 2026-11-11.)*
+- **One pot for the whole cabinet**, not a wallet per kid. Each maker's running total for the month is shown wherever the pot is. Geoff: "they'll sort it out if they have the data". A friend's make comes out of the same pot and shows under the friend's name.
+- **The pot is the real budget: 100 coins = $10 a month.** 1 coin = 10 cents. Coins are shown big, the real cents small beside them.
+- **On the 1st of each month the pot fills back to 100** (Q17, option A). Leftover coins don't carry over, and a negative balance is wiped. Not chosen: carrying leftovers over.
+- **A make or change is charged what it really cost** (its session's list cost), rounded to whole coins for the kids, in exact cents in the ledger.
+- **No refunds, ever.** A failed make still spent real money; its result screen says so kindly and blames Claude, not the kid. The same goes for a stopped or abandoned make (D188) and one a restart cut off (D189, D191).
+
+**D203. A make starts only if the pot holds its usual cost; once started, it always finishes.** *(Geoff, answer 4 and 6; walkthrough Q16, option A.)*
+- The cabinet won't start what the pot can't cover. Since a make's real cost is known only at the end, "cover" means its usual cost: **6 coins for a new game, 3 for a change.** With 5 coins left, a change can start and a new game can't. Not chosen: anything above zero; the worst case (30 coins).
+- A started make is never cut off for coins. If it costs more than the pot holds, it finishes and the pot shows a negative balance until the 1st.
+- The usual costs are settings, not constants: 6 matches the live makes (56¢ and 53¢); 3 is a guess until a change is measured.
+
+**D204. The cabinet workspace's spend limit rises from $10 to $13.** *(Geoff, walkthrough Q15, option A. Changes D157.)*
+- The pot is $10 and the workspace limit was $10, so a make that ran past the pot would have hit the real limit and stopped halfway, which D203 rules out. $13 leaves room for one overrun. The per-make cap stays about $3 (the session budget).
+- The pot stays 100 coins. Geoff sets the new limit in the Claude Console. If the real limit is ever hit, the kids see "The Studio is resting" until the 1st (canvas board L5).
+
+**D205. Only the COIN button starts spending, and only grown-ups add coins, in the Manager.** *(Geoff, answers 9 and 12.)*
+- A coin check comes before every make and change: the usual cost, the time it takes, and what the pot holds. **Only the COIN button starts it.** Every other screen keeps D182's "any player button picks".
+- Top-ups and resets happen only in the Cabinet Manager, never at the cabinet. Each has a reason, which the kids see in the coin history.
+
+**D206. Anyone can change any game, and the shelf shows family rows.** *(Geoff, answer 8; walkthrough Q11, option A of four.)*
+- The maker's change is the next version of the same game. Anyone else's change is their own version, which starts from the parent's spec (§8.2). The original is never touched, and nothing is deleted (D5).
+- **The shelf shows family rows:** the newest version of each game, one press to play, with a version tag. Other makers' versions are indented under the game they came from. Older versions are on the game's card (stick right on its row). Not chosen: folders, big tiles, a flat list.
+
+**D207. At most two you-check questions after a play, about things you can see.** *(Geoff, answer 14, as a default rather than a question.)*
+- After a play of a made game, the cabinet asks at most two you-check questions, chosen from rules a kid can judge in one play. Sound isn't asked about while the cabinet has none to hear. The rest wait for later plays. The live make asked three, including one about holes that only appear later and one about sound.
