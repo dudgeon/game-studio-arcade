@@ -1,0 +1,31 @@
+# B1-B3 on a cabinet's first-ever boot, then the shelf with the starter games (S1),
+# how to play one (G0), and the starter's post-game screen (G5).
+#seed seeds/first-boot.json
+#! --examples
+wait boot
+shot B1-power-on
+wait B2
+shot B2-first-boot-controls
+press a
+wait B3
+shot B3-first-boot-coin-pot
+press a
+wait S1
+shot S1-shelf-starters
+press down
+press a
+wait G0
+shot G0-starter-how-to-play
+press a
+wait play
+sleep 800
+press esc
+wait G5
+shot G5-starter-post-game
+press up
+press up
+press a
+wait R1
+shot R1-whos-changing-a-starter
+press esc
+wait S1

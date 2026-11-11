@@ -110,7 +110,9 @@ const studio = createStudio({
       const changeDir = values["replay-change"] ? path.resolve(values["replay-change"]) : `${base}-change`;
       const dir = what?.kind === "change" && fs.existsSync(changeDir) ? changeDir : base;
       const usage = usageOf(dir, values["replay-cost"] != null ? Number(values["replay-cost"]) : null);
-      const r = replayApi({ dir, paceMs: Number(values.pace), resume, usage, noCart: values["replay-fail"] }).api;
+      // Each replayed make is its own session, as live, so each is charged once (D208). A pick-up keeps its id.
+      const sessionId = resume ? undefined : `sesn_replay_${Date.now().toString(36)}`;
+      const r = replayApi({ dir, paceMs: Number(values.pace), resume, usage, noCart: values["replay-fail"], sessionId }).api;
       if (values["replay-limit"]) r.createSession = async () => Promise.reject(new Error("400 invalid_request_error: this workspace has reached its spend limit"));
       return r;
     }

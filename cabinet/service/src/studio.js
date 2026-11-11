@@ -185,7 +185,7 @@ export function createStudio(o) {
       used_cents: run.usedCents,
       // Working time so far: the clock stops while Claude waits on the kid (M10's time left).
       working_s: Math.max(0, Math.round((Date.now() - run.t0 - waited) / 1000)),
-      pending: run.pending ? { ...run.pending.shown, warn: run.warn } : null,
+      pending: run.pending ? { ...run.pending.shown, warn: run.warn, ...(run.warn ? { warn_until: run.warnUntil } : {}) } : null,
     };
   };
   const changed = () => {
@@ -338,6 +338,7 @@ export function createStudio(o) {
       setTimeout(() => {
         if (run?.pending) {
           run.warn = true;
+          run.warnUntil = Date.now() + warningMs;
           changed();
         }
       }, timeoutMs - warningMs),

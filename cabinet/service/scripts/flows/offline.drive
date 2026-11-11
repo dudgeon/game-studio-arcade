@@ -1,0 +1,10 @@
+# E1, E2: no Wi-Fi. The shelf says so, Make needs it, and nothing is spent.
+#seed seeds/family.json
+#! --offline --examples
+wait E1
+shot E1-shelf-no-wifi
+press a
+wait E2
+shot E2-cant-reach-claude
+press a
+wait E1

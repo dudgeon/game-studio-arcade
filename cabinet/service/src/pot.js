@@ -22,7 +22,7 @@ export const POT_DEFAULTS = {
   /** Over this many times the usual cost, the result says "more than usual" (L4). */
   over_usual: 1.5,
   /** The cabinet workspace's real limit (D204); the Manager warns past it. */
-  workspace_limit_cents: 1300,
+  workspace_limit_cents: 1500,
 };
 
 /** @typedef {typeof POT_DEFAULTS} PotSettings */

@@ -9,12 +9,12 @@ import { ADVANCE, GLYPH_H, H, LINE_H, W, clean, colsFor, fit, heightOf, rowsFor,
 /** @typedef {import("./text.js").BoxRecord} BoxRecord */
 
 export const M = 6; // side margin
-const INNER = W - M * 2;
-const HEADER_H = 14;
-const BODY_Y = HEADER_H + 4;
-const HINT_Y = H - GLYPH_H - 2;
-const TILE_GAP = 2;
-const TILE_PAD = 3;
+export const INNER = W - M * 2;
+export const HEADER_H = 14;
+export const BODY_Y = HEADER_H + 4;
+export const HINT_Y = H - GLYPH_H - 2;
+export const TILE_GAP = 2;
+export const TILE_PAD = 3;
 const BADGE_W = 12;
 const BIG_ROWS = 3;
 
@@ -28,6 +28,8 @@ export class Painter {
     /** @type {BoxRecord[]} */
     this.boxes = [];
     this.warn = false;
+    /** @type {number | null} */
+    this.warnLeft = null;
   }
 
   begin(bg = C.night) {
@@ -75,7 +77,9 @@ export class Painter {
   /** @param {string} text */
   hint(text) {
     // Near the walk-away timeout, this says so on any screen that's waiting (D188).
-    this.box({ id: "hint", text: this.warn ? "Still there? Move the stick!" : text, x: M, y: HINT_Y, w: INNER, h: GLYPH_H, color: this.warn ? C.yellow : C.silver, onCut: "never" });
+    // E7: the last minute counts down (D188).
+    const warnText = this.warnLeft != null ? `Still there? Move the stick! ${this.warnLeft}` : "Still there? Move the stick!";
+    this.box({ id: "hint", text: this.warn ? warnText : text, x: M, y: HINT_Y, w: INNER, h: GLYPH_H, color: this.warn ? C.yellow : C.silver, onCut: "never" });
   }
 
   /**
@@ -176,7 +180,7 @@ function shelf(p, v) {
 }
 
 /** @param {Painter} p @param {number} x @param {number} y @param {1 | -1} dir */
-function arrow(p, x, y, dir) {
+export function arrow(p, x, y, dir) {
   for (let i = 0; i < 3; i++) p.fb.rectfill(x + (dir > 0 ? i : 2 - i), y + i, 1 + (dir > 0 ? 4 - i * 2 : i * 2), 1, C.yellow);
 }
 
@@ -212,13 +216,17 @@ function say(p, v) {
     y += heightOf(Math.max(1, r.rows)) + 6;
   }
   if (v.phase === "confirm") {
-    p.box({ id: "say-heard-label", text: "I heard:", x: M, y, w: INNER, h: GLYPH_H, color: C.yellow });
+    p.box({ id: "say-heard-label", text: v.purpose === "name" ? "Is this your name?" : v.added ? "Is this right? With what you said before:" : "Is this right? I heard:", x: M, y, w: INNER, h: GLYPH_H, color: C.yellow });
     y += LINE_H + 1;
-    const tilesY = HINT_Y - 2 * (heightOf(1) + TILE_PAD * 2 + TILE_GAP) - 2;
-    const r = p.box({ id: "say-transcript", text: v.transcript, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.transcript), tilesY - y - 2), onCut: "reader", readable: true });
+    // M6 and M2: typed words get this step too (D201). "Add more" joins the next words to these.
+    /** @type {string[]} */
+    const tiles = v.confirmTiles ?? (v.purpose === "name" ? ["Yes, that's me", "Type it again"] : ["Yes! That's it", "Say it again", "Add more"]);
+    const tilesY = HINT_Y - tiles.length * (heightOf(1) + TILE_PAD * 2 + TILE_GAP) - 2;
+    const r = p.box({ id: "say-transcript", text: v.added ? `${v.added} ${v.transcript}` : v.transcript, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.transcript), tilesY - y - 2), onCut: "reader", readable: true });
     let ty = tilesY;
-    ty = p.tile({ id: "say-yes", text: "Yes, that's it", y: ty, rows: 1, lit: v.sel === 0, hue: C.green }).y;
-    p.tile({ id: "say-again", text: "Say it again", y: ty, rows: 1, lit: v.sel === 1 });
+    tiles.forEach((t, i) => {
+      ty = p.tile({ id: ["say-yes", "say-again", "say-more"][i], text: t, y: ty, rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : C.blue }).y;
+    });
     p.hint(r.cut ? READ_MORE : CHOOSE);
     return;
   }
@@ -248,10 +256,10 @@ function say(p, v) {
   p.fb.rectfill(W / 2 - 6, cy + 1, 13, 2, C.white);
   p.fb.rectfill(W / 2 - 1, cy + 3, 3, 5, C.white);
   p.fb.rectfill(W / 2 - 5, cy + 8, 11, 2, C.white);
-  const msg = listening ? "Listening... let go when you're done" : hearing ? "Writing that down..." : v.phase === "silence" ? "I didn't catch that. Try again!" : "Hold any button and talk";
+  const msg = listening ? "Listening... let go when you're done" : hearing ? "Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : "Hold any button and talk";
   p.box({ id: "say-message", text: msg, x: M, y: cy + 25, w: INNER, h: heightOf(2), color: listening ? C.pink : v.phase === "silence" ? C.yellow : C.white, align: "center", onCut: "never" });
-  if (!listening && !hearing) p.box({ id: "say-sub", text: "Let go to send it", x: M, y: cy + 25 + 2 * LINE_H, w: INNER, h: GLYPH_H, color: C.silver, align: "center" });
-  p.hint(listening || hearing ? "" : "F1: type instead. ESC: back.");
+  if (!listening && !hearing && v.phase !== "silence") p.box({ id: "say-sub", text: "Let go to send it", x: M, y: cy + 25 + 2 * LINE_H, w: INNER, h: GLYPH_H, color: C.silver, align: "center" });
+  p.hint(listening || hearing ? "" : v.phase === "silence" ? "Hold a button to try. F1: type it." : "F1: type instead. ESC: back.");
 }
 
 /** @param {Painter} p @param {any} v */
@@ -437,6 +445,7 @@ export function draw(p, view) {
   if (!fn) throw new Error(`no screen ${view.screen}`);
   p.begin();
   p.warn = !!view.warn;
+  p.warnLeft = view.warnLeft ?? null;
   fn(p, view);
 }
 

@@ -1,0 +1,12 @@
+# L2: the pot is empty. Making stops until the 1st; playing doesn't.
+#seed seeds/pot-empty.json
+#! --examples
+wait S1
+shot S1-pot-negative
+press a
+wait M1
+press a
+wait L2
+shot L2-pot-is-empty
+press a
+wait S1

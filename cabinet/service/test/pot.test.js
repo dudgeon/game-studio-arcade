@@ -166,8 +166,8 @@ test("top-ups and resets: grown-ups only, each with a reason; the ledger is appe
 
 test("the Manager is warned when a top-up would take the month past the workspace limit (D204)", () => {
   const { pot } = potAt(1000);
-  assert.equal(pot.preview(20).over_limit, false, "$10 + $2 is under $13");
-  assert.equal(pot.preview(40).over_limit, true, "$10 + $4 is over $13");
+  assert.equal(pot.preview(40).over_limit, false, "$10 + $4 is under $15 (D211)");
+  assert.equal(pot.preview(60).over_limit, true, "$10 + $6 is over $15");
   assert.equal(pot.preview(20).dollars, 2);
 });
 
@@ -374,7 +374,7 @@ test("a Manager top-up, with its reason, shows in the coin history the launcher 
     assert.equal(state.coins, 120);
     assert.equal(history[0].kind, "topup");
     assert.equal(history[0].reason, "Birthday bonus");
-    const warn = await (await post("/api/manager/pot/topup", { coins: 20, reason: "Another" }, { Authorization: "Bearer tok-123" })).json();
+    const warn = await (await post("/api/manager/pot/topup", { coins: 40, reason: "Another" }, { Authorization: "Bearer tok-123" })).json();
     assert.match(warn.warning, /past the workspace/);
     const rules = await (await fetch(`${s.url}/api/manager/pot`, { headers: { Authorization: "Bearer tok-123" } })).json();
     assert.equal(rules.rules.usual_cost_new, 6);
