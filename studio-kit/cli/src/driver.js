@@ -2,7 +2,7 @@
 // tools (D41) until the session goes idle for good. Plays the cabinet's
 // Studio-side role (tile relay); the CLI and later the cabinet service share it.
 import { planResult, questionResult } from "./tiles.js";
-import { progressFor } from "./progress.js";
+import { LINE_STAGE, progressFor, progressGate, tellStage } from "./progress.js";
 
 /**
  * @typedef {import("./api.js").StudioApi} StudioApi
@@ -94,12 +94,17 @@ export async function runSession(o) {
   let lastProgress = "";
   let stopReason = "";
 
-  const say = (text) => {
-    if (text && text !== lastProgress) {
-      lastProgress = text;
-      ui.progress(text);
+  // Only forward, and never the same words twice (D198).
+  const gate = progressGate();
+  /** @param {string} text @param {number | null | "hide"} [stage] */
+  const say = (text, stage) => {
+    const shown = gate(text, stage ?? LINE_STAGE[text] ?? null);
+    if (shown) {
+      lastProgress = shown;
+      ui.progress(shown);
     }
   };
+
 
   async function reply(ev, text) {
     answered.add(ev.id);
@@ -131,7 +136,7 @@ export async function runSession(o) {
       return reply(ev, planResult(a));
     }
     if (ev.name === "tell_player") {
-      say(String(input.message ?? ""));
+      say(String(input.message ?? ""), tellStage(input.stage));
       return reply(ev, JSON.stringify({ ok: true }));
     }
     notes.add(`unknown_tool:${ev.name}`);

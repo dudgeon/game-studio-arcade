@@ -69,7 +69,7 @@ All words go through `Painter.box` in `launcher/screens.js`, which uses `launche
 | The service restarts mid-build (D189, D191) | "The cabinet is restarting", then "may still finish" and the shelf, then a shelf entry when it's done. A game being played carries on | `outcome: "service_restarted"`, then the usual record with `resumed_after_restart` | Picked back up, within its budget; its cart is checked and committed as usual. Then archived, and that's logged as a correction |
 | The service restarts on a question, or one comes up after (D191) | "Tell me your idea again", or a shelf entry saying nobody could answer | `outcome: "service_restarted"`, then `"abandoned"`, `ended_by: "no_one_to_answer"` | Archived, never deleted |
 
-Make is free in every case. How a make ended is its own shelf entry with its maker's name, under Make, until someone opens it (D192).
+Make is free in every case, except while a make a restart cut off is still being collected: then it waits, and says so (D199). The service's journal has a line for each restart, re-attach and collect. How a make ended is its own shelf entry with its maker's name, under Make, until someone opens it (D192).
 
 Files in the data folder: `studio-run.json` exists only while a make runs, and is how a restart finds the make it cut off. `studio-left.json` lists sessions still to collect. `studio-results.json` holds the entries; viewing one stamps it.
 
