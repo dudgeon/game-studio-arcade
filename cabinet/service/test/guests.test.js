@@ -49,6 +49,10 @@ test("teti loads nothing from the network: no http(s) URL in its page, styles or
   const play = path.join(REPO_GUESTS, "teti", "play");
   const html = fs.readFileSync(path.join(play, "index.html"), "utf8");
   assert.doesNotMatch(html, /(src|href)="https?:/);
+  // No GSAP (not open source, D233): our own tween helper instead, loaded before the game.
+  const files = fs.readdirSync(play, { recursive: true }).map(String);
+  assert.deepEqual(files.filter((f) => /gsap/i.test(f)), []);
+  assert.ok(html.indexOf('src="./src/tween.js"') > 0 && html.indexOf('src="./src/tween.js"') < html.indexOf('src="./src/main.js"'));
   for (const f of fs.readdirSync(path.join(play, "styles")).filter((f) => f.endsWith(".css"))) {
     assert.doesNotMatch(fs.readFileSync(path.join(play, "styles", f), "utf8"), /url\(['"]?https?:/, f);
   }
