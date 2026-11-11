@@ -40,7 +40,18 @@ test("the provisioning tar holds the update script", () => {
   const out = path.join(dir, "p.tgz");
   makeProvisionTar(REPO, out);
   const names = execFileSync("tar", ["-tzf", out], { encoding: "utf8" }).split("\n");
-  for (const f of ["./provision.sh", "./update-on-cabinet.sh", "./lock.json", "./files/arcade-keyd"]) assert.ok(names.includes(f), f);
+  for (const f of ["./provision.sh", "./update-on-cabinet.sh", "./data-check.mjs", "./lock.json", "./files/arcade-keyd"]) assert.ok(names.includes(f), f);
+});
+
+// update-on-cabinet.sh records all the data before provisioning and checks it after, on every path (D196).
+test("the update records the data before provisioning, and checks it on every way out", () => {
+  const s = fs.readFileSync(path.join(REPO, "cabinet/provision/update-on-cabinet.sh"), "utf8");
+  const at = (t) => s.indexOf(t);
+  assert.ok(at("data-check.mjs\" record") > 0 && at("data-check.mjs\" record") < at('provision.sh" --profile'), "recorded before");
+  const after = s.slice(at('provision.sh" --profile'));
+  assert.equal(after.match(/^\s*data_check$/gm)?.length, 3, "checked after a failure, a rollback and a success");
+  assert.match(s, /studio-left\.json/, "won't run with makes left to collect");
+  assert.match(s, /\[ "\$DATA_KEPT" = true \] \|\| finish false/);
 });
 
 // update-on-cabinet.sh mustn't touch a key, a cart or a log, so it never names them for writing.
@@ -130,4 +141,85 @@ test("drive: gives up after ARCADE_RIDE_S, exit 255, if the cabinet never answer
     code = e.status;
   }
   assert.equal(code, 255);
+});
+
+// data-check.mjs, on a cabinet's data folder in miniature (D196).
+const CHECK = path.join(REPO, "cabinet/provision/data-check.mjs");
+
+function dataFolder() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "data-"));
+  const put = (rel, text) => {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), text);
+  };
+  put("carts/cloud-popper/game.js", "export default {}\n");
+  put("carts/cloud-popper/cart.json", '{"id":"cloud-popper"}\n');
+  put("carts/.git/HEAD", "ref: refs/heads/main\n");
+  put("sessions/sesn_failed/events.jsonl", '{"type":"x"}\n');
+  put("sessions/sesn_failed/answers.json", "[]\n");
+  put("makers.json", '[{"id":"alina"}]\n');
+  put("studio-results.json", '[{"id":1}]\n');
+  put("studio-left.json", "[]\n");
+  put("kit-uploads.json", "{}\n");
+  put("logs/play.jsonl", '{"a":1}\n');
+  put("logs/studio_session.jsonl", '{"id":"sesn_failed"}\n');
+  put("chromium/Default/Cache/data_0", "cache");
+  return { root, put, manifest: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "manifest-")), "m.json") };
+}
+const runCheck = (cmd, root, manifest) => {
+  try {
+    return { code: 0, out: execFileSync(process.execPath, [CHECK, cmd, root, manifest], { encoding: "utf8" }) };
+  } catch (e) {
+    return { code: e.status, out: e.stdout };
+  }
+};
+
+test("data-check: nothing changed passes, logs may grow, and new logs are fine", () => {
+  const d = dataFolder();
+  assert.match(runCheck("record", d.root, d.manifest).out, /recorded 11 files/, "everything but the browser cache");
+  fs.appendFileSync(path.join(d.root, "logs/play.jsonl"), '{"a":2}\n');
+  d.put("logs/studio_session_correction.jsonl", "{}\n");
+  d.put("chromium/Default/Cache/data_1", "more cache");
+  const r = runCheck("check", d.root, d.manifest);
+  assert.equal(r.code, 0, r.out);
+  const report = JSON.parse(r.out);
+  assert.deepEqual(report.grown, ["logs/play.jsonl"]);
+  assert.deepEqual(report.new_logs, ["logs/studio_session_correction.jsonl"]);
+  assert.equal(report.files, 11);
+});
+
+for (const [what, harm, field, file] of [
+  ["a failed make's record in sessions/ removed", (d) => fs.rmSync(path.join(d.root, "sessions/sesn_failed"), { recursive: true }), "missing", "sessions/sesn_failed/events.jsonl"],
+  ["makers.json rewritten", (d) => d.put("makers.json", '[{"id":"owen"}]\n'), "changed", "makers.json"],
+  ["studio-results.json changed", (d) => d.put("studio-results.json", '[{"id":1,"viewed_at":"x"}]\n'), "changed", "studio-results.json"],
+  ["studio-left.json changed", (d) => d.put("studio-left.json", '[{"session_id":"s"}]\n'), "changed", "studio-left.json"],
+  ["kit-uploads.json deleted", (d) => fs.rmSync(path.join(d.root, "kit-uploads.json")), "missing", "kit-uploads.json"],
+  ["a cart's file changed", (d) => d.put("carts/cloud-popper/game.js", "export default { x: 1 }\n"), "changed", "carts/cloud-popper/game.js"],
+  ["the cart library's git history changed", (d) => d.put("carts/.git/HEAD", "ref: refs/heads/other\n"), "changed", "carts/.git/HEAD"],
+  ["a log rewritten, though it grew", (d) => d.put("logs/play.jsonl", '{"a":9}\n{"a":2}\n'), "shrunk_or_rewritten", "logs/play.jsonl"],
+  ["a log cut short", (d) => d.put("logs/studio_session.jsonl", ""), "shrunk_or_rewritten", "logs/studio_session.jsonl"],
+  ["a file added outside logs/", (d) => d.put("carts/new-cart/game.js", "x"), "added", "carts/new-cart/game.js"],
+  ["a mode changed", (d) => fs.chmodSync(path.join(d.root, "makers.json"), 0o600), "changed", "makers.json"],
+]) {
+  test(`data-check: fails when ${what}`, () => {
+    const d = dataFolder();
+    fs.chmodSync(path.join(d.root, "makers.json"), 0o644);
+    runCheck("record", d.root, d.manifest);
+    harm(d);
+    const r = runCheck("check", d.root, d.manifest);
+    assert.equal(r.code, 1);
+    const report = JSON.parse(r.out);
+    assert.equal(report.ok, false);
+    assert.ok(report[field].includes(file), `${field}: ${JSON.stringify(report)}`);
+  });
+}
+
+test("data-check: reports paths, never contents", () => {
+  const d = dataFolder();
+  d.put("makers.json", '[{"id":"alina","secret":"SHOULD-NOT-APPEAR"}]\n');
+  runCheck("record", d.root, d.manifest);
+  d.put("makers.json", "[]\n");
+  const r = runCheck("check", d.root, d.manifest);
+  assert.doesNotMatch(r.out, /SHOULD-NOT-APPEAR|alina/);
+  assert.doesNotMatch(fs.readFileSync(d.manifest, "utf8"), /SHOULD-NOT-APPEAR|alina/);
 });
