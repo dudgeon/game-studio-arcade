@@ -37,7 +37,7 @@ start_service() {
   # The restart command for `restart` steps: the same service, the same data, after DOWN_MS.
   on "cat > /tmp/arcade-replay/$flow.run" <<EOF
 #!/bin/bash
-cd $APP && exec node cabinet/service/bin/cabinet-service.js --port 8331 --data /tmp/arcade-replay/$flow --replay $FIX --pace 20 --manager-token drive-manager-token $args
+cd $APP && exec node cabinet/service/bin/cabinet-service.js --port 8331 --guest-port 0 --data /tmp/arcade-replay/$flow --replay $FIX --pace 20 --manager-token drive-manager-token $args
 EOF
   on "chmod +x /tmp/arcade-replay/$flow.run; nohup /tmp/arcade-replay/$flow.run > /tmp/arcade-replay/$flow.log 2>&1 < /dev/null & for i in \$(seq 1 50); do grep -q 'cabinet service on' /tmp/arcade-replay/$flow.log && exit 0; sleep 0.2; done; cat /tmp/arcade-replay/$flow.log; exit 1"
 }

@@ -1,0 +1,95 @@
+// Guest games in the launcher (D230–D232). The shelf lists them after the carts;
+// playing one opens its page full screen in an iframe on the guest port, with
+// focus, so the game reads the keys itself. The guest page's escape script
+// (served by the service) posts {gsa: "star"} on Escape, and the play ends.
+import { COLORS as C } from "../../../runtime/src/palette.js";
+
+/** The guests, as shelf entries shaped like carts (`guest: true`). Never throws: no guests is fine. */
+export async function fetchGuests() {
+  try {
+    const r = await fetch("/api/guests");
+    if (!r.ok) return [];
+    return (await r.json()).guests.filter((/** @type {any} */ g) => g.url);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The same surface the launcher uses from runtime/src/host.js's createHost.
+ * @param {{ container: HTMLElement, cartUrl: string, onStar?: () => void, onError?: () => void }} opts
+ */
+export function createGuestHost(opts) {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", "game");
+  iframe.setAttribute("allow", "autoplay");
+  iframe.style.cssText = "border:0;display:block;width:100vw;height:100vh;background:#000";
+  const origin = new URL(opts.cartUrl, location.href).origin;
+  /** @type {(v?: any) => void} */
+  let markReady = () => {};
+  /** @type {(e: Error) => void} */
+  let markFailed = () => {};
+  const ready = new Promise((resolve, reject) => {
+    markReady = resolve;
+    markFailed = reject;
+  });
+  const onMessage = (/** @type {MessageEvent} */ e) => {
+    if (e.source !== iframe.contentWindow || e.origin !== origin) return;
+    if (e.data?.gsa === "star") opts.onStar?.();
+  };
+  addEventListener("message", onMessage);
+  iframe.addEventListener("load", () => {
+    iframe.focus();
+    markReady();
+  });
+  iframe.addEventListener("error", () => markFailed(new Error("the game didn't load")));
+  // If the page never loads (the guest port is down), give up rather than sit on a black screen.
+  const timer = setTimeout(() => markFailed(new Error("the game didn't load in time")), 20000);
+  ready.finally(() => clearTimeout(timer)).catch(() => {});
+  iframe.src = opts.cartUrl;
+  opts.container.appendChild(iframe);
+  // Keep focus in the game: a stray click or blur mustn't leave the keys going nowhere.
+  const refocus = () => setTimeout(() => document.activeElement !== iframe && iframe.focus(), 0);
+  addEventListener("focus", refocus);
+
+  return {
+    iframe,
+    ready,
+    ticks: null,
+    destroy() {
+      removeEventListener("message", onMessage);
+      removeEventListener("focus", refocus);
+      clearTimeout(timer);
+      iframe.remove();
+      window.focus();
+    },
+  };
+}
+
+// ---------- guests on the arcade boards (D201; the proposal in docs/falling-blocks.md §5) ----------
+
+/** S1: a guest's shelf row: "by <author>", a "free game" tag, no card (guests have no versions). @param {any} g */
+export function guestRow(g) {
+  return { kind: "cart", cart: g, title: g.title, by: g.by ? `by ${g.by}` : undefined, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false };
+}
+
+/** G0: how to play, from guest.json's howToPlay. @param {any} g */
+export function guestHowto(g) {
+  const h = g.howToPlay ?? {};
+  const controls = Array.isArray(h.controls) && h.controls.length ? h.controls : ["Stick and buttons: try them and see!"];
+  return { screen: "howto", cart: g, title: g.title, by: g.by ? `by ${g.by}` : "", goal: h.goal ?? null, controls };
+}
+
+/** After a guest game: play again or back to the shelf. No change, no coins (D230). @param {any} g */
+export function guestPostGame(g) {
+  return {
+    screen: "board",
+    board: "G6",
+    title: "Done playing",
+    right: g.title,
+    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, { text: "Playing is always free.", rows: 1, onCut: "never" }],
+    tiles: [{ text: "Play again", note: "free" }, { text: "Back to the shelf", hue: C.green }],
+    sel: 1,
+    post: ["again", "shelf"],
+  };
+}

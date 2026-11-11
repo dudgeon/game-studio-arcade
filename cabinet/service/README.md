@@ -121,11 +121,15 @@ Make is free in every case, except while a make a restart cut off is still being
 
 Files in the data folder: `studio-run.json` exists only while a make runs, and is how a restart finds the make it cut off. `studio-left.json` lists sessions still to collect. `studio-results.json` holds the entries; viewing one stamps it.
 
+## Guest games (D230–D233)
+
+Downloaded web games sit on the shelf after the carts. Each is a folder in the repo's `guests/` (or `<data>/guests/`) with `guest.json`, `play/` and a `NOTICE.md` of every file's licence (D231). The service serves them on their own origin, `guest_port` in the cabinet config or `--guest-port` (default 8340), with a script that turns Escape into "back to the shelf" before the game sees it (D232). The launcher plays one in a focused full-screen iframe and logs the play to `logs/guest_play.jsonl`. Code: `src/guests.js`, `launcher/guests.js`; tests: `test/guests*.test.js`. The first guest is teti (`guests/teti`, D233).
+
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** request screening (Phase 3, so E10 can't be reached), launcher sound, gamepads in the launcher's menus, guest players, MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
+- **Not built:** request screening (Phase 3, so E10 can't be reached), launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 
