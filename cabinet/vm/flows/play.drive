@@ -4,6 +4,10 @@ shot shelf
 press down
 shot shelf-moved
 press a
+# G0: how to play comes before every game.
+wait howto
+shot howto
+press a
 wait play
 sleep 1500
 shot game-title
