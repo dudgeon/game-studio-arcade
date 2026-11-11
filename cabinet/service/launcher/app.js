@@ -13,7 +13,7 @@ import { CHECK_TILES, Painter, draw, flow, planLines, questionText } from "./scr
 import {
   SHELF_HINT,
   bootBoard,
-  coinsWord,
+  resultItem,
   cardView,
   coinCheck,
   historyLines,
@@ -125,7 +125,7 @@ async function showShelf() {
   following = false;
   try {
     await refresh();
-    const ended = (studio.results ?? []).map((/** @type {any} */ r) => ({ kind: "result", result: r, title: r.ok ? (r.kind === "change" ? "A change is ready!" : "New game ready!") : r.failed ? "Sorry! It didn't come out right" : "A new game didn't finish", by: `by ${r.maker_name ?? r.maker}`, note: r.ok ? r.title : r.failed && r.cost_cents != null ? `used ${coinsWord(Math.round(r.cost_cents / 10))}` : undefined, urgent: true }));
+    const ended = (studio.results ?? []).map(resultItem); // how makes ended, until someone has seen (D192)
     const games = gameRows(carts, nameOf).map((r) => ({ ...r, hasCard: true }));
     const items = [...makeTiles(), ...ended, ...games, ...guests.map(guestRow)];
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : it.kind === "waiting" ? "waiting" : "tile");

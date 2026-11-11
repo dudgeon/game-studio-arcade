@@ -756,6 +756,13 @@ export function postGame(o) {
   };
 }
 
+/** How a make ended, as its shelf row (D192, E3): whose it was, and what a failed try used. @param {any} r */
+export function resultItem(r) {
+  const title = r.ok ? (r.kind === "change" ? "A change is ready!" : "New game ready!") : r.failed ? "Sorry! It didn't come out right" : "A new game didn't finish";
+  const note = r.ok ? r.title : r.failed && r.cost_cents != null ? `used ${coinsWord(coinsOfCents(r.cost_cents))}` : undefined;
+  return { kind: "result", result: r, title, by: `by ${r.maker_name ?? r.maker}`, note, urgent: true };
+}
+
 /** The first-ever boot (B2, B3) and a new month (B4). @param {"controls" | "pot" | "month"} which @param {Pot | null} pot */
 export function bootBoard(which, pot) {
   if (which === "controls") {

@@ -7,7 +7,7 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
-import { bootBoard, cardView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { bootBoard, cardView, coinsWord, resultItem, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 
 const STRINGS = Object.entries(LONG);
@@ -284,4 +284,17 @@ test("check catches real overruns", () => {
 test("flow keeps blank lines between paragraphs and fits the scroll column", () => {
   const f = flow("one\n\ntwo");
   assert.deepEqual(f.map((l) => l.text), ["one", "", "two"]);
+});
+
+test("coins are counted in words a kid would say: 1 coin, 2 coins (the shelf's failed-make row)", () => {
+  assert.equal(coinsWord(1), "1 coin");
+  assert.equal(coinsWord(0), "0 coins");
+  assert.equal(coinsWord(-1), "-1 coin");
+  assert.equal(coinsWord(7), "7 coins");
+  const row = (/** @type {number} */ cents) => resultItem({ ok: false, failed: true, cost_cents: cents, maker_name: "Tester", request: "x" });
+  assert.equal(row(9).note, "used 1 coin", "the live change's 9c (D214)");
+  assert.equal(row(68).note, "used 7 coins");
+  assert.equal(row(9).by, "by Tester");
+  assert.equal(resultItem({ ok: true, kind: "change", title: "Log Hopper", maker_name: "Tester" }).title, "A change is ready!");
+  assert.equal(resultItem({ ok: false, message: "x", maker: "owen" }).note, undefined, "no cost known, nothing said");
 });
