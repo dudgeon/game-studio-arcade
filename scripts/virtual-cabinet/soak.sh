@@ -23,7 +23,8 @@ mkdir -p "$OUT"
 MINI="$OUT/mini.log"
 say() { echo "$(date -u +%FT%TZ) $*" | tee -a "$MINI"; }
 
-state() { "$U" status arcade-virtual 2>/dev/null; }
+# Never utmctl while UTM isn't running: it would launch UTM with its window (vm-state.sh).
+state() { "$(dirname "$0")/vm-state.sh"; }
 windows_clear() { swift "$REPO/scripts/virtual-cabinet/windows.swift" >/dev/null 2>&1; }
 ip_now() { dscacheutil -q host -a name "$HOST" 2>/dev/null | sed -n 's/^ip_address: //p' | head -1; }
 reach() { local ip; ip="$(ip_now)"; [ -n "$ip" ] && /usr/bin/nc -z -G 3 "$ip" 22 >/dev/null 2>&1; }

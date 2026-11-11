@@ -15,8 +15,10 @@ NETWORK=Bridged
 
 # Ask utmctl only while UTM is running: a utmctl call would launch it, and that can show its window.
 state() {
-  pgrep -x UTM >/dev/null || { echo stopped; return; }
-  "$UTMCTL" status arcade-virtual 2>/dev/null || echo absent
+  local s
+  s="$("$(dirname "$0")/vm-state.sh" || true)"
+  [ "$s" = utm-not-running ] && s=stopped
+  echo "$s"
 }
 
 if [ "$(state)" = started ]; then
