@@ -80,7 +80,8 @@ export function createGuestHost(opts) {
  * @param {any} g @param {(id: string) => string} [nameOf]
  */
 export function guestRow(g, nameOf = (id) => id) {
-  const by = g.maker ? `by ${nameOf(g.maker)}` : g.by ? `by ${g.by}` : undefined;
+  // A grown-up maker isn't in the "who's making" list (D236), so the version's own guest.json names them.
+  const by = g.maker ? `by ${g.maker_name ?? nameOf(g.maker)}` : g.by ? `by ${g.by}` : undefined;
   return { kind: "cart", cart: g, title: g.title, by, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false, indent: 0 };
 }
 

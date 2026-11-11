@@ -47,10 +47,10 @@ export function makersStore({ file, now = () => new Date() }) {
   };
   return {
     read,
-    /** The list the "who's making" screen shows: most recent first (D87). */
+    /** The list the "who's making" screen shows: most recent first (D87). Grown-ups aren't offered there (D236). */
     list() {
       return read()
-        .filter((m) => !m.hidden)
+        .filter((m) => !m.hidden && !m.grown_up)
         .sort((a, b) => (b.last_made ?? b.added).localeCompare(a.last_made ?? a.added));
     },
     /** A name from the new-name slot. The same name again is the same maker. */

@@ -112,6 +112,7 @@ export function createGuests(o) {
         version: meta.version ?? null,
         // A version of another guest (D234): who made it, what it came from, and its family.
         maker: typeof meta.maker?.id === "string" ? meta.maker.id : null,
+        maker_name: typeof meta.maker?.name === "string" ? meta.maker.name : null,
         parent: typeof meta.parent?.id === "string" ? meta.parent.id : null,
         family: typeof meta.family === "string" ? meta.family : id,
         changed: typeof meta.changed === "string" ? meta.changed : null,

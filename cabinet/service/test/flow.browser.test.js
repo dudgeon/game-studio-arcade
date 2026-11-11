@@ -92,7 +92,8 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
     assert.deepEqual(check.answers.map((/** @type {any} */ a) => a.answer), ["yes", "no"], "two at most, none about sound (D207)");
 
     const makers = JSON.parse(fs.readFileSync(path.join(data, "makers.json"), "utf8"));
-    assert.deepEqual(makers.map((/** @type {any} */ m) => [m.id, m.name, m.guest]), [["alina", "Alina", true]]);
+    // Alina, added through the new-name slot; and Geoff, the grown-up maker of a guest version, added by the service (D236).
+    assert.deepEqual(makers.map((/** @type {any} */ m) => [m.id, m.name, m.guest]).sort(), [["alina", "Alina", true], ["geoff", "Geoff", false]]);
   });
 });
 

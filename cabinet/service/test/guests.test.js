@@ -198,6 +198,8 @@ test("Geoff is added as a grown-up maker, once, and a maker already there is lef
   for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
   for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
   assert.deepEqual(makers.read(), [{ id: "geoff", name: "Geoff", added: "2026-11-11T12:00:00.000Z", guest: false, grown_up: true }]);
+  assert.deepEqual(makers.list(), [], "grown-ups aren't offered in the kids' who's-making list");
+  assert.equal(makers.get("geoff")?.name, "Geoff", "but he's a maker the logs can name");
   // Someone who chose the name at the cabinet stays as they are.
   const file2 = path.join(tmp(), "makers.json");
   const kids = makersStore({ file: file2 });

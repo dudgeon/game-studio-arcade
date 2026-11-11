@@ -1012,7 +1012,8 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
 **D236. A guest version's maker is a grown-up maker, added by the service.** *(Claude; the Brief asked that Geoff be added "the way a grown-up maker should be added (not as a guest kid)".)*
 - `makers.json` gets `{id: "geoff", name: "Geoff", guest: false, grown_up: true}`. `guest: false`: he wasn't added through the cabinet's new-name slot (D87). `grown_up: true` marks him as a grown-up.
 - **The service adds him** at start, from any guest version's `maker`, if he isn't there already. A maker already there is never changed, and nothing is removed (D5). The id must be his name's slug.
-- **He shows in the "who's making" list** like anyone else, so a game he makes at the cabinet is his and comes out of the family pot under his name (D202). Playing a guest stays free: no coins, no Studio session.
+- **Grown-ups aren't offered in the kids' "who's making" list (M1).** The list is the kids', and a name added to every cabinet would sit in it unasked. Geoff makes games on the mini (desktop-initiated). The shelf takes his name from the version's `guest.json`. His entry in `makers.json` is there so his version and its plays are his in the logs.
+- Playing a guest stays free: no coins, no Studio session.
 
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
 - **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.
