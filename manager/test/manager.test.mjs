@@ -1,0 +1,252 @@
+// The Cabinet Manager v0 (D280-D286), with a stand-in cabinet: no SSH, no real cabinet.
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+import { activity } from "../activity.mjs";
+import { loadCabinets } from "../cabinet.mjs";
+import { toLinux } from "../keys.mjs";
+import { createManager, goodHost, homeAddress, managerKey } from "../server.mjs";
+
+const PNG = Buffer.from("89504e470d0a1a0a0000", "hex");
+
+function fakeCabinet(o = {}) {
+  const c = {
+    config: { label: "Fake", host: "fake.local" },
+    problem: "",
+    frame: null,
+    canDrive: true,
+    pressed: [],
+    calls: [],
+    paired: false,
+    grabs: 0,
+    async grab() {
+      c.grabs++;
+      const now = Date.now();
+      c.frame = { png: PNG, hash: "h", at: now, changedAt: now };
+    },
+    async driveable() {
+      return c.canDrive;
+    },
+    async keys(how, codes) {
+      if (!c.canDrive) throw new Error("this cabinet has no driver keyboard (D282): use its own controls");
+      c.pressed.push(`${how} ${codes.join(" ")}`);
+    },
+    async logs() {
+      return o.logs ?? {};
+    },
+    async service(method, p, body) {
+      c.calls.push({ method, p, body });
+      if (o.unpaired) throw Object.assign(new Error("not paired"), { unpaired: true });
+      if (p.startsWith("/api/manager/pot/preview")) return { status: 200, body: { over_limit: Number(p.split("=")[1]) > 50, month_total_cents: 1600, workspace_limit_cents: 1500 } };
+      if (p === "/api/manager/pot/topup") return { status: 200, body: { ok: true, entry: { pot_after_cents: 1200 } } };
+      return { status: 200, body: { pot: { coins: 98 }, history: [] } };
+    },
+    async pair() {
+      c.paired = true;
+    },
+    close() {},
+  };
+  return c;
+}
+
+async function withManager(cabinets, fn) {
+  const server = createManager({ key: "sesame", cabinets: new Map(Object.entries(cabinets)) });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    await fn(base);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((r) => server.close(r));
+  }
+}
+
+async function login(base) {
+  const r = await fetch(`${base}/?key=sesame`, { redirect: "manual" });
+  assert.equal(r.status, 303);
+  return r.headers.get("set-cookie").split(";")[0];
+}
+
+const post = (base, cookie, p, body, extra = {}) => fetch(`${base}${p}`, { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json", "X-Manager": "1", ...extra }, body: JSON.stringify(body) });
+
+test("only home addresses and safe Host names (D285)", () => {
+  for (const ip of ["127.0.0.1", "::ffff:192.168.86.20", "10.0.0.4", "172.20.1.1", "::1", "fe80::1"]) assert.ok(homeAddress(ip), ip);
+  for (const ip of ["8.8.8.8", "::ffff:172.32.0.1", "2001:db8::1", undefined]) assert.ok(!homeAddress(ip), String(ip));
+  for (const h of ["192.168.86.96:8335", "localhost:8335", "geoffs-mac-mini.local:8335", "[::1]:8335"]) assert.ok(goodHost(h), h);
+  for (const h of ["evil.example.com:8335", "manager.attacker.net", undefined]) assert.ok(!goodHost(h), String(h));
+});
+
+test("the Manager key is made once, 0600", () => {
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mk-")), "k");
+  const k = managerKey(f);
+  assert.match(k, /^[A-Za-z0-9_-]{20,}$/);
+  assert.equal(managerKey(f), k);
+  assert.equal(fs.statSync(f).mode & 0o777, 0o600);
+});
+
+test("without the key: locked; a wrong key: refused; the right one sets a cookie", async () => {
+  await withManager({ virtual: fakeCabinet() }, async (base) => {
+    let r = await fetch(`${base}/`);
+    assert.equal(r.status, 401);
+    assert.match(await r.text(), /Ask a grown-up/);
+    assert.equal((await fetch(`${base}/api/cabinets`)).status, 401);
+    assert.equal((await fetch(`${base}/?key=nope`, { redirect: "manual" })).status, 403);
+    const cookie = await login(base);
+    assert.match(cookie, /^gsa_manager=/);
+    r = await fetch(`${base}/`, { headers: { Cookie: cookie } });
+    assert.equal(r.status, 200);
+    assert.match(await r.text(), /Cabinet Manager/);
+    r = await fetch(`${base}/api/cabinets`, { headers: { Cookie: cookie } });
+    const j = await r.json();
+    assert.deepEqual(j.cabinets.map((c) => c.name), ["virtual"]);
+    assert.ok(j.controls.some((c) => c.id === "coin" && c.code === "F2"));
+  });
+});
+
+test("a foreign Host is refused before anything else (D285)", async () => {
+  await withManager({ virtual: fakeCabinet() }, async (base) => {
+    const status = await new Promise((resolve, reject) => {
+      const u = new URL(base);
+      http.get({ host: u.hostname, port: u.port, path: "/?key=sesame", headers: { Host: "rebind.example.com" } }, (r) => {
+        r.resume();
+        resolve(r.statusCode);
+      }).on("error", reject);
+    });
+    assert.equal(status, 403);
+  });
+});
+
+test("keys go down and up in order, and a POST without the Manager header is refused (D282)", async () => {
+  const cab = fakeCabinet();
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    assert.equal((await fetch(`${base}/api/c/virtual/keys`, { method: "POST", headers: { Cookie: cookie }, body: JSON.stringify({ how: "down", codes: ["KeyZ"] }) })).status, 403);
+    assert.equal((await post(base, cookie, "/api/c/virtual/keys", { how: "down", codes: ["KeyZ"] }, { Origin: "http://evil.example.com" })).status, 403);
+    assert.equal((await post(base, cookie, "/api/c/virtual/keys", { how: "down", codes: ["F2"], viewer: "v1" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/keys", { how: "up", codes: ["F2"], viewer: "v1" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/keys", { how: "down", codes: ["Nope"] })).status, 502);
+    assert.deepEqual(cab.pressed, ["down 60", "up 60"]);
+  });
+});
+
+test("a viewer that goes away lets go of what it held (D282)", async () => {
+  const cab = fakeCabinet();
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    const ac = new AbortController();
+    const stream = await fetch(`${base}/api/c/virtual/screen?viewer=v2`, { headers: { Cookie: cookie }, signal: ac.signal });
+    assert.equal(stream.status, 200);
+    await post(base, cookie, "/api/c/virtual/keys", { how: "down", codes: ["F1"], viewer: "v2" });
+    ac.abort();
+    for (let i = 0; i < 40 && cab.pressed.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.deepEqual(cab.pressed, ["down 59", "up 59"]);
+  });
+});
+
+test("the screen stream sends frames and freshness while watched, and stops grabbing after (D281)", async () => {
+  const cab = fakeCabinet();
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    const ac = new AbortController();
+    const r = await fetch(`${base}/api/c/virtual/screen`, { headers: { Cookie: cookie }, signal: ac.signal });
+    const reader = r.body.getReader();
+    let text = "";
+    while (!/event: frame/.test(text)) text += new TextDecoder().decode((await reader.read()).value);
+    assert.match(text, /event: status/);
+    const frame = JSON.parse(/event: frame\ndata: (.*)/.exec(text)[1]);
+    assert.equal(Buffer.from(frame.png, "base64").toString("hex"), PNG.toString("hex"));
+    ac.abort();
+    await new Promise((res) => setTimeout(res, 100));
+    const n = cab.grabs;
+    await new Promise((res) => setTimeout(res, 600));
+    assert.equal(cab.grabs, n);
+  });
+});
+
+test("a cabinet without the driver keyboard says so", async () => {
+  const cab = fakeCabinet();
+  cab.canDrive = false;
+  await withManager({ real: cab }, async (base) => {
+    const cookie = await login(base);
+    const r = await post(base, cookie, "/api/c/real/keys", { how: "down", codes: ["KeyZ"] });
+    assert.match((await r.json()).error, /no driver keyboard/);
+  });
+});
+
+test("a top-up past the workspace limit needs a second press (D284)", async () => {
+  const cab = fakeCabinet();
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    let j = await (await post(base, cookie, "/api/c/virtual/pot/topup", { coins: 80, reason: "Birthday" })).json();
+    assert.equal(j.needs_confirm, true);
+    assert.match(j.warning, /\$15\.00/);
+    assert.ok(!cab.calls.some((s) => s.p === "/api/manager/pot/topup"));
+    j = await (await post(base, cookie, "/api/c/virtual/pot/topup", { coins: 80, reason: "Birthday", confirm: true })).json();
+    assert.equal(j.ok, true);
+    const t = cab.calls.find((s) => s.p === "/api/manager/pot/topup");
+    assert.equal(t.body.coins, 80);
+    assert.equal(t.body.reason, "Birthday");
+    assert.equal((await post(base, cookie, "/api/c/virtual/pot/topup", { coins: 5, reason: " " })).status, 400);
+    assert.equal((await post(base, cookie, "/api/c/virtual/pot/reset", {})).status, 400);
+    assert.equal((await post(base, cookie, "/api/c/virtual/pot/reset", { reason: "Fresh start" })).status, 200);
+  });
+});
+
+test("an unpaired cabinet says so, and pairing works (D284)", async () => {
+  const cab = fakeCabinet({ unpaired: true });
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    const r = await fetch(`${base}/api/c/virtual/pot`, { headers: { Cookie: cookie } });
+    assert.equal(r.status, 409);
+    assert.equal((await r.json()).unpaired, true);
+    assert.equal((await post(base, cookie, "/api/c/virtual/pair", {})).status, 200);
+    assert.equal(cab.paired, true);
+  });
+});
+
+test("activity joins sessions, charges, plays and screened requests (D283)", () => {
+  const a = activity({
+    studio_session: [
+      { id: "s1", maker: "tester", request: "dodge the rocks", kind: "new", parent: null, turns: [{ question: "How do you move?", option_a: "Left/right", option_b: "Anywhere", choice: "A", said: null }], ended_by: "answers", outcome: "committed", cart_id: "rock", cart_version: "1", list_cost: { amount: "19", currency: "USD" }, wall_seconds: 120, started_at: "2026-11-11T10:00:00Z", errors: [] },
+      { id: "s2", maker: "tester", request: "make it faster", kind: "change", parent: "rock", turns: [], ended_by: "make_it_now", outcome: "failed", list_cost_usd: 0.07, started_at: "2026-11-11T11:00:00Z", errors: ["x"] },
+    ],
+    studio_session_correction: [{ corrects: "s1", why: "collected after a restart", at: "2026-11-11T10:05:00Z" }],
+    coin_ledger: [{ kind: "charge", session_id: "s1", cost_cents: 19, cents: -19, coins: 2, outcome: "on the shelf", who: "tester", at: "2026-11-11T10:02:00Z", pot_after_cents: 981 }, { kind: "topup", cents: 200, reason: "Birthday", by: "geoff", at: "2026-11-11T12:00:00Z", pot_after_cents: 1181 }],
+    play: [{ cart_id: "rock", cart_version: "1", session_id: "s1", started_at: "2026-11-11T10:10:00Z", duration_s: 47.7, score: 9, ended: "star", errors: 0 }],
+    guest_play: [{ guest_id: "teti", guest_version: "1.4", started_at: "2026-11-11T09:00:00Z", duration_s: 13, ended: "star", errors: 0 }],
+    request_screening: [{ at: "2026-11-11T13:00:00Z", maker: "tester", request: "something rude", verdict: "redirected", offered: "something kind" }],
+  });
+  assert.equal(a.makes[0].id, "s2");
+  assert.equal(a.makes[0].kind, "change");
+  assert.equal(a.makes[0].cents, 7);
+  assert.equal(a.makes[0].charged, false);
+  const m = a.makes[1];
+  assert.deepEqual([m.who, m.said, m.coins, m.cents, m.kid_outcome, m.plays, m.minutes], ["tester", "dodge the rocks", 2, 19, "on the shelf", 1, 2]);
+  assert.equal(m.answers[0].choice, "A");
+  assert.equal(m.corrections.length, 1);
+  assert.deepEqual(a.plays.map((p) => [p.game, p.guest, p.made_by]), [["rock", false, "tester"], ["teti", true, null]]);
+  assert.deepEqual([a.screened[0].said, a.screened[0].verdict, a.screened[0].offered], ["something rude", "redirected", "something kind"]);
+  assert.equal(a.coins[0].kind, "topup");
+});
+
+test("key names map to Linux codes; unknown keys are refused", () => {
+  assert.deepEqual(toLinux(["ArrowUp", "KeyZ", "Enter", "Escape", "F1", "F2", "ShiftLeft"]), [103, 44, 28, 1, 59, 60, 42]);
+  assert.throws(() => toLinux(["MetaLeft"]));
+  assert.throws(() => toLinux([]));
+});
+
+test("cabinets: virtual reads the VM's host; cabinets.json overrides and adds (D286)", () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), "cabs-"));
+  fs.mkdirSync(path.join(d, "vm"));
+  fs.writeFileSync(path.join(d, "vm/host"), "192.168.64.2\n");
+  let cabs = loadCabinets(d, path.join(d, "cfg"));
+  assert.deepEqual(cabs.map((c) => [c.name, c.host]), [["virtual", "192.168.64.2"], ["real", "arcade.local"]]);
+  fs.mkdirSync(path.join(d, "manager"));
+  fs.writeFileSync(path.join(d, "manager/cabinets.json"), JSON.stringify({ real: { host: "192.168.86.50" }, spare: { host: "spare.local", key: "/k" } }));
+  cabs = loadCabinets(d, path.join(d, "cfg"));
+  assert.deepEqual(cabs.map((c) => [c.name, c.host]), [["virtual", "192.168.64.2"], ["real", "192.168.86.50"], ["spare", "spare.local"]]);
+  assert.match(cabs[2].tokenFile, /manager-token-spare$/);
+});
