@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- cabinet: teti's info page, rewritten so its credits match what this build ships (D233).
+     Upstream's info.html credits TETR.IO's sounds, Touhou music and third-party skins,
+     loads CSS and a Markdown renderer from CDNs, and uses a wallpaper image; none of that ships here. -->
+<html lang="en">
+<head>
+    <title>teti - about</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @font-face { font-family: "Montserrat"; src: url(./styles/Montserrat-latin-400.woff2) format("woff2"); }
+        body { background: #080b0c; color: #e8edf1; font-family: "Montserrat", sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+        h1 { font-size: 2.5rem; margin-bottom: 0; }
+        h2 { color: #ffd23f; margin-top: 2rem; }
+        a { color: #3fd8f0; }
+        li { margin: 0.3rem 0; }
+    </style>
+</head>
+<body>
+    <h1>teti</h1>
+    <p>A modern block stacker by <strong>TitanPlayz100</strong>, changed for the arcade cabinet.</p>
+
+    <h2>The game</h2>
+    <ul>
+        <li>teti by TitanPlayz100, MIT licence (github.com/TitanPlayz100/teti, commit 1de7944). Its code is used here, changed for the cabinet.</li>
+        <li>Cabinet changes: Marathon and Zen modes, a game picker and pause and game-over screens for a joystick and buttons, a bigger board, and its own small animation helper.</li>
+    </ul>
+
+    <h2>Sound, music and pictures</h2>
+    <ul>
+        <li>Sound effects, the music ("Brick Parade") and the block skin, particle and icons are made for this cabinet by a script in its own repository, not taken from other games.</li>
+    </ul>
+
+    <h2>Libraries and fonts</h2>
+    <ul>
+        <li>PixiJS 8.23.0, MIT licence.</li>
+        <li>Montserrat (Julieta Ulanovsky and others) and Major Mono Display (Emre Parlak), SIL Open Font License 1.1.</li>
+    </ul>
+
+    <p>Every file's origin and licence is listed in NOTICE.md beside the game.</p>
+    <p><a href="./index.html">Back to the game</a></p>
+</body>
+</html>
