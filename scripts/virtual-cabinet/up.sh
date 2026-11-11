@@ -30,7 +30,11 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 
 # Launch hidden at the OS level, then a plain start: that shows no window. Don't use utmctl's --hide:
 # it asks UTM to close its window, which is refused here (-10004), and the window stays (D149).
+# Never run utmctl unless UTM is already running hidden: utmctl launches UTM itself, window and all.
+# That's what opened a window on 2026-11-11 at 03:02:26 UTC (scripts/virtual-cabinet/vm-state.sh).
 open -gj "$UTM"
+for _ in $(seq 1 10); do pgrep -x UTM >/dev/null && break; sleep 1; done
+pgrep -x UTM >/dev/null || { echo "UTM didn't start" >&2; exit 1; }
 # UTM takes a while to load its list, and a slow start mustn't look like an unknown VM: that opens a window.
 # Polls until UTM knows the VM, for up to about $1 tries.
 vm_known() {
