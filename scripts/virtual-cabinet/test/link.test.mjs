@@ -100,6 +100,13 @@ test("the cabinet's card for the mini never becomes its way out", () => {
   for (const line of ["never-default=true", "ignore-auto-dns=true", "ignore-auto-routes=true", "method=disabled"]) assert.ok(k.split("\n").includes(line), line);
 });
 
+test("NetworkManager doesn't treat the bridge's MAC NAT as an address conflict (D245), on the virtual profile only", () => {
+  assert.equal(profile("nm_no_acd_conf"), "[connection-arcade-no-acd]\nipv4.dad-timeout=0\n");
+  const p = fs.readFileSync(PROFILE, "utf8");
+  assert.ok(/hw_late\(\) \{[^}]*step_no_acd/.test(p));
+  assert.ok(!fs.readFileSync(path.join(path.dirname(PROFILE), "picade.sh"), "utf8").includes("dad-timeout"), "a conflict on the Picade is real");
+});
+
 test("the firewall refuses new connections out to the shared network, apart from DHCP, mDNS and DNS", () => {
   const rules = profile('firewall_rules "192.168.86.96,192.168.64.1" "fd00::1"').split("\n").map((l) => l.trim());
   const link = rules.indexOf("ip daddr 192.168.64.0/24 ct state new counter reject");
