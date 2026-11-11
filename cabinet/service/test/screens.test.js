@@ -9,6 +9,7 @@ import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/tex
 import { LONG } from "../test-support/stress.js";
 import { bootBoard, cardView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
+import { guestHowto, guestPostGame } from "../launcher/guests.js";
 
 const STRINGS = Object.entries(LONG);
 
@@ -86,6 +87,8 @@ function boardsWith(s) {
     "A1 negative": { screen: "pot", pot: pot(-12) },
     "A2": { screen: "history", flowed: historyLines([{ kind: "charge", at: "2026-11-11T10:00:00Z", who: "alina", name: s, what: "new game", title: s, coins: 7, cost_cents: 68, outcome: "didn't finish" }, { kind: "topup", at: "2026-11-10T10:00:00Z", cents: 200, reason: s }, { kind: "reset", at: "2026-11-09T10:00:00Z", reason: s }, { kind: "refill", at: "2026-11-01T00:00:00Z", pot_after_cents: 1000 }]), top: 0 },
     "G0": howtoView(cart, nameOf),
+    "G0 guest": guestHowto({ id: "teti", guest: true, title: s, by: s, howToPlay: { goal: s, controls: [s, s, s, s, s] } }),
+    "G6 guest": guestPostGame({ id: "teti", guest: true, title: s, by: s }),
     "G3": postGame({ cart, noRule: { id: "R12", text: s }, versions: 3, usual: { change: 3 } }),
     "G4": postGame({ cart, noRule: null, versions: 3, usual: { change: 3 } }),
     "G5": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 3 } }),
@@ -284,4 +287,16 @@ test("check catches real overruns", () => {
 test("flow keeps blank lines between paragraphs and fits the scroll column", () => {
   const f = flow("one\n\ntwo");
   assert.deepEqual(f.map((l) => l.text), ["one", "", "two"]);
+});
+
+test("a guest's G0, from its real guest.json: nothing cut, and no author in the header (it was cut to \"by...\")", () => {
+  const meta = JSON.parse(fs.readFileSync(new URL("../../../guests/teti/guest.json", import.meta.url), "utf8"));
+  const p = new Painter();
+  draw(p, { ...guestHowto({ ...meta, guest: true }), board: "G0" });
+  assert.deepEqual(check(p.boxes), []);
+  assert.deepEqual(p.boxes.filter((b) => b.cut).map((b) => b.id), [], "every box on teti's G0 shows its words in full");
+  const words = p.boxes.flatMap((b) => b.lines.map((l) => l.text)).join(" | ");
+  assert.doesNotMatch(words, /\bby\b/, "the header has no author; the shelf row says who made it");
+  assert.match(words, /Fill whole rows/);
+  assert.equal(p.boxes.filter((b) => /^howto-control-/.test(b.id)).length, 4, "all four control lines show");
 });
