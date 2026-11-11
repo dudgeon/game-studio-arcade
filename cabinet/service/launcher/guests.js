@@ -73,11 +73,15 @@ export function guestRow(g) {
   return { kind: "cart", cart: g, title: g.title, by: g.by ? `by ${g.by}` : undefined, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false };
 }
 
-/** G0: how to play, from guest.json's howToPlay. @param {any} g */
+/**
+ * G0: how to play, from guest.json's howToPlay. The header has no author: the header's
+ * right side is short, so "by TitanPlayz100" was cut to "by...", and the shelf row says who made it.
+ * @param {any} g
+ */
 export function guestHowto(g) {
   const h = g.howToPlay ?? {};
   const controls = Array.isArray(h.controls) && h.controls.length ? h.controls : ["Stick and buttons: try them and see!"];
-  return { screen: "howto", cart: g, title: g.title, by: g.by ? `by ${g.by}` : "", goal: h.goal ?? null, controls };
+  return { screen: "howto", cart: g, title: g.title, by: "", goal: h.goal ?? null, controls };
 }
 
 /** After a guest game: play again or back to the shelf. No change, no coins (D230). @param {any} g */
