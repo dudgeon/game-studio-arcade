@@ -23,6 +23,8 @@ const KEYS = {
     // Keys the cabinet doesn't have, so these never fire.
     resetKey: "F9", editMenuKey: "F10", undoKey: "F11", redoKey: "F12", pauseReplayKey: "F8",
 };
+// The board fills more of the cabinet's 1024x768 screen than teti's default Board Size (100).
+const BOARD_SIZE = 130; // the top of teti's own slider: the board is 580 px of 768, from 460
 const PICK = new Set(["z", "x", "c", "v", "q", "e", "Enter"]);
 const HELP = "Stick moves &middot; Up drops &middot; A / B turn &middot; X holds &middot; START pauses";
 
@@ -129,10 +131,14 @@ export function start(game) {
     const s = Game.settings;
     Object.assign(s.control, KEYS);
     s.game.competitiveMode = true; // each mode's own rules, not custom settings
-    Object.assign(s.display, { pauseNoFocus: false, outoffocus: false });
+    // Board size: teti's own setting (percent of its default, 60% of the screen's height).
+    // ?board=N overrides it, for trying sizes.
+    const board = Number(new URLSearchParams(location.search).get("board")) || BOARD_SIZE;
+    Object.assign(s.display, { pauseNoFocus: false, outoffocus: false, boardHeight: board });
     Object.assign(s.volume, { sfxLevel: 600, audioLevel: 300 });
     Game.controls.menuKey = "F7"; // teti's own menus never open
     Game.menuactions.saveSettings();
+    dispatchEvent(new Event("resize")); // teti redraws the board at the new size
 
     // Game over goes to the cabinet's screen instead of teti's dialog; teti's other dialogs stay shut.
     const openModal = Game.modals.openModal.bind(Game.modals);

@@ -159,7 +159,9 @@ export class Visuals {
     }
 
     createTextGraphic(style, name, pos, parent, alpha = 0, msg = "") {
-        const text = new PIXI.Text({ text: msg, style });
+        // cabinet: each text gets its own copy of the style. Texts share style objects, so scaling
+        // the shared one compounded with every text when Board Size isn't 100.
+        const text = new PIXI.Text({ text: msg, style: style.clone() });
         text.resolution = 2;
         text.alpha = alpha;
         text.style.fontSize *= Number(Game.settings.display.boardHeight) / 100;
