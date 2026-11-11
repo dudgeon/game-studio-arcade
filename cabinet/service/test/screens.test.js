@@ -10,6 +10,7 @@ import { LONG } from "../test-support/stress.js";
 import { bootBoard, cardView, coinsWord, resultItem, scoreLine, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
+import { redirectBoard } from "../launcher/redirect.js";
 
 const STRINGS = Object.entries(LONG);
 
@@ -126,6 +127,8 @@ function boardsWith(s) {
     "L5": resting(),
     "E2": offlineMake(),
     "E8": leaveView({ usedCents: 123 }),
+    "E10": redirectBoard({ say: "Let's make it a little different. How about this?", alternative: s.slice(0, 160) }),
+    "E10 for an answer": redirectBoard({ alternative: s.slice(0, 160), answer: true }),
   };
 }
 

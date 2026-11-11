@@ -14,6 +14,7 @@ import { stubSpeech } from "../src/speech.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, startGuestServer } from "../src/guests.js";
+import { createScreener, modelCheck } from "../src/screening.js";
 
 const { values } = parseArgs({
   options: {
@@ -156,7 +157,12 @@ const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs });
 const guestServer = await startGuestServer(guests, { port: Number(values["guest-port"] ?? config.guest_port ?? 8340), host: values.host });
 guests.port = guestServer.port;
 
+// Request screening (D270-D275): the word list always; the model with the cabinet's own key, unless replaying.
+// config.screening: false turns the model off (the list stays).
+const screen = createScreener({ logsDir: paths.logs, model: client && config.screening !== false ? (text, o) => modelCheck(client, text, o) : null });
+
 const s = await startService({
+  screen,
   guests,
   studio,
   makers,

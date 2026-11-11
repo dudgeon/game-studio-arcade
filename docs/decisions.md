@@ -1060,3 +1060,27 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
 - **The fix:** `provision.sh` masks `systemd-networkd-wait-online` for both profiles (`boot-wait.sh`), but only where NetworkManager is enabled and `/etc` or `/run` has no `.network` file for networkd. A mask outlasts any later preset run. networkd itself stays as it is: it manages nothing, so it costs nothing.
 - **How it's checked:** `boot-wait.test.mjs`, plus `verify.sh`. `boot-not-held` checks the mask is in place and that `network-online` was reached within 30 seconds of boot, and `no-failed-units` no longer excuses the wait.
 - **Proving it** needs one restart after the update.
+
+**D270. Request screening: a light touch that redirects, never scolds.** *(Geoff, 2026-11-11: "Part of validation but with a very light touch—profanity, racism, bigotry, etc; I'm less concerned about violence but we may later create a rubric to keep an eye on what they're making; machine should not scold when the kid breaches a guardrail, instead offer a close, safe alternative; problem solve, not block".)*
+- **What it catches:** profanity, slurs, racism, bigotry, mocking people for who they are, sexual content, hurting real people, hate celebrated. **What passes:** cartoon and game violence (battles, blasters, zombies, bosses, explosions), spooky things, gross-out jokes and silly insults.
+- **When:** before a make or a change starts (so before any session or coins), and on a kid's own words during a make: "Something else" (C) on a question, and "change" on the plan. Tile answers A, B and D aren't screened; they're Claude's words.
+- **What the kid sees** is E10 (D275), never a refusal.
+- A violence rubric, if Geoff wants one later, reads the log (D273); it isn't a gate.
+
+**D271. Two layers: a short word list on the cabinet, then a small model call.** *(Claude.)*
+- **The word list** (`src/screening.js`) holds only clear-cut swear words and slurs, matched as whole words after undoing simple letter swaps ("sh1t"). It's free, instant and works offline. Words that are fine in a game (nazi in "fight the robot nazis", body words for gross-out humour) are left to the model.
+- **The model** judges everything else and writes the alternative. When it answers, its verdict wins over the list (so "Scunthorpe" and "cocktail" pass either way, and a list false positive can't block).
+- **When the model can't answer** (no network, timeout after 6 s, bad output), the list's answer stands. That fails open on purpose: a light touch, with the Studio agent's brief as the second line (D274).
+- An alternative is never itself flagged by the list; if the model's would be, a plain safe one replaces it.
+
+**D272. The model: Claude Haiku 5.5, structured output, low effort, the cabinet's own key.** *(Claude.)*
+- `claude-haiku-5-5`, `output_config.effort: "low"`, a JSON schema for `{verdict, alternative, why}`, no retries, 6 s timeout. The kid's words go inside `<idea>` tags and the brief says they're only data.
+- **Cost per check:** about 700 input tokens and 40 to 400 output tokens (low-effort thinking included) at $0.10/$0.50 per million (list price, checked live 2026-11-11): **$0.0001 to $0.0003 a check**, so well under a cent for a whole make with several typed answers. A live run of the table (D275's tests) will pin the real figure. Each check's real cost, from its usage, is in its log line. It isn't charged to the coin pot.
+- It runs through the cabinet service's own client (D131), so it needs nothing new on either cabinet. `config.screening: false` turns the model off; the list stays. Replays (D186) use the list only and spend nothing.
+- A model refusal counts as a redirect.
+
+**D273. Every check is logged, with its outcome.** *(Claude.)* `logs/screening.jsonl` on the cabinet: the kid's words, which kind (new, change, answer), the maker, `pass` or `redirected`, the alternative offered, which layer decided, the time taken, and the model's cost and tokens. Picking an offered alternative is logged too (`by: "offered"`), without a second model call. Like every kid log, it never enters the repo.
+
+**D274. The Studio agent's brief says the same, for anything that gets past.** *(Claude.)* Its content line now says game violence is fine and, if an idea or answer goes off-limits even mid-game, never to scold, lecture, refuse or say "inappropriate": quietly build the closest safe version, and say so in one friendly line or offer it as a tile. **It needs an `ant apply` in each cabinet's workspace** before a cabinet runs it: until then, the cabinet's brief check (D185) finds the applied agent doesn't match and stops makes as stale. So it's its own commit, deployed with the next apply (the cabinet's key, from Geoff's keyboard, `connect-cabinet.sh`).
+
+**D275. E10 says "How about this?"** *(Claude; replaces the handoff's "Let's pick another idea".)* One friendly line ("Let's make it a little different. How about this?"), the alternative in yellow, and for a new idea "No coins were used." Tiles: **Make this one** (or **Use this one** for an answer), **Say it a new way** (back to the talk screen, F1 still types), **Back to the shelf** (or **Back to the question**, which keeps waiting). ESC does what the last tile does. One alternative, not the handoff's two: it's the closest version of their own idea, and "Say it a new way" covers the rest.
