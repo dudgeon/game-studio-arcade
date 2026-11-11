@@ -190,13 +190,11 @@ test("the API: a version's maker, parent and family; plays keep their scores; th
   }
 });
 
-test("Geoff is added as a grown-up maker, once, and a maker already there is left alone (D236)", () => {
+test("a grown-up maker is added once, isn't offered in the kids' list, and a maker already there is left alone (D236)", () => {
   const file = path.join(tmp(), "makers.json");
   const makers = makersStore({ file, now: () => new Date("2026-11-11T12:00:00Z") });
-  const guests = createGuests({ dirs: [REPO_GUESTS], logsDir: tmp() });
-  assert.deepEqual(guests.makers(), [{ id: "geoff", name: "Geoff" }]);
-  for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
-  for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
+  makers.ensureGrownUp("Geoff");
+  makers.ensureGrownUp("geoff");
   assert.deepEqual(makers.read(), [{ id: "geoff", name: "Geoff", added: "2026-11-11T12:00:00.000Z", guest: false, grown_up: true }]);
   assert.deepEqual(makers.list(), [], "grown-ups aren't offered in the kids' who's-making list");
   assert.equal(makers.get("geoff")?.name, "Geoff", "but he's a maker the logs can name");
@@ -205,7 +203,7 @@ test("Geoff is added as a grown-up maker, once, and a maker already there is lef
   const kids = makersStore({ file: file2 });
   kids.add("Geoff");
   const before = kids.read();
-  kids.ensureGrownUp("geoff", "Geoff");
+  kids.ensureGrownUp("Geoff");
   assert.deepEqual(kids.read(), before);
-  assert.equal(makers.ensureGrownUp("someone-else", "Geoff"), null, "the id must be the name's");
+  assert.equal(makers.ensureGrownUp("!!!"), null, "a name is needed");
 });

@@ -172,11 +172,11 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     await until(page, async () => (await launcher("board")) === "G6" && /Score:/.test(await words()), "G6 again");
     assert.match(await words(), s2 > s1 ? new RegExp(`Score: ${s2}\\. A new best!`) : new RegExp(`Score: ${s2}\\. Best: ${s1}\\.`));
 
-    // Both plays logged with their scores; Geoff is a grown-up maker.
+    // Both plays logged with their scores. The service wrote no makers: "by Geoff" came from guest.json (D236).
     const log = () => fs.readFileSync(path.join(data, "logs", "guest_play.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     assert.deepEqual(log().map((r) => [r.guest_id, r.scores]), [["teti-geoff", [s1]], ["teti-geoff", [s2]]]);
-    const geoff = JSON.parse(fs.readFileSync(path.join(data, "makers.json"), "utf8")).find((/** @type {any} */ m) => m.id === "geoff");
-    assert.deepEqual([geoff.name, geoff.guest, geoff.grown_up], ["Geoff", false, true]);
+    const makersFile = path.join(data, "makers.json");
+    assert.ok(!fs.existsSync(makersFile) || !JSON.parse(fs.readFileSync(makersFile, "utf8")).some((/** @type {any} */ m) => m.id === "geoff"), "the service never adds a maker itself");
 
     // The original still plays, and shows no score.
     await press(page, "z"); // Back to the shelf

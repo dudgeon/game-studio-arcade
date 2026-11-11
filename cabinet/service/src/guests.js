@@ -126,15 +126,6 @@ export function createGuests(o) {
     });
   };
 
-  /**
-   * Grown-up makers named by guest versions (D236), for the service to add to makers.json.
-   * @returns {{ id: string, name: string }[]}
-   */
-  const makers = () =>
-    all()
-      .map(({ meta }) => meta.maker)
-      .filter((m) => m && typeof m.id === "string" && /^[a-z0-9][a-z0-9-]{0,39}$/.test(m.id) && typeof m.name === "string" && m.name.trim());
-
   /** @param {any} b */
   const playRecord = (b) => {
     const g = find(typeof b?.guest_id === "string" ? b.guest_id : "");
@@ -261,7 +252,7 @@ export function createGuests(o) {
   };
 
   /** `port` is the guest server's, set once it listens. */
-  const self = { port: o.guestPort ?? 0, list, logPlay, files, api, makers };
+  const self = { port: o.guestPort ?? 0, list, logPlay, files, api };
   return self;
 }
 

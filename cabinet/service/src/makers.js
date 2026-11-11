@@ -68,13 +68,15 @@ export function makersStore({ file, now = () => new Date() }) {
       return maker;
     },
     /**
-     * A grown-up maker (D236), such as the author of a guest version: `guest: false` (not added
-     * through the new-name slot) and `grown_up: true`. Someone already there is left exactly as is.
-     * @param {string} id @param {string} rawName
+     * A grown-up maker (D236), such as the author of a guest version, added by a grown-up's command
+     * on the mini (scripts/maker.mjs): `guest: false` (not added through the new-name slot) and
+     * `grown_up: true`. Someone already there is left exactly as is.
+     * @param {string} rawName
      */
-    ensureGrownUp(id, rawName) {
+    ensureGrownUp(rawName) {
       const name = firstName(rawName);
-      if (!name || slug(name) !== id) return null;
+      if (!name) return null;
+      const id = slug(name);
       const list = read();
       const known = list.find((m) => m.id === id);
       if (known) return known;

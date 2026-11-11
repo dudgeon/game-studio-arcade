@@ -1009,10 +1009,17 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
   - **Zen** reports nothing: nothing falls, so its points only measure patience.
   - The picker says which modes keep score. A round left with Escape before it ends reports nothing, as for made games.
 
-**D236. A guest version's maker is a grown-up maker, added by the service.** *(Claude; the Brief asked that Geoff be added "the way a grown-up maker should be added (not as a guest kid)".)*
+**D236. A guest version's maker is a grown-up maker, added by a grown-up's command on the mini.** *(Claude; the Brief asked that Geoff be added "the way a grown-up maker should be added (not as a guest kid)". Amended 2026-11-11 with the director's choice: an explicit command, not the service.)*
 - `makers.json` gets `{id: "geoff", name: "Geoff", guest: false, grown_up: true}`. `guest: false`: he wasn't added through the cabinet's new-name slot (D87). `grown_up: true` marks him as a grown-up.
-- **The service adds him** at start, from any guest version's `maker`, if he isn't there already. A maker already there is never changed, and nothing is removed (D5). The id must be his name's slug.
-- **Grown-ups aren't offered in the kids' "who's making" list (M1).** The list is the kids', and a name added to every cabinet would sit in it unasked. Geoff makes games on the mini (desktop-initiated). The shelf takes his name from the version's `guest.json`. His entry in `makers.json` is there so his version and its plays are his in the logs.
+- **Only a grown-up's command adds one:**
+  - `node scripts/maker.mjs add-grown-up Geoff` on the mini, through the cabinet's token-gated Manager endpoints (D208), as coin.mjs works (D216). `maker.mjs list` shows every maker.
+  - A maker already there is never changed, a kid's name stays the kid's, and nothing is removed (D5).
+- **The service never writes `makers.json` on its own**, so an update's data check stays exact: nothing outside `logs/` changes (D196).
+  - A first cut added Geoff at service start. On the virtual cabinet's update to 3bd20c3 the data check came back not ok on `makers.json`.
+  - His entry there (added 2026-11-11 19:03 UTC) came from that cut, not from the command. It stays, since data is never deleted.
+- **Grown-ups aren't offered in the kids' "who's making" list (M1).** The list is the kids', and a name added to every cabinet would sit in it unasked. Geoff makes games on the mini (desktop-initiated).
+  - The shelf takes his name from the version's `guest.json`, so his row reads "by Geoff" whether or not he's in `makers.json`.
+  - The entry is there so the logs can name him.
 - Playing a guest stays free: no coins, no Studio session.
 
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:

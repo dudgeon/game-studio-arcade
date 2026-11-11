@@ -25,6 +25,8 @@
 //   GET  /api/manager/pot/preview?coins=N   what a top-up would do, and whether it passes the workspace limit (D204)
 //   POST /api/manager/pot/topup  {coins, reason, by?}
 //   POST /api/manager/pot/reset  {reason, by?}
+//   GET  /api/manager/makers     every maker, grown-ups included (D236)
+//   POST /api/manager/makers/grown-up  {name}: add a grown-up maker; one already there is left as is
 //   everything else              createPlayerHandler (/api/carts, /api/plays, /api/you-check, /runtime/…, /carts/…)
 import fs from "node:fs";
 import http from "node:http";
@@ -206,6 +208,15 @@ export function createServiceHandler(o) {
   /** @param {http.IncomingMessage} req @param {http.ServerResponse} res @param {string} pathname @param {URL} url */
   const manager = async (req, res, pathname, url) => {
     managerOk(req);
+    // Makers, grown-ups included (D236): a grown-up is added only here, by a grown-up's command, never by the service itself.
+    if (req.method === "GET" && pathname === "/api/manager/makers") return json(res, 200, { makers: o.makers.read() });
+    if (req.method === "POST" && pathname === "/api/manager/makers/grown-up") {
+      const body = await readJson(req);
+      const before = o.makers.read().length;
+      const maker = o.makers.ensureGrownUp(String(body.name ?? ""));
+      if (!maker) throw new HttpError(400, "a grown-up maker needs a first name");
+      return json(res, 200, { ok: true, maker, added: o.makers.read().length > before });
+    }
     if (!o.pot) throw new HttpError(404, "this cabinet has no coin pot");
     if (req.method === "GET" && pathname === "/api/manager/pot") return json(res, 200, { ...potView(0), rules: o.pot.settings });
     if (req.method === "GET" && pathname === "/api/manager/pot/preview") return json(res, 200, o.pot.preview(Number(url.searchParams.get("coins") ?? 0)));
