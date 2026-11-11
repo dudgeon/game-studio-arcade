@@ -6,7 +6,8 @@
 //
 // It sends the bundle over SSH and the cabinet runs the update itself, in its own systemd unit, so a dropped
 // connection (D156) can't stop it halfway. The cabinet compares carts, logs and config before and after, and
-// rolls back if the service doesn't return. It won't start while a make is running. ARCADE_HOST picks the cabinet.
+// rolls back if the service doesn't return. It won't start while a make is running or one is left to collect.
+// It checks every data file, not only carts and logs (D196). ARCADE_HOST picks the cabinet.
 // The cabinet needs network to reach npm and any changed apt packages.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -92,7 +93,8 @@ try {
   if (!result.ok) stop(`${result.reason}${result.rolled_back ? ". It rolled back to the version it had" : ""}. Log on the cabinet: ${dir}/update.log`);
   if (result.version_before === result.version_after) say(`already on ${result.version_after}: nothing moved`);
   else say(`updated from ${result.version_before} to ${result.version_after}`);
-  say("carts and logs kept, config untouched");
+  const d = result.data ?? {};
+  say(`all ${d.files ?? "?"} data files kept${d.grown?.length ? `, ${d.grown.length} logs grew` : ""}${d.new_logs?.length ? `, ${d.new_logs.length} new logs` : ""}; config untouched`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
