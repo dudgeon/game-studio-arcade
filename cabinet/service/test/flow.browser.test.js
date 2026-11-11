@@ -568,7 +568,20 @@ test("a starter game has no label and asks nothing after a play; a made game has
       sleep 400
       press esc
       wait check
+      press a
+      press a
+      wait G4
+      press up
+      press up
+      press up
+      press a
+      wait play
+      sleep 400
+      press esc
+      wait G4
     `);
+    // Play again after answering: the answered checks aren't asked again (the live run, D215).
+    assert.equal(readLog(path.join(data, "logs", "you_check.jsonl")).length, 1);
     assert.deepEqual(await faults(), []);
     assert.deepEqual(problems, []);
   });

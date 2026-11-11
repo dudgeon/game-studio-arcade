@@ -684,7 +684,8 @@ function onBoard(v, action) {
       return showCoinCheck({ maker, kind: r.kind, parent, request: r.request, back: () => showShelf() });
     }
     case "again":
-      return startPlay(v.cart);
+      // The cart as it is now: answered checks aren't asked again, and the best is current (D215).
+      return startPlay(carts.find((c) => c.id === v.cart.id) ?? v.cart);
     case "change":
       return startChange(v.cart);
     case "fix":

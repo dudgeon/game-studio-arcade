@@ -55,6 +55,8 @@ test("coin: show, add with a reason the kids see, the $15 warning, reset (D205, 
     assert.equal(await c.run(["add", "40", "Too much", "--yes"]), 0);
     assert.equal(c.pot.state().coins, 155);
 
+    assert.equal(await c.run(["add", "1", "Testing the coin command", "--yes"]), 0);
+    assert.match(c.out.at(-1) ?? "", /^Added 1 coin \(\$0\.10\)/, "one coin, not 1 coins");
     assert.equal(await c.run(["reset", "Back", "to", "normal"]), 0);
     assert.equal(c.pot.state().coins, 100);
     await assert.rejects(c.run(["add", "5"]), /needs a reason/);

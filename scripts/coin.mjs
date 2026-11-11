@@ -128,7 +128,7 @@ export async function main(argv, io = {}) {
       return 3;
     }
     const r = check(await request(at, "POST", "/api/manager/pot/topup", { coins: n, reason, by }));
-    log(`Added ${n} coins (${dollars(n * 10)}): "${reason}". The pot now has ${coins(r.entry.pot_after_cents)} coins.`);
+    log(`Added ${n} coin${n === 1 ? "" : "s"} (${dollars(n * 10)}): "${reason}". The pot now has ${coins(r.entry.pot_after_cents)} coins.`);
     return 0;
   }
   if (cmd === "reset") {
