@@ -9,10 +9,10 @@
     "./agents/studio.md": {
       "kind": "agent",
       "id": "agent_01GCfhH2MUfkwgaEJTbyGZQM",
-      "version": "3",
-      "hash": "4ef010a6008a3c8297bc51a435cc2ded",
-      "remote_hash": "6270d5fcd59c2083090de1f7bfa4457e",
-      "stamp": "3"
+      "version": "4",
+      "hash": "11315c234536e8d4db46e8596c6f707f",
+      "remote_hash": "aba6c5f272357befecf16160426ab46a",
+      "stamp": "4"
     },
     "./environments/studio.yaml": {
       "kind": "environment",
