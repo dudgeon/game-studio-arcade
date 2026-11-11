@@ -109,6 +109,13 @@ test("with no private link it watches the bridged path alone", () => {
   assert.deepEqual(lines, ["netwatch CHANGE eth0.router=up eth0.mini=up"]);
 });
 
+test("its unit starts at boot without waiting for network-online, which takes 2 minutes and fails here", () => {
+  const unit = fs.readFileSync(path.join(REPO, "cabinet/provision/files/arcade-netwatch.service"), "utf8");
+  const directives = unit.split("\n").filter((l) => !l.startsWith("#"));
+  assert.ok(directives.includes("WantedBy=multi-user.target"));
+  assert.ok(!directives.some((l) => /^(After|Wants|Requires)=.*network-online/.test(l)));
+});
+
 test("it runs on the mini's bash 3, as tested", () => {
   assert.match(execFileSync("/bin/bash", ["--version"], { encoding: "utf8" }), /version [3-9]\./);
   assert.ok(!fs.readFileSync(NETWATCH, "utf8").includes("declare -A"), "no associative arrays: bash 3 has none");

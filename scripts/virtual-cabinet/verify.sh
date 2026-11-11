@@ -75,6 +75,8 @@ link_probe() {
 }
 check firewall-refuses-mini-on-link link_probe
 # The network record (D242), kept across restarts.
+# Enabled, and not held behind network-online, which waits 2 minutes and fails on every boot here.
+check netwatch-starts-at-boot guest 'test "$(systemctl is-enabled arcade-netwatch)" = enabled && ! systemctl show -p After -p Wants -p Requires arcade-netwatch | grep -q network-online'
 check netwatch-recording guest 'systemctl is-active --quiet arcade-netwatch && sudo journalctl -u arcade-netwatch -b --no-pager | grep -q "netwatch CHANGE"'
 check journal-on-disk guest 'test -d /var/log/journal && journalctl --list-boots --no-pager | grep -q .'
 
@@ -84,9 +86,9 @@ rm -rf "$PLAY"
 check play-flow /opt/homebrew/opt/node@22/bin/node "$REPO/cabinet/vm/flow.mjs" --script "$REPO/cabinet/vm/flows/play.drive" --out "$PLAY"
 different() { [ -s "$1" ] && [ -s "$2" ] && ! cmp -s "$1" "$2"; }
 check input-moved-selection different "$PLAY/01-shelf.png" "$PLAY/02-shelf-moved.png"
-check game-started different "$PLAY/03-game-title.png" "$PLAY/04-game-playing.png"
-check hold-changed-game different "$PLAY/04-game-playing.png" "$PLAY/05-game-after-hold.png"
-check left-the-game different "$PLAY/05-game-after-hold.png" "$PLAY/06-left-the-game.png"
+check game-started different "$PLAY/04-game-title.png" "$PLAY/05-game-playing.png"
+check hold-changed-game different "$PLAY/05-game-playing.png" "$PLAY/06-game-after-hold.png"
+check left-the-game different "$PLAY/06-game-after-hold.png" "$PLAY/07-left-the-game.png"
 check play-logged-as-cabinet guest 'sudo grep -q "\"origin\":\"cabinet\"" /var/lib/arcade/logs/play.jsonl && ! sudo grep -q "\"origin\":\"desktop\"" /var/lib/arcade/logs/play.jsonl'
 # Leave wherever the game left us, so the next run starts from the shelf.
 "$D" press esc >/dev/null 2>&1 || true
