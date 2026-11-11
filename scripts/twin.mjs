@@ -4,6 +4,7 @@
 //   node scripts/twin.mjs status --real HOST       what differs: release, shelf, files (reads both, writes nothing)
 //   node scripts/twin.mjs sync --real HOST         pull the real cabinet's data into the twin, append-only
 //   node scripts/twin.mjs seed --real HOST --yes   once, at bring-up: the real cabinet starts as a copy of the twin
+//     --set-aside-real                             ...after moving aside what bring-up checks left on it (D298)
 //
 //   --twin HOST                the twin (default: the virtual cabinet, found as cabinet/vm/drive finds it)
 //   --real-dir D --twin-dir D  two data folders on this machine instead (tests, rehearsals)
@@ -159,9 +160,11 @@ export function sync(real, twin, now = new Date()) {
 /**
  * Once, at bring-up (D295): the real cabinet becomes a copy of the twin, Tester's games and history included.
  * Refuses if the real cabinet holds anything the twin doesn't, so it can't run over a cabinet the kids have used.
- * @param {End} real @param {End} twin
+ * With setAsideReal, and only before any seed, the real cabinet's own files (bring-up checks) are moved to
+ * twin-sync/set-aside/<time>/ on it first, never deleted (D298).
+ * @param {End} real @param {End} twin @param {{ setAsideReal?: boolean }} [o]
  */
-export function seed(real, twin, now = new Date()) {
+export function seed(real, twin, now = new Date(), o = {}) {
   const [ri, ti] = [real.call("info"), twin.call("info")];
   if (ti.replay.length) throw new Error(`the twin has replay data (${ti.replay.join(", ")}); it can't go to a live cabinet (D150, D155)`);
   if (ri.makeInFlight || ti.makeInFlight) throw new Error("a make is running; seed once it's done");
@@ -169,9 +172,9 @@ export function seed(real, twin, now = new Date()) {
   const rm = real.call("manifest");
   const own = drift(tm.files, rm.files, null);
   const changed = own.changed.map((c) => c.rel).concat(own.grown.map((g) => g.rel));
-  if (own.extra.length || changed.length) {
-    const list = [...own.extra.map((e) => e.rel), ...changed];
-    throw new Error(`the real cabinet already has data of its own (${list.length} files: ${list.slice(0, 5).join(", ")}${list.length > 5 ? ", ..." : ""}). Seeding is only for a new cabinet, and never overwrites one.`);
+  const list = [...own.extra.map((e) => e.rel), ...changed];
+  if (list.length && (!o.setAsideReal || ri.seed)) {
+    throw new Error(`the real cabinet already has data of its own (${list.length} files: ${list.slice(0, 5).join(", ")}${list.length > 5 ? ", ..." : ""}). Seeding is only for a new cabinet, and never overwrites one.${ri.seed ? "" : " If these are only from bring-up checks, --set-aside-real moves them aside on it first (kept, not deleted)."}`);
   }
   if (ri.seed && !own.missing.length) throw new Error(`the real cabinet was seeded at ${ri.seed.seeded_at}; seeding happens once. Use sync.`);
   if (!ti.seed) {
@@ -193,13 +196,16 @@ export function seed(real, twin, now = new Date()) {
     tm = twin.call("manifest");
   }
   const d = drift(tm.files, rm.files, null);
+  // Only with setAsideReal: a log the real cabinet started on its own is replaced whole, its own copy set aside.
+  for (const g of d.grown.splice(0)) d.changed.push({ rel: g.rel, untouched: false });
   const got = fetchFrom(twin, d, tm.files, rm.files, null);
   const plan = applyInput(d, tm.files, rm.files, got);
+  for (const a of plan.setAside) a.reason = "on the real cabinet before the seed";
   const result = real.call("apply", { stamp: stampNow(now), ...plan });
   if (result.skipped.length) throw new Error(`${result.skipped.length} files changed on the real cabinet while seeding; run seed again`);
   // The twin's baseline: from here on, a difference on the twin is the twin's own (D294).
   twin.call("apply", { stamp: stampNow(now), setAside: [], write: [], append: [], baseline: true, lastSync: { at: now.toISOString(), from: real.name, seeded: true } });
-  return { copied: result.written, appended: result.appended };
+  return { copied: result.written, appended: result.appended, setAsideOnReal: result.setAside };
 }
 
 function describe(/** @type {ReturnType<typeof status>} */ s) {
@@ -231,6 +237,7 @@ async function main() {
       "real-dir": { type: "string" },
       "twin-dir": { type: "string" },
       yes: { type: "boolean", default: false },
+      "set-aside-real": { type: "boolean", default: false },
       json: { type: "boolean", default: false },
     },
   });
@@ -251,7 +258,7 @@ async function main() {
     if (!values.json) console.log(describe(s));
   } else {
     if (!values.yes) throw new Error(`seed writes the twin's games, makers, ledger and logs onto ${real.name}, once. Add --yes to go ahead.`);
-    const r = seed(real, twin);
+    const r = seed(real, twin, new Date(), { setAsideReal: values["set-aside-real"] });
     print(r, `Seeded ${real.name} from ${twin.name}: ${r.copied} files. From now on: node scripts/twin.mjs sync --real ${real.name}`);
   }
 }

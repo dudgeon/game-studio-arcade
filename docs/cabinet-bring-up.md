@@ -139,8 +139,11 @@ scripts/cabinet-card/connect-picade.sh
 
 ## Part E: data, then the first real make
 
-**E1. Copy the twin's data** (the twin-sync worker's script, D290+)
-- The real cabinet starts as a copy of the virtual cabinet's games, logs and makers (Geoff, 2026-11-11). The copy and the sync are the twin worker's; this checklist just marks where it happens: after D2, before E2. Nothing on the virtual cabinet is deleted (D5).
+**E1. Copy the twin's data** (D290-D298)
+- The real cabinet starts as a copy of the virtual cabinet's games, logs and makers (Geoff, 2026-11-11). After D2, before E2. Nothing on either cabinet is deleted (D5); keys and config never move.
+- **Do** (Claude, with your yes): `node scripts/twin.mjs status --real arcade.local`, then `node scripts/twin.mjs seed --real arcade.local --yes`. If the checks above left log lines on the Picade, the seed lists them and stops; `--set-aside-real` moves them aside on the Picade first (kept).
+- **Look for:** the virtual cabinet's games on the Picade's shelf (Tester's included; `twin-seed.json` lists them as test data), and `status` saying "In sync".
+- **If not:** tell Claude. From then on the twin follows the Picade: `node scripts/twin.mjs sync --real arcade.local`.
 
 **E2. First make on the cabinet** 🔧
 - With a kid, from the shelf: Make → answer with the stick and buttons → a game lands on the shelf → play it.

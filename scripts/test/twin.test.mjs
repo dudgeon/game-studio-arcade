@@ -85,6 +85,24 @@ test("seed: once only, and never over a cabinet with data of its own", () => {
   assert.equal(get(used, "logs/play.jsonl"), '{"kid":1}\n');
 });
 
+test("seed: --set-aside-real moves what bring-up checks left on the real cabinet aside, then copies (D298)", () => {
+  const twin = virtualCabinet();
+  const real = tmp();
+  put(real, "logs/coin_ledger.jsonl", '{"kind":"bring-up"}\n'); // the same file the twin has, different content
+  put(real, "logs/guest_play.jsonl", '{"guest":"teti"}\n'); // only on the real cabinet
+  assert.throws(() => seed(folderEnd(real), folderEnd(twin)), /--set-aside-real/);
+  const r = seed(folderEnd(real), folderEnd(twin), new Date("2026-11-12T10:00:00Z"), { setAsideReal: true });
+  assert.equal(r.setAsideOnReal, 2);
+  const aside = path.join(real, "twin-sync/set-aside/2026-11-12T10-00-00-000Z");
+  assert.equal(get(aside, "logs/coin_ledger.jsonl"), '{"kind":"bring-up"}\n');
+  assert.equal(get(aside, "logs/guest_play.jsonl"), '{"guest":"teti"}\n');
+  assert.match(get(aside, "set-aside.jsonl"), /before the seed/);
+  assert.ok(status(folderEnd(real), folderEnd(twin)).inSync);
+  // Never once a seed has happened.
+  put(real, "logs/later.jsonl", "{}\n");
+  assert.throws(() => seed(folderEnd(real), folderEnd(twin), new Date(), { setAsideReal: true }), /already has data of its own/);
+});
+
 test("seed: refuses replay data and a make in flight (D150, D155)", () => {
   const twin = virtualCabinet();
   put(twin, "carts/penguin/cart.json", JSON.stringify({ session_id: "sesn_replay" }));
