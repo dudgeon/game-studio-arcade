@@ -1,7 +1,8 @@
 [Unit]
 Description=Record the virtual cabinet's network paths (D242)
-After=network-online.target
-Wants=network-online.target
+# Not network-online.target: Pi OS enables networkd's wait-online too, and with NetworkManager running the
+# network it waits 2 minutes and fails on every boot. The record should start at once, gaps and all.
+After=NetworkManager.service
 
 [Service]
 ExecStart=/usr/local/bin/arcade-netwatch

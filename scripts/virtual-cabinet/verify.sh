@@ -75,7 +75,9 @@ link_probe() {
 }
 check firewall-refuses-mini-on-link link_probe
 # The network record (D242), kept across restarts.
-check netwatch-recording guest 'systemctl is-active --quiet arcade-netwatch && sudo journalctl -u arcade-netwatch -b --no-pager | grep -q "netwatch CHANGE"'
+# Enabled, and not held behind network-online, which waits 2 minutes and fails on every boot here.
+check netwatch-starts-at-boot guest 'test "$(systemctl is-enabled arcade-netwatch)" = enabled && ! systemctl show -p After -p Wants -p Requires arcade-netwatch | grep -q network-online'
+check netwatch-recording guest'systemctl is-active --quiet arcade-netwatch && sudo journalctl -u arcade-netwatch -b --no-pager | grep -q "netwatch CHANGE"'
 check journal-on-disk guest 'test -d /var/log/journal && journalctl --list-boots --no-pager | grep -q .'
 
 # The screens: a cart from the shelf, by the real input path. Safe to repeat.
