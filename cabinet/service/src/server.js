@@ -80,7 +80,7 @@ function readJson(req) {
  *   guests?: ReturnType<typeof import("./guests.js").createGuests>,
  *   pot?: ReturnType<typeof import("./pot.js").potStore>,
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
- *   managerToken?: string | null,
+ *   managerToken?: string | null | (() => string | null),
  * }} o
  */
 export function createServiceHandler(o) {
@@ -195,9 +195,11 @@ export function createServiceHandler(o) {
 
   /** Only the Manager, with its pairing token. No token configured: there's no Manager yet. @param {http.IncomingMessage} req */
   const managerOk = (req) => {
-    if (!o.managerToken) throw new HttpError(404, "no Cabinet Manager is paired with this cabinet");
+    // A function reads the token file on each request, so pairing needs no restart (D215).
+    const token = typeof o.managerToken === "function" ? o.managerToken() : o.managerToken;
+    if (!token) throw new HttpError(404, "no Cabinet Manager is paired with this cabinet");
     const got = Buffer.from(String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""));
-    const want = Buffer.from(o.managerToken);
+    const want = Buffer.from(token);
     if (got.length !== want.length || !timingSafeEqual(got, want)) throw new HttpError(401, "the Manager's token is needed");
   };
 

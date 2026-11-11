@@ -2,7 +2,7 @@
 //   host -> frame: { type: "boot", cartUrl, seed, save, players }
 //                  { type: "tick", n, masks }            run n updates, then draw (one mask per controller)
 //                  { type: "call", id, method, args }    test handle call
-//   frame -> host: { type: "ready" } | { type: "out", audio, save }
+//   frame -> host: { type: "ready" } | { type: "out", audio, save, scores }
 //                  { type: "error", error } | { type: "result", id, value?, error? }
 //                  { type: "key", code, down }           keys pressed while the frame has focus
 import { H, W } from "./gfx.js";
@@ -40,8 +40,9 @@ function flush() {
   const audio = m.drainAudio();
   const save = m.drainSave();
   const warnings = m.drainWarnings();
+  const scores = m.drainScores();
   for (const w of warnings) console.warn(`[cart] frame ${w.frame}: ${w.message}`);
-  if (audio.length || save !== undefined || warnings.length) post({ type: "out", audio, save, warnings });
+  if (audio.length || save !== undefined || warnings.length || scores.length) post({ type: "out", audio, save, warnings, scores });
 }
 
 async function boot({ cartUrl, seed, save, players }) {
@@ -82,7 +83,7 @@ function tick(n, masks) {
   flush();
 }
 
-const METHODS = new Set(["step", "input", "probe", "poke", "frame", "sounds", "warnings", "reset"]);
+const METHODS = new Set(["step", "input", "probe", "poke", "frame", "sounds", "scores", "warnings", "reset"]);
 
 async function call(id, method, args) {
   try {

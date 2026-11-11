@@ -922,6 +922,43 @@ Director's go: one new game and one change by "Tester", $3 at most. Screens are 
 - **usual_cost_change is now 2** (the director, 2026-11-11). The one measured change cost 9c (about 1 coin), a one-number change with one question; 2 leaves headroom until more are measured. It stays a setting (config `pot.usual_cost_change`). The change fixture now ends at 9c too, so the replayed change reads "about usual" against 2, and the screens say "about 2" for a change wherever they said "about 3"; the handoff's coin table says so.
 - **The change, again, with the fix** (`sesn_01HK8K41KHN8yWLHhwBmfnUd`, after updating the cabinet to 7531b1c): Tester's v2 of Log Hopper came home as `log-hopper-v2`, version 2, for 14c with one question and no fix rounds. The ledger charged 14c / 1 coin, "on the shelf", pot 937 to 923c, and A2 lists it. The two measured changes, 9c and 14c, are both about 1 coin, so 2 holds.
 
+## 2026-11-11 — Arcade UX follow-ups (worker)
+
+From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exists, "A command on the mini"; the post-game score, "Build score and best"; kids changing a downloaded game, recorded verbatim in D218.
+
+**D215. A game reports a round's score with `g.score(n)`, and the post-game screen shows it and the best ever.** *(Geoff: "Build score and best". How is Claude's.)*
+- **The runtime:** `g.score(n)` takes a whole number from 0 to 999,999,999, once when a round ends. Anything else throws, so the playtest's no-errors check catches a bad call. The frame passes scores to the host with its other output, and the host keeps them (`host.scores`). Checks can see them with `t.scores()`, on both playtest drivers.
+- **The starter library reports for every game that uses it:** `score.commit(g, sc)`, which every starting point already calls at game over, now calls `g.score` first. So games built from the library report with no change, and so do the starters already on the shelf. The brief adds one line for games that don't use the library: call `g.score(n)` once at game over. That's a brief change; the director reapplies it.
+- **The play log** keeps each play's `scores` and its best as `score`. The best ever is worked out from the play log, per game line: a game's versions by its maker (D206). Another maker's version has its own best. `/api/carts` gives it as `best`.
+- **The screen:** G3, G4 and G5 show "Score: 120. Best: 340." under their title, or "Score: 400. A new best!" when this play beat every earlier one. A game that reports nothing shows no score line. The play is logged before the screen reads the best, so the best includes this play.
+- **Downloaded games** don't report yet. teti would need its game-over handler to post `{type: "score", n}` to the launcher's window, which is a few lines in its `src/cabinet.js`, and the guest bridge (D232) would pass it on like Escape. That's small but not done here: its post-game screen (D232) has no score line yet either.
+
+**D216. The coin command on the mini, until the Cabinet Manager exists.** *(Geoff: "A command on the mini". Carries out D205's top-ups and resets.)*
+- `node scripts/coin.mjs show | add N "reason" | reset "reason"`, using the cabinet's own token-gated Manager endpoints (D208) through the cabinet's SSH (`cabinet/vm/drive`, so the private link of D241).
+- **The token:** `coin.mjs pair` has the cabinet make a 32-byte token in `/etc/arcade/manager-token` (0600, owned by arcade) if it has none. It keeps a copy in `~/.config/game-studio-arcade/manager-token` (0600). The service reads that file on each request, so pairing needs no restart and the API key's config file is never touched. The token only ever travels on stdin: a small helper on the cabinet reads the request and the token from stdin and calls the service on 127.0.0.1. It isn't in a command line, a log or this repo. A token file others can read is refused.
+- **`add`** previews first. If the month could pass the workspace's real $15 limit (D211), it says so and stops unless given `--yes`. The reason is required, and the kids see it in A2.
+- Tested against a real service on the mini (`scripts/test/coin.test.mjs`). The cabinet needs an update to read the token file, then one `pair`.
+
+**D217. The plan always shows how to play: the cabinet's driver was dropping it.** *(Claude. Corrects D214's line that the agent left `controls` out.)*
+- In both live sessions the agent did send `controls` and `top_rules`. The CLI's driver built the plan for the screen from `summary`, `rules` and `changes` only, so the screen never saw them. M9 fell back to its own four rules and showed no "How to play".
+- **Fix:** the driver passes every `show_plan` field through (`planOf`), both live and when it rebuilds turns after a restart. A test checks that nothing the agent sent is dropped.
+- **Belt and braces:** `controls` is now required in the `show_plan` tool's schema. That's a tool change, reapplied with D215's brief line. No retry loop: the agent sent it every time, and a retry would cost a turn to fix a mistake that wasn't the agent's.
+
+**D218. Kids can change downloaded games however they like; it stays on the cabinet.** *(Geoff, 2026-11-11, verbatim: "Kids can make arbitrary changes to look, name, mechanics — these are non commercial, fair use and will not be distributed". Answers D233's open question.)*
+- A kid's change to a downloaded game (D230) may change its look, its name and its mechanics. The result stays on the family's cabinet and its backup, and is never published or shared outside the home.
+- **Not built.** What building it would take:
+  1. **A change flow for guests:** the guest's folder as the parent (`play/` and `guest.json`), mounted as `parent.tgz` is today (D209). The result is a new guest version in the cabinet's data, never in the repo's `guests/`.
+  2. **The brief:** teti is 6.5k lines of plain JS with no `spec.md` and no `checks.js`. A spec-first change (D1) needs at least a short spec written for the guest first, and the agent has to find its way around a big codebase rather than read it all. That costs more than a cart change: likely a new-game cost or more, so its own usual cost.
+  3. **Checks:** the house playtest can't run a guest. A guest smoke test (it loads, no errors, the keys work, Escape goes back) would stand in, plus you-check questions about the change.
+  4. **The screens:** the guest post-game screen (D232) gets "Change it?". The shelf shows a kid's guest version under the original, as family rows do (D206).
+- **Licences:** the cabinet keeps each guest's NOTICE as it is, and a kid's version carries it forward. teti is MIT, and its non-free parts were already replaced (D233).
+
+**D219. The replay's change is a recorded one.** *(Claude.)* `studio-kit/cli/fixtures/log-hopper` and `log-hopper-change` are Tester's live make and change (D214), copied from the virtual cabinet, so the replay has a matched, recorded pair. The cabinet service's replay uses `<replay>-change` if it exists, otherwise `log-hopper-change`. The hand-written `penguin-catch-change` and its generator are gone. These are the test maker's sessions, typed by Claude, with nothing a kid said in them.
+- **Small follow-ups from the build:**
+  - A session that fails on the cabinet's side after it ran (as the live change did, D214) is now archived, like a released one, and the archive is logged as a correction.
+  - `cabinet/vm/drive` takes `coin` as the COIN key (it's `f2`).
+  - The cabinet's launcher helper waits on board ids (`wait M3`) as well as screen names, so live drives no longer need `expect` and sleeps to tell boards apart. It ships with the next update.
+
 ## 2026-11-11 — Downloaded games on the shelf (worker; D208–D229 are the arcade UX build's)
 
 **D230. Downloaded games reach the shelf as web games in the kiosk ("guest games").** *(Geoff asked for the stack to be chosen first and for games Claude can change cheaply, 2026-11-11; the choice is Claude's. Report: docs/falling-blocks.md.)*
@@ -939,7 +976,7 @@ Director's go: one new game and one change by "Tester", $3 at most. Screens are 
 - The launcher plays a guest in a full-screen iframe that has focus, so the game reads the keys itself. The service puts a small script at the top of the guest's page: it takes Escape before the game sees it and tells the launcher, which ends the play (D88). F1 and F2 stay launcher-only by convention; a guest never gets Escape.
 - Plays are logged like a cart's, to `logs/guest_play.jsonl` (guest id and version instead of a cart's).
 
-**D233. The first guest is teti, cleaned up for the cabinet.** *(Geoff's pick, 2026-11-11; the cleanup is Claude's.)*
+**D233. The first guest is teti, cleaned up for the cabinet.** *(Its open question, a kid's change to a downloaded game, is answered by D218.)* *(Geoff's pick, 2026-11-11; the cleanup is Claude's.)*
 - teti (TitanPlayz100/teti, MIT, pinned to commit 1de7944), tier A: about 6.5k lines of plain JS, no build step.
 - Its sounds (TETR.IO's), music (commercial Touhou arrangements), skins and icons are replaced by assets this repo generates (`guests/teti/tools/make-assets.mjs`); pixi.js 8.23.0 (MIT) is vendored at a pinned version; fonts are OFL and local. Nothing loads from the network.
 - **No GSAP** (director, 2026-11-11). Upstream teti animates with GSAP, whose Standard "No Charge" licence isn't open source: it bars use in no-code animation tools that compete with Webflow's, and lets Webflow end the licence. So the cabinet's teti has its own small tween helper, `play/src/tween.js`, with GSAP's names, so teti's 31 call sites are unchanged. Everything teti ships is open source (MIT, OFL) or this repo's, and the Studio can change all of it.

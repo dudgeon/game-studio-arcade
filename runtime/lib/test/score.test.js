@@ -72,3 +72,18 @@ test("loadField and saveField merge into one save object", () => {
   assert.equal(score.loadField(g, "missing"), null);
   assert.throws(() => score.saveField(g, "big", "x".repeat(5000)), /4 KB/);
 });
+
+test("commit reports the round's score to the cabinet with g.score (D215), new best or not", () => {
+  /** @type {number[]} */
+  const reported = [];
+  const f = fakeG({ save: { best: 100 } });
+  const g = asG({ ...f, save: f.save, load: f.load, score: (/** @type {number} */ n) => reported.push(n) });
+  const sc = score.newScore(g);
+  score.addPoints(sc, 40);
+  score.commit(g, sc);
+  sc.score = 250;
+  score.commit(g, sc);
+  assert.deepEqual(reported, [40, 250]);
+  // An older runtime with no g.score: commit still saves.
+  assert.doesNotThrow(() => score.commit(asG(fakeG()), score.newScore(asG(fakeG()))));
+});

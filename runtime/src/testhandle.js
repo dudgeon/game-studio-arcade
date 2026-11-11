@@ -74,6 +74,9 @@ export function createTestHandle(cart, opts = {}) {
     async sounds() {
       return m.sounds();
     },
+    async scores() {
+      return m.scores;
+    },
     async warnings() {
       return m.warnings();
     },

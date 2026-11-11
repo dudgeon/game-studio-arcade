@@ -99,7 +99,7 @@ test("ask_player matches HANDOFF §9.1", () => {
 
 test("show_plan can carry the changes a frozen check needs (D44)", () => {
   const t = JSON.parse(read("agents/tools/show_plan.json"));
-  assert.deepEqual(t.input_schema.required, ["summary", "rules"], "changes stays optional");
+  assert.deepEqual(t.input_schema.required, ["summary", "controls", "rules"], "changes stays optional; how to play is required (D217)");
   assert.deepEqual(t.input_schema.properties.changes.items.required, ["id", "text"]);
 });
 

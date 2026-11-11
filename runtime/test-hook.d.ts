@@ -116,6 +116,8 @@ declare namespace Arcade {
     frame(): Promise<Frame>;
     /** Sounds started since the last reset, oldest first. */
     sounds(): Promise<SoundEvent[]>;
+    /** Round scores the cart reported with g.score() since the last reset, oldest first (D215). */
+    scores(): Promise<number[]>;
     /**
      * Dev warnings since the last reset, each kind once: today, a color outside
      * 0..31 (it still draws, wrapped into the palette). For the palette check.

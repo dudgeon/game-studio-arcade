@@ -1,0 +1,18 @@
+{
+  "request": "make the logs float a bit faster each time the frog gets across",
+  "maker": "tester",
+  "questions": [
+    {
+      "question": "Logs already speed up a bit after each crossing, up to 5 times. Change it?",
+      "option_a": "Keep speeding up with every crossing, no stop",
+      "option_b": "Bigger speed-ups, still stopping after 5",
+      "choice": "B",
+      "answer": "Bigger speed-ups, still stopping after 5"
+    }
+  ],
+  "plan": [
+    {
+      "choice": "build"
+    }
+  ]
+}

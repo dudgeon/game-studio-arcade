@@ -51,6 +51,19 @@ This is how fixes reach a running cabinet (D195). Its data and key stay as they 
 
 To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`.
 
+## Add coins or reset the pot
+
+Until the Cabinet Manager exists, a grown-up does it from the mini (D215). The reason is shown to the kids in the coin history (A2).
+
+```sh
+node scripts/coin.mjs pair                      # once: the cabinet makes its Manager token, and a copy is kept in ~/.config/game-studio-arcade/
+node scripts/coin.mjs show                      # the pot, this month's makers, the latest entries
+node scripts/coin.mjs add 20 "Owen helped clean the basement"
+node scripts/coin.mjs reset "Fresh start after the fix"
+```
+
+`add` warns, and stops unless given `--yes`, when the month could pass the workspace's real $15 limit (D211). It goes through the cabinet's own SSH (`cabinet/vm/drive`), and the token only ever travels on stdin.
+
 ## Bring up the virtual cabinet
 
 Once per Mac, with someone there: `open /Applications/UTM.app`, click Open, quit UTM. The first `utmctl` call may ask to control UTM.

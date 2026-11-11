@@ -25,7 +25,7 @@ import { LINE_STAGE, progressFor, progressGate, tellStage } from "./progress.js"
  * @typedef {object} SessionResult
  * @property {string} sessionId
  * @property {Turn[]} turns
- * @property {{summary: string, rules: any[], changes?: any[], choice: string, said: string|null}[]} planTurns
+ * @property {{summary: string, controls?: string, top_rules?: string[], rules: any[], changes?: any[], choice: string, said: string|null}[]} planTurns
  * @property {"answers"|"make_it_now"} endedBy
  * @property {string} stopReason   end_turn | budget_reached | retries_exhausted | refusal | terminated | stream_lost
  * @property {any} usage           session usage (list_cost, tokens, active_seconds)
@@ -51,6 +51,24 @@ export function requestMessage({ request, maker, withPlayer }) {
     `"${request}"`,
   ];
   return { type: "user.message", content: [{ type: "text", text: lines.join("\n") }] };
+}
+
+/**
+ * A show_plan call as the player's screen gets it: every field the tool has (D210),
+ * so how to play and the four rules that matter reach the screen (D215: the cabinet
+ * once dropped `controls` and `top_rules` here, and the plan showed no "How to play").
+ * @param {any} input
+ */
+export function planOf(input) {
+  const controls = typeof input.controls === "string" ? input.controls.trim() : "";
+  const top = Array.isArray(input.top_rules) ? input.top_rules.filter((/** @type {unknown} */ x) => typeof x === "string").slice(0, 4) : [];
+  return {
+    summary: String(input.summary ?? ""),
+    ...(controls ? { controls } : {}),
+    ...(top.length ? { top_rules: top } : {}),
+    rules: Array.isArray(input.rules) ? input.rules : [],
+    ...(Array.isArray(input.changes) && input.changes.length ? { changes: input.changes } : {}),
+  };
 }
 
 const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted", "refusal"]);
@@ -132,7 +150,7 @@ export async function runSession(o) {
       return reply(ev, questionResult(a));
     }
     if (ev.name === "show_plan") {
-      const p = { summary: String(input.summary ?? ""), rules: Array.isArray(input.rules) ? input.rules : [], ...(Array.isArray(input.changes) && input.changes.length ? { changes: input.changes } : {}) };
+      const p = planOf(input);
       const a = await o.answerer.plan(p);
       planTurns.push({ ...p, choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
       return reply(ev, planResult(a));
@@ -240,7 +258,7 @@ export async function runSession(o) {
         if (a.choice === "D") madeItNow = true;
         turns.push({ question: String(input.question ?? ""), option_a: String(input.option_a ?? ""), option_b: String(input.option_b ?? ""), choice: a.choice, said: a.choice === "C" ? (a.said ?? "") : null });
       } else if (use?.name === "show_plan") {
-        planTurns.push({ summary: String(input.summary ?? ""), rules: Array.isArray(input.rules) ? input.rules : [], choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
+        planTurns.push({ ...planOf(input), choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
       }
     }
   }

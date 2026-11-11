@@ -238,6 +238,26 @@ test("save/load: JSON round trip, 4 KB limit, survives reset only with keepSave"
   await assert.rejects(big.step(), /limit is 4096/);
 });
 
+test("g.score: each round's final score, in order, for the cabinet; whole numbers only (D215)", async () => {
+  const t = await headless({
+    init: () => ({}),
+    update: (g) => {
+      if (g.frame === 2) g.score(120);
+      if (g.frame === 4) g.score(0);
+    },
+    draw() {},
+  });
+  assert.deepEqual(await t.scores(), []);
+  await t.step(5);
+  assert.deepEqual(await t.scores(), [120, 0]);
+  await t.reset();
+  assert.deepEqual(await t.scores(), [], "a reset starts a new run");
+  for (const bad of [-1, 1.5, NaN, "9", 1e10]) {
+    const b = await headless({ init: () => ({}), update: (g) => g.score(/** @type {any} */ (bad)), draw() {} });
+    await assert.rejects(b.step(), /g\.score\(\) needs a whole number/, String(bad));
+  }
+});
+
 test("probe is JSON-cloned and null when the cart has none", async () => {
   const shared = { list: [1, 2] };
   const t = await headless({ init: () => shared, update() {}, draw() {}, probe: (g, s) => s });

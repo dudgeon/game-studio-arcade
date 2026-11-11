@@ -24,7 +24,7 @@ Mutates. Adds 1 or `n`, capped at `max`. Returns lives.
 True at no lives.
 
 ### `score.commit(g, sc)`
-Saves the high score if it beats the saved one, keeping other fields; returns true if it saved. Call once when the game ends. Checks test it with `t.reset({ keepSave: true })`.
+Reports the round's score to the cabinet with `g.score` (its post-game screen shows it and the best ever), then saves the high score if it beats the saved one, keeping other fields; returns true if it saved. Call once when the game ends. Checks test it with `t.reset({ keepSave: true })`, and see what was reported with `t.scores()`.
 
 ### `score.loadField(g, key, fallback?)`
 The saved field, or `fallback` (default null).

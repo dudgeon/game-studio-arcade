@@ -43,7 +43,7 @@ async function connect() {
 const READ = `(() => {
   const l = window.launcher;
   if (!l) return null;
-  return JSON.stringify({ screen: l.screen(), phase: l.phase(), sel: l.sel(), studio: l.studio().phase, boxes: l.boxes(), faults: l.faults() });
+  return JSON.stringify({ screen: l.screen(), board: l.board ? l.board() : null, phase: l.phase(), sel: l.sel(), studio: l.studio().phase, boxes: l.boxes(), faults: l.faults() });
 })()`;
 
 async function read(c) {
@@ -78,10 +78,11 @@ if (cmd === "wait") {
   let at = null;
   while (Date.now() < deadline) {
     at = await read(c);
-    if (at && at.screen === screen && (!phase || phase === "-" || at.phase === phase)) process.exit(0);
+    // A screen name or a board id (M3, R6...: D212), as drive.js waits.
+    if (at && (at.screen === screen || at.board === screen) && (!phase || phase === "-" || at.phase === phase)) process.exit(0);
     await new Promise((r) => setTimeout(r, 40));
   }
-  console.error(`timed out waiting for ${screen} ${phase ?? ""}: on ${at?.screen} ${at?.phase ?? ""} (Studio: ${at?.studio})`);
+  console.error(`timed out waiting for ${screen} ${phase ?? ""}: on ${at?.screen} ${at?.board ?? ""} ${at?.phase ?? ""} (Studio: ${at?.studio})`);
   process.exit(1);
 }
 if (cmd === "errors") {

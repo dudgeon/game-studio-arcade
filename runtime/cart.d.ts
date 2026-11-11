@@ -180,6 +180,10 @@ declare namespace Arcade {
     save(data: unknown): void;
     /** The last saved data, or null if nothing has been saved. */
     load(): any;
+
+    // Score (D215): what the cabinet shows after a play, with the best ever.
+    /** A round's final score, once, when the round ends (game over). A whole number from 0 to 999,999,999. Games with no score don't call it. */
+    score(n: number): void;
   }
 
   /** Starter library types (D50), so carts can annotate state without import paths, e.g. `Arcade.Lib.Grid`. */

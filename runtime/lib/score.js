@@ -96,13 +96,15 @@ export function isOver(sc) {
 }
 
 /**
- * Save the high score if this game beat it, keeping other saved fields.
- * Call it once when the game ends (not every frame). Returns true if a new
- * high score was saved.
+ * The game ended: report its score to the cabinet (g.score, D215) and save the
+ * high score if this game beat it, keeping other saved fields. Call it once
+ * when the game ends (not every frame). Returns true if a new high score was saved.
  * @param {Arcade.G} g
  * @param {Score} sc
  */
 export function commit(g, sc) {
+  // An older runtime has no g.score; the save still works there.
+  if (typeof g.score === "function") g.score(Math.max(0, Math.min(999_999_999, Math.floor(sc.score))));
   const saved = loadField(g, sc.key, 0);
   if (typeof saved === "number" && sc.score <= saved) return false;
   saveField(g, sc.key, sc.score);

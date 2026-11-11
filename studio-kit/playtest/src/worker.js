@@ -62,6 +62,7 @@ async function open() {
       poke: (o) => rpc("poke", [o]),
       frame: () => rpc("frame", []),
       sounds: () => rpc("sounds", []),
+      scores: () => rpc("scores", []),
       warnings: () => rpc("warnings", []),
       reset: (o) => rpc("reset", [o]),
     };
@@ -115,6 +116,7 @@ function wrap(base) {
       poke: (o) => base.poke(o),
       frame: () => base.frame(),
       sounds: () => base.sounds(),
+      scores: () => base.scores(),
       async reset(o) {
         gameFrame = 0;
         await base.reset(o);
