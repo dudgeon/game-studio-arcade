@@ -1,8 +1,13 @@
 {
-  "id": "teti",
+  "id": "teti-geoff",
   "title": "teti",
   "by": "TitanPlayz100",
-  "version": "1.4.4-cabinet.1",
+  "maker": { "id": "geoff", "name": "Geoff" },
+  "parent": { "id": "teti", "version": "1.4.4-cabinet.1" },
+  "family": "teti",
+  "made": "2026-11-11",
+  "changed": "Keeps score: Marathon and 2 Minutes report your points when a game ends.",
+  "version": "1.4.4-cabinet.1-geoff.1",
   "kind": "web",
   "entry": "index.html?cabinet",
   "players": 1,
@@ -12,7 +17,7 @@
     "licence": "MIT"
   },
   "howToPlay": {
-    "goal": "Fill whole rows with falling blocks to clear them.",
+    "goal": "Fill whole rows to clear them. Marathon and 2 Minutes keep your score.",
     "controls": ["Stick: move. Up drops it all the way", "A or B: turn it", "X: keep a block for later", "START: pause"]
   }
 }

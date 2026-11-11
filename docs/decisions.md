@@ -986,6 +986,34 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
 - The board is bigger on the cabinet: teti's own Board Size at 130, the top of its slider, so the board is 580 px of the 768 (from 460). That needed one upstream fix: texts shared style objects, so their font size compounded at any size but 100. The in-game info page is ours, crediting only what ships (director, 2026-11-11).
 - It keeps guideline-style piece colours; it has no Tetris name. That's acceptable for a downloaded game (D230); a kid's change to it may count as a Studio-made game, and that question is open.
 
+**D234. A version of a downloaded game is its own guest folder, naming its parent and its maker.** *(Geoff: "make a new version that keeps a score; treat it/show it like a fork to test that pattern, make the author Geoff". The shape is Claude's; it's the pattern D218's kid changes will use.)*
+- **A full copy, not an overlay:** `guests/teti-geoff/` holds its own `play/`, `guest.json`, `LICENSE` and `NOTICE.md`, like a change to a cart is a new cart folder (D209). A version is a snapshot, so a later change to teti can't change Geoff's. The copy was committed unchanged first, so the history shows exactly what the version changes. Git stores the unchanged files once, so the copy costs almost nothing in the repo.
+- **`guest.json` names it:**
+  - `maker` (`{id, name}`);
+  - `parent` (`{id, version}` of what it came from);
+  - `family` (the original's id);
+  - `made`, and `changed` (what's different, in a line).
+  - `by` stays the original author, so credit stays true.
+- **The original is untouched.** A test checks that the two `play/` folders hold the same files and differ only where the version changed them (`src/cabinet.js`, `info.html`).
+- **The shelf** shows a guest's versions as family rows (D206): the original, then each version indented under it, "by <maker>", with the same "free game" tag. A version whose original isn't there stands on its own. Neither has a card yet: guests have no older versions to list.
+- **NOTICE** is carried forward and says what changed (D218): Geoff's version is teti by TitanPlayz100 (MIT), changed.
+- **For a kid's change later** (D218, not built): the same folder shape, written to the cabinet's data (`<data>/guests/`) rather than the repo, with the kid's maker id.
+
+**D235. A guest reports a round's score through the guest bridge; the post-game screen shows it and the best, as made games do.** *(Carries D215 to guests.)*
+- **The game posts `{gsa: "score", n}`** to the launcher when a round ends. n is a whole number from 0 to 999,999,999, as for `g.score(n)`. The launcher takes it only from the playing guest's own frame and origin, at most 200 a play, and keeps them as the host's `scores`.
+- **The play log** (`guest_play.jsonl`) keeps each play's `scores` and their best as `score`. `/api/guests` gives each guest's `best`, per guest id. A version has its own best, as another maker's line does (D215).
+- **G6** shows "Score: N. Best: M." or "Score: N. A new best!" under "Nice game!" when the play reported a score. Otherwise there's no score line, so the original teti shows none.
+- **teti's score, in Geoff's version:**
+  - **Marathon and 2 Minutes** report teti's own points when a game ends: topping out, or reaching the goal (150 lines, or the 2 minutes).
+  - **Sprint** reports nothing: it's a race against the clock, so lower is better, and that doesn't fit a "best" where higher wins.
+  - **Zen** reports nothing: nothing falls, so its points only measure patience.
+  - The picker says which modes keep score. A round left with Escape before it ends reports nothing, as for made games.
+
+**D236. A guest version's maker is a grown-up maker, added by the service.** *(Claude; the Brief asked that Geoff be added "the way a grown-up maker should be added (not as a guest kid)".)*
+- `makers.json` gets `{id: "geoff", name: "Geoff", guest: false, grown_up: true}`. `guest: false`: he wasn't added through the cabinet's new-name slot (D87). `grown_up: true` marks him as a grown-up.
+- **The service adds him** at start, from any guest version's `maker`, if he isn't there already. A maker already there is never changed, and nothing is removed (D5). The id must be his name's slug.
+- **He shows in the "who's making" list** like anyone else, so a game he makes at the cabinet is his and comes out of the family pot under his name (D202). Playing a guest stays free: no coins, no Studio session.
+
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
 - **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.
 - **Not the guest's lease.** It's 24 hours from the router, so renewals come every 12 hours.

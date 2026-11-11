@@ -10,12 +10,21 @@
 // Game is handed in by main.js (importing main.js here would deadlock its top-level await).
 let Game;
 
+// Geoff's version (D234, D235): Marathon and 2 Minutes keep score. Sprint is a race against
+// the clock (lower is better) and Zen has no pressure, so neither reports a score.
 const MODES = [
-    { id: "marathon", name: "Marathon", line: "Clear lines. Every 10 lines it gets faster." },
+    { id: "marathon", name: "Marathon", line: "Every 10 lines it gets faster. Keeps your score.", scored: true },
     { id: "sprint", name: "Sprint", line: "Clear 40 lines as fast as you can." },
-    { id: "ultra", name: "2 Minutes", line: "Score as much as you can in 2 minutes." },
+    { id: "ultra", name: "2 Minutes", line: "Score as much as you can in 2 minutes. Keeps your score.", scored: true },
     { id: "zen", name: "Zen", line: "Nothing falls on its own. Take your time." },
 ];
+
+/** Tell the cabinet a round's score (D235): the launcher keeps it, like a made game's g.score(n). */
+function reportScore() {
+    if (!MODES.find((m) => m.id === lastMode)?.scored) return;
+    const n = Math.max(0, Math.min(999_999_999, Math.round(Number(Game.stats.score) || 0)));
+    if (parent !== window) parent.postMessage({ gsa: "score", n }, "*");
+}
 
 const KEYS = {
     leftKey: "ArrowLeft", rightKey: "ArrowRight", sdKey: "ArrowDown", hdKey: "ArrowUp",
@@ -66,7 +75,7 @@ function show(next) {
 
 function picker() {
     const sel = Math.max(0, MODES.findIndex((m) => m.id === lastMode));
-    show({ kind: "picker", title: "teti", text: "Pick a game", sel, items: MODES.map((m) => ({ ...m, go: () => play(m.id) })) });
+    show({ kind: "picker", title: "teti", text: "Geoff's version: it keeps score", sel, items: MODES.map((m) => ({ ...m, go: () => play(m.id) })) });
 }
 
 function pause() {
@@ -80,6 +89,7 @@ function pause() {
 function gameOver() {
     const reason = Game.elementReason.textContent;
     const lost = ["Topout", "Blockout", "Lockout"].includes(reason);
+    reportScore(); // a round ended: topped out, or reached its goal
     show({ kind: "over", title: lost ? "Game over!" : "You did it!", text: lost ? `Lines: ${Game.stats.clearlines}  Score: ${Game.stats.score}` : `${reason}. ${Game.elementResult.textContent}`, sel: 0, items: [
         { name: "Play again", go: () => play(lastMode) },
         { name: "Pick another game", go: picker },

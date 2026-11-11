@@ -101,18 +101,38 @@ export function createGuests(o) {
   const list = (/** @type {string} */ host) => {
     const plays = readLog(logFile());
     const hostname = (host || "127.0.0.1").replace(/:\d+$/, "");
-    return all().map(({ id, meta }) => ({
-      id,
-      guest: true,
-      title: meta.title,
-      by: meta.by ?? null,
-      version: meta.version ?? null,
-      players: meta.players ?? 1,
-      howToPlay: meta.howToPlay ?? null,
-      url: self.port ? `http://${hostname}:${self.port}/${id}/${meta.entry}` : null,
-      plays: plays.filter((p) => p.guest_id === id).length,
-    }));
+    return all().map(({ id, meta }) => {
+      const mine = plays.filter((p) => p.guest_id === id);
+      const scored = mine.filter((p) => Number.isInteger(p.score));
+      return {
+        id,
+        guest: true,
+        title: meta.title,
+        by: meta.by ?? null,
+        version: meta.version ?? null,
+        // A version of another guest (D234): who made it, what it came from, and its family.
+        maker: typeof meta.maker?.id === "string" ? meta.maker.id : null,
+        parent: typeof meta.parent?.id === "string" ? meta.parent.id : null,
+        family: typeof meta.family === "string" ? meta.family : id,
+        changed: typeof meta.changed === "string" ? meta.changed : null,
+        players: meta.players ?? 1,
+        howToPlay: meta.howToPlay ?? null,
+        url: self.port ? `http://${hostname}:${self.port}/${id}/${meta.entry}` : null,
+        plays: mine.length,
+        // The best round score ever on this guest, or null if it has never reported one (D235, as D215).
+        best: scored.length ? Math.max(...scored.map((p) => p.score)) : null,
+      };
+    });
   };
+
+  /**
+   * Grown-up makers named by guest versions (D236), for the service to add to makers.json.
+   * @returns {{ id: string, name: string }[]}
+   */
+  const makers = () =>
+    all()
+      .map(({ meta }) => meta.maker)
+      .filter((m) => m && typeof m.id === "string" && /^[a-z0-9][a-z0-9-]{0,39}$/.test(m.id) && typeof m.name === "string" && m.name.trim());
 
   /** @param {any} b */
   const playRecord = (b) => {
@@ -131,8 +151,16 @@ export function createGuests(o) {
       duration_s: Math.round(duration * 10) / 10,
       ended: ENDED.has(b.ended) ? b.ended : "back",
       errors: Number.isInteger(b.errors) && b.errors >= 0 ? b.errors : 0,
+      // D235: the round scores the guest reported, and this play's best of them; none if it reported nothing.
+      ...scoresOf(b.scores),
       logged_at: now().toISOString(),
     };
+  };
+
+  /** Round scores: whole numbers from 0 to 999,999,999, at most 200 (as D215's). @param {unknown} raw */
+  const scoresOf = (raw) => {
+    const l = Array.isArray(raw) ? raw.filter((n) => Number.isInteger(n) && n >= 0 && n <= 999_999_999).slice(0, 200) : [];
+    return l.length ? { scores: l, score: Math.max(...l) } : {};
   };
 
   /** @param {any} body */
@@ -232,7 +260,7 @@ export function createGuests(o) {
   };
 
   /** `port` is the guest server's, set once it listens. */
-  const self = { port: o.guestPort ?? 0, list, logPlay, files, api };
+  const self = { port: o.guestPort ?? 0, list, logPlay, files, api, makers };
   return self;
 }
 

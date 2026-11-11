@@ -3,6 +3,7 @@
 // focus, so the game reads the keys itself. The guest page's escape script
 // (served by the service) posts {gsa: "star"} on Escape, and the play ends.
 import { COLORS as C } from "../../../runtime/src/palette.js";
+import { scoreLine } from "./boards.js";
 
 /** The guests, as shelf entries shaped like carts (`guest: true`). Never throws: no guests is fine. */
 export async function fetchGuests() {
@@ -33,9 +34,13 @@ export function createGuestHost(opts) {
     markReady = resolve;
     markFailed = reject;
   });
+  /** Round scores the guest reported (D235), like a cart's `host.scores` (D215). @type {number[]} */
+  const scores = [];
   const onMessage = (/** @type {MessageEvent} */ e) => {
     if (e.source !== iframe.contentWindow || e.origin !== origin) return;
     if (e.data?.gsa === "star") opts.onStar?.();
+    const n = e.data?.n;
+    if (e.data?.gsa === "score" && Number.isInteger(n) && n >= 0 && n <= 999_999_999 && scores.length < 200) scores.push(n);
   };
   addEventListener("message", onMessage);
   iframe.addEventListener("load", () => {
@@ -56,6 +61,7 @@ export function createGuestHost(opts) {
     iframe,
     ready,
     ticks: null,
+    scores,
     destroy() {
       removeEventListener("message", onMessage);
       removeEventListener("focus", refocus);
@@ -68,9 +74,30 @@ export function createGuestHost(opts) {
 
 // ---------- guests on the arcade boards (D201; the proposal in docs/falling-blocks.md §5) ----------
 
-/** S1: a guest's shelf row: "by <author>", a "free game" tag, no card (guests have no versions). @param {any} g */
-export function guestRow(g) {
-  return { kind: "cart", cart: g, title: g.title, by: g.by ? `by ${g.by}` : undefined, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false };
+/**
+ * S1: a guest's shelf row: "by <author>", a "free game" tag, no card. Someone's own version of
+ * a guest (D234) reads "by <maker>", as another maker's version of a game does (D206).
+ * @param {any} g @param {(id: string) => string} [nameOf]
+ */
+export function guestRow(g, nameOf = (id) => id) {
+  const by = g.maker ? `by ${nameOf(g.maker)}` : g.by ? `by ${g.by}` : undefined;
+  return { kind: "cart", cart: g, title: g.title, by, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false, indent: 0 };
+}
+
+/**
+ * The guests' shelf rows as family rows (D206, D234): each original, then the versions made
+ * from it, indented under it. A version whose original isn't here stands on its own.
+ * @param {any[]} guests @param {(id: string) => string} [nameOf]
+ */
+export function guestRows(guests, nameOf) {
+  const ids = new Set(guests.map((g) => g.id));
+  const isVersion = (/** @type {any} */ g) => g.parent && ids.has(g.parent);
+  const rows = [];
+  for (const g of guests.filter((x) => !isVersion(x))) {
+    rows.push(guestRow(g, nameOf));
+    for (const v of guests.filter((x) => isVersion(x) && x.parent === g.id)) rows.push({ ...guestRow(v, nameOf), indent: 1 });
+  }
+  return rows;
 }
 
 /**
@@ -84,14 +111,18 @@ export function guestHowto(g) {
   return { screen: "howto", cart: g, title: g.title, by: "", goal: h.goal ?? null, controls };
 }
 
-/** After a guest game: play again or back to the shelf. No change, no coins (D230). @param {any} g */
-export function guestPostGame(g) {
+/**
+ * After a guest game: play again or back to the shelf. No change, no coins (D230). A guest that
+ * reports a score shows "Score: N. Best: M." or "A new best!", as made games do (D215, D235).
+ * @param {any} g @param {{ score?: number | null, best?: number | null, bestBefore?: number | null }} [played]
+ */
+export function guestPostGame(g, played = {}) {
   return {
     screen: "board",
     board: "G6",
     title: "Done playing",
     right: g.title,
-    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, { text: "Playing is always free.", rows: 1, onCut: "never" }],
+    blocks: [{ text: "Nice game!", scale: 2, color: C.yellow, rows: 1, after: 4, onCut: "never" }, ...scoreLine(played), { text: "Playing is always free.", rows: 1, onCut: "never" }],
     tiles: [{ text: "Play again", note: "free" }, { text: "Back to the shelf", hue: C.green }],
     sel: 1,
     post: ["again", "shelf"],

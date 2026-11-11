@@ -9,7 +9,7 @@ import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/tex
 import { LONG } from "../test-support/stress.js";
 import { bootBoard, cardView, coinsWord, resultItem, scoreLine, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
-import { guestHowto, guestPostGame } from "../launcher/guests.js";
+import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
 
 const STRINGS = Object.entries(LONG);
 
@@ -89,6 +89,9 @@ function boardsWith(s) {
     "G0": howtoView(cart, nameOf),
     "G0 guest": guestHowto({ id: "teti", guest: true, title: s, by: s, howToPlay: { goal: s, controls: [s, s, s, s, s] } }),
     "G6 guest": guestPostGame({ id: "teti", guest: true, title: s, by: s }),
+    "G6 guest, a score": guestPostGame({ id: "teti-geoff", guest: true, title: s, by: s }, { score: 999_999_999, best: 999_999_999, bestBefore: 5 }),
+    "G6 guest, a best": guestPostGame({ id: "teti-geoff", guest: true, title: s, by: s }, { score: 12, best: 999_999_999, bestBefore: 999_999_999 }),
+    "S1 guest family": { screen: "shelf", console: s, pot: 100, sel: 2, items: [{ kind: "make", title: "Make a new game", cost: 6 }, ...guestRows([{ id: "teti", guest: true, title: s, by: s }, { id: "teti-geoff", guest: true, title: s, by: s, maker: "geoff", parent: "teti" }], () => s)] },
     "G3": postGame({ cart, noRule: { id: "R12", text: s }, versions: 3, usual: { change: 3 } }),
     "G4": postGame({ cart, noRule: null, versions: 3, usual: { change: 3 } }),
     "G4 with a score": postGame({ cart, noRule: null, versions: 3, usual: { change: 2 }, score: 999_999_999, best: 999_999_999, bestBefore: 5 }),
@@ -324,4 +327,38 @@ test("score and best after a play (D215): this play's score, the best ever, a ne
   assert.equal(scoreLine({ score: 50, best: 50, bestBefore: null })[0].text, "Score: 50. A new best!", "the first score is the best so far");
   assert.equal(scoreLine({ score: 0, best: 0, bestBefore: null })[0].text, "Score: 0. Best: 0.", "zero isn't a record");
   assert.equal(scoreLine({ score: 120, best: null, bestBefore: 340 })[0].text, "Score: 120. Best: 120.", "a best not yet logged still reads sensibly");
+});
+
+test("guest family rows: the original, then someone's version indented under it, by its maker (D234)", () => {
+  const nameOf = (/** @type {string} */ id) => /** @type {Record<string, string>} */ ({ geoff: "Geoff" })[id] ?? id;
+  const rows = guestRows(
+    [
+      { id: "teti-geoff", guest: true, title: "teti", by: "TitanPlayz100", maker: "geoff", parent: "teti" },
+      { id: "teti", guest: true, title: "teti", by: "TitanPlayz100" },
+      { id: "lonely", guest: true, title: "Lonely", by: "Someone", maker: "geoff", parent: "not-here" },
+    ],
+    nameOf,
+  );
+  assert.deepEqual(rows.map((r) => [r.cart.id, r.indent, r.by, r.tags[0].text, r.hasCard]), [
+    ["teti", 0, "by TitanPlayz100", "free game", false],
+    ["teti-geoff", 1, "by Geoff", "free game", false],
+    ["lonely", 0, "by Geoff", "free game", false],
+  ]);
+  const p = new Painter();
+  draw(p, { screen: "shelf", console: "Quarter Deck", pot: 92, sel: 1, items: rows });
+  assert.deepEqual(check(p.boxes), []);
+  const x = (/** @type {number} */ n) => p.boxes.find((b) => b.id === `shelf-title-${n}`)?.x ?? -1;
+  assert.ok(x(1) > x(0), "the version's row is indented under the original");
+});
+
+test("a guest's G6 shows the score line only when it reported one (D235)", () => {
+  const words = (/** @type {any} */ v) => {
+    const p = new Painter();
+    draw(p, v);
+    assert.deepEqual(check(p.boxes), []);
+    return p.boxes.flatMap((b) => b.lines.map((l) => l.text)).join(" | ");
+  };
+  assert.doesNotMatch(words(guestPostGame({ id: "teti", title: "teti" })), /Score/, "the original teti: no score line");
+  assert.match(words(guestPostGame({ id: "teti-geoff", title: "teti" }, { score: 340, best: 340, bestBefore: null })), /Score: 340\. A new best!/);
+  assert.match(words(guestPostGame({ id: "teti-geoff", title: "teti" }, { score: 120, best: 340, bestBefore: 340 })), /Score: 120\. Best: 340\./);
 });

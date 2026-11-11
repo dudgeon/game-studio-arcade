@@ -7,7 +7,7 @@ import path from "node:path";
 export const NAME_MAX = 16;
 
 /**
- * @typedef {{ id: string, name: string, added: string, guest: boolean, hidden?: boolean, last_made?: string }} Maker
+ * @typedef {{ id: string, name: string, added: string, guest: boolean, grown_up?: boolean, hidden?: boolean, last_made?: string }} Maker
  */
 
 const slug = (name) =>
@@ -63,6 +63,23 @@ export function makersStore({ file, now = () => new Date() }) {
       if (known) return known;
       /** @type {Maker} */
       const maker = { id, name, added: now().toISOString(), guest: true };
+      list.push(maker);
+      write(list);
+      return maker;
+    },
+    /**
+     * A grown-up maker (D236), such as the author of a guest version: `guest: false` (not added
+     * through the new-name slot) and `grown_up: true`. Someone already there is left exactly as is.
+     * @param {string} id @param {string} rawName
+     */
+    ensureGrownUp(id, rawName) {
+      const name = firstName(rawName);
+      if (!name || slug(name) !== id) return null;
+      const list = read();
+      const known = list.find((m) => m.id === id);
+      if (known) return known;
+      /** @type {Maker} */
+      const maker = { id, name, added: now().toISOString(), guest: false, grown_up: true };
       list.push(maker);
       write(list);
       return maker;

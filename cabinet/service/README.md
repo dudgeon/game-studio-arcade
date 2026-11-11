@@ -125,9 +125,11 @@ Make is free in every case, except while a make a restart cut off is still being
 
 Files in the data folder: `studio-run.json` exists only while a make runs, and is how a restart finds the make it cut off. `studio-left.json` lists sessions still to collect. `studio-results.json` holds the entries; viewing one stamps it.
 
-## Guest games (D230–D233)
+## Guest games (D230–D236)
 
 Downloaded web games sit on the shelf after the carts. Each is a folder in the repo's `guests/` (or `<data>/guests/`) with `guest.json`, `play/` and a `NOTICE.md` of every file's licence (D231). The service serves them on their own origin, `guest_port` in the cabinet config or `--guest-port` (default 8340), with a script that turns Escape into "back to the shelf" before the game sees it (D232). The launcher plays one in a focused full-screen iframe and logs the play to `logs/guest_play.jsonl`. Code: `src/guests.js`, `launcher/guests.js`; tests: `test/guests*.test.js`. The first guest is teti (`guests/teti`, D233).
+
+A version of a guest is its own folder whose `guest.json` names its `maker`, `parent` and `family`; the shelf indents it under the original (D234). `guests/teti-geoff` is Geoff's teti that keeps score. A guest reports a round's score by posting `{gsa: "score", n}` to the launcher; the play log keeps it, and G6 shows the score and the best (D235). The service adds a version's maker to `makers.json` as a grown-up if they aren't there (D236).
 
 ## What's stubbed or not here
 

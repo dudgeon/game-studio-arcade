@@ -155,6 +155,8 @@ const guestDirs = values.guests ?? [path.resolve(path.dirname(new URL(import.met
 const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs });
 const guestServer = await startGuestServer(guests, { port: Number(values["guest-port"] ?? config.guest_port ?? 8340), host: values.host });
 guests.port = guestServer.port;
+// Grown-up makers named by guest versions (D236): added once, as grown-ups, never as guest kids.
+for (const m of guests.makers()) if (!makers.get(m.id) && makers.ensureGrownUp(m.id, m.name)) console.log(`maker added: ${m.name} (grown-up, from a guest version)`);
 
 const s = await startService({
   guests,

@@ -5,7 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
-import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRow } from "./guests.js";
+import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
 import { H, W, check } from "./text.js";
@@ -129,7 +129,7 @@ async function showShelf() {
     await refresh();
     const ended = (studio.results ?? []).map(resultItem); // how makes ended, until someone has seen (D192)
     const games = gameRows(carts, nameOf).map((r) => ({ ...r, hasCard: true }));
-    const items = [...makeTiles(), ...ended, ...games, ...guests.map(guestRow)];
+    const items = [...makeTiles(), ...ended, ...games, ...guestRows(guests, nameOf)];
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : it.kind === "waiting" ? "waiting" : "tile");
     const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
     returnTo = null;
@@ -377,13 +377,12 @@ async function endPlay(ended) {
   stage.hidden = true;
   stage.replaceChildren();
   canvas.hidden = false;
-  if (p.cart.guest) void post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors }).catch(() => {});
   // This play's round scores go with its record, which the best comes from (D215). Logged before the post-game screen reads it.
   const scores = [...(p.host.scores ?? [])];
   p.score = scores.length ? Math.max(...scores) : null;
-  p.bestBefore = carts.find((c) => c.id === p.cart.id)?.best ?? p.cart.best ?? null;
+  p.bestBefore = (p.cart.guest ? guests : carts).find((c) => c.id === p.cart.id)?.best ?? p.cart.best ?? null;
   const logged = p.cart.guest
-    ? null
+    ? post("/api/guest-plays", { guest_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ended, errors: p.errors, scores }).catch(() => {}) // D232, D235
     : post("/api/plays", { cart_id: p.cart.id, play_id: p.playId, started_at: p.startedAt, duration_s: duration, ticks, sides: [...p.sides], ended, errors: p.errors, scores }).catch(() => {});
   scoreOf.set(p.cart.id, { score: p.score, bestBefore: p.bestBefore, logged });
   if (p.failed) {
@@ -410,12 +409,17 @@ async function finishCheck() {
 
 /** After every game (D201). @param {any} cart @param {any} noRule */
 async function showPostGame(cart, noRule) {
-  if (cart.guest) {
-    const g = guestPostGame(cart);
-    return showBoard(g, g.post, { cart, noRule: null });
-  }
   const played = scoreOf.get(cart.id);
   await played?.logged;
+  if (cart.guest) {
+    // The score and best ever, for a guest that reports one (D235); logged first, so the best includes this play.
+    try {
+      await refresh();
+    } catch {}
+    const best = guests.find((x) => x.id === cart.id)?.best ?? null;
+    const g = guestPostGame(cart, { score: played?.score ?? null, best, bestBefore: played?.bestBefore ?? null });
+    return showBoard(g, g.post, { cart, noRule: null });
+  }
   try {
     await refresh();
   } catch {}

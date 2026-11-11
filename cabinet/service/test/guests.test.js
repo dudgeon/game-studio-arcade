@@ -7,6 +7,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
+import { makersStore } from "../src/makers.js";
 
 const REPO_GUESTS = path.resolve(import.meta.dirname, "../../../guests");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guests-"));
@@ -137,4 +138,72 @@ test("the API lists guests with their guest-port URL, and logs plays from the la
   } finally {
     api.close();
   }
+});
+
+// ---------- a version of a guest: Geoff's teti (D234-D236) ----------
+
+/** Every file under a folder, relative. @param {string} dir */
+const filesUnder = (dir) => fs.readdirSync(dir, { recursive: true }).map(String).filter((f) => fs.statSync(path.join(dir, f)).isFile()).sort();
+
+test("Geoff's teti is a version of teti: its parent, family and maker, and only its own changes", () => {
+  const all = listGuests(REPO_GUESTS);
+  const v = all.find((g) => g.id === "teti-geoff");
+  assert.ok(v, "teti-geoff is a guest");
+  assert.deepEqual(v.meta.parent, { id: "teti", version: all.find((g) => g.id === "teti")?.meta.version });
+  assert.equal(v.meta.family, "teti");
+  assert.deepEqual(v.meta.maker, { id: "geoff", name: "Geoff" });
+  assert.match(fs.readFileSync(path.join(v.dir, "NOTICE.md"), "utf8"), /teti by TitanPlayz100 \(MIT\), changed/);
+  // Same files; only cabinet.js (the score) and info.html (the credit line) differ.
+  const a = path.join(REPO_GUESTS, "teti", "play");
+  const b = path.join(v.dir, "play");
+  assert.deepEqual(filesUnder(b), filesUnder(a));
+  const differ = filesUnder(a).filter((f) => !fs.readFileSync(path.join(a, f)).equals(fs.readFileSync(path.join(b, f))));
+  assert.deepEqual(differ, ["info.html", "src/cabinet.js"]);
+  // The original reports no score; the version does.
+  assert.doesNotMatch(fs.readFileSync(path.join(a, "src/cabinet.js"), "utf8"), /gsa: "score"/);
+  assert.match(fs.readFileSync(path.join(b, "src/cabinet.js"), "utf8"), /gsa: "score"/);
+});
+
+test("the API: a version's maker, parent and family; plays keep their scores; the best is per guest", async () => {
+  const logsDir = tmp();
+  const guests = createGuests({ dirs: [REPO_GUESTS], logsDir });
+  guests.port = 8340;
+  const api = /** @type {any} */ (await apiServer(guests));
+  const host = new URL(api.url).host;
+  const listed = async () => JSON.parse(/** @type {any} */ (await request(`${api.url}/api/guests`)).body.toString()).guests;
+  const play = (/** @type {string} */ id, /** @type {string} */ playId, /** @type {any} */ scores) =>
+    request(`${api.url}/api/guest-plays`, { method: "POST", headers: { origin: `http://${host}` }, body: JSON.stringify({ guest_id: id, play_id: playId, started_at: "2026-11-11T12:00:00Z", duration_s: 60, ended: "star", scores }) });
+  try {
+    const [teti, geoff] = ["teti", "teti-geoff"].map(async (id) => (await listed()).find((/** @type {any} */ g) => g.id === id));
+    assert.deepEqual([(await teti).maker, (await teti).parent, (await teti).family, (await teti).best], [null, null, "teti", null]);
+    assert.deepEqual([(await geoff).maker, (await geoff).parent, (await geoff).family, (await geoff).best], ["geoff", "teti", "teti", null]);
+    await play("teti-geoff", "pl_a", [120, 340]);
+    await play("teti-geoff", "pl_b", [200, -5, 1.5, "9", 1e12]); // only whole numbers in range count
+    await play("teti", "pl_c", undefined);
+    const log = fs.readFileSync(path.join(logsDir, "guest_play.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    assert.deepEqual(log.map((r) => [r.guest_id, r.scores ?? null, r.score ?? null]), [["teti-geoff", [120, 340], 340], ["teti-geoff", [200], 200], ["teti", null, null]]);
+    const now = await listed();
+    assert.equal(now.find((/** @type {any} */ g) => g.id === "teti-geoff").best, 340);
+    assert.equal(now.find((/** @type {any} */ g) => g.id === "teti").best, null, "the original keeps no score");
+  } finally {
+    api.close();
+  }
+});
+
+test("Geoff is added as a grown-up maker, once, and a maker already there is left alone (D236)", () => {
+  const file = path.join(tmp(), "makers.json");
+  const makers = makersStore({ file, now: () => new Date("2026-11-11T12:00:00Z") });
+  const guests = createGuests({ dirs: [REPO_GUESTS], logsDir: tmp() });
+  assert.deepEqual(guests.makers(), [{ id: "geoff", name: "Geoff" }]);
+  for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
+  for (const m of guests.makers()) makers.ensureGrownUp(m.id, m.name);
+  assert.deepEqual(makers.read(), [{ id: "geoff", name: "Geoff", added: "2026-11-11T12:00:00.000Z", guest: false, grown_up: true }]);
+  // Someone who chose the name at the cabinet stays as they are.
+  const file2 = path.join(tmp(), "makers.json");
+  const kids = makersStore({ file: file2 });
+  kids.add("Geoff");
+  const before = kids.read();
+  kids.ensureGrownUp("geoff", "Geoff");
+  assert.deepEqual(kids.read(), before);
+  assert.equal(makers.ensureGrownUp("someone-else", "Geoff"), null, "the id must be the name's");
 });

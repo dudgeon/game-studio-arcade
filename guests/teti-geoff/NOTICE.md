@@ -1,4 +1,6 @@
-# teti on the cabinet: where every file comes from
+# teti, Geoff's version: where every file comes from
+
+**This is Geoff's version of the cabinet's teti** (D234): teti by TitanPlayz100 (MIT), changed. It was copied from `guests/teti` at version `1.4.4-cabinet.1` on 2026-11-11, and that folder is untouched. Its only change: `play/src/cabinet.js` reports the score when a Marathon or 2 Minutes game ends (D235), and its picker says it's Geoff's version. The history of `guests/teti-geoff` shows the exact diff against the copy. Everything below is carried forward from teti's NOTICE (D218).
 
 Upstream: [TitanPlayz100/teti](https://github.com/TitanPlayz100/teti), commit `1de7944ecee0a9e0420349f3da190a385f52a227` (2026-06-03), MIT (`LICENSE`). Licences were checked on 2026-11-11 (D231, D233).
 
