@@ -1,0 +1,13 @@
+[Unit]
+Description=Record the virtual cabinet's network paths (D242)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/arcade-netwatch
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

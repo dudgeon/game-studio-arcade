@@ -67,6 +67,16 @@ mini_probe() {
   done
 }
 check firewall-refuses-mini mini_probe
+# The mini's private card (D241): the mini comes in by it, the cabinet can't go out by it.
+link_probe() {
+  guest 'ip -o -4 addr show | grep -q " 192\.168\.64\."' || { echo "no private card on this VM: skipped"; return 0; }
+  guest '! ip -4 route show default | grep -q 192\.168\.64\.' || { echo "the private card has a default route"; return 1; }
+  guest "count() { sudo nft list table inet arcade_isolation | grep -o 'packets [0-9]*' | awk '{s+=\$2} END {print s+0}'; }; before=\$(count); ! timeout 5 bash -c 'exec 3<>/dev/tcp/192.168.64.1/22'; after=\$(count); test \"\$after\" -gt \"\$before\""
+}
+check firewall-refuses-mini-on-link link_probe
+# The network record (D242), kept across restarts.
+check netwatch-recording guest 'systemctl is-active --quiet arcade-netwatch && sudo journalctl -u arcade-netwatch -b --no-pager | grep -q "netwatch CHANGE"'
+check journal-on-disk guest 'test -d /var/log/journal && journalctl --list-boots --no-pager | grep -q .'
 
 # The screens: a cart from the shelf, by the real input path. Safe to repeat.
 PLAY="$OUT/play"

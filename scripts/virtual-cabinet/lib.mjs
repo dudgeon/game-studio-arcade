@@ -139,10 +139,33 @@ export const dir = (name) => ({ name, mode: S_IFDIR | 0o755 });
 export const file = (name, data, perm = 0o644) => ({ name, mode: S_IFREG | perm, data });
 export const link = (name, target) => ({ name, mode: S_IFLNK | 0o777, link: target });
 
+/** The second card's fixed MAC: the mini's own way in, on the shared network (D241). */
+export const MINI_LINK_MAC = "5a:47:41:43:41:43";
+
+/** The cards for a network choice. "Both": bridged for the cabinet (D152), shared for the mini (D241). */
+export function networkCards(network, mac, bridgeInterface) {
+  const bridged = { Mode: "Bridged", MacAddress: mac, BridgeInterface: bridgeInterface };
+  if (network === "Bridged") return [bridged];
+  if (network === "Shared") return [{ Mode: "Shared", MacAddress: mac }];
+  if (network === "Both") return [bridged, { Mode: "Shared", MacAddress: MINI_LINK_MAC }];
+  throw new Error(`unknown network ${network}`);
+}
+
+const macKey = (mac) => mac.toLowerCase().split(":").map((o) => o.replace(/^0(?=.)/, "")).join(":");
+
+/** The address macOS's DHCP server gave a MAC, from /var/db/dhcpd_leases' text. It drops leading zeros there. */
+export function leaseFor(text, mac) {
+  const want = macKey(mac);
+  for (const block of text.split("}")) {
+    const ip = block.match(/^\s*ip_address=(\S+)/m)?.[1];
+    const hw = block.match(/^\s*hw_address=\d+,(\S+)/m)?.[1];
+    if (ip && hw && macKey(hw) === want) return ip;
+  }
+  return null;
+}
+
 /** The UTM 5 config for D123, with no display (D141). Same input, same config. */
 export function utmConfig({ name, uuid, mac, network, bridgeInterface, cmdline, serial = false, cpus = 4, memoryMb = 8192 }) {
-  const net = { Mode: network, MacAddress: mac };
-  if (network === "Bridged") net.BridgeInterface = bridgeInterface;
   return {
     Backend: "Apple",
     ConfigurationVersion: 4,
@@ -174,7 +197,7 @@ export function utmConfig({ name, uuid, mac, network, bridgeInterface, cmdline, 
     },
     Display: [],
     Drive: [{ Identifier: "A7C3F1E2-0D4B-4E6A-9B21-3C5D7E9F1A2B", ImageName: "disk.img", ReadOnly: false, Nvme: false }],
-    Network: [net],
+    Network: networkCards(network, mac, bridgeInterface),
     // No serial device unless debugging: an unread one freezes the guest (D148).
     Serial: serial ? [{ Mode: "Ptty" }] : [],
   };

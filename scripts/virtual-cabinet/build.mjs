@@ -2,7 +2,7 @@
 // Generates the virtual cabinet's UTM VM from the lock file (D123, D140, D143).
 // Needs no UTM and shows no window: everything here is files on the mini.
 //
-//   node scripts/virtual-cabinet/build.mjs [--replace] [--network Bridged|Shared] [--bridge en1]
+//   node scripts/virtual-cabinet/build.mjs [--replace] [--network Both|Bridged|Shared] [--bridge en1]
 //
 // --serial-console adds a serial device for debugging. Always run serial.sh with it, or the guest freezes (D148).
 // Output: ~/game-studio-data/vm/arcade-virtual.utm (never in git). It refuses to
@@ -37,7 +37,7 @@ const BOOT_MODULES = ["virtio_blk", "ext4", "vfat", "nls_cp437", "nls_ascii", "c
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
-const network = opt("--network", "Bridged");
+const network = opt("--network", "Both"); // bridged for the home network, shared for the mini (D241)
 const bridge = opt("--bridge", "en1");
 const lock = JSON.parse(readFileSync(join(REPO, "cabinet/provision/lock.json"), "utf8"));
 const say = (m) => console.log(`[build] ${m}`);
@@ -150,7 +150,7 @@ function sshKey() {
 
 /** The mini's own IPv4 and IPv6 addresses, for the VM's firewall (D124). */
 function miniAddrs() {
-  const addrs = new Set(network === "Shared" ? ["192.168.64.1"] : []);
+  const addrs = new Set(network !== "Bridged" ? ["192.168.64.1"] : []);
   for (const list of Object.values(networkInterfaces())) {
     for (const a of list ?? []) if (!a.internal) addrs.add(a.address.split("%")[0]);
   }
