@@ -1,0 +1,344 @@
+#!/usr/bin/env node
+// Writes the Picade's microSD card on the mini (D250-D252): the pinned Raspberry Pi OS Lite image (the same file
+// and SHA-256 as the virtual cabinet), then a seed on its FAT partition, so the Pi boots unattended, joins the home
+// Wi-Fi and runs provision.sh with the picade profile.
+//
+// Run it yourself, in a Terminal window on the mini (not with Claude Code's `!`, so the Wi-Fi password stays out of chats):
+//
+//   node scripts/cabinet-card/flash.mjs --list          the disks it could write, and why the others are refused
+//   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
+//
+// Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8.
+//
+//   node scripts/cabinet-card/flash.mjs --image-file OUT.img
+//
+// writes the same bytes to an image file instead of a card, through the same steps, with no sudo. Tests use it,
+// and so can anyone who wants to look at a card before writing one. With no terminal it reads the Wi-Fi name and
+// password from stdin, one per line; a card is only ever written from a terminal.
+//
+// The Wi-Fi password is asked for with no echo and kept in memory. Only its WPA key (a hash of the password and
+// the network's name) is written, and only to the card, which replaces it on first boot (D251). Nothing is
+// written to the repo, the mini's disk or a log. Needs a clean checkout: the card records the commit it came from.
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import { closeSync, createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, writeSync, cpSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { pipeline } from "node:stream/promises";
+import { Readable, Transform } from "node:stream";
+import { fileURLToPath } from "node:url";
+import { makeBundle, makeProvisionTar } from "../virtual-cabinet/lib.mjs";
+import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, "../..");
+const VM_ROOT = process.env.GSA_VM_DIR || join(homedir(), "game-studio-data/vm");
+const DL = join(VM_ROOT, "dl"); // the virtual cabinet's downloads: the same pinned files, checked by hash
+const CABINET_DIR = process.env.GSA_CABINET_DIR || join(homedir(), "game-studio-data/cabinets/arcade");
+const SSH_DIR = join(CABINET_DIR, "ssh");
+const KEY_NAME = "arcade_ed25519";
+const BLOCK = 4 * 2 ** 20;
+
+const args = process.argv.slice(2);
+const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
+const flag = (n) => args.includes(n);
+const lock = JSON.parse(readFileSync(join(REPO, "cabinet/provision/lock.json"), "utf8"));
+const say = (m) => console.log(`[card] ${m}`);
+const run = (cmd, a, o = {}) => execFileSync(cmd, a, { encoding: "utf8", maxBuffer: 2 ** 26, ...o });
+const plist = (a) => JSON.parse(run("plutil", ["-convert", "json", "-o", "-", "-"], { input: run("diskutil", a) }));
+class Stop extends Error {}
+const stop = (m) => {
+  throw new Stop(m);
+};
+
+async function sha256File(path) {
+  const h = createHash("sha256");
+  await pipeline(createReadStream(path), h);
+  return h.digest("hex");
+}
+
+/** A pinned file from dl/, downloaded if it's missing, and always checked by SHA-256. */
+async function pinned({ name, url, sha256: want }) {
+  mkdirSync(DL, { recursive: true });
+  const path = join(DL, name);
+  if (!existsSync(path) || (await sha256File(path)) !== want) {
+    say(`downloading ${name}`);
+    const r = await fetch(url);
+    if (!r.ok) stop(`${url}: HTTP ${r.status}`);
+    await pipeline(Readable.fromWeb(/** @type {any} */ (r.body)), createWriteStream(`${path}.part`));
+    if ((await sha256File(`${path}.part`)) !== want) stop(`${name} doesn't match its pinned SHA-256`);
+    run("mv", [`${path}.part`, path]);
+  }
+  say(`ok ${name} ${want.slice(0, 12)}`);
+  return path;
+}
+
+// ---- The disk ----
+
+function bootWholeDisks() {
+  const out = new Set();
+  for (const vol of ["/", "/System/Volumes/Data"]) {
+    try {
+      const i = plist(["info", "-plist", vol]);
+      if (i.ParentWholeDisk) out.add(i.ParentWholeDisk);
+      for (const s of i.APFSPhysicalStores ?? []) {
+        const store = typeof s === "string" ? s : s.APFSPhysicalStore;
+        if (store) out.add(plist(["info", "-plist", store]).ParentWholeDisk);
+      }
+    } catch {
+      /* a volume that isn't there can't be written to */
+    }
+  }
+  return [...out];
+}
+
+const diskInfo = (id) => plist(["info", "-plist", id]);
+function partitionsOf(id) {
+  const l = plist(["list", "-plist", id]);
+  return l.AllDisksAndPartitions?.[0]?.Partitions ?? [];
+}
+
+function listDisks() {
+  const all = plist(["list", "-plist", "physical"]).WholeDisks ?? [];
+  const boot = bootWholeDisks();
+  if (!all.length) say("no physical disks found");
+  for (const id of all) {
+    const info = diskInfo(id);
+    const why = refusals(info, { bootWholeDisks: boot });
+    console.log(describe(info, partitionsOf(id)).join("\n"));
+    console.log(why.length ? `  refused: ${why.join("; ")}\n` : `  can be written: node scripts/cabinet-card/flash.mjs --disk ${id}\n`);
+  }
+}
+
+// ---- Asking ----
+
+/** One line from the terminal, with or without echo. Prompts go to the terminal, never stdout. */
+function ask(prompt, { secret = false } = {}) {
+  const r = spawnSync("/bin/bash", ["-c", `printf '%s' "$1" >/dev/tty; IFS= read -r${secret ? "s" : ""} line </dev/tty; s=$?; ${secret ? "printf '\\n' >/dev/tty;" : ""} printf '%s' "$line"; exit $s`, "ask", prompt], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  if (r.status !== 0) stop("no answer");
+  return r.stdout;
+}
+
+function wifiFromTerminal() {
+  const ssid = ask("Home Wi-Fi network name: ");
+  const pass = ask("Its password (nothing will show): ", { secret: true });
+  return { ssid, psk: wifiPsk(ssid, pass) };
+}
+
+function wifiFromStdin() {
+  const [ssid, pass] = readFileSync(0, "utf8").split("\n");
+  if (!ssid || pass === undefined) stop("with no terminal, stdin must hold the Wi-Fi name and password, one per line");
+  return { ssid, psk: wifiPsk(ssid, pass) };
+}
+
+function miniTimezone() {
+  try {
+    return run("readlink", ["/etc/localtime"]).trim().replace(/^.*\/zoneinfo\//, "");
+  } catch {
+    return "America/New_York";
+  }
+}
+
+// ---- What goes on the card ----
+
+/** The cabinet's own SSH key on the mini, never one of the mini's existing keys (D123, D254). */
+function cabinetKey() {
+  mkdirSync(SSH_DIR, { recursive: true, mode: 0o700 });
+  const key = join(SSH_DIR, KEY_NAME);
+  if (!existsSync(key)) run("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-C", `${PROFILE}-cabinet-admin`, "-f", key]);
+  return readFileSync(`${key}.pub`, "utf8").trim();
+}
+
+function repoCommit() {
+  const dirty = run("git", ["status", "--porcelain"], { cwd: REPO }).trim();
+  if (dirty && !flag("--allow-dirty")) stop("the checkout has changes. Flash from a clean checkout of main (or pass --allow-dirty to try one out).");
+  return `${run("git", ["rev-parse", "--short=12", "HEAD"], { cwd: REPO }).trim()}${dirty ? "-dirty" : ""}`;
+}
+
+/** The seed folder, built on the mini: the same contents a virtual cabinet's seed has, for the picade profile (D143). */
+function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit }) {
+  const prov = join(REPO, "cabinet/provision");
+  makeProvisionTar(REPO, join(dir, "provision.tar.gz"));
+  say(`bundle.tar.gz: ${makeBundle(REPO, join(dir, "bundle.tar.gz"))} files`);
+  writeFileSync(join(dir, "commit"), `${commit}\n`);
+  cpSync(nodeTarball, join(dir, lock.node.name));
+  cpSync(join(prov, "files/firstboot.sh"), join(dir, "firstboot.sh"));
+  cpSync(join(prov, "files/arcade-seed.service"), join(dir, "arcade-seed.service"));
+  writeFileSync(join(dir, "profile"), `${PROFILE}\n`);
+  writeFileSync(join(dir, "hostname"), `${hostname}\n`);
+  writeFileSync(join(dir, "authorized_keys"), `${authorizedKey}\n`);
+  for (const f of [...SEED_FILES, lock.node.name]) if (!existsSync(join(dir, f))) stop(`the seed is missing ${f}`);
+}
+
+// ---- Writing ----
+
+/** xz -dc image | [sudo] dd of=target. Returns the image's bytes and SHA-256, hashed on the way through. */
+async function writeImage(image, target, { sudo }) {
+  const h = createHash("sha256");
+  let bytes = 0;
+  const xz = spawn("xz", ["-dc", image], { stdio: ["ignore", "pipe", "inherit"] });
+  const ddArgs = [`of=${target}`, `bs=${BLOCK}`];
+  const dd = sudo ? spawn("sudo", ["dd", ...ddArgs], { stdio: ["pipe", "ignore", "pipe"] }) : spawn("dd", ddArgs, { stdio: ["pipe", "ignore", "pipe"] });
+  let ddErr = "";
+  dd.stderr.on("data", (b) => (ddErr += b));
+  const ddDone = new Promise((res) => dd.on("close", res));
+  const tap = new Transform({
+    transform(chunk, _e, cb) {
+      h.update(chunk);
+      bytes += chunk.length;
+      cb(null, chunk);
+    },
+  });
+  await pipeline(xz.stdout, tap, dd.stdin);
+  const code = await ddDone;
+  if (code !== 0) stop(`dd failed: ${ddErr.trim().split("\n").pop()}`);
+  return { bytes, sha256: h.digest("hex") };
+}
+
+/** Read the first `bytes` back from the target and hash them. */
+async function readBack(target, bytes, { sudo }) {
+  if (bytes % BLOCK) stop("the image isn't a whole number of 4 MiB blocks");
+  const a = ["dd", `if=${target}`, `bs=${BLOCK}`, `count=${bytes / BLOCK}`];
+  const dd = sudo ? spawn("sudo", a, { stdio: ["ignore", "pipe", "ignore"] }) : spawn(a[0], a.slice(1), { stdio: ["ignore", "pipe", "ignore"] });
+  const h = createHash("sha256");
+  await pipeline(dd.stdout, h);
+  return h.digest("hex");
+}
+
+/** The FAT partition of what was written, mounted out of Finder's way. Returns its mount point and how to let go. */
+function mountBoot(target, { file }) {
+  if (file) {
+    const root = mkdtempSync(join(tmpdir(), "card-mnt-"));
+    const out = run("hdiutil", ["attach", "-imagekey", "diskimage-class=CRawDiskImage", "-nobrowse", "-mountrandom", root, "-plist", target]);
+    const mounts = [...out.matchAll(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/g)].map((m) => m[1]);
+    const dev = out.match(/<key>dev-entry<\/key>\s*<string>(\/dev\/disk\d+)<\/string>/)?.[1];
+    if (mounts.length !== 1) {
+      if (dev) spawnSync("hdiutil", ["detach", "-force", dev]);
+      stop(`expected only the FAT partition to mount, got: ${mounts.join(", ") || "none"}`);
+    }
+    return { mount: mounts[0], release: () => (run("hdiutil", ["detach", dev ?? mounts[0]]), rmSync(root, { recursive: true, force: true })) };
+  }
+  const disk = target.replace("/dev/rdisk", "disk");
+  const part = `${disk}s1`;
+  let info = diskInfo(part);
+  if (!info.MountPoint) {
+    run("diskutil", ["mount", part]);
+    info = diskInfo(part);
+  }
+  if (!info.MountPoint || !/^(MS-DOS|FAT|msdos)/i.test(`${info.FilesystemType ?? ""}${info.FilesystemName ?? ""}`)) stop(`${part} didn't mount as FAT`);
+  return { mount: info.MountPoint, release: () => run("diskutil", ["eject", disk]) };
+}
+
+/** Put the seed and the cloud-init files on the FAT, and check each one by reading it back. */
+async function writeBoot(mount, seedDir, cloud) {
+  const seed = join(mount, "seed");
+  rmSync(seed, { recursive: true, force: true });
+  mkdirSync(seed);
+  const want = new Map();
+  for (const name of readdirSync(seedDir)) {
+    cpSync(join(seedDir, name), join(seed, name));
+    want.set(join(seed, name), await sha256File(join(seedDir, name)));
+  }
+  for (const [name, text] of Object.entries(cloud)) {
+    const path = join(mount, name);
+    const fd = openSync(path, "w");
+    writeSync(fd, text);
+    closeSync(fd);
+    want.set(path, createHash("sha256").update(text).digest("hex"));
+  }
+  // macOS leaves AppleDouble files beside anything with extended attributes on FAT.
+  for (const dir of [mount, seed]) for (const n of readdirSync(dir)) if (n.startsWith("._")) rmSync(join(dir, n), { force: true });
+  run("sync", []);
+  for (const [path, sha] of want) if ((await sha256File(path)) !== sha) stop(`${path} didn't read back as written`);
+  say(`seed and cloud-init files written and read back (${want.size} files)`);
+}
+
+// ---- Main ----
+
+async function main() {
+  if (flag("--list")) return listDisks();
+  const diskId = opt("--disk");
+  const imageFile = opt("--image-file");
+  if (!!diskId === !!imageFile) stop("name one target: --disk diskN (a card), or --image-file PATH. --list shows the disks.");
+  const country = opt("--country", "US");
+  const timezone = opt("--timezone", miniTimezone());
+  const locale = opt("--locale", "en_US.UTF-8");
+  const hostname = profileHostname(readFileSync(join(REPO, "cabinet/provision/profiles/picade.sh"), "utf8"));
+
+  // 1. The target, checked before anything is asked or built.
+  let target;
+  let confirmed = null;
+  if (diskId) {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) stop("write a card from a Terminal window on the mini, so its questions can be answered.");
+    const info = diskInfo(diskId);
+    const why = refusals(info, { bootWholeDisks: bootWholeDisks() });
+    if (why.length) stop(`won't write ${diskId}: ${why.join("; ")}`);
+    console.log("\nThis erases everything on:\n");
+    console.log(describe(info, partitionsOf(diskId)).join("\n"));
+    const phrase = confirmPhrase(info);
+    console.log(`\nIt becomes the cabinet's card: Raspberry Pi OS Lite ${lock.image.name}, hostname ${hostname}, profile ${PROFILE}.`);
+    const typed = ask(`Type "${phrase}" to erase it, or anything else to stop: `);
+    if (typed.trim() !== phrase) stop("nothing written.");
+    confirmed = info;
+    target = `/dev/r${diskId}`;
+  } else {
+    target = resolve(imageFile);
+    if (existsSync(target)) stop(`${target} exists; name a new file`);
+  }
+
+  // 2. Wi-Fi, in memory only.
+  const wifi = diskId || process.stdin.isTTY ? wifiFromTerminal() : wifiFromStdin();
+
+  // 3. The pinned files and the seed, built in a temp folder that's removed at the end.
+  const commit = repoCommit();
+  const image = await pinned(lock.image);
+  const nodeTarball = await pinned(lock.node);
+  const authorizedKey = cabinetKey();
+  const work = mkdtempSync(join(tmpdir(), "card-seed-"));
+  try {
+    const seedDir = join(work, "seed");
+    mkdirSync(seedDir);
+    buildSeed(seedDir, { hostname, authorizedKey, nodeTarball, commit });
+    const instance = `${hostname}-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-${randomBytes(3).toString("hex")}`;
+    const cloud = {
+      "user-data": userData({ hostname, timezone, locale, authorizedKey, country }),
+      "meta-data": metaData(instance),
+      "network-config": networkConfig({ ssid: wifi.ssid, psk: wifi.psk, country }),
+    };
+    wifi.psk = "";
+
+    // 4. Write, read back, seed.
+    if (confirmed) {
+      if (!sameDisk(confirmed, diskInfo(diskId))) stop(`${diskId} isn't the card you confirmed any more. Nothing written.`);
+      run("diskutil", ["unmountDisk", diskId]);
+      say(`writing ${lock.image.name} to ${diskId}; sudo asks for the mini's password`);
+    } else {
+      say(`writing ${lock.image.name} to ${target}`);
+    }
+    const sudo = Boolean(confirmed);
+    const written = await writeImage(image, target, { sudo });
+    say(`wrote ${(written.bytes / 2 ** 30).toFixed(2)} GiB; reading it back`);
+    if ((await readBack(target, written.bytes, { sudo })) !== written.sha256) stop("the card didn't read back as written. Try another card.");
+    say("read back ok");
+    if (confirmed) spawnSync("diskutil", ["mountDisk", diskId], { stdio: "ignore" });
+    const boot = mountBoot(target, { file: !confirmed });
+    try {
+      await writeBoot(boot.mount, seedDir, cloud);
+    } finally {
+      boot.release();
+    }
+    for (const k of Object.keys(cloud)) cloud[k] = "";
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  // 5. A new card is a new cabinet to SSH: forget the old host keys.
+  if (confirmed) rmSync(join(SSH_DIR, "known_hosts"), { force: true });
+  say(confirmed ? `done: ${diskId} is ejected. Put it in the Pi and follow docs/cabinet-bring-up.md, step 3.` : `done: ${target}`);
+  say(`admin login once it's up: ARCADE_HOST=${hostname}.local ARCADE_SSH_DIR=${SSH_DIR} ARCADE_SSH_KEY_NAME=${KEY_NAME} cabinet/vm/drive ssh (user ${ADMIN})`);
+}
+
+main().catch((err) => {
+  console.error(`[card] ${err instanceof Stop ? "Stopped" : "FAILED"}: ${err.message}`);
+  process.exit(1);
+});

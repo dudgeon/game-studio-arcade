@@ -13,6 +13,7 @@
 # never an argument, an environment variable, a file on the mini, or a log line.
 #
 # ARCADE_HOST and CABINET pick another cabinet: CABINET names its lock file, default arcade-virtual.
+# For the Picade, use scripts/cabinet-card/connect-picade.sh, which sets them and its SSH key (D254).
 # ARCADE_DRIVE, ARCADE_AGENT_DIR and GSA_NODE are for its test (test/connect.test.mjs).
 set -euo pipefail
 set +x
@@ -103,6 +104,14 @@ esac
 [ -n "$workspace" ] || stop "the API didn't say which workspace this key is for."
 mini_workspace="$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).origin.workspace_id' "$AGENT_DIR/claude-lock.json")"
 [ "$workspace" != "$mini_workspace" ] || stop "this key is for the mini's own workspace ($workspace). A cabinet needs a key for its own workspace (D131)."
+# Nor another cabinet's: the virtual cabinet and the Picade each have their own workspace and spend limit (D131, D254).
+for other in "$AGENT_DIR"/claude-lock.*.json; do
+  [ -f "$other" ] || continue
+  name="${other##*/claude-lock.}"; name="${name%.json}"
+  case "$name" in "$CABINET"|skill) continue ;; esac
+  other_ws="$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).origin?.workspace_id ?? ""' "$other" 2>/dev/null || true)"
+  [ "$other_ws" != "$workspace" ] || stop "this key is for the $name cabinet's workspace ($workspace). Each cabinet needs its own workspace (D131)."
+done
 echo "This key is for workspace $workspace."
 
 # 4. The plan, then the apply, in that workspace, with this cabinet's own lock file (D155).

@@ -14,3 +14,9 @@ mv "$WORK.new" "$WORK"
 /bin/bash "$WORK/provision.sh" --profile "$PROFILE" --payload "$SEED"
 echo "=== firstboot ok $(date -u) ==="
 touch "$SEED/provision.ok"
+# The picade profile asks for one restart when it changed config.txt (D250): its overlay and screen power
+# only start at boot. The virtual profile never asks.
+if [ -f /run/arcade-reboot-wanted ]; then
+  echo "=== firstboot: restarting once for the new boot config $(date -u) ==="
+  systemctl reboot --no-block
+fi
