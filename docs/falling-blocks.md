@@ -112,6 +112,15 @@ Geoff picked teti, cleaned up. Decisions D230–D233. It was built and tested lo
 - **Coins:** playing a guest costs no coins (D230).
 - **The shelf:** a guest row reads "by <author>", with a "free game" tag where starters have "starter".
 
+**GSAP, exactly** (its Standard "No Charge" licence, gsap.com/standard-license, read 2026-11-11):
+- **Allowed:** "the implementation and/or use of GSAP Products on any website, web application, or digital interface".
+- **Forbidden without written consent:** "use of GSAP Products in tools that allow users to build visual animations without code" that "materially assists in creating a solution that competes with Webflow's visual animation building capabilities".
+- **Also forbidden:** reverse engineering it to build a competing product, and removing its notices.
+- **If those terms are broken,** Webflow can end the licence, and every copy must be destroyed.
+- teti on the cabinet is a game, not an animation tool, so it's allowed. The risk would be the Studio one day letting kids build animations with it.
+
+**Can teti do without GSAP cheaply?** Yes. It's used in 5 files, 31 call sites: text pop-ups, the reset wipe, the danger tint, rainbow sides, menu slides and a few speed-run effects. All of it is `gsap.to`/`timeline` on a handful of properties (alpha, scale, tint, x, y). A small tween helper of about 100 lines of our own could replace it. That's a tier-A change of an hour or two, plus a visual check. It isn't done; say if you want it.
+
 **Left to do:**
 1. With the director's go: update the virtual cabinet, then check on it that teti is on the shelf, plays with the cabinet's keys, and Escape goes back. The bundle now includes `guests/`, and the service starts the guest port by default, so no provisioning change is needed.
 2. Rebase onto the arcade UX build when it lands.
