@@ -920,6 +920,7 @@ Director's go: one new game and one change by "Tester", $3 at most. Screens are 
   - The header's coins-used read "Tester: 0..." cut; it's now "N used" with a coin.
   - A new game's plan re-shown mid-build (a rule change after testing, brief step 7) now says what changed first, and leaves out how to play, which the first plan showed.
 - **usual_cost_change is now 2** (the director, 2026-11-11). The one measured change cost 9c (about 1 coin), a one-number change with one question; 2 leaves headroom until more are measured. It stays a setting (config `pot.usual_cost_change`). The change fixture now ends at 9c too, so the replayed change reads "about usual" against 2, and the screens say "about 2" for a change wherever they said "about 3"; the handoff's coin table says so.
+- **The change, again, with the fix** (`sesn_01HK8K41KHN8yWLHhwBmfnUd`, after updating the cabinet to 7531b1c): Tester's v2 of Log Hopper came home as `log-hopper-v2`, version 2, for 14c with one question and no fix rounds. The ledger charged 14c / 1 coin, "on the shelf", pot 937 to 923c, and A2 lists it. The two measured changes, 9c and 14c, are both about 1 coin, so 2 holds.
 
 ## 2026-11-11 — Downloaded games on the shelf (worker; D208–D229 are the arcade UX build's)
 
