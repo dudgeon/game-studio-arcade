@@ -37,6 +37,7 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 ## Director
 
 - **Merge and push checked work:** when a worker's branch passes the director's own checks (tests run by the director, deliverable read), the director may merge it into main and push main to the private GitHub repo without asking each time, and lists each merge in its digest. (Geoff, 2026-11-07)
+- **Restart the virtual cabinet when it drops off the network:** when the VM is running but the mini can't reach it, the director may shut it down cleanly and start it again with no window (utmctl, only while UTM is already running), then check its data files, without asking each time. (Geoff, 2026-11-11)
 
 ## Done
 
