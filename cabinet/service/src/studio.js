@@ -59,6 +59,7 @@ export function kidMessage(record) {
  *   questionTimeoutMs?: number,
  *   warningMs?: number,
  *   recheckMs?: number,
+ *   log?: (line: string) => void,
  *   now?: () => Date,
  * }} StudioOptions
  */
@@ -78,6 +79,10 @@ export function createStudio(o) {
   const recheckMs = o.recheckMs ?? RECHECK_MS;
   const journalFile = path.join(o.paths.root, "studio-run.json");
   const leftFile = path.join(o.paths.root, "studio-left.json");
+  /** One line in the service's journal (D199). */
+  const log = o.log ?? ((/** @type {string} */ line) => console.log(`cabinet-service: ${line}`));
+  /** Sessions a restart left, still to collect. While any are, Make is busy (D199). */
+  let toCollect = 0;
   const resultsFile = path.join(o.paths.root, "studio-results.json");
   /** @type {Set<(s: any) => void>} */
   const listeners = new Set();
@@ -120,7 +125,8 @@ export function createStudio(o) {
   const state = () => {
     const shelf = unviewed();
     const ended = shelf.length ? { results: shelf } : {};
-    if (!run) return notice ? { phase: "idle", notice, ...ended } : { phase: "idle", ...ended };
+    const busy = toCollect ? { collecting: true } : {};
+    if (!run) return notice ? { phase: "idle", notice, ...ended, ...busy } : { phase: "idle", ...ended, ...busy };
     return {
       phase: "running",
       run_id: run.id,
@@ -181,9 +187,13 @@ export function createStudio(o) {
     clearJournal();
     const stillGoing = Boolean(left.session_id) && !left.waiting;
     notice = { id: nextId++, kind: "restarted", ...(stillGoing ? NOTICES.restarted_building : NOTICES.restarted) };
-    if (left.session_id) writeJson(leftFile, [...readJson(leftFile, []), left]);
+    if (left.session_id) {
+      writeJson(leftFile, [...readJson(leftFile, []), left]);
+      log(`a restart cut off a make; session ${left.session_id} will be picked up (D191)`);
+    } else log("a restart cut off a make before its session started; nothing to pick up (D189)");
   };
   recover();
+  toCollect = readJson(leftFile, []).length;
 
   // ---------- picking up what a restart cut off (D191) ----------
 
@@ -200,6 +210,7 @@ export function createStudio(o) {
     const lock = item.lock ?? o.lock();
     const base = { maker: item.maker, makerName: item.maker_name ?? o.nameOf?.(item.maker) ?? item.maker };
     try {
+      log(`re-attaching to session ${item.session_id} (D191)`);
       api = await o.api({ answered: item.answered ?? 0 });
       const { record, committed } = await makeCart({
         api,
@@ -221,17 +232,23 @@ export function createStudio(o) {
           ? { ...shelfEntry(base), ok: true, cart_id: committed.id, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
           : { ...shelfEntry(base), ok: false, message: kidMessage(record), session_id: record.id },
       );
-      logArchive(item.session_id, "collected after a service restart (D191)", await archive(api, item.session_id));
+      const archived = await archive(api, item.session_id);
+      logArchive(item.session_id, "collected after a service restart (D191)", archived);
+      log(`collected session ${item.session_id}: ${record.outcome}${committed ? ` (${committed.id})` : ""}; archive ${archived.ok ? "ok" : `failed: ${archived.error}`}`);
     } catch (/** @type {any} */ e) {
       if (e instanceof NoOneToAnswer) {
         await finishRelease({ api, sessionId: item.session_id, maker: item.maker, request: item.request, turns: item.turns ?? [], released: "no_one_to_answer", startedAt: item.started_at });
         // Already told, if it was waiting at the restart.
         if (!item.waiting) addResult({ ...shelfEntry(base), ok: false, message: MESSAGES.no_one_to_answer, session_id: item.session_id });
+        log(`collected session ${item.session_id}: it was waiting on a question nobody can answer, so it was released (D191)`);
       } else if (e?.status === 404) {
         appendLog(o.paths.logs, "studio_session_correction", { corrects: item.session_id, why: "the API no longer has this session, so nothing could be collected (D191)", at: now().toISOString() });
+        log(`session ${item.session_id} is gone from the API; nothing to collect (D191)`);
       } else throw e;
     }
-    writeJson(leftFile, readJson(leftFile, []).filter((/** @type {any} */ x) => x.session_id !== item.session_id));
+    const rest = readJson(leftFile, []).filter((/** @type {any} */ x) => x.session_id !== item.session_id);
+    writeJson(leftFile, rest);
+    toCollect = rest.length;
     changed();
   };
 
@@ -396,6 +413,8 @@ export function createStudio(o) {
     /** @param {{ maker: string, request: string }} a */
     start({ maker, request }) {
       if (run) throw new StudioBusy("a game is already being made");
+      // One paid session at a time holds across a restart too (D183, D199).
+      if (toCollect) throw new StudioBusy("the last game is still being finished");
       /** @type {any} */
       const current = {
         id: nextId++,

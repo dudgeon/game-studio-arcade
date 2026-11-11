@@ -390,7 +390,7 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
       `);
       service.kill();
       await page.waitForFunction(() => /** @type {any} */ (window).launcher.screen() === "notice", null, { timeout: 15_000 });
-      const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, port: Number(new URL(url).port) }));
+      const again = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 1500, port: Number(new URL(url).port) }));
       try {
         await run(`
           wait result
@@ -400,8 +400,18 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
         await run(`
           press a
           wait shelf
+          sleep 100
+        `);
+        // Being finished: Make waits, and says why (D199).
+        assert.equal(await boxText(page, "shelf-by-0"), "Finishing the last game first");
+        await run(`
+          press a
+          wait result
+          press a
+          wait shelf
         `);
         await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
+        assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea", "and Make is Make again");
         assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
         assert.equal(await boxText(page, "shelf-by-1"), "by Alina - Penguin Catch");
         await run(`

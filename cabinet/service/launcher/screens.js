@@ -147,7 +147,7 @@ export function flow(text, color, cols = SCROLL_COLS) {
 
 // ---------- the screens ----------
 
-/** @typedef {{ kind: "make" | "back" | "result" | "cart", title: string, by?: string, note?: string, urgent?: boolean }} ShelfItem */
+/** @typedef {{ kind: "make" | "back" | "result" | "busy" | "cart", title: string, by?: string, note?: string, urgent?: boolean }} ShelfItem */
 
 /** @param {Painter} p @param {any} v */
 function shelf(p, v) {

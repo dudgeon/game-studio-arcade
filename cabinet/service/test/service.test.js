@@ -9,7 +9,7 @@ import { dataPaths } from "@game-studio-arcade/studio-cli/src/config.js";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { firstName, makersStore, NAME_MAX } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
-import { createStudio, kidMessage } from "../src/studio.js";
+import { createStudio, kidMessage, StudioBusy } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { replayApi, REPLAY_LOCK, stepsFrom } from "../test-support/replay-api.js";
 
@@ -146,7 +146,8 @@ test("the recorded session relays through the service, commits and logs", async 
   assert.equal(done.results[0].ok, true);
   assert.equal(done.results[0].maker_name, "Alina");
   assert.equal(done.results[0].title, "Penguin Catch");
-  assert.ok(lines.includes("All done! Your penguin game is ready to play"));
+  assert.ok(lines.includes("Getting my tools out"));
+  assert.ok(!lines.includes("All done! Your penguin game is ready to play"), "the result screen says it, after the checks (D198)");
   assert.ok(lines.every((/** @type {string} */ l) => !l.includes(paths.root)), "no paths on a kid's screen");
   assert.ok(made.mock.calls[0].startsWith("retrieveAgent:"), "D173: the check comes before anything else");
 
@@ -343,7 +344,7 @@ test("a restart mid-question: logged, told, archived, since nobody can answer it
   b.dismissNotice(s.notice.id + 1);
   assert.ok(b.state().notice, "another message's id doesn't clear it");
   b.dismissNotice(s.notice.id);
-  assert.deepEqual(b.state(), { phase: "idle" });
+  assert.deepEqual(b.state(), { phase: "idle", collecting: true }, "Make waits until it's been dealt with (D199)");
   await b.collectLeft();
   const rel = logged(a.paths).find((r) => r.outcome === "abandoned");
   assert.equal(rel.ended_by, "no_one_to_answer");
@@ -390,6 +391,60 @@ test("a restart mid-build: the session is picked up, its cart collected and on t
   assert.ok(!calls.some((c) => /delete/i.test(c)));
   assert.deepEqual(logged(paths, "studio_session_correction")[0].archive, { ok: true });
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(paths.root, "studio-left.json"), "utf8")), []);
+});
+
+test("while a restarted make is being collected, Make is busy; the journal says each step (D199)", async () => {
+  const paths = dataPaths(tmp());
+  leaveJournal(paths, { answered: 4 });
+  /** @type {string[]} */
+  const lines = [];
+  /** @type {(v?: any) => void} */
+  let release = () => {};
+  const gate = new Promise((r) => (release = r));
+  const b = reboot(
+    paths,
+    async () => {
+      await gate; // the API is slow to answer, as at a real boot
+      return replayApi({ dir: FIXTURE, resume: { answered: 4 } }).api;
+    },
+    { log: (/** @type {string} */ l) => lines.push(l) },
+  );
+  assert.equal(b.state().collecting, true);
+  assert.throws(() => b.start({ maker: "alina", request: "another game" }), /still being finished/);
+  const collected = b.collectLeft();
+  assert.equal(b.state().collecting, true, "still busy while it's attached");
+  assert.throws(() => b.start({ maker: "alina", request: "another game" }), StudioBusy);
+  release();
+  await collected;
+  assert.equal(b.state().collecting, undefined);
+  assert.equal(b.state().results[0].ok, true);
+  assert.match(lines[0], /restart cut off a make; session sesn_replay will be picked up/);
+  assert.match(lines[1], /re-attaching to session sesn_replay/);
+  assert.match(lines[2], /collected session sesn_replay: committed \(penguin-catch\); archive ok/);
+  // And Make is Make again.
+  b.start({ maker: "alina", request: "another game" });
+  assert.equal(b.state().phase, "running");
+});
+
+test("busy stays while an attach waits to retry, and a restart before a session started logs that (D199)", async () => {
+  const paths = dataPaths(tmp());
+  leaveJournal(paths, { answered: 4 });
+  /** @type {string[]} */
+  const lines = [];
+  const b = reboot(paths, async () => {
+    throw new Error("connect ECONNREFUSED");
+  }, { recheckMs: 3_600_000, log: (/** @type {string} */ l) => lines.push(l) });
+  await b.collectLeft();
+  assert.equal(b.state().collecting, true, "nothing collected, so still busy");
+  assert.throws(() => b.start({ maker: "alina", request: "x" }), StudioBusy);
+
+  const none = dataPaths(tmp());
+  leaveJournal(none, { session_id: null });
+  /** @type {string[]} */
+  const noneLines = [];
+  const c = reboot(none, async () => replayApi({ dir: FIXTURE }).api, { log: (/** @type {string} */ l) => noneLines.push(l) });
+  assert.match(noneLines[0], /before its session started/);
+  assert.equal(c.state().collecting, undefined, "nothing to collect, so Make is free");
 });
 
 test("picked up and failing its checks: nothing on the shelf, the kid told, and archived (D191)", async () => {

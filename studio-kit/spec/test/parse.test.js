@@ -55,6 +55,18 @@ test('template rules: ids and kinds', () => {
   assert.deepEqual(rulesOf(TEMPLATE).map((r) => [r.id, r.kind]), [['R1', 'auto'], ['R2', 'auto'], ['R3', 'you-check']]);
 });
 
+test('a dotted changelog version is accepted and counts as its whole number (D197)', () => {
+  const text = SLOTH.replace(/(## Changelog\n\n(?:- .*\n)+)/, '$1- v2.1: Birds enter from the side.\n');
+  const spec = parseSpec(text);
+  assert.deepEqual(spec.errors, []);
+  assert.deepEqual(spec.changelog.at(-1), { id: 'v2.1', n: 2, text: 'Birds enter from the side.', line: spec.changelog.at(-1)?.line });
+  assert.equal(formatSpec(spec), formatSpec(parseSpec(formatSpec(spec))), 'it round-trips');
+  assert.ok(formatSpec(spec).includes('- v2.1: Birds enter from the side.'));
+  for (const bad of ['- v: x', '- 1.1: x', '- v1.: x', '- v1.1.1: x']) {
+    assert.ok(parseSpec(text.replace('- v2.1: Birds enter from the side.', bad)).errors.length > 0, bad);
+  }
+});
+
 test('fixture: byline, rules with continuation, gaps, assumptions, changelog', () => {
   const spec = parseSpec(SLOTH);
   assert.equal(spec.title, 'Sloth Snacks');
