@@ -578,6 +578,34 @@ test("the service won't start on a bad config, and doesn't quote it (D131, D185)
   assert.ok(!noAgent.stderr.includes(KEY));
 });
 
+test("with no key and --offline, the service starts and Make can't reach the API (D252)", async () => {
+  const bin = path.resolve(import.meta.dirname, "../bin/cabinet-service.js");
+  const dir = tmp();
+  const none = spawnSync(process.execPath, [bin, "--port", "0", "--data", dir], { encoding: "utf8", timeout: 20000 });
+  assert.equal(none.status, 2, "no key and no --offline still refuses");
+  const { spawn } = await import("node:child_process");
+  const child = spawn(process.execPath, [bin, "--port", "0", "--guest-port", "0", "--data", dir, "--offline"], { stdio: ["ignore", "pipe", "pipe"] });
+  try {
+    let out = "";
+    const url = await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`no start: ${out}`)), 20000);
+      child.stdout.on("data", (b) => {
+        out += b;
+        const m = out.match(/cabinet service on (\S+),/);
+        if (m && /OFFLINE with no key/.test(out)) {
+          clearTimeout(t);
+          resolve(m[1]);
+        }
+      });
+      child.on("exit", (code) => reject(new Error(`exited ${code}: ${out}`)));
+    });
+    const r = await fetch(url);
+    assert.equal(r.status, 200, "the shelf is served");
+  } finally {
+    child.kill();
+  }
+});
+
 test("a starter game asks nobody to check it; a made game still does (D193)", async () => {
   const data = tmp();
   const paths = dataPaths(data);

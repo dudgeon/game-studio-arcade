@@ -91,6 +91,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 **C2. Wi-Fi in the basement** 🔧
 - On the mini: `ping arcade.local`. Claude checks it joined the home Wi-Fi, the signal level, and that it can reach the internet but not the mini (the cabinet never uses the mini, D7).
 - If it can't be found: the Wi-Fi name or password was wrong, or the basement is out of range. Re-writing the card is the fix for the first; a mesh point nearer the basement for the second.
+- If the network is **WPA3-only**, the precomputed key can't work: re-write the card with `--wpa3`, which puts the password itself on the card (still erased at first boot). Most mesh systems run WPA2/WPA3 mixed, which the default handles.
 
 **C3. Screen** 🔧
 - Look for: the shelf filling the 10" screen with no black bars and sharp, square pixels (1024×768, D81).

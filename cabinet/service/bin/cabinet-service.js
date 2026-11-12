@@ -40,8 +40,10 @@ const { values } = parseArgs({
 
 const paths = dataPaths(values.data ?? dataDir());
 const replaying = Boolean(values.replay);
-if (!replaying && !values.config) {
-  console.error("cabinet-service: --config FILE (the cabinet's config, 0600, D131), or --replay DIR to spend nothing (D186)");
+// --offline alone is a cabinet with no key yet, such as the Picade before connect-cabinet.sh (D252): the shelf
+// plays, and Make waits. It can't spend, because nothing reaches the API while offline.
+if (!replaying && !values.config && !values.offline) {
+  console.error("cabinet-service: --config FILE (the cabinet's config, 0600, D131), --replay DIR to spend nothing (D186), or --offline (D252)");
   process.exit(2);
 }
 /** @type {any} */
@@ -176,7 +178,7 @@ const s = await startService({
 });
 console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
 console.log(`guest games on ${guestServer.url}: ${guests.list("").map((g) => g.id).join(", ") || "none"}`);
-console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : `Managed Agents, with the key in ${values.config} (D131)`);
+console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : values.config ? `Managed Agents, with the key in ${values.config} (D131)` : "OFFLINE with no key: the shelf plays, and Make waits until the cabinet is connected (D252)");
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
 studio.collectLeft();
 

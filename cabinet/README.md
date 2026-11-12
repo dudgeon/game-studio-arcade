@@ -4,6 +4,8 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 
 **Status:** the virtual cabinet runs the cabinet service, on replay until it has a key (D154). No VM window yet (D141), so nobody can sit and play at it. The `picade` profile has never run: it needs the Picade.
 
+**The Picade (D250-D256):** its card is written by `scripts/cabinet-card/flash.mjs` and it's connected by `scripts/cabinet-card/connect-picade.sh`. Follow [docs/cabinet-bring-up.md](../docs/cabinet-bring-up.md) from unboxing to the first make.
+
 | Path | What it is |
 |---|---|
 | `provision/provision.sh` | The script: `--profile picade\|virtual --payload DIR`. Safe to run again |
@@ -11,6 +13,7 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 | `provision/profiles/` | The hardware layer of each profile |
 | `provision/files/` | Services and helpers it installs |
 | `vm/drive` | The driver: press, hold, type, screenshot over SSH, no window |
+| `../scripts/cabinet-card/` | Writes the Picade's microSD card (`flash.mjs`) and connects it to its workspace (`connect-picade.sh`) |
 | `../scripts/virtual-cabinet/` | Generates the UTM VM (`build.mjs`), starts it (`up.sh`), updates it (`update-cabinet.mjs`), checks it (`verify.sh`) |
 
 ## Connect the virtual cabinet to Claude

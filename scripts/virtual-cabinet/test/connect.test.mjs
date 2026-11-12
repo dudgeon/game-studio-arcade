@@ -192,6 +192,17 @@ test("refuses a key for the mini's own workspace (D131)", { skip }, async () => 
   assert.equal(read(path.join(w.log, "ant.argv")), "", "ant never ran");
 });
 
+test("refuses another cabinet's workspace: each cabinet has its own (D131, D254)", { skip }, async () => {
+  const w = world();
+  fs.writeFileSync(path.join(w.agent, "claude-lock.arcade-virtual.json"), JSON.stringify({ origin: { workspace_id: "wrkspc_VIRTUAL" } }));
+  const r = await inTerminal(w, { env: { STUB_WS: "wrkspc_VIRTUAL", CABINET: "arcade" } });
+  assert.notEqual(r.code, 0);
+  assert.match(r.out, /the arcade-virtual cabinet's workspace/);
+  assert.equal(read(path.join(w.log, "ant.argv")), "", "ant never ran");
+  const same = await inTerminal(world(), { env: { STUB_WS: "wrkspc_CABINET", CABINET: "arcade" } });
+  assert.equal(same.code, 0, same.out);
+});
+
 test("says so when the API refuses the key, or it isn't scoped to a workspace", { skip }, async () => {
   assert.match((await inTerminal(world(), { env: { STUB_STATUS: "401" } })).out, /refused this key/);
   assert.match((await inTerminal(world(), { env: { STUB_STATUS: "400" } })).out, /isn't scoped to a workspace/);
