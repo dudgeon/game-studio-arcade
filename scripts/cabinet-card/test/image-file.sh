@@ -38,6 +38,10 @@ cmp -s "$boot/seed/firstboot.sh" "$REPO/cabinet/provision/files/firstboot.sh" ||
 tar -tzf "$boot/seed/provision.tar.gz" | grep -q '^./profiles/picade.sh$' || fail "provision.tar has no picade profile"
 tar -xzOf "$boot/seed/provision.tar.gz" ./profiles/picade.sh | cmp -s - "$REPO/cabinet/provision/profiles/picade.sh" || fail "picade.sh in the seed differs"
 echo "$(shasum -a 256 "$boot/seed/node-v22.23.4-linux-arm64.tar.xz" | cut -c1-64)" | grep -q 6287aa46b6c375d816e63ae66d024fbbfd70404825aabdfdf898a970871d2f4b || fail "node tarball hash"
+ls "$boot/seed/speech/wheels/"moonshine_voice-*.whl >/dev/null || fail "no speech wheels on the card"
+for f in $("$NODE" -e 'console.log(Object.keys(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).files).join(" "))' "$REPO/cabinet/service/speech/models.lock.json"); do
+  [ -s "$boot/seed/speech/models/$f" ] || fail "speech model file $f missing"
+done
 head -1 "$boot/user-data" | grep -qx '#cloud-config' || fail "user-data header"
 grep -q '^  - name: cabinet$' "$boot/user-data" || fail "no cabinet user"
 grep -q 'regulatory-domain: "US"' "$boot/network-config" || fail "no Wi-Fi country"

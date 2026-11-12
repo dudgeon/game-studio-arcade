@@ -161,3 +161,16 @@ export function describe(info, parts) {
   for (const p of parts) lines.push(`  ${p.DeviceIdentifier}  ${p.VolumeName || p.Content || "no name"}  ${gb(p.Size ?? 0)}${p.MountPoint ? `  mounted at ${p.MountPoint}` : ""}`);
   return lines;
 }
+
+/** The wheels in speech's requirements.lock: name, version and SHA-256 of each (D261). */
+export function lockedWheels(lockText) {
+  const out = [];
+  for (const line of lockText.split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const m = t.match(/^([A-Za-z0-9_.-]+)==([^\s]+)\s+--hash=sha256:([0-9a-f]{64})$/);
+    if (!m) throw new Error(`requirements.lock: can't read "${t}"`);
+    out.push({ name: m[1], version: m[2], sha256: m[3] });
+  }
+  return out;
+}

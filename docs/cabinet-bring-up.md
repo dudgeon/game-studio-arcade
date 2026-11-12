@@ -9,6 +9,22 @@ Sources, checked live 2026-11-11: Pimoroni's [Assembling your Picade](https://le
 
 ---
 
+## The first end-to-end run, short
+
+For when the cabinet is built (Part A). Details for each step are in the parts below.
+
+1. **Card into the mini's reader.** In a Terminal window, in the repo on `main`:
+   `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
+   Type the `erase diskN NNGB` phrase it shows, the Wi-Fi name, the Wi-Fi password (nothing shows), then the mini's password for sudo. About 5 minutes (the first time it also fetches speech's files, about 300 MB, once); it ejects the card. (Part B)
+2. **Card into the Pi** from underneath. **Plug your USB mic into a black USB 2 port.** Power on.
+3. **Wait for the shelf** (about 10–20 minutes, not yet timed on the Pi). The screen shows "Setting up the arcade" with each step, restarts once by itself, then shows the shelf. Make will say it needs a connection: that's right for now. (Part C)
+4. **Console:** make the `cabinet-picade` workspace, its spend limit, and a key scoped to it. (D1)
+5. **Terminal:** `scripts/cabinet-card/connect-picade.sh`, paste the key, check the workspace, answer `y`. (D2)
+6. **Claude, with your yes:** `node scripts/twin.mjs seed --yes` copies the virtual cabinet's games and history onto the Picade (add `--set-aside-real` if the checks left log lines on it). It reaches the Picade with the SSH key step 1 made, in `~/game-studio-data/cabinets/arcade/ssh/`. (E1)
+7. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2) The Manager only watches the Picade: its driver keyboard stays off unless you switch it on with `scripts/cabinet-card/driver-keyboard.sh on` (D287).
+
+---
+
 ## Part A: build it (start now, no software needed)
 
 Allow 2–3 hours. Tools: a cross-head screwdriver and a flat one 2.5 mm or smaller. Tweezers help. A second pair of hands helps with the screen and marquee.
@@ -84,7 +100,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 ## Part C: first boot (unattended, about 10–25 minutes)
 
 **C1. Power on and wait** 🔧
-- Look for, in order: text scrolling, a reboot or two (the Pi grows its partition), then a quiet console for several minutes while it installs (apt, Node, the cabinet software, the Picade driver).
+- Look for, in order: text scrolling, a reboot or two (the Pi grows its partition), then **"Setting up the arcade"** in large letters with the step it's on (8 steps: the clock, the screen and browser, Node, the arcade, speech, the cabinet's buttons and sound, starting, finishing) and the time it started (D257). The browser step downloads from the internet and is the slow one; speech comes from the card. If it says **"Setup stopped"**, tell Claude; a power cycle runs it again from where it can.
 - It restarts once by itself at the end (so the Picade driver and screen power take effect), then **the shelf** appears: the cabinet's game list. Claude checks it from the mini over SSH.
 - If it never reaches the shelf after 30 minutes: tell Claude. The log is on the card's boot partition at `seed/provision.log` (readable on the mini), and on the cabinet over SSH.
 

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "../scripts/cabinet-card/picade.mjs";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -28,11 +29,11 @@ export function loadCabinets(dataDir = DATA_DIR, configDir = CONFIG_DIR) {
   try {
     vmHost = fs.readFileSync(path.join(vm, "host"), "utf8").trim() || vmHost;
   } catch {}
-  const picade = path.join(dataDir, "cabinets", "arcade"); // flash.mjs's folder for the Picade (D254)
+  const picade = picadeDir(process.env, dataDir); // flash.mjs's folder for the Picade (D254, D259)
   /** @type {Record<string, CabinetConfig>} */
   const all = {
     virtual: { name: "virtual", label: "Virtual cabinet", host: vmHost, key: path.join(vm, "ssh/arcade-virtual_ed25519"), knownHosts: path.join(vm, "ssh/known_hosts"), tokenFile: path.join(configDir, "manager-token") },
-    real: { name: "real", label: "Real cabinet (Picade)", host: "arcade.local", key: path.join(picade, "ssh/arcade_ed25519"), knownHosts: path.join(picade, "ssh/known_hosts"), tokenFile: path.join(configDir, "manager-token-real") },
+    real: { name: "real", label: "Real cabinet (Picade)", host: PICADE_HOST, key: path.join(picade, "ssh", PICADE_KEY_NAME), knownHosts: path.join(picade, "ssh/known_hosts"), tokenFile: path.join(configDir, "manager-token-real") },
   };
   const file = path.join(dataDir, "manager", "cabinets.json");
   if (fs.existsSync(file)) {

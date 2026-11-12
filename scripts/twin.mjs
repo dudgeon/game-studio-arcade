@@ -7,7 +7,7 @@
 //     --set-aside-real                  ...after moving aside what bring-up checks left on it (D298)
 //
 //   The real cabinet is the Picade: arcade.local, with the key the card script made in
-//   ~/game-studio-data/cabinets/arcade/ssh/ (GSA_CABINET_DIR moves it), as connect-picade.sh reaches it.
+//   the folder scripts/cabinet-card/picade-ssh.sh names (GSA_CABINET_DIR moves it), as connect-picade.sh reaches it.
 //   --real HOST                another name for the Picade, if arcade.local doesn't resolve
 //   --twin HOST                the twin (default: the virtual cabinet, found as cabinet/vm/drive finds it)
 //   --real-dir D --twin-dir D  two data folders on this machine instead (tests, rehearsals)
@@ -19,11 +19,11 @@
 // Keys, the cabinet's config and its Manager token are never read or copied (D292).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as helper from "../cabinet/twin/helper.mjs";
+import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./cabinet-card/picade.mjs";
 import { applyInput, drift, inSync, shelfDrift } from "../cabinet/twin/plan.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -66,9 +66,9 @@ export function bootEnd(dir) {
 
 /** The Picade's SSH, as connect-picade.sh reaches it: the key flash.mjs made when the card was written (D251). */
 export const PICADE = {
-  host: "arcade.local",
-  dir: process.env.GSA_CABINET_DIR ?? path.join(os.homedir(), "game-studio-data", "cabinets", "arcade"),
-  keyName: "arcade_ed25519",
+  host: PICADE_HOST,
+  dir: picadeDir(),
+  keyName: PICADE_KEY_NAME,
 };
 
 /** Drive's own settings, so one cabinet's never leak into the other's call. */

@@ -9,10 +9,12 @@
 # ARCADE_HOST picks the cabinet (default arcade.local).
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-CABINET_DIR="${GSA_CABINET_DIR:-$HOME/game-studio-data/cabinets/arcade}"
-export ARCADE_HOST="${ARCADE_HOST:-arcade.local}"
+# shellcheck source=picade-ssh.sh
+. "$REPO/scripts/cabinet-card/picade-ssh.sh"
+CABINET_DIR="$PICADE_DIR"
+export ARCADE_HOST="${ARCADE_HOST:-$PICADE_HOST}"
 export ARCADE_SSH_DIR="$CABINET_DIR/ssh"
-export ARCADE_SSH_KEY_NAME=arcade_ed25519
+export ARCADE_SSH_KEY_NAME="$PICADE_KEY_NAME"
 export GSA_VM_DIR="$CABINET_DIR"
 [ -f "$ARCADE_SSH_DIR/$ARCADE_SSH_KEY_NAME" ] || { echo "Stopped: no SSH key for the Picade at $ARCADE_SSH_DIR (scripts/cabinet-card/flash.mjs makes it)." >&2; exit 1; }
 on_cabinet() { ARCADE_SSH_TIMEOUT_S=60 "$REPO/cabinet/vm/drive" ssh "$1"; }

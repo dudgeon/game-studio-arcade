@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NETWORK_CONFIG_APPLIED, SEED_FILES, confirmPhrase, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, shellQuote, userData, wifiPsk } from "../lib.mjs";
+import { NETWORK_CONFIG_APPLIED, SEED_FILES, confirmPhrase, lockedWheels, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, shellQuote, userData, wifiPsk } from "../lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../../..");
@@ -243,6 +243,47 @@ test("the seed list matches what build.mjs's seed has, less what only a VM needs
   assert.deepEqual([...inBuild].sort(), [...SEED_FILES].sort());
 });
 
+test("first boot puts each provisioning stage on the screen, and says so when it stops (D257)", () => {
+  const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
+  const declared = Number(prov.match(/^STAGES=(\d+)$/m)?.[1]);
+  assert.equal((prov.match(/^stage "/gm) ?? []).length, declared, "STAGES counts every stage");
+  const run = (exitCode) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "card-firstboot-"));
+    const seed = path.join(root, "seed");
+    const src = path.join(root, "src");
+    fs.mkdirSync(seed);
+    fs.mkdirSync(src);
+    fs.writeFileSync(path.join(seed, "profile"), "picade\n");
+    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] profile picade"\necho "[provision 10:00:01] == 1/2 Checking the clock"\necho "[provision 10:00:02] == 2/2 Installing speech: Moonshine"\nexit ${exitCode}\n`);
+    execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
+    const screen = path.join(root, "tty1");
+    fs.writeFileSync(screen, "");
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen } });
+    const out = { status: r.status, log: r.stdout, screen: fs.readFileSync(screen, "utf8"), ok: fs.existsSync(path.join(seed, "provision.ok")) };
+    fs.rmSync(root, { recursive: true, force: true });
+    return out;
+  };
+  const good = run(0);
+  assert.equal(good.status, 0, good.log);
+  assert.match(good.log, /== 2\/2 Installing speech/, "the log keeps every line");
+  assert.match(good.screen, /Step 1\/2\s+Checking the clock/);
+  assert.match(good.screen, /Step 2\/2\s+Installing speech: Moonshine/);
+  assert.match(good.screen, /Done\./);
+  assert.ok(good.ok);
+  const bad = run(3);
+  assert.notEqual(bad.status, 0, "a failed provision fails first boot, so it runs again at the next boot");
+  assert.match(bad.screen, /Setup stopped\./);
+  assert.ok(!bad.ok);
+});
+
+test("speech's lock reads as exact wheels, each with its hash (D257)", () => {
+  const wheels = lockedWheels(fs.readFileSync(path.join(REPO, "cabinet/service/speech/requirements.lock"), "utf8"));
+  assert.ok(wheels.length >= 5);
+  assert.ok(wheels.some((w) => w.name === "moonshine-voice"));
+  for (const w of wheels) assert.match(w.sha256, /^[0-9a-f]{64}$/);
+  assert.throws(() => lockedWheels("numpy>=2"), /can't read/);
+});
+
 test("the Picade's driver keyboard stays off unless its setting says on (D287)", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drv-"));
   const setting = path.join(dir, "driver-keyboard");
@@ -263,4 +304,27 @@ test("the Picade's driver keyboard stays off unless its setting says on (D287)",
   assert.equal(fs.readFileSync(modules, "utf8").trim(), "uinput");
   // It is part of every provisioning run on the Picade.
   assert.match(fs.readFileSync(PROFILE, "utf8"), /hw_late\(\) \{[^}]*step_driver_keyboard/);
+});
+
+test("one place for the Picade's SSH key: picade-ssh.sh, read by everything that reaches the Picade (D259)", async () => {
+  const { PICADE_HOST, PICADE_KEY_NAME, PICADE_DATA_ROOT, PICADE_DIR_UNDER_DATA, picadeDir } = await import("../picade.mjs");
+  assert.equal(PICADE_HOST, "arcade.local");
+  assert.equal(picadeDir({}, "/home/x/game-studio-data"), path.join("/home/x/game-studio-data", PICADE_DIR_UNDER_DATA));
+  assert.equal(picadeDir({ GSA_CABINET_DIR: "/elsewhere" }), "/elsewhere", "GSA_CABINET_DIR moves it");
+  // The shell side gives the same answer.
+  const sh = execFileSync("/bin/bash", ["-c", `. ${JSON.stringify(path.join(REPO, "scripts/cabinet-card/picade-ssh.sh"))}; echo "$PICADE_DIR $PICADE_KEY_NAME $PICADE_HOST"`], { encoding: "utf8", env: { ...process.env, HOME: "/home/x", GSA_CABINET_DIR: "" } }).trim();
+  assert.equal(sh, `${path.join("/home/x", PICADE_DATA_ROOT, PICADE_DIR_UNDER_DATA)} ${PICADE_KEY_NAME} ${PICADE_HOST}`);
+  // No code spells the folder or the key's name anywhere else, so a second path can't creep in.
+  const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { cwd: REPO, encoding: "utf8" }).split("\n").filter((f) => /\.(mjs|js|sh)$|(^|\/)drive$/.test(f) && !f.includes("node_modules") && fs.existsSync(path.join(REPO, f)));
+  const allowed = new Set(["scripts/cabinet-card/picade-ssh.sh"]);
+  const spelled = [PICADE_DIR_UNDER_DATA, PICADE_DIR_UNDER_DATA.split("/").map((x) => `"${x}"`).join(", "), `${PICADE_DATA_ROOT}/picade`, PICADE_KEY_NAME];
+  const hits = [];
+  for (const f of files) {
+    if (allowed.has(f) || f.includes("/test/")) continue;
+    const text = fs.readFileSync(path.join(REPO, f), "utf8");
+    for (const word of spelled) if (text.includes(word)) hits.push(`${f}: ${word}`);
+  }
+  assert.deepEqual(hits, [], "use scripts/cabinet-card/picade-ssh.sh (shell) or picade.mjs (Node)");
+  for (const f of ["scripts/cabinet-card/connect-picade.sh", "scripts/cabinet-card/driver-keyboard.sh"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /picade-ssh\.sh/, f);
+  for (const f of ["scripts/cabinet-card/flash.mjs", "scripts/twin.mjs", "manager/cabinet.mjs"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /cabinet-card\/picade\.mjs|\.\/picade\.mjs/, f);
 });

@@ -9,6 +9,7 @@
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
+// --no-speech-on-card leaves speech's wheels and model for first boot to download (D257),
 // --wpa3 for a WPA3-only network: its passphrase goes on the card instead of the WPA key (still erased at first boot).
 //
 //   node scripts/cabinet-card/flash.mjs --image-file OUT.img
@@ -29,15 +30,16 @@ import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { makeBundle, makeProvisionTar } from "../virtual-cabinet/lib.mjs";
-import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
+import { PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
+import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../..");
 const VM_ROOT = process.env.GSA_VM_DIR || join(homedir(), "game-studio-data/vm");
 const DL = join(VM_ROOT, "dl"); // the virtual cabinet's downloads: the same pinned files, checked by hash
-const CABINET_DIR = process.env.GSA_CABINET_DIR || join(homedir(), "game-studio-data/cabinets/arcade");
+const CABINET_DIR = picadeDir();
 const SSH_DIR = join(CABINET_DIR, "ssh");
-const KEY_NAME = "arcade_ed25519";
+const KEY_NAME = PICADE_KEY_NAME;
 const BLOCK = 4 * 2 ** 20;
 
 const args = process.argv.slice(2);
@@ -177,6 +179,49 @@ function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit }) {
   for (const f of [...SEED_FILES, lock.node.name]) if (!existsSync(join(dir, f))) stop(`the seed is missing ${f}`);
 }
 
+/** A file into the cache once, checked by SHA-256 every time. */
+async function cached(dir, name, url, want) {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, name);
+  if (existsSync(path) && (await sha256File(path)) === want) return path;
+  const r = await fetch(url);
+  if (!r.ok) stop(`${url}: HTTP ${r.status}`);
+  await pipeline(Readable.fromWeb(/** @type {any} */ (r.body)), createWriteStream(`${path}.part`));
+  if ((await sha256File(`${path}.part`)) !== want) stop(`${name} doesn't match its pinned SHA-256`);
+  run("mv", [`${path}.part`, path]);
+  return path;
+}
+
+/**
+ * Speech's wheels and model on the card (D257), so first boot needn't download them. speech.sh already reads
+ * $PAYLOAD/speech/wheels and speech/models; each file is the one its lock pins, by SHA-256.
+ */
+async function speechPayload(seedDir) {
+  const src = join(REPO, "cabinet/service/speech");
+  const cache = join(DL, "speech");
+  const wheels = join(seedDir, "speech/wheels");
+  const models = join(seedDir, "speech/models");
+  mkdirSync(wheels, { recursive: true });
+  mkdirSync(models, { recursive: true });
+  for (const w of lockedWheels(readFileSync(join(src, "requirements.lock"), "utf8"))) {
+    const r = await fetch(`https://pypi.org/pypi/${w.name}/${w.version}/json`);
+    if (!r.ok) stop(`PyPI: ${w.name} ${w.version}: HTTP ${r.status}`);
+    const file = (/** @type {any} */ (await r.json())).urls.find((u) => u.digests?.sha256 === w.sha256);
+    if (!file) stop(`PyPI has no ${w.name} ${w.version} file with the pinned hash`);
+    cpSync(await cached(join(cache, "wheels"), file.filename, file.url, w.sha256), join(wheels, file.filename));
+  }
+  const m = JSON.parse(readFileSync(join(src, "models.lock.json"), "utf8"));
+  for (const [name, sha] of Object.entries(m.files)) cpSync(await cached(join(cache, "models", m.dir), name, `${m.base_url}/${name}`, String(sha)), join(models, name));
+  say(`speech: ${readdirSync(wheels).length} wheels and the ${m.arch} model on the card`);
+}
+
+/** Bytes in a folder, all the way down. */
+function folderBytes(dir) {
+  let n = 0;
+  for (const e of readdirSync(dir, { withFileTypes: true })) n += e.isDirectory() ? folderBytes(join(dir, e.name)) : statSync(join(dir, e.name)).size;
+  return n;
+}
+
 // ---- Writing ----
 
 /** xz -dc image | [sudo] dd of=target. Returns the image's bytes and SHA-256, hashed on the way through. */
@@ -240,12 +285,13 @@ function mountBoot(target, { file }) {
 async function writeBoot(mount, seedDir, cloud) {
   const seed = join(mount, "seed");
   rmSync(seed, { recursive: true, force: true });
-  mkdirSync(seed);
+  const free = Number(run("df", ["-k", mount]).trim().split("\n").pop()?.split(/\s+/)[3]) * 1024;
+  const need = folderBytes(seedDir) + 2 * 2 ** 20;
+  if (!(free > need)) stop(`the seed needs ${(need / 2 ** 20).toFixed(0)} MiB and the boot partition has ${(free / 2 ** 20).toFixed(0)} MiB free. Try --no-speech-on-card.`);
+  cpSync(seedDir, seed, { recursive: true });
   const want = new Map();
-  for (const name of readdirSync(seedDir)) {
-    cpSync(join(seedDir, name), join(seed, name));
-    want.set(join(seed, name), await sha256File(join(seedDir, name)));
-  }
+  const list = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(join(d, e.name)) : [join(d, e.name)]));
+  for (const f of list(seedDir)) want.set(join(seed, f.slice(seedDir.length + 1)), await sha256File(f));
   for (const [name, text] of Object.entries(cloud)) {
     const path = join(mount, name);
     const fd = openSync(path, "w");
@@ -254,7 +300,13 @@ async function writeBoot(mount, seedDir, cloud) {
     want.set(path, createHash("sha256").update(text).digest("hex"));
   }
   // macOS leaves AppleDouble files beside anything with extended attributes on FAT.
-  for (const dir of [mount, seed]) for (const n of readdirSync(dir)) if (n.startsWith("._")) rmSync(join(dir, n), { force: true });
+  const sweep = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith("._")) rmSync(join(dir, e.name), { force: true });
+      else if (e.isDirectory()) sweep(join(dir, e.name));
+    }
+  };
+  sweep(mount);
   run("sync", []);
   for (const [path, sha] of want) if ((await sha256File(path)) !== sha) stop(`${path} didn't read back as written`);
   say(`seed and cloud-init files written and read back (${want.size} files)`);
@@ -306,6 +358,8 @@ async function main() {
     const seedDir = join(work, "seed");
     mkdirSync(seedDir);
     buildSeed(seedDir, { hostname, authorizedKey, nodeTarball, commit });
+    if (!flag("--no-speech-on-card")) await speechPayload(seedDir);
+    say(`seed: ${(folderBytes(seedDir) / 2 ** 20).toFixed(0)} MiB`);
     const instance = `${hostname}-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-${randomBytes(3).toString("hex")}`;
     const cloud = {
       "user-data": userData({ hostname, timezone, locale, authorizedKey, country }),
