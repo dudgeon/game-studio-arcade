@@ -1209,3 +1209,14 @@ The real cabinet is only read. It never knows the mini exists; if either side is
 - The picade profile installs `arcade-keyd` and its unit like the virtual profile, but runs it only while `/etc/arcade/driver-keyboard` says `on`. Nothing on the card or in an update writes that file, so a new Picade starts with it off, and every provisioning run keeps whatever it says. `uinput` is loaded only while it is on.
 - `scripts/cabinet-card/driver-keyboard.sh on|off|status` sets it from the mini over the Picade's admin SSH key (D254), and starts or stops the daemon at once. The Manager notices within 20 seconds.
 - **How it is protected:** (1) off unless a grown-up switches it on, on the mini; (2) switching it, and every key press, needs the Picade's admin SSH key, which only the mini has: the daemon listens on a root-only socket (0600), never on the network; (3) through the Manager, a press also needs the Manager key and a home-network address (D285); (4) nothing at the cabinet can switch it on, and a kid at the controls is unaffected: the overlay's keys and the driver's reach the same screen; (5) each press is logged in `/run/arcade/keys.log` until the next restart. Switch it off after validation if it is not wanted day to day.
+
+## 2026-11-11 — Live paths never run before (validation, D300+)
+
+The director's validation run on the virtual cabinet, as Tester, typed input: walking away, stopping, someone else's own version, a restart mid-build. Screenshots in `~/game-studio-data/vm/verify/live-paths-2026-11-11/`.
+
+**D300. A make that stopped without the kid says what it used, and keeps the idea for a try again.** *(Claude; the handoff's rule for edge screens: say what happened, that the idea is kept, and what it cost.)*
+- **Run 1, live:** a question left alone for 10 minutes. At 9 minutes the hint counted down (E7). At 10 the make was released: charged 3c ("walked away"), archived at Anthropic, the request kept in the record. But the screen said only "You were away for a while… Tell me your idea again any time!": no cost, and the kid had to re-tell the idea.
+- **Now:** a walk-away's notice carries the idea, and its cost once it's charged. The screen adds "It used N coins (Xc) before it stopped." and "Your idea is saved.", and leads with "Try again, same idea". That tile goes to the coin check, then "Is this right?" with the words filled in, as E3 does.
+- **E5** (a restart while Claude was asking) keeps the idea the same way. Its cost isn't known until the session is collected, so its screen doesn't say it.
+
+**D301. Every finished session is archived at Anthropic, a game on the shelf too.** *(The director, 2026-11-11.)* Until now only released, collected and failed sessions were archived (D188, D191, D219). A make that ends normally is now archived too, and the archive is logged as a correction beside its record. Archiving keeps a session's history and stops nothing that's still needed (D5).
