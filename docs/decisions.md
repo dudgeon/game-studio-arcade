@@ -1138,3 +1138,35 @@ Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. 
 **D274. The Studio agent's brief says the same, for anything that gets past.** *(Claude.)* Its content line now says game violence is fine and, if an idea or answer goes off-limits even mid-game, never to scold, lecture, refuse or say "inappropriate": quietly build the closest safe version, and say so in one friendly line or offer it as a tile. **It needs an `ant apply` in each cabinet's workspace** before a cabinet runs it: until then, the cabinet's brief check (D185) finds the applied agent doesn't match and stops makes as stale. So it's its own commit, deployed with the next apply (the cabinet's key, from Geoff's keyboard, `connect-cabinet.sh`).
 
 **D275. E10 says "How about this?"** *(Claude; replaces the handoff's "Let's pick another idea".)* One friendly line ("Let's make it a little different. How about this?"), the alternative in yellow, and for a new idea "No coins were used." Tiles: **Make this one** (or **Use this one** for an answer), **Say it a new way** (back to the talk screen, F1 still types), **Back to the shelf** (or **Back to the question**, which keeps waiting). ESC does what the last tile does. One alternative, not the handoff's two: it's the closest version of their own idea, and "Say it a new way" covers the rest.
+
+**D280. Cabinet Manager v0: one process on the mini, a page on the home network.** *(Claude, Manager worker, 2026-11-11; carries out HANDOFF §3.1 and Geoff's validation direction.)*
+- `manager/` in this repo: Node 22's standard library only, no packages. `scripts/manager.sh start` starts it in the background (`stop`, `status`, `url`); no window opens on the mini. It listens on port 8335.
+- Four views: the cabinet's **screen** with its controls, **activity**, **coins**, and a **cabinet picker** (virtual, real). Carts, push and updates come later.
+- It is never in the play path: the cabinet doesn't know it exists, and every cabinet works with it off. It talks to each cabinet over that cabinet's SSH (the same key and host `drive` uses, D144, D241), through one held connection.
+
+**D281. Watching: the compositor's own screenshots, a few a second, with their age shown.** *(Claude.)*
+- The picture is `arcade-screenshot` (grim, D144): what the screen really shows, on both profiles. Measured on the virtual cabinet over a held connection: 30-60 ms a shot. While at least one browser is watching, the Manager takes about 4 a second and sends a frame only when the picture changed; with nobody watching it takes none.
+- The page says how fresh it is: the age of the last good shot, turning to a warning past 3 seconds, and "no picture" with the reason when the cabinet can't be reached.
+- Not the kiosk's DevTools screencast: only the virtual profile opens that port (127.0.0.1:9222), it shows the page rather than the screen, and the Picade has none.
+
+**D282. Driving: the browser's keys go to the cabinet as a keyboard, pressed and released separately.** *(Claude.)*
+- On-screen buttons for the D82 controls (stick, A B X Y, START, ESC, F1, COIN) and Geoff's own keyboard, which sends the same keys (arrows, Z X C V, Enter, Escape, F1, F2). Each key goes down when pressed and up when released, so holds work (hold-to-talk, D87). Every other key on Geoff's keyboard passes through too, so F1's "type it" screen takes typing.
+- Keys go through `arcade-keyd` (D144), so they take the kid's path: kernel, compositor, Chromium. A browser that closes or loses focus releases what it was holding.
+- **The Picade has no `arcade-keyd`:** D144 put it on the `virtual` profile only. So on the real cabinet the Manager watches, and the controls are the cabinet's own. Its page says so. Putting the driver keyboard on the Picade too is a separate question for Geoff (it lets anyone with the Manager key press buttons on the kids' cabinet).
+
+**D283. Activity is read from the cabinet's own logs, read-only, and kept nowhere on the mini.** *(Claude.)*
+- The Manager reads the tail of each `/var/lib/arcade/logs/*.jsonl` over SSH when the page asks, and joins them as §9.5 says: a make or change (`studio_session`) with who, what was said, each question and answer, ended by, the outcome and game version, its list cost in cents and the coins it was charged (`coin_ledger`, by session id); plays (`play`, `guest_play`); and screened requests (any log whose name says `screen`, so the screening work's log shows up when it exists).
+- Nothing is written on the mini: the kids' words travel from the cabinet to Geoff's browser and stay on the cabinet (CLAUDE.md).
+
+**D284. Coins: the D208 endpoints, with the $15 warning before a top-up that passes it.** *(Claude; carries out D205 and D215.)*
+- Show, add N with a reason, reset with a reason: the same endpoints and rules as `scripts/coin.mjs`, reached through the held SSH connection (a forwarded port to the service's 127.0.0.1:8330). A top-up that `preview` says passes the workspace's limit needs a second, explicit press.
+- The token: the virtual cabinet's is the one `coin.mjs pair` keeps (`~/.config/game-studio-arcade/manager-token`); another cabinet's is `manager-token-<name>` beside it. The Manager can pair (make the cabinet's token if it has none, D208) from the coin page. The token never reaches the browser.
+
+**D285. Who can open the Manager: home-network addresses, with a key, once per browser.** *(Claude.)*
+- It answers only loopback, private (10/8, 172.16/12, 192.168/16) and link-local addresses, and only for a Host that is an IP address, `localhost` or a `.local` name (no DNS rebinding).
+- **A Manager key** (random, made on first start, `~/.config/game-studio-arcade/manager-web-key`, 0600) opens it. `scripts/manager.sh url` prints the link with the key; opening it sets an HttpOnly, SameSite=Strict cookie for a year, and the key leaves the address bar. Without it a home device (the kids' included) gets "ask a grown-up". Actions need the cookie and a same-origin request.
+- Plain HTTP on the home Wi-Fi: someone already on the network who watches the traffic could copy the cookie. Accepted for v0 (the same trust as the cabinet's own LAN service, D7); HTTPS is the step up if wanted.
+
+**D286. Which cabinet: virtual and real by default, overridable in a file.** *(Claude.)*
+- `virtual`: the host in `~/game-studio-data/vm/host` (D241) or `arcade-virtual.local`, with the VM's SSH key. `real`: `arcade.local` with the key at `~/game-studio-data/picade/ssh/arcade_ed25519`, the place the SD-card work is asked to use. `~/game-studio-data/manager/cabinets.json` overrides either or adds one (`{"real": {"host": "…", "key": "…"}}`).
+- A cabinet that can't be reached says why (no key, no answer) and the others keep working.
