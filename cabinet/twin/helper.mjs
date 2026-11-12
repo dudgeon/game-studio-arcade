@@ -118,7 +118,8 @@ export function info(root, input = {}) {
   }
   return {
     release,
-    makeInFlight: fs.existsSync(path.join(root, "studio-run.json")),
+    // A make running, or one a restart left to collect (D191): its session lives in this cabinet's workspace only.
+    makeInFlight: fs.existsSync(path.join(root, "studio-run.json")) || (readJson(path.join(root, "studio-left.json")) ?? []).length > 0,
     replay: replayData(root),
     seed: readJson(path.join(root, "twin-seed.json")),
     lastSync: readJson(path.join(root, SYNC_DIR, "last-sync.json")),
