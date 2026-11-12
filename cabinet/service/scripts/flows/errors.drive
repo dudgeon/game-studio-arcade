@@ -37,6 +37,7 @@ wait E4
 shot E4-restarting
 wait E5
 shot E5-restarted-on-a-question
+press down
 press a
 wait S1
 press a

@@ -899,6 +899,31 @@ export function whatToChange(o) {
   };
 }
 
+/**
+ * A make that stopped while the kid was away, or that a restart cut off (D188, D189; E5, E6).
+ * Says what it used and keeps the idea for a try again when it can (the handoff's rule for edge screens, D300).
+ * @param {any} n the Studio's notice @param {{ new: number, change: number }} usual
+ */
+export function goneView(n, usual) {
+  const board = n?.kind === "restarted" ? (/may still finish/.test(n.message ?? "") ? "E6" : "E5") : "gone";
+  /** @type {any[]} */
+  const blocks = [{ text: n?.message ?? "This game stopped being made. Tell me your idea again!", rows: 5, keepLines: true }];
+  if (n?.cost_cents != null) blocks.push({ text: `It used ${coinsWord(coinsOfCents(n.cost_cents))} (${cents(n.cost_cents)}) before it stopped.`, color: C.silver, rows: 2 });
+  if (n?.retry?.request) blocks.push({ text: "Your idea is saved.", color: C.lime, rows: 1, onCut: "never" });
+  const retry = n?.retry?.request ? n.retry : null;
+  const cost = retry?.kind === "change" ? usual.change : usual.new;
+  return {
+    screen: "board",
+    board,
+    title: n?.kind === "timed_out" ? "Put away for now" : "Sorry!",
+    blocks,
+    tiles: [...(retry ? [{ text: "Try again, same idea", note: `about ${cost}`, noteCoin: true, hue: C.green }] : []), { text: "Back to the shelf", hue: retry ? C.blue : C.green, center: !retry }],
+    sel: 0,
+    actions: [...(retry ? ["retry-notice"] : []), "notice-shelf"],
+    retry,
+  };
+}
+
 /** E8: ESC during a question (D188). @param {{ usedCents: number }} o */
 export function leaveView(o) {
   return {

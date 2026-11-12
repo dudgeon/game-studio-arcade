@@ -14,6 +14,7 @@ import {
   SHELF_HINT,
   bootBoard,
   resultItem,
+  goneView,
   cardView,
   coinCheck,
   historyLines,
@@ -320,8 +321,8 @@ function showGone() {
   followRun = null;
   seenRunning = false;
   const n = studio.notice;
-  const board = n?.kind === "restarted" ? (/may still finish/.test(n.message) ? "E6" : "E5") : "gone";
-  showBoard({ screen: "board", board, title: n?.kind === "timed_out" ? "Put away for now" : "Sorry!", blocks: [{ text: n?.message ?? "This game stopped being made. Tell me your idea again!", rows: 8, keepLines: true }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["notice-shelf"], { noticeId: n?.id });
+  const v = goneView(n, usual());
+  showBoard(v, v.actions, { noticeId: n?.id, costShown: n?.cost_cents != null });
 }
 
 /** @param {string} choice @param {string} [said] */
@@ -680,6 +681,12 @@ function onBoard(v, action) {
         return c ? showHowTo(c) : showShelf();
       });
     }
+    case "retry-notice":
+      if (v.noticeId) {
+        post("/api/studio/notice-seen", { id: v.noticeId }).catch(() => {});
+        studio = { ...studio, notice: undefined };
+      }
+    // falls through: the same retry as E3's
     case "retry": {
       leaveResult();
       const r = v.retry;
@@ -942,6 +949,8 @@ function connect() {
     if (view.screen === "shelf") showShelf();
     followStudio();
     if (view.screen === "notice" && view.restarting) showShelf();
+    // The walk-away's cost arrives a moment after the screen: show it when it does (D300).
+    if (view.noticeId && studio.notice?.id === view.noticeId && studio.notice.cost_cents != null && !view.costShown) showGone();
   };
   stream.onerror = () => {
     offlineSince ||= Date.now();

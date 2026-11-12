@@ -7,7 +7,7 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
-import { bootBoard, cardView, coinsWord, resultItem, scoreLine, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { bootBoard, cardView, coinsWord, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
 
@@ -126,6 +126,9 @@ function boardsWith(s) {
     "L5": resting(),
     "E2": offlineMake(),
     "E8": leaveView({ usedCents: 123 }),
+    "gone, walked away, with the cost and a retry": goneView({ kind: "timed_out", message: s, cost_cents: 999, retry: { maker: "m", request: s, kind: "change" } }, { new: 6, change: 2 }),
+    "E5 with a retry": goneView({ kind: "restarted", message: s, retry: { maker: "m", request: s, kind: "new" } }, { new: 6, change: 2 }),
+    "E6": goneView({ kind: "restarted", message: "Your game may still finish: look for it on the shelf." }, { new: 6, change: 2 }),
   };
 }
 

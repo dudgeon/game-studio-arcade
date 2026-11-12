@@ -1060,3 +1060,14 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
 - **The fix:** `provision.sh` masks `systemd-networkd-wait-online` for both profiles (`boot-wait.sh`), but only where NetworkManager is enabled and `/etc` or `/run` has no `.network` file for networkd. A mask outlasts any later preset run. networkd itself stays as it is: it manages nothing, so it costs nothing.
 - **How it's checked:** `boot-wait.test.mjs`, plus `verify.sh`. `boot-not-held` checks the mask is in place and that `network-online` was reached within 30 seconds of boot, and `no-failed-units` no longer excuses the wait.
 - **Proving it** needs one restart after the update.
+
+## 2026-11-11 — Live paths never run before (validation, D300+)
+
+The director's validation run on the virtual cabinet, as Tester, typed input: walking away, stopping, someone else's own version, a restart mid-build. Screenshots in `~/game-studio-data/vm/verify/live-paths-2026-11-11/`.
+
+**D300. A make that stopped without the kid says what it used, and keeps the idea for a try again.** *(Claude; the handoff's rule for edge screens: say what happened, that the idea is kept, and what it cost.)*
+- **Run 1, live:** a question left alone for 10 minutes. At 9 minutes the hint counted down (E7). At 10 the make was released: charged 3c ("walked away"), archived at Anthropic, the request kept in the record. But the screen said only "You were away for a while… Tell me your idea again any time!": no cost, and the kid had to re-tell the idea.
+- **Now:** a walk-away's notice carries the idea, and its cost once it's charged. The screen adds "It used N coins (Xc) before it stopped." and "Your idea is saved.", and leads with "Try again, same idea". That tile goes to the coin check, then "Is this right?" with the words filled in, as E3 does.
+- **E5** (a restart while Claude was asking) keeps the idea the same way. Its cost isn't known until the session is collected, so its screen doesn't say it.
+
+**D301. Every finished session is archived at Anthropic, a game on the shelf too.** *(The director, 2026-11-11.)* Until now only released, collected and failed sessions were archived (D188, D191, D219). A make that ends normally is now archived too, and the archive is logged as a correction beside its record. Archiving keeps a session's history and stops nothing that's still needed (D5).

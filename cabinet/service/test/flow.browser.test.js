@@ -275,7 +275,12 @@ test("walking away: warned, then a message, then the shelf with Make free, and i
         shot walked-away
       `);
       assert.match(await boxText(page, "gone-0"), /away for a while/);
+      // What it used, and the idea kept for a try again (D300). The cost arrives a moment after.
+      await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => /before it stopped/.test(b.text)), null, { timeout: 10_000 });
+      assert.equal(await boxText(page, "gone-tile-0"), "Try again, same idea");
+      assert.match(await boxText(page, "gone-2"), /idea is saved/);
       await run(`
+        press down
         press a
         wait shelf
       `);
@@ -345,7 +350,9 @@ test("the service restarts mid-question: a moment's notice, then a message, then
       assert.equal(rec.outcome, "service_restarted");
       assert.equal(rec.session_left_running, true);
       assert.match(rec.id, /^sesn_replay/);
+      assert.equal(await boxText(page, "E5-tile-0"), "Try again, same idea", "the idea is kept (E5, D300)");
       await run(`
+        press down
         press a
         wait shelf
         sleep 200
