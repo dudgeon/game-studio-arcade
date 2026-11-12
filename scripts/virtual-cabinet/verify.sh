@@ -81,7 +81,7 @@ check netwatch-starts-at-boot guest 'test "$(systemctl is-enabled arcade-netwatc
 check netwatch-recording guest 'systemctl is-active --quiet arcade-netwatch && sudo journalctl -u arcade-netwatch -b --no-pager | grep -q "netwatch CHANGE"'
 # D245: no false address conflicts from the bridge's MAC NAT, and the bridged card keeps its subnet route.
 check bridged-subnet-route guest 'd=$(ip -4 route show default | awk "{print \$5; exit}") && ip -4 route show table main | grep " dev $d proto kernel scope link" && test "$(cat /etc/NetworkManager/conf.d/arcade-no-acd.conf)" = "$(printf "[connection-arcade-no-acd]\nipv4.dad-timeout=0")"'
-check journal-on-disk guest'test -d /var/log/journal && journalctl --list-boots --no-pager | grep -q .'
+check journal-on-disk guest 'test -d /var/log/journal && journalctl --list-boots --no-pager | grep -q .'
 
 # The screens: a cart from the shelf, by the real input path. Safe to repeat.
 PLAY="$OUT/play"
