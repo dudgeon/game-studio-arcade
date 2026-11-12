@@ -239,7 +239,9 @@ export function createStudio(o) {
     });
     clearJournal();
     const stillGoing = Boolean(left.session_id) && !left.waiting;
-    notice = { id: nextId++, kind: "restarted", ...(stillGoing ? NOTICES.restarted_building : NOTICES.restarted) };
+    // On a question, the idea goes with the notice so the kid can try again without re-telling it (E5, D300).
+    const retry = !stillGoing && left.request && left.maker ? { retry: { maker: left.maker, request: left.request, kind: left.kind ?? "new", parent: left.parent?.id ?? null } } : {};
+    notice = { id: nextId++, kind: "restarted", ...(stillGoing ? NOTICES.restarted_building : NOTICES.restarted), ...retry };
     if (left.session_id) {
       writeJson(leftFile, [...readJson(leftFile, []), left]);
       log(`a restart cut off a make; session ${left.session_id} will be picked up (D191)`);
@@ -479,7 +481,8 @@ export function createStudio(o) {
     current.released = reason;
     current.pending = null;
     run = null; // Make is free now, whatever the API does next.
-    notice = reason === "timed_out" ? { id: nextId++, kind: reason, ...NOTICES.timed_out, used_cents: current.usedCents } : null;
+    // The idea goes with the notice, so the kid can try again without saying it again (D300); the cost follows once charged.
+    notice = reason === "timed_out" ? { id: nextId++, kind: reason, ...NOTICES.timed_out, used_cents: current.usedCents, run_id: current.id, retry: { maker: current.maker, request: current.request, kind: current.kind ?? "new", parent: current.parent?.id ?? null } } : null;
     p.reject(new Released(reason));
     changed();
   }
@@ -650,9 +653,20 @@ export function createStudio(o) {
             ? { ...shelfEntry(current), ...cost, ...more, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, title: o.titleOf?.(committed.id) ?? committed.id, changed: changedLine(record, request), session_id: record.id }
             : { ...shelfEntry(current), ...cost, ok: false, failed: true, request, message: kidMessage(record), session_id: record.id },
         );
+        // Every finished session is archived at Anthropic, a game on the shelf too: kept, never deleted (D5, D301).
+        const archived = await archive(api, record.id);
+        logArchive(record.id, "the make finished; archived (D301)", archived);
       })()
         .catch(async (e) => {
-          if (e instanceof Released) return void (await finishRelease(current));
+          if (e instanceof Released) {
+            const cost = await finishRelease(current);
+            // What the walk-away cost, on the screen that says it happened (D202, D300).
+            if (notice?.run_id === current.id && cost?.cost_cents != null) {
+              notice = { ...notice, cost_cents: cost.cost_cents, pot_after_cents: cost.pot_after_cents };
+              changed();
+            }
+            return;
+          }
           logFailure(current, e);
           const stale = /doesn't match agents\/studio\.md/.test(String(e?.message));
           // No session, nothing spent; the workspace limit means resting until the 1st (D204, L5).

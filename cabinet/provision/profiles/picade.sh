@@ -18,7 +18,7 @@ hw_late() {
   step_config_txt
   step_input_rule
   step_sound
-  step_driver_keys
+  step_driver_keyboard
 }
 
 # The Pi has no battery clock. Until NTP answers, the clock says the image's date, and apt refuses
@@ -89,6 +89,32 @@ step_config_txt() {
 
 # Pimoroni's installer adds this rule: it tells udev, and so libinput and the kiosk, that the
 # overlay's gpio_keys device is a keyboard.
+# D287: the driver keyboard (D144) is installed here too, but runs only while /etc/arcade/driver-keyboard says
+# "on". Nothing on the card makes that file: scripts/cabinet-card/driver-keyboard.sh on|off sets it over the
+# admin SSH key, and the setting outlasts updates and restarts until it's switched off.
+DRIVER_SETTING="${DRIVER_SETTING:-/etc/arcade/driver-keyboard}"
+DRIVER_MODULES="${DRIVER_MODULES:-/etc/modules-load.d/arcade-driver.conf}"
+driver_keyboard_on() {
+  [ "$(tr -d '[:space:]' < "$DRIVER_SETTING" 2>/dev/null)" = on ]
+}
+
+step_driver_keyboard() {
+  install -m 0755 "$SELF_DIR/files/arcade-keyd" /usr/local/bin/arcade-keyd
+  install -m 0644 "$SELF_DIR/files/arcade-keyd.service" /etc/systemd/system/arcade-keyd.service
+  systemctl daemon-reload
+  if driver_keyboard_on; then
+    echo uinput > "$DRIVER_MODULES"
+    modprobe uinput
+    systemctl enable arcade-keyd
+    systemctl restart arcade-keyd
+    log "driver keyboard: on (D287)"
+  else
+    rm -f "$DRIVER_MODULES"
+    systemctl disable --now arcade-keyd 2>/dev/null || true
+    log "driver keyboard: off (D287)"
+  fi
+}
+
 step_input_rule() {
   printf 'SUBSYSTEM=="input", ATTRS{name}=="gpio_keys", ENV{ID_INPUT_KEYBOARD}="1"\n' > "$UDEV_RULES"
   udevadm control --reload 2>/dev/null || true
@@ -146,25 +172,6 @@ ALSA
 step_sound() {
   asound_conf > "$ASOUND_CONF"
   chmod 0644 "$ASOUND_CONF"
-}
-
-# D258: the Manager's driver keyboard (arcade-keyd, D144, D282), only when asked: the card's seed/driver-keys,
-# or /etc/arcade/driver-keys on the cabinet. Off by default, because it lets whoever holds the Manager's key
-# press buttons on the kids' cabinet. To turn it off: remove the file, then systemctl disable --now arcade-keyd.
-DRIVER_KEYS_FLAG="${DRIVER_KEYS_FLAG:-/etc/arcade/driver-keys}"
-driver_keys_wanted() {
-  [ -f "$PAYLOAD/driver-keys" ] || [ -f "$DRIVER_KEYS_FLAG" ]
-}
-step_driver_keys() {
-  driver_keys_wanted || return 0
-  install -d "$(dirname "$DRIVER_KEYS_FLAG")"
-  touch "$DRIVER_KEYS_FLAG"
-  install -m 0755 "$SELF_DIR/files/arcade-keyd" /usr/local/bin/arcade-keyd
-  install -m 0644 "$SELF_DIR/files/arcade-keyd.service" /etc/systemd/system/arcade-keyd.service
-  systemctl daemon-reload
-  systemctl enable arcade-keyd
-  systemctl restart arcade-keyd
-  log "driver keyboard on (D258)"
 }
 
 # Until connect-cabinet.sh gives it a key, the Picade plays offline: the shelf works, and Make waits (D252).

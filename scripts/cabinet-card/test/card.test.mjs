@@ -276,24 +276,55 @@ test("first boot puts each provisioning stage on the screen, and says so when it
   assert.ok(!bad.ok);
 });
 
-test("the Manager's driver keyboard is off on the Picade unless asked for (D258)", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-keyd-"));
-  const want = (setup) => profileBash(`PAYLOAD=${JSON.stringify(path.join(dir, "seed"))}; DRIVER_KEYS_FLAG=${JSON.stringify(path.join(dir, "etc/driver-keys"))}; ${setup} driver_keys_wanted && echo yes || echo no`).trim();
-  fs.mkdirSync(path.join(dir, "seed"));
-  assert.equal(want(""), "no");
-  fs.writeFileSync(path.join(dir, "seed/driver-keys"), "yes\n");
-  assert.equal(want(""), "yes", "asked for on the card");
-  fs.rmSync(path.join(dir, "seed/driver-keys"));
-  fs.mkdirSync(path.join(dir, "etc"));
-  fs.writeFileSync(path.join(dir, "etc/driver-keys"), "");
-  assert.equal(want(""), "yes", "asked for on the cabinet");
-  fs.rmSync(dir, { recursive: true, force: true });
-});
-
 test("speech's lock reads as exact wheels, each with its hash (D257)", () => {
   const wheels = lockedWheels(fs.readFileSync(path.join(REPO, "cabinet/service/speech/requirements.lock"), "utf8"));
   assert.ok(wheels.length >= 5);
   assert.ok(wheels.some((w) => w.name === "moonshine-voice"));
   for (const w of wheels) assert.match(w.sha256, /^[0-9a-f]{64}$/);
   assert.throws(() => lockedWheels("numpy>=2"), /can't read/);
+});
+
+test("the Picade's driver keyboard stays off unless its setting says on (D287)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drv-"));
+  const setting = path.join(dir, "driver-keyboard");
+  const modules = path.join(dir, "arcade-driver.conf");
+  const stubs = `install() { echo "install $*"; }; systemctl() { echo "systemctl $*"; }; modprobe() { echo "modprobe $*"; }; DRIVER_SETTING=${JSON.stringify(setting)}; DRIVER_MODULES=${JSON.stringify(modules)}; step_driver_keyboard`;
+  let out = profileBash(stubs);
+  assert.match(out, /systemctl disable --now arcade-keyd/);
+  assert.doesNotMatch(out, /systemctl enable|modprobe uinput/);
+  assert.match(out, /driver keyboard: off/);
+  assert.ok(!fs.existsSync(modules));
+  fs.writeFileSync(setting, "off\n");
+  assert.match(profileBash(stubs), /driver keyboard: off/);
+  fs.writeFileSync(setting, "on\n");
+  out = profileBash(stubs);
+  assert.match(out, /modprobe uinput/);
+  assert.match(out, /systemctl enable arcade-keyd/);
+  assert.match(out, /driver keyboard: on/);
+  assert.equal(fs.readFileSync(modules, "utf8").trim(), "uinput");
+  // It is part of every provisioning run on the Picade.
+  assert.match(fs.readFileSync(PROFILE, "utf8"), /hw_late\(\) \{[^}]*step_driver_keyboard/);
+});
+
+test("one place for the Picade's SSH key: picade-ssh.sh, read by everything that reaches the Picade (D259)", async () => {
+  const { PICADE_HOST, PICADE_KEY_NAME, PICADE_DATA_ROOT, PICADE_DIR_UNDER_DATA, picadeDir } = await import("../picade.mjs");
+  assert.equal(PICADE_HOST, "arcade.local");
+  assert.equal(picadeDir({}, "/home/x/game-studio-data"), path.join("/home/x/game-studio-data", PICADE_DIR_UNDER_DATA));
+  assert.equal(picadeDir({ GSA_CABINET_DIR: "/elsewhere" }), "/elsewhere", "GSA_CABINET_DIR moves it");
+  // The shell side gives the same answer.
+  const sh = execFileSync("/bin/bash", ["-c", `. ${JSON.stringify(path.join(REPO, "scripts/cabinet-card/picade-ssh.sh"))}; echo "$PICADE_DIR $PICADE_KEY_NAME $PICADE_HOST"`], { encoding: "utf8", env: { ...process.env, HOME: "/home/x", GSA_CABINET_DIR: "" } }).trim();
+  assert.equal(sh, `${path.join("/home/x", PICADE_DATA_ROOT, PICADE_DIR_UNDER_DATA)} ${PICADE_KEY_NAME} ${PICADE_HOST}`);
+  // No code spells the folder or the key's name anywhere else, so a second path can't creep in.
+  const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { cwd: REPO, encoding: "utf8" }).split("\n").filter((f) => /\.(mjs|js|sh)$|(^|\/)drive$/.test(f) && !f.includes("node_modules") && fs.existsSync(path.join(REPO, f)));
+  const allowed = new Set(["scripts/cabinet-card/picade-ssh.sh"]);
+  const spelled = [PICADE_DIR_UNDER_DATA, PICADE_DIR_UNDER_DATA.split("/").map((x) => `"${x}"`).join(", "), `${PICADE_DATA_ROOT}/picade`, PICADE_KEY_NAME];
+  const hits = [];
+  for (const f of files) {
+    if (allowed.has(f) || f.includes("/test/")) continue;
+    const text = fs.readFileSync(path.join(REPO, f), "utf8");
+    for (const word of spelled) if (text.includes(word)) hits.push(`${f}: ${word}`);
+  }
+  assert.deepEqual(hits, [], "use scripts/cabinet-card/picade-ssh.sh (shell) or picade.mjs (Node)");
+  for (const f of ["scripts/cabinet-card/connect-picade.sh", "scripts/cabinet-card/driver-keyboard.sh"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /picade-ssh\.sh/, f);
+  for (const f of ["scripts/cabinet-card/flash.mjs", "scripts/twin.mjs", "manager/cabinet.mjs"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /cabinet-card\/picade\.mjs|\.\/picade\.mjs/, f);
 });

@@ -1,5 +1,5 @@
 [Unit]
-Description=Arcade driver keyboard (uinput; the virtual cabinet, and the Picade only if asked: D144, D258)
+Description=Arcade driver keyboard (uinput; always on the virtual cabinet, D144; on the Picade only when switched on, D287)
 After=systemd-modules-load.service
 Before=arcade-kiosk.service
 

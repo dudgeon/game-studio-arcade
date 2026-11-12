@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-// The digital twin (D290-D297): the virtual cabinet mirrors the real one, from the Mac mini.
+// The digital twin (D290-D299): the virtual cabinet mirrors the real one, from the Mac mini.
 //
-//   node scripts/twin.mjs status --real HOST       what differs: release, shelf, files (reads both, writes nothing)
-//   node scripts/twin.mjs sync --real HOST         pull the real cabinet's data into the twin, append-only
-//   node scripts/twin.mjs seed --real HOST --yes   once, at bring-up: the real cabinet starts as a copy of the twin
-//     --set-aside-real                             ...after moving aside what bring-up checks left on it (D298)
+//   node scripts/twin.mjs status        what differs: release, shelf, files (reads both, writes nothing)
+//   node scripts/twin.mjs sync          pull the Picade's data into the twin, append-only
+//   node scripts/twin.mjs seed --yes    once, at bring-up: the Picade starts as a copy of the twin
+//     --set-aside-real                  ...after moving aside what bring-up checks left on it (D298)
 //
+//   The real cabinet is the Picade: arcade.local, with the key the card script made in
+//   the folder scripts/cabinet-card/picade-ssh.sh names (GSA_CABINET_DIR moves it), as connect-picade.sh reaches it.
+//   --real HOST                another name for the Picade, if arcade.local doesn't resolve
 //   --twin HOST                the twin (default: the virtual cabinet, found as cabinet/vm/drive finds it)
 //   --real-dir D --twin-dir D  two data folders on this machine instead (tests, rehearsals)
 //   --json                     print the result as JSON
@@ -20,10 +23,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as helper from "../cabinet/twin/helper.mjs";
+import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./cabinet-card/picade.mjs";
 import { applyInput, drift, inSync, shelfDrift } from "../cabinet/twin/plan.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DRIVE = path.join(REPO, "cabinet/vm/drive");
+/** TWIN_DRIVE: a stand-in for drive, in tests only. */
+const DRIVE = process.env.TWIN_DRIVE ?? path.join(REPO, "cabinet/vm/drive");
 const HELPER_SRC = fs.readFileSync(path.join(REPO, "cabinet/twin/helper.mjs"), "utf8");
 const CABINET_DATA = "/var/lib/arcade";
 /** Bytes read from the source per round trip. */
@@ -59,24 +64,35 @@ export function bootEnd(dir) {
   };
 }
 
-/** The Picade's SSH key, where flash.mjs makes it and the Manager reads it (D254, D286). */
-export const PICADE_SSH = { ARCADE_SSH_DIR: path.join(process.env.GSA_PICADE_DIR || path.join(process.env.HOME ?? "", "game-studio-data/picade"), "ssh"), ARCADE_SSH_KEY_NAME: "arcade_ed25519" };
+/** The Picade's SSH, as connect-picade.sh reaches it: the key flash.mjs made when the card was written (D251). */
+export const PICADE = {
+  host: PICADE_HOST,
+  dir: picadeDir(),
+  keyName: PICADE_KEY_NAME,
+};
+
+/** Drive's own settings, so one cabinet's never leak into the other's call. */
+const DRIVE_ENV = ["ARCADE_HOST", "ARCADE_SSH_DIR", "ARCADE_SSH_KEY_NAME", "GSA_VM_DIR"];
 
 /**
  * @param {string | undefined} host undefined: the virtual cabinet, found as cabinet/vm/drive finds it
- * @param {Record<string, string>} [ssh] the driver's SSH key settings for this cabinet (the real one's: PICADE_SSH)
+ * @param {Record<string, string>} [env] drive's settings for this cabinet; none means the virtual cabinet's defaults
+ * @param {string} [label]
  * @returns {End}
  */
-export function cabinetEnd(host, ssh = {}) {
+export function cabinetEnd(host, env, label) {
   const code = Buffer.from(HELPER_SRC).toString("base64");
-  const name = host ?? "the virtual cabinet";
+  const name = label ?? host ?? "the virtual cabinet";
+  const base = { ...process.env };
+  // The twin keeps any GSA_VM_DIR the shell set (that's where the virtual cabinet lives); the Picade sets its own.
+  for (const k of DRIVE_ENV) if (env || k !== "GSA_VM_DIR") delete base[k];
   return {
     name,
     call(cmd, input) {
       const r = spawnSync(DRIVE, ["ssh", `sudo -u arcade /usr/local/bin/node -e '${BOOT}'`], {
         input: JSON.stringify({ code, cmd, root: CABINET_DATA, input }),
         encoding: "utf8",
-        env: { ...process.env, ...(host ? { ARCADE_HOST: host } : {}), ...ssh, ARCADE_SSH_TIMEOUT_S: "300" },
+        env: { ...base, ...(env ?? {}), ...(host ? { ARCADE_HOST: host } : {}), ARCADE_SSH_TIMEOUT_S: "300" },
         maxBuffer: 2 ** 30,
       });
       if (r.status === 255) throw new Error(`can't reach ${name} over SSH. Is it up?`);
@@ -91,6 +107,18 @@ export function cabinetEnd(host, ssh = {}) {
       return out.ok;
     },
   };
+}
+
+/**
+ * The Picade, by its own key. Stops early, the way connect-picade.sh does, if the card hasn't been written yet.
+ * @param {string} [host] another name for it, if arcade.local doesn't resolve
+ * @returns {End}
+ */
+export function picadeEnd(host = PICADE.host, dir = PICADE.dir) {
+  const ssh = path.join(dir, "ssh");
+  if (!fs.existsSync(path.join(ssh, PICADE.keyName))) throw new Error(`no SSH key for the Picade at ${ssh}. It's made when the card is written (scripts/cabinet-card/flash.mjs).`);
+  // GSA_VM_DIR as connect-picade.sh sets it, so drive never takes the virtual cabinet's address from its host file.
+  return cabinetEnd(host, { ARCADE_SSH_DIR: ssh, ARCADE_SSH_KEY_NAME: PICADE.keyName, GSA_VM_DIR: dir }, `the Picade (${host})`);
 }
 
 /** Reads what a drift needs from the source, in batches. A grown log that wasn't grown after all becomes changed. */
@@ -192,6 +220,7 @@ export function seed(real, twin, now = new Date(), o = {}) {
       from: "the virtual cabinet",
       twin_release: ti.release,
       note: "Everything listed here was made before the real cabinet existed: test data (Tester and grown-ups), not the kids' (D295).",
+      sessions_note: "These session ids are in the virtual cabinet's workspace (cabinet-virtual). They are records only: nothing on the Picade resumes or fetches them, and a make in flight never seeds (D299).",
       carts: ids(/^carts\/([^/.][^/]*)\/cart\.json$/),
       sessions: ids(/^sessions\/([^/]+)\//),
       makers,
@@ -246,9 +275,9 @@ async function main() {
     },
   });
   const cmd = positionals[0];
-  if (!["status", "sync", "seed"].includes(cmd ?? "")) throw new Error("usage: node scripts/twin.mjs status|sync|seed --real HOST [--twin HOST] [--yes]");
-  if (!values.real && !values["real-dir"]) throw new Error("which real cabinet? --real HOST (the Picade, once it's on the network), or --real-dir D");
-  const real = values["real-dir"] ? folderEnd(values["real-dir"]) : cabinetEnd(/** @type {string} */ (values.real), PICADE_SSH);
+  if (!["status", "sync", "seed"].includes(cmd ?? "")) throw new Error("usage: node scripts/twin.mjs status|sync|seed [--yes] [--real HOST] [--twin HOST]");
+  // The Picade by default, by its own key (D299); --real only renames it.
+  const real = values["real-dir"] ? folderEnd(values["real-dir"]) : picadeEnd(values.real);
   const twin = values["twin-dir"] ? folderEnd(values["twin-dir"]) : cabinetEnd(values.twin);
   if (real.name === twin.name) throw new Error("the real cabinet and the twin are the same place");
   const print = (/** @type {any} */ x, /** @type {string} */ text) => console.log(values.json ? JSON.stringify(x, null, 2) : text);
@@ -263,7 +292,7 @@ async function main() {
   } else {
     if (!values.yes) throw new Error(`seed writes the twin's games, makers, ledger and logs onto ${real.name}, once. Add --yes to go ahead.`);
     const r = seed(real, twin, new Date(), { setAsideReal: values["set-aside-real"] });
-    print(r, `Seeded ${real.name} from ${twin.name}: ${r.copied} files. From now on: node scripts/twin.mjs sync --real ${real.name}`);
+    print(r, `Seeded ${real.name} from ${twin.name}: ${r.copied} files. From now on: node scripts/twin.mjs sync`);
   }
 }
 

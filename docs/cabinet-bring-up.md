@@ -20,8 +20,8 @@ For when the cabinet is built (Part A). Details for each step are in the parts b
 3. **Wait for the shelf** (about 10–20 minutes, not yet timed on the Pi). The screen shows "Setting up the arcade" with each step, restarts once by itself, then shows the shelf. Make will say it needs a connection: that's right for now. (Part C)
 4. **Console:** make the `cabinet-picade` workspace, its spend limit, and a key scoped to it. (D1)
 5. **Terminal:** `scripts/cabinet-card/connect-picade.sh`, paste the key, check the workspace, answer `y`. (D2)
-6. **Claude, with your yes:** `node scripts/twin.mjs seed --real arcade.local --yes` copies the virtual cabinet's games and history onto the Picade. (E1)
-7. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2)
+6. **Claude, with your yes:** `node scripts/twin.mjs seed --yes` copies the virtual cabinet's games and history onto the Picade (add `--set-aside-real` if the checks left log lines on it). It reaches the Picade with the SSH key step 1 made, in `~/game-studio-data/cabinets/arcade/ssh/`. (E1)
+7. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2) The Manager only watches the Picade: its driver keyboard stays off unless you switch it on with `scripts/cabinet-card/driver-keyboard.sh on` (D287).
 
 ---
 
@@ -158,9 +158,9 @@ scripts/cabinet-card/connect-picade.sh
 
 **E1. Copy the twin's data** (D290-D298)
 - The real cabinet starts as a copy of the virtual cabinet's games, logs and makers (Geoff, 2026-11-11). After D2, before E2. Nothing on either cabinet is deleted (D5); keys and config never move.
-- **Do** (Claude, with your yes): `node scripts/twin.mjs status --real arcade.local`, then `node scripts/twin.mjs seed --real arcade.local --yes`. If the checks above left log lines on the Picade, the seed lists them and stops; `--set-aside-real` moves them aside on the Picade first (kept).
+- **Do** (Claude, with your yes): `node scripts/twin.mjs status`, then `node scripts/twin.mjs seed --yes`. If the checks above left log lines on the Picade, the seed lists them and stops; `--set-aside-real` moves them aside on the Picade first (kept).
 - **Look for:** the virtual cabinet's games on the Picade's shelf (Tester's included; `twin-seed.json` lists them as test data), and `status` saying "In sync".
-- **If not:** tell Claude. From then on the twin follows the Picade: `node scripts/twin.mjs sync --real arcade.local`.
+- **If not:** tell Claude. From then on the twin follows the Picade: `node scripts/twin.mjs sync`.
 
 **E2. First make on the cabinet** 🔧
 - With a kid, from the shelf: Make → answer with the stick and buttons → a game lands on the shelf → play it.

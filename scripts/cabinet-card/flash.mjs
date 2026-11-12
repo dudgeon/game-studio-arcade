@@ -9,7 +9,6 @@
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
-// --driver-keys puts the Manager's driver keyboard on the Picade (D258; off unless Geoff says yes),
 // --no-speech-on-card leaves speech's wheels and model for first boot to download (D257),
 // --wpa3 for a WPA3-only network: its passphrase goes on the card instead of the WPA key (still erased at first boot).
 //
@@ -31,15 +30,16 @@ import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { makeBundle, makeProvisionTar } from "../virtual-cabinet/lib.mjs";
+import { PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../..");
 const VM_ROOT = process.env.GSA_VM_DIR || join(homedir(), "game-studio-data/vm");
 const DL = join(VM_ROOT, "dl"); // the virtual cabinet's downloads: the same pinned files, checked by hash
-const CABINET_DIR = process.env.GSA_CABINET_DIR || join(homedir(), "game-studio-data/picade");
+const CABINET_DIR = picadeDir();
 const SSH_DIR = join(CABINET_DIR, "ssh");
-const KEY_NAME = "arcade_ed25519";
+const KEY_NAME = PICADE_KEY_NAME;
 const BLOCK = 4 * 2 ** 20;
 
 const args = process.argv.slice(2);
@@ -176,7 +176,6 @@ function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit }) {
   writeFileSync(join(dir, "profile"), `${PROFILE}\n`);
   writeFileSync(join(dir, "hostname"), `${hostname}\n`);
   writeFileSync(join(dir, "authorized_keys"), `${authorizedKey}\n`);
-  if (flag("--driver-keys")) writeFileSync(join(dir, "driver-keys"), "Geoff's yes to the Manager's driver keyboard on this cabinet (D258)\n");
   for (const f of [...SEED_FILES, lock.node.name]) if (!existsSync(join(dir, f))) stop(`the seed is missing ${f}`);
 }
 

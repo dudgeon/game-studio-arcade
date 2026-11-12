@@ -237,6 +237,19 @@ test("a make is charged its real cost at the end: the session's list cost, in ce
   assert.equal(readLog(path.join(paths.logs, "studio_session.jsonl"))[0].id, "sesn_replay");
 });
 
+test("every finished session is archived at Anthropic, a game on the shelf too, and the archive logged (D301)", async () => {
+  const made = replayApi({ dir: MAKE, usage: usageOf(MAKE) });
+  const { studio, runThrough, paths } = studioWith({ api: made.api });
+  studio.start({ maker: "alina", request: "a penguin game" });
+  const r = await runThrough();
+  assert.equal(r.ok, true);
+  for (let i = 0; i < 100 && !made.mock.calls.includes("archiveSession"); i++) await new Promise((res) => setTimeout(res, 10));
+  assert.ok(made.mock.calls.includes("archiveSession"), "archived, never deleted");
+  const c = readLog(path.join(paths.logs, "studio_session_correction.jsonl")).at(-1);
+  assert.equal(c?.corrects, "sesn_replay");
+  assert.equal(c?.archive?.ok, true);
+});
+
 test("the coins used so far count up during the build, from the session's usage (M10)", async () => {
   const { studio, until, runThrough } = studioWith();
   /** @type {number[]} */

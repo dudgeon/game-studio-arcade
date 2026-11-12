@@ -28,8 +28,11 @@ export const SPEECH_FILE = "/opt/arcade/speech/speech.json";
  * @typedef {object} Engine
  * @property {string} name
  * @property {(pcm: Buffer) => Promise<string>} transcribe
+ * @property {() => void} [warm]   get ready for a clip soon: called when a button goes down
  * @property {() => void} [close]
  */
+/** Idle longer than this and Moonshine is warmed again when a hold starts. */
+export const WARM_AFTER_MS = 30_000;
 
 /**
  * The cabinet's first capture device, as ALSA lists it, or null. A USB mic on the Pi and the virtio
@@ -177,16 +180,18 @@ export function moonshineEngine(o) {
   };
   launch();
 
-  /** @param {Buffer} pcm */
+  let lastUsed = 0;
+  /** @param {Buffer | null} pcm  null: warm up */
   const once = async (pcm) => {
     if (!child && !closed) launch();
     if (!(await ready)) throw new Error("Moonshine isn't running");
     const c = /** @type {import("node:child_process").ChildProcess} */ (child);
     const answer = new Promise((resolve) => waiting.push(resolve));
     const head = Buffer.alloc(4);
-    head.writeUInt32LE(pcm.length);
+    head.writeUInt32LE(pcm ? pcm.length : 0xffffffff);
     c.stdin?.write(head);
-    if (pcm.length) c.stdin?.write(pcm);
+    if (pcm?.length) c.stdin?.write(pcm);
+    lastUsed = Date.now();
     /** @type {any} */
     const msg = await answer;
     if (msg.error) throw new Error(`Moonshine: ${msg.error}`);
@@ -206,6 +211,16 @@ export function moonshineEngine(o) {
         () => {},
       );
       return r;
+    },
+    warm() {
+      // Idle a while: the model may have gone cold. Warm it while the kid is still talking.
+      if (Date.now() - lastUsed < WARM_AFTER_MS) return;
+      lastUsed = Date.now();
+      const r = queue.then(() => once(null));
+      queue = r.then(
+        () => {},
+        () => {},
+      );
     },
     close() {
       closed = true;
@@ -319,6 +334,7 @@ export function liveSpeech(o) {
       if (open) return;
       open = true;
       startedAt = now();
+      if (!fedText.length) for (const e of o.engines) e.warm?.();
       if (!fed.length && !fedText.length) o.recorder.start();
     },
     async stop() {

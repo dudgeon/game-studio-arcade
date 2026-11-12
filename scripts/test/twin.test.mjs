@@ -110,6 +110,16 @@ test("seed: refuses replay data and a make in flight (D150, D155)", () => {
   const busy = virtualCabinet();
   put(busy, "studio-run.json", "{}");
   assert.throws(() => seed(folderEnd(tmp()), folderEnd(busy)), /make is running/);
+  // A make a restart left to collect: its session is in the twin's workspace only (D299). Collected, it's [].
+  const left = virtualCabinet();
+  put(left, "studio-left.json", JSON.stringify([{ session_id: "sesn_x" }]));
+  assert.throws(() => seed(folderEnd(tmp()), folderEnd(left)), /make is running/);
+  put(left, "studio-left.json", "[]");
+  const real = tmp();
+  seed(folderEnd(real), folderEnd(left));
+  // What D255 says mustn't move as it is never does: kit uploads, a make's own state.
+  for (const f of ["kit-uploads.json", "studio-left.json", "cabinet-state.json"]) assert.ok(!has(real, f), f);
+  assert.match(get(real, "twin-seed.json"), /cabinet-virtual/);
 });
 
 test("sync: the real cabinet's new games, versions, sessions and log lines reach the twin, append-only", () => {
@@ -229,7 +239,29 @@ test("the command: status, sync and seed on two folders", () => {
   const sy = run(["sync", "--real-dir", real, "--twin-dir", twin]);
   assert.match(sy.stdout, /1 new/);
   assert.match(sy.stdout, /In sync\./);
-  assert.match(run(["status"]).stderr, /which real cabinet/);
+  // With no --real-dir it's the Picade, by its own key; before the card is written there's none.
+  const noCard = spawnSync(process.execPath, [TWIN, "status"], { encoding: "utf8", env: { ...process.env, GSA_CABINET_DIR: tmp() } });
+  assert.equal(noCard.status, 1);
+  assert.match(noCard.stderr, /no SSH key for the Picade at .*\/ssh\. It's made when the card is written/);
+});
+
+test("the Picade is reached by its own key and host, and the twin never by the Picade's (D299)", () => {
+  const dir = tmp();
+  put(dir, "ssh/arcade_ed25519", "not a real key\n");
+  // A stand-in for drive that answers with the settings it was given.
+  const fake = path.join(tmp(), "drive");
+  fs.writeFileSync(fake, `#!${process.execPath}\nconst e=process.env;process.stdin.resume();process.stdin.on("end",()=>console.log(JSON.stringify({ok:{host:e.ARCADE_HOST??null,dir:e.ARCADE_SSH_DIR??null,key:e.ARCADE_SSH_KEY_NAME??null,vm:e.GSA_VM_DIR??null,args:process.argv.slice(2)}})));\n`, { mode: 0o755 });
+  const out = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    const t = await import(${JSON.stringify(TWIN)});
+    const p = t.picadeEnd(undefined, ${JSON.stringify(dir)}).call("info");
+    const v = t.cabinetEnd(undefined).call("info");
+    console.log(JSON.stringify({ p, v }));`], { encoding: "utf8", env: { ...process.env, TWIN_DRIVE: fake, ARCADE_SSH_DIR: "/leak", ARCADE_SSH_KEY_NAME: "leak", ARCADE_HOST: "leak.local" } });
+  assert.equal(out.status, 0, out.stderr);
+  const { p, v } = JSON.parse(out.stdout.trim().split("\n").at(-1));
+  assert.deepEqual([p.host, p.dir, p.key, p.vm], ["arcade.local", path.join(dir, "ssh"), "arcade_ed25519", dir]);
+  assert.equal(p.args[0], "ssh");
+  assert.match(p.args[1], /^sudo -u arcade \/usr\/local\/bin\/node -e '/);
+  assert.deepEqual([v.host, v.dir, v.key], [null, null, null], "the twin gets drive's own defaults");
 });
 
 test("sync: a real git cart library keeps every version on the twin, through new commits and a gc on the real cabinet", () => {

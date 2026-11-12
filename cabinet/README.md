@@ -72,12 +72,12 @@ node scripts/coin.mjs reset "Fresh start after the fix"
 The virtual cabinet is the Picade's digital twin (D290-D297): the Picade is the truth, and the mini pulls its games, versions, sessions, logs, ledger, makers and downloaded games into the twin. Keys and config never move.
 
 ```sh
-node scripts/twin.mjs seed --real PICADE_HOST --yes   # once, at bring-up: the Picade starts as a copy of the twin
-node scripts/twin.mjs status --real PICADE_HOST       # what differs: release, games, files (writes nothing)
-node scripts/twin.mjs sync --real PICADE_HOST         # pull into the twin; the twin's own changes are set aside, never deleted
+node scripts/twin.mjs seed --yes   # once, at bring-up: the Picade starts as a copy of the twin
+node scripts/twin.mjs status      # what differs: release, games, files (writes nothing)
+node scripts/twin.mjs sync        # pull into the twin; the twin's own changes are set aside, never deleted
 ```
 
-The real cabinet is only read, except by `seed`. Anything the twin made itself goes to `/var/lib/arcade/twin-sync/set-aside/<time>/` on the twin. `--real-dir` and `--twin-dir` work on two folders here instead.
+The real cabinet is the Picade, reached as `connect-picade.sh` reaches it: `arcade.local` with the key the card script made in `~/game-studio-data/cabinets/arcade/ssh/`, defined once in `scripts/cabinet-card/picade-ssh.sh` (D259, D299; `--real HOST` if that name does not resolve). It is only read, except by `seed`. Anything the twin made itself goes to `/var/lib/arcade/twin-sync/set-aside/<time>/` on the twin. `--real-dir` and `--twin-dir` work on two folders here instead.
 
 ## Bring up the virtual cabinet
 
