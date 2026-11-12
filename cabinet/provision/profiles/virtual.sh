@@ -14,6 +14,7 @@ hw_early() {
 hw_late() {
   step_journal
   step_mini_link
+  step_no_acd
   step_firewall
   step_keys
   step_netwatch
@@ -62,6 +63,27 @@ step_mini_link() {
   mini_link_keyfile > "$f"
   chmod 0600 "$f"
   nmcli connection reload || true
+}
+
+# D245: no address-conflict detection here. Bridged on Wi-Fi, macOS's MAC NAT puts the mini's own MAC on ARP
+# for the cabinet's address, which is expected, not a conflict. On 2026-11-11 NetworkManager took one for a
+# conflict and the cabinet lost its subnet route. Only the virtual profile: on the Picade a conflict is real.
+nm_no_acd_conf() {
+  printf '[connection-arcade-no-acd]\nipv4.dad-timeout=0\n'
+}
+step_no_acd() {
+  local f=/etc/NetworkManager/conf.d/arcade-no-acd.conf dev changed=no
+  install -d /etc/NetworkManager/conf.d
+  if [ "$(cat "$f" 2>/dev/null)" != "$(nm_no_acd_conf)" ]; then nm_no_acd_conf > "$f"; changed=yes; fi
+  nmcli general reload conf || true
+  # The bridged card takes the new default, and a subnet route lost to a past false conflict comes back,
+  # with a reapply, which keeps the lease. Otherwise both happen at the next boot.
+  dev="$(ip -4 route show default | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')"
+  [ -n "$dev" ] || return 0
+  if [ "$changed" = yes ] || ! ip -4 route show table main | grep -q " dev $dev proto kernel scope link"; then
+    log "reapplying $dev (no address-conflict detection; subnet route)"
+    nmcli device reapply "$dev" || log "reapply didn't take: it applies at the next boot"
+  fi
 }
 
 # D242: the cabinet's own record of its network paths.
