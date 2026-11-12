@@ -203,6 +203,12 @@ process.stdin.on("data", (d) => {
   buf = Buffer.concat([buf, d]);
   while (buf.length >= 4) {
     const n = buf.readUInt32LE(0);
+    if (n === 0xffffffff) {
+      buf = buf.subarray(4);
+      require("fs").appendFileSync(${JSON.stringify(path.join(dir, "warmed"))}, "w");
+      console.log(JSON.stringify({ text: "", ms: 1, warm: true }));
+      continue;
+    }
     if (buf.length < 4 + n) return;
     buf = buf.subarray(4 + n);
     console.log(JSON.stringify(n === 0 ? { text: "", ms: 0 } : { text: "bytes " + n, ms: 1 }));
@@ -223,6 +229,18 @@ test("Moonshine's helper: loaded once, clips answered in order", async () => {
   assert.equal(a, "bytes 6400");
   assert.equal(b, "bytes 32000");
   assert.match(logged.join("\n"), /ready in 5 ms/);
+  m.close?.();
+});
+
+test("Moonshine is warmed when a hold starts after a quiet spell, and the clip's answer is still its own", async () => {
+  const dir = tmp();
+  const m = moonshineEngine({ python: process.execPath, helper: fakeHelper(dir), modelDir: "/m", arch: "medium-streaming" });
+  const s = liveSpeech({ recorder: fakeRecorder(Buffer.alloc(16000)), engines: [m] });
+  s.start(); // idle since it began: warms
+  assert.equal((await s.stop()).text, "bytes 16000");
+  s.start(); // just used: no warm-up, and the answer still lines up
+  assert.equal((await s.stop()).text, "bytes 16000");
+  assert.equal(fs.readFileSync(path.join(dir, "warmed"), "utf8"), "w", "warmed once");
   m.close?.();
 });
 

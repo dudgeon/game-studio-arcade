@@ -11,9 +11,13 @@ Protocol:
   stdin, per clip    4-byte little-endian length N, then N bytes of 16 kHz mono signed 16-bit PCM
   stdout, per clip   {"text": "...", "ms": N}  or  {"error": "..."}
 A length of 0 is a clip of silence and answers {"text": "", "ms": 0}.
+A length of 0xFFFFFFFF (no bytes follow) is "warm up": the helper transcribes its own sample of speech and
+answers {"text": "", "ms": N, "warm": true}. The service asks while a kid is still holding the button, so a
+helper gone cold while idle is warm again by the time they let go.
 """
 
 import json
+import os
 import struct
 import sys
 import time
@@ -36,6 +40,23 @@ def read_exact(stream, n):
     return bytes(buf)
 
 
+WARM = 0xFFFFFFFF
+
+
+def warm_sample():
+    """Two seconds of real speech from the package's own test audio, else silence."""
+    try:
+        import moonshine_voice
+        from moonshine_voice.utils import load_wav_file
+
+        audio, rate = load_wav_file(os.path.join(os.path.dirname(moonshine_voice.__file__), "assets", "beckett.wav"))
+        if rate == 16000 and len(audio) >= 32000:
+            return audio[:32000]
+    except Exception:  # noqa: BLE001 - silence still warms the encoder
+        pass
+    return [0.0] * 32000
+
+
 def main():
     if len(sys.argv) != 3:
         say({"error": "usage: moonshine_helper.py MODEL_DIR ARCH"})
@@ -47,8 +68,9 @@ def main():
         from moonshine_voice.transcriber import Transcriber
 
         transcriber = Transcriber(model_dir, string_to_model_arch(arch_name))
-        # Warm it up, so the first kid doesn't wait for the first-call cost.
-        transcriber.transcribe_without_streaming([0.0] * 16000, 16000)
+        # Warm it up on speech, so the first kid doesn't wait for the first-call cost.
+        sample = warm_sample()
+        transcriber.transcribe_without_streaming(sample, 16000)
     except Exception as e:  # noqa: BLE001 - any failure here means no Moonshine
         say({"error": f"couldn't load Moonshine: {type(e).__name__}: {e}"})
         sys.exit(1)
@@ -60,6 +82,14 @@ def main():
         if head is None:
             return
         (n,) = struct.unpack("<I", head)
+        if n == WARM:
+            t = time.monotonic()
+            try:
+                transcriber.transcribe_without_streaming(sample, 16000)
+            except Exception:  # noqa: BLE001
+                pass
+            say({"text": "", "ms": round((time.monotonic() - t) * 1000), "warm": True})
+            continue
         pcm = read_exact(stdin, n) if n else b""
         if pcm is None:
             return

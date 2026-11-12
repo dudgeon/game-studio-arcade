@@ -52,7 +52,11 @@ The Picade needs nothing more: plug a USB mic into the Pi.
 | Where | Model | Clips | WER | Latency median / p90 / max |
 |---|---|---|---|---|
 | Mac mini (M-series), Python 3.12 | medium-streaming | 48 TTS (4 voices) | 23.1% (Samantha 0%, Daniel 5.4%, Flo 22.6%, Junior 64.5%) | 148 / 199 / 306 ms |
+| **Virtual cabinet** (4 vCPU), Python 3.13, 2026-11-12 | medium-streaming | same | 23.4% (Samantha 0%, Daniel 4.3%, Flo 22.6%, Junior 66.7%) | 260 / 349 / 450 ms |
+| Virtual cabinet, live holds through the launcher (fed clips) | medium-streaming | 3 holds | 1 word wrong in 27 ("ice" heard as "eyes"; Say it again fixed it) | 1874 ms (the first, after 4 min idle), then 541, 488 ms |
 | Mac mini | small-streaming | same | 30.4% | 93 ms median |
 | Mac mini | tiny-streaming | same | 38.7% | 39 ms median |
+
+The first live hold was slow because the helper had gone cold while idle. Since then, the service warms Moonshine when a button goes down after 30 s idle, using two seconds of the package's own speech sample, so the warm-up finishes while the kid is still talking (D262).
 
 Junior is a novelty robot voice and Flo a synthetic one, so the natural voices are the better guide for adults. Kids' voices are the real test: that's the bake-off with Geoff (§3.1). Their clips stay on the cabinet or the mini, are deleted after, and never enter the repo.
