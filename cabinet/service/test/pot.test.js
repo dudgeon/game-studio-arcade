@@ -309,6 +309,7 @@ test("someone else's change is their own version: a new line, version 1, the ori
   assert.equal(cart.parent, "penguin-catch@1");
   assert.equal(cart.family, "penguin-catch");
   assert.equal(cart.branch, undefined, "its own line starts with itself");
+  assert.equal(r.parent?.maker_name, "Alina", "R8 names whose game stays the same (D302)");
   assert.notEqual(r.cart_id, "penguin-catch");
   assert.equal(fs.readFileSync(path.join(parentDir, "spec.md"), "utf8"), before);
 });

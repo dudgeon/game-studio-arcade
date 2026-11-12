@@ -368,7 +368,8 @@ export function createStudio(o) {
     maker: current.maker,
     maker_name: current.makerName,
     kind: current.kind ?? "new",
-    ...(current.parent ? { parent: { id: current.parent.id, title: current.parent.title, version: current.parent.version, maker: current.parent.maker } } : {}),
+    // The parent's maker by name, for R8's "Tester's game stays the same." (D302).
+    ...(current.parent ? { parent: { id: current.parent.id, title: current.parent.title, version: current.parent.version, maker: current.parent.maker, maker_name: current.parent.maker ? (o.nameOf?.(current.parent.maker) ?? current.parent.maker) : null } } : {}),
   });
 
   /**

@@ -1215,3 +1215,15 @@ The director's validation run on the virtual cabinet, as Tester, typed input: wa
 - **E5** (a restart while Claude was asking) keeps the idea the same way. Its cost isn't known until the session is collected, so its screen doesn't say it.
 
 **D301. Every finished session is archived at Anthropic, a game on the shelf too.** *(The director, 2026-11-11.)* Until now only released, collected and failed sessions were archived (D188, D191, D219). A make that ends normally is now archived too, and the archive is logged as a correction beside its record. Archiving keeps a session's history and stops nothing that's still needed (D5).
+
+**D302. The four live paths, run on the virtual cabinet (2026-11-11/12).** *(Claude, for the director's validation, D300+.)* All typed input, as Tester and Tester2. Cost: 3 + 8 + 13 + 31 = 55c. The cabinet ran the release before D300 and D301.
+1. **Walking away at a question** (`sesn_015q41kvq2xBdPu8ExbUqZXj`): at 9 minutes, "Still there? Move the stick! 31". At 10 minutes the make was released: charged 3c ("walked away"), archived, the request kept in the record. The screen's missing cost and idea led to D300.
+2. **"Stop making this game" at the plan** (`sesn_012FMPJEshtEr2XeR98QeWFP`). The stop isn't offered during a build, by design (D188). E8 said "It has used 1 coin so far." The stop went quietly to the shelf with Make free. Charged 8c ("stopped") and archived.
+3. **Someone else's own version** (`sesn_014bS1GVbeyX28Trw4aAx2fn`). Tester2, as Someone new, went through R1, M2 and R2 ("This is Tester's game. Your changes make a new game, just yours. Tester's stays the same."), then R3 to R8. "Snowball Drop" is a new line, v1, indented under Rock Rain (R9). Charged 13c, about usual against 2. It wasn't archived, because the cabinet's release predates D301.
+   - **Fixed:** R8 said "The old game stays the same." because the result entry didn't carry the parent's maker's name. It now says "Tester's game stays the same.", with tests.
+4. **The service restarted mid-build** (`systemctl restart arcade-launcher`, not the VM; `sesn_0128Bz363N9gDZpxkErAJ7Gw`).
+   - E6 showed "Your game may still finish: look for it on the shelf".
+   - The shelf said "Finishing the last game first" for about 3 minutes (D199).
+   - Then "New game ready!" appeared. M11 said "It finished while the cabinet was restarting.", with 3 coins (31c).
+   - The ledger has "restart, on the shelf". The record says `resumed_after_restart`, and the correction "collected after a service restart", archive ok. The journal has the cut-off, re-attach and collect lines (D191, D199).
+   - The run went to Tester2, not Tester: "Who's making?" lists the most recent maker first, and the drive script picked the top row.
