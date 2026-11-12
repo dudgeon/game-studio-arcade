@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cabinet Manager</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Cabinet Manager</h1>
+  <label class="pick">Cabinet <select id="cabinet"></select></label>
+  <nav>
+    <button data-view="screen" class="on">Screen</button>
+    <button data-view="activity">Activity</button>
+    <button data-view="coins">Coins</button>
+  </nav>
+</header>
+
+<main>
+  <section id="screen" class="view on">
+    <div class="screenwrap">
+      <div id="display" tabindex="0" aria-label="The cabinet's screen. Click here, then your keyboard drives the cabinet.">
+        <img id="shot" alt="The cabinet's screen" width="1024" height="768">
+        <div id="noshot">Waiting for the first picture…</div>
+      </div>
+      <p id="fresh" class="fresh">—</p>
+      <p id="focus" class="hint">Click the screen to send your keyboard to the cabinet: arrows, Z X C V for A B X Y, Enter for START, Escape for ESC, F1 to type, F2 for COIN. Other keys type.</p>
+    </div>
+    <div class="pad" id="pad">
+      <div class="stick">
+        <button data-c="up" class="up">▲</button>
+        <button data-c="left" class="left">◀</button>
+        <button data-c="right" class="right">▶</button>
+        <button data-c="down" class="down">▼</button>
+      </div>
+      <div class="face">
+        <button data-c="a">A<small>Z</small></button>
+        <button data-c="b">B<small>X</small></button>
+        <button data-c="x">X<small>C</small></button>
+        <button data-c="y">Y<small>V</small></button>
+      </div>
+      <div class="util">
+        <button data-c="start">START<small>Enter</small></button>
+        <button data-c="esc">ESC ★<small>Escape</small></button>
+        <button data-c="f1">F1<small>type / talk</small></button>
+        <button data-c="coin" class="coin">COIN<small>F2</small></button>
+      </div>
+      <p id="drivenote" class="hint"></p>
+    </div>
+  </section>
+
+  <section id="activity" class="view">
+    <div class="bar"><button id="reload">Refresh</button><span id="actnote" class="hint"></span></div>
+    <div id="now"></div>
+    <h2>Makes and changes</h2>
+    <div id="makes"></div>
+    <h2>Screened requests</h2>
+    <div id="screened"></div>
+    <h2>Plays</h2>
+    <table id="plays"></table>
+  </section>
+
+  <section id="coins" class="view">
+    <div id="pot"></div>
+    <form id="topup" class="card">
+      <h2>Add coins</h2>
+      <label>Coins <input name="coins" type="number" min="1" max="1000" value="20" required></label>
+      <label>Reason the kids see <input name="reason" required placeholder="Birthday bonus"></label>
+      <button>Add</button>
+      <p id="warn" class="warn" hidden></p>
+    </form>
+    <form id="reset" class="card">
+      <h2>Reset to 100</h2>
+      <label>Reason the kids see <input name="reason" required placeholder="Fresh start"></label>
+      <button>Reset</button>
+    </form>
+    <div id="pair" class="card" hidden>
+      <p>This Manager has no token for this cabinet yet. Pairing makes one on the cabinet (if it has none) and keeps a copy on the mini.</p>
+      <button id="pairbtn">Pair</button>
+    </div>
+    <p id="coinmsg" class="hint"></p>
+    <h2>Coin history</h2>
+    <table id="ledger"></table>
+  </section>
+</main>
+</body>
+</html>

@@ -10,6 +10,7 @@ import { LONG } from "../test-support/stress.js";
 import { bootBoard, cardView, coinsWord, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
+import { redirectBoard } from "../launcher/redirect.js";
 
 const STRINGS = Object.entries(LONG);
 
@@ -129,6 +130,8 @@ function boardsWith(s) {
     "gone, walked away, with the cost and a retry": goneView({ kind: "timed_out", message: s, cost_cents: 999, retry: { maker: "m", request: s, kind: "change" } }, { new: 6, change: 2 }),
     "E5 with a retry": goneView({ kind: "restarted", message: s, retry: { maker: "m", request: s, kind: "new" } }, { new: 6, change: 2 }),
     "E6": goneView({ kind: "restarted", message: "Your game may still finish: look for it on the shelf." }, { new: 6, change: 2 }),
+    "E10": redirectBoard({ say: "Let's make it a little different. How about this?", alternative: s.slice(0, 160) }),
+    "E10 for an answer": redirectBoard({ alternative: s.slice(0, 160), answer: true }),
   };
 }
 

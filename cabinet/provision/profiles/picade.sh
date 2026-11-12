@@ -1,16 +1,39 @@
 # Hardware layer for the real cabinet (D82, D83, D122). Sourced by provision.sh.
-# Not run yet: the Picade hasn't arrived. Check all of it on arrival (V3).
+# Reviewed line by line against Pimoroni's picade-hat repo at the pinned commit and its setup guide (D253).
+# Not run yet: the Picade hasn't arrived. docs/cabinet-bring-up.md lists what only the hardware can prove.
 HOSTNAME_WANTED=arcade
 CONFIG_TXT=/boot/firmware/config.txt
+UDEV_RULES=/etc/udev/rules.d/10-picade.rules
+ASOUND_CONF=/etc/asound.conf
+# config.txt is read at boot, so a change to it wants a restart. firstboot.sh does that one restart (D250);
+# an update leaves it to a person, and says so.
+REBOOT_FLAG="${REBOOT_FLAG:-/run/arcade-reboot-wanted}"
 
-hw_early() { :; }
+hw_early() {
+  wait_for_clock
+}
 
 hw_late() {
   step_overlay
   step_config_txt
+  step_input_rule
+  step_sound
+}
+
+# The Pi has no battery clock. Until NTP answers, the clock says the image's date, and apt refuses
+# Release files "not valid yet". Wait up to 5 minutes for a sync, then carry on and let apt say why.
+wait_for_clock() {
+  local i
+  for i in $(seq 1 60); do
+    [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = yes ] && { log "clock synced"; return 0; }
+    [ "$i" = 1 ] && log "waiting for the clock to sync"
+    sleep 5
+  done
+  log "the clock still isn't synced; carrying on"
 }
 
 # D83: build the overlay at a pinned commit, not with the curl | bash installer.
+# Pimoroni's Makefile does the same dtc call, and installs to /boot/firmware/overlays as here.
 step_overlay() {
   local commit build
   commit="$(sed -n 's/.*"picade_hat_commit": *"\([^"]*\)".*/\1/p' "$SELF_DIR/lock.json")"
@@ -29,12 +52,10 @@ step_overlay() {
 }
 
 # D82's key map and D83's power and audio lines, in one block we own.
-step_config_txt() {
-  local begin='# BEGIN arcade provision' end='# END arcade provision'
-  sed -i "/^$begin\$/,/^$end\$/d" "$CONFIG_TXT"
-  sed -i -E 's/^dtoverlay=vc4-kms-v3d$/dtoverlay=vc4-kms-v3d,noaudio/; s/^dtparam=audio=on$/dtparam=audio=off/' "$CONFIG_TXT"
-  cat >> "$CONFIG_TXT" <<CONF
-$begin
+config_block() {
+  cat <<'CONF'
+# BEGIN arcade provision
+[all]
 usb_max_current_enable=1
 dtparam=audio=off
 dtoverlay=picade
@@ -48,13 +69,87 @@ dtparam=start=28
 dtparam=escape=1
 dtparam=enter=59
 dtparam=coin=60
-$end
+# END arcade provision
 CONF
 }
 
-# The Picade needs its key file: with none, the service says so and stays down (D185).
+# Pass the file, so a test can run this on a copy of the image's own config.txt.
+step_config_txt() {
+  local file="${1:-$CONFIG_TXT}" before
+  before="$(cat "$file")"
+  sed -i '/^# BEGIN arcade provision$/,/^# END arcade provision$/d' "$file"
+  sed -i -E 's/^dtoverlay=vc4-kms-v3d$/dtoverlay=vc4-kms-v3d,noaudio/; s/^dtparam=audio=on$/dtparam=audio=off/' "$file"
+  config_block >> "$file"
+  if [ "$(cat "$file")" != "$before" ]; then
+    log "config.txt changed: the Picade's driver and screen power start at the next boot"
+    touch "$REBOOT_FLAG"
+  fi
+}
+
+# Pimoroni's installer adds this rule: it tells udev, and so libinput and the kiosk, that the
+# overlay's gpio_keys device is a keyboard.
+step_input_rule() {
+  printf 'SUBSYSTEM=="input", ATTRS{name}=="gpio_keys", ENV{ID_INPUT_KEYBOARD}="1"\n' > "$UDEV_RULES"
+  udevadm control --reload 2>/dev/null || true
+}
+
+# Sound goes to the X HAT's DAC by its card name, not "card 0" as in Pimoroni's file: the USB mic is
+# a sound card too, and could come up first. dmix lets two sounds play at once; softvol gives a
+# "PCM" volume control, which the DAC lacks. The mic's side is set when the mic is picked (D89).
+asound_conf() {
+  cat <<'ALSA'
+# Written by the arcade provisioning script (D253). The X HAT's DAC is card "sndrpihifiberry".
+pcm.hat {
+  type hw
+  card sndrpihifiberry
+  device 0
+}
+pcm.dmixer {
+  type dmix
+  ipc_key 1024
+  ipc_perm 0666
+  slave.pcm "hat"
+  slave {
+    period_time 0
+    period_size 1024
+    buffer_size 8192
+    rate 44100
+  }
+  bindings {
+    0 0
+    1 1
+  }
+}
+ctl.dmixer {
+  type hw
+  card sndrpihifiberry
+}
+pcm.softvol {
+  type softvol
+  slave.pcm "dmixer"
+  control {
+    name "PCM"
+    card sndrpihifiberry
+  }
+}
+pcm.!default {
+  type plug
+  slave.pcm "softvol"
+}
+ctl.!default {
+  type hw
+  card sndrpihifiberry
+}
+ALSA
+}
+step_sound() {
+  asound_conf > "$ASOUND_CONF"
+  chmod 0644 "$ASOUND_CONF"
+}
+
+# Until connect-cabinet.sh gives it a key, the Picade plays offline: the shelf works, and Make waits (D252).
 service_args_without_key() {
-  echo "--config /etc/arcade/service.json"
+  echo "--offline"
 }
 
 kiosk_env() {

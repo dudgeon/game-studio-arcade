@@ -1,14 +1,13 @@
 #!/bin/bash
-# The virtual cabinet's own record of its network paths (D242), into the journal, which is kept on disk here.
+# The virtual cabinet's own record of its network paths (D242, D245), into the journal, which is kept on disk here.
 # Every round, for each interface with an IPv4 address:
 #   router  ping to the default gateway, on the interface that has it
-#   mini    an ARP probe to the first of the mini's addresses that's on that interface's link
+#   subnet  whether the interface's own subnet route is there (D245: a lost one sends the LAN via the router)
+#   mini    an ARP probe to the first of the mini's addresses inside that interface's subnet
 # ARP isn't a connection, so the probe stays inside D124's rule (no new connections to the mini).
-# It prints a CHANGE line when any path changes and a COUNT line every COUNT_EVERY rounds.
-# On the bridged interface (the one with the default route) it also announces itself (gratuitous ARP)
-# every round, and when the mini's path there is down for a second round in a row it forgets the mini's
-# ARP entry and announces three more times. That's a nudge, logged as such, so the record shows whether
-# it helps. Plain bash 3 so it's tested on the mini as it runs here.
+# It only watches: no announcements (D245 found they may provoke a false address conflict).
+# It prints a CHANGE line when anything changes and a COUNT line every COUNT_EVERY rounds.
+# Plain bash 3, so it's tested on the mini as it runs here.
 set -u
 INTERVAL="${NETWATCH_INTERVAL:-15}"
 ROUNDS="${NETWATCH_ROUNDS:-0}"            # 0 runs for ever; tests set a count
@@ -23,19 +22,29 @@ mini_candidates() {
   { [ -r "$MINI_ADDRS" ] && grep -E '^[0-9]+(\.[0-9]+){3}$' "$MINI_ADDRS"; echo "$LINK_GATEWAY"; } | sort -u
 }
 
-# "dev ip" for each interface with a global IPv4 address.
-interfaces() { ip -o -4 addr show scope global | awk '{split($4, a, "/"); print $2, a[1]}'; }
+# "dev ip/prefix" for each interface with a global IPv4 address.
+interfaces() { ip -o -4 addr show scope global | awk '{print $2, $4}'; }
 
 # "dev gateway" of the default route.
 default_route() {
   ip -4 route show default | awk '{for (i = 1; i < NF; i++) { if ($i == "via") g = $(i + 1); if ($i == "dev") d = $(i + 1) } print d, g; exit}'
 }
 
-# Is ADDR on DEV's own link, with no gateway between?
-on_link() {
-  local r
-  r="$(ip -4 route get "$2" 2>/dev/null | head -1)"
-  case "$r" in *" via "*) return 1 ;; *" dev $1 "*) return 0 ;; *) return 1 ;; esac
+to_int() { local IFS=.; set -- $1; echo $(( ($1 << 24) + ($2 << 16) + ($3 << 8) + $4 )); }
+to_ip() { echo "$(( ($1 >> 24) & 255 )).$(( ($1 >> 16) & 255 )).$(( ($1 >> 8) & 255 )).$(( $1 & 255 ))"; }
+mask_of() { [ "$1" = 0 ] && echo 0 || echo $(( (0xffffffff << (32 - $1)) & 0xffffffff )); }
+
+# Is ADDR inside CIDR (a.b.c.d/n)? By the interface's own address, not the routes, which D245 saw go missing.
+in_subnet() {
+  local m; m="$(mask_of "${2#*/}")"
+  [ $(( $(to_int "$1") & m )) = $(( $(to_int "${2%/*}") & m )) ]
+}
+
+# The subnet's route, as "a.b.c.0/n dev DEV", is in the main table.
+has_subnet_route() {
+  local n m; m="$(mask_of "${2#*/}")"
+  n="$(to_ip $(( $(to_int "${2%/*}") & m )))/${2#*/}"
+  ip -4 route show table main | grep -q "^$n dev $1 "
 }
 
 # Counters live in plain variables named after the path: up_eth0_mini and so on.
@@ -51,27 +60,19 @@ while [ "$ROUNDS" = 0 ] || [ "$round" -lt "$ROUNDS" ]; do
   bdev=""; gw=""
   read -r bdev gw < <(default_route)
   now=""
-  while read -r dev addr; do
+  while read -r dev cidr; do
     [ -n "$dev" ] || continue
     if [ "$dev" = "$bdev" ]; then
-      arping -q -U -c 1 -I "$dev" "$addr" >/dev/null 2>&1 || true
       s=DOWN
       [ -n "$gw" ] && ping -n -q -c 1 -W 2 -I "$dev" "$gw" >/dev/null 2>&1 && s=up
       now="$now $dev.router=$s"
     fi
+    s=DOWN; has_subnet_route "$dev" "$cidr" && s=up
+    now="$now $dev.subnet=$s"
     for m in $(mini_candidates); do
-      on_link "$dev" "$m" || continue
-      key="$dev.mini"
-      if arping -q -c 1 -w 2 -I "$dev" "$m" >/dev/null 2>&1; then s=up; put down "$key" 0
-      else
-        s=DOWN; put down "$key" $(( $(get down "$key") + 1 ))
-        if [ "$dev" = "$bdev" ] && [ "$(get down "$key")" = 2 ]; then
-          ip neigh flush to "$m" dev "$dev" >/dev/null 2>&1 || true
-          for _ in 1 2 3; do arping -q -U -c 1 -I "$dev" "$addr" >/dev/null 2>&1 || true; done
-          say "NUDGE $dev: forgot $m's ARP entry and announced $addr three times"
-        fi
-      fi
-      now="$now $key=$s"
+      in_subnet "$m" "$cidr" || continue
+      s=DOWN; arping -q -c 1 -w 2 -I "$dev" "$m" >/dev/null 2>&1 && s=up
+      now="$now $dev.mini=$s"
       break
     done
   done < <(interfaces)

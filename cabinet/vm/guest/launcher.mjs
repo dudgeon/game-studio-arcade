@@ -4,6 +4,7 @@
 //   node launcher.mjs state                    screen, phase, sel, Studio phase, boxes, faults as JSON
 //   node launcher.mjs wait SCREEN [PHASE] [MS] wait for that screen (default 180 s); exit 1 if it never comes
 //   node launcher.mjs say [ID]                 feed the speech stub the text on stdin (D184), once for each ID (D195)
+//   node launcher.mjs hear WAV                 the next hold-to-talk hears this 16 kHz mono WAV instead of the mic (D264)
 //   node launcher.mjs errors                   print page errors as they happen, until killed
 import fs from "node:fs";
 
@@ -64,6 +65,15 @@ if (cmd === "say") {
     process.exit(1);
   }
   if (mark) fs.writeFileSync(mark, "");
+  process.exit(0);
+}
+
+if (cmd === "hear") {
+  const r = await fetch(`${SERVICE}/api/speech/feed`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wav: args[0] }) });
+  if (!r.ok) {
+    console.error(`hear: ${await r.text()}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 

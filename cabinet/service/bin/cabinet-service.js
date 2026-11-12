@@ -11,9 +11,11 @@ import { potStore } from "../src/pot.js";
 import { cabinetState } from "../src/cabinet-state.js";
 import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
+import { cabinetSpeech } from "../src/speech-live.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, startGuestServer } from "../src/guests.js";
+import { createScreener, modelCheck } from "../src/screening.js";
 
 const { values } = parseArgs({
   options: {
@@ -40,8 +42,10 @@ const { values } = parseArgs({
 
 const paths = dataPaths(values.data ?? dataDir());
 const replaying = Boolean(values.replay);
-if (!replaying && !values.config) {
-  console.error("cabinet-service: --config FILE (the cabinet's config, 0600, D131), or --replay DIR to spend nothing (D186)");
+// --offline alone is a cabinet with no key yet, such as the Picade before connect-cabinet.sh (D252): the shelf
+// plays, and Make waits. It can't spend, because nothing reaches the API while offline.
+if (!replaying && !values.config && !values.offline) {
+  console.error("cabinet-service: --config FILE (the cabinet's config, 0600, D131), --replay DIR to spend nothing (D186), or --offline (D252)");
   process.exit(2);
 }
 /** @type {any} */
@@ -96,7 +100,8 @@ if (!replaying && !values.offline) {
   check();
   setInterval(check, 20_000).unref();
 }
-const speech = stubSpeech(); // D184: real speech is Phase 3.
+// D260: real speech where provisioning installed it (Moonshine, and Groq first with a key); the stub elsewhere.
+const speech = cabinetSpeech({ config, logsDir: paths.logs, online: () => online, log: (m) => console.log(m) }) ?? stubSpeech();
 
 /** @type {any} */
 let api = null;
@@ -156,7 +161,12 @@ const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs });
 const guestServer = await startGuestServer(guests, { port: Number(values["guest-port"] ?? config.guest_port ?? 8340), host: values.host });
 guests.port = guestServer.port;
 
+// Request screening (D270-D275): the word list always; the model with the cabinet's own key, unless replaying.
+// config.screening: false turns the model off (the list stays).
+const screen = createScreener({ logsDir: paths.logs, model: client && config.screening !== false ? (text, o) => modelCheck(client, text, o) : null });
+
 const s = await startService({
+  screen,
   guests,
   studio,
   makers,
@@ -176,7 +186,7 @@ const s = await startService({
 });
 console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
 console.log(`guest games on ${guestServer.url}: ${guests.list("").map((g) => g.id).join(", ") || "none"}`);
-console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : `Managed Agents, with the key in ${values.config} (D131)`);
+console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : values.config ? `Managed Agents, with the key in ${values.config} (D131)` : "OFFLINE with no key: the shelf plays, and Make waits until the cabinet is connected (D252)");
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
 studio.collectLeft();
 

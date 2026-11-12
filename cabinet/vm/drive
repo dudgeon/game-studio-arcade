@@ -14,7 +14,8 @@
 #   drive ssh [COMMAND]       a shell on the cabinet as its admin
 #
 # Keys: up down left right a b x y q e start enter esc star f1 f2 (D82). coin is f2, the COIN button (D205).
-# ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124).
+# ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124). ARCADE_SSH_DIR picks the folder with its
+# SSH key and known_hosts (default the virtual cabinet's); the Picade's card script makes its own (D251).
 #
 # The mini can lose the cabinet for a while (D156), so this waits it out for up to ARCADE_RIDE_S (default 300)
 # seconds. Reads just repeat. Each key has an id, and a repeat with that id is pressed only if it wasn't already
@@ -23,7 +24,8 @@ set -euo pipefail
 
 HOST="${ARCADE_HOST:-arcade-virtual.local}"
 VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
-KEY="$VM_ROOT/ssh/arcade-virtual_ed25519"
+SSH_DIR="${ARCADE_SSH_DIR:-$VM_ROOT/ssh}"
+KEY="$SSH_DIR/${ARCADE_SSH_KEY_NAME:-arcade-virtual_ed25519}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.
@@ -36,7 +38,7 @@ cabinet() {
   ${ARCADE_SSH_TIMEOUT_S:+perl -e 'alarm shift; exec @ARGV' "$ARCADE_SSH_TIMEOUT_S"} \
   ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
     -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
-    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$VM_ROOT/ssh/known_hosts" \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
     ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@" || rc=$?
   [ "$rc" = 142 ] && return 255
   return "$rc"

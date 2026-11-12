@@ -4,6 +4,8 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 
 **Status:** the virtual cabinet runs the cabinet service, on replay until it has a key (D154). No VM window yet (D141), so nobody can sit and play at it. The `picade` profile has never run: it needs the Picade.
 
+**The Picade (D250-D256):** its card is written by `scripts/cabinet-card/flash.mjs` and it's connected by `scripts/cabinet-card/connect-picade.sh`. Follow [docs/cabinet-bring-up.md](../docs/cabinet-bring-up.md) from unboxing to the first make.
+
 | Path | What it is |
 |---|---|
 | `provision/provision.sh` | The script: `--profile picade\|virtual --payload DIR`. Safe to run again |
@@ -11,6 +13,7 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 | `provision/profiles/` | The hardware layer of each profile |
 | `provision/files/` | Services and helpers it installs |
 | `vm/drive` | The driver: press, hold, type, screenshot over SSH, no window |
+| `../scripts/cabinet-card/` | Writes the Picade's microSD card (`flash.mjs`) and connects it to its workspace (`connect-picade.sh`) |
 | `../scripts/virtual-cabinet/` | Generates the UTM VM (`build.mjs`), starts it (`up.sh`), updates it (`update-cabinet.mjs`), checks it (`verify.sh`) |
 
 ## Connect the virtual cabinet to Claude
@@ -63,6 +66,18 @@ node scripts/coin.mjs reset "Fresh start after the fix"
 ```
 
 `add` warns, and stops unless given `--yes`, when the month could pass the workspace's real $15 limit (D211). It goes through the cabinet's own SSH (`cabinet/vm/drive`), and the token only ever travels on stdin.
+
+## Keep the twin in sync with the Picade
+
+The virtual cabinet is the Picade's digital twin (D290-D297): the Picade is the truth, and the mini pulls its games, versions, sessions, logs, ledger, makers and downloaded games into the twin. Keys and config never move.
+
+```sh
+node scripts/twin.mjs seed --real PICADE_HOST --yes   # once, at bring-up: the Picade starts as a copy of the twin
+node scripts/twin.mjs status --real PICADE_HOST       # what differs: release, games, files (writes nothing)
+node scripts/twin.mjs sync --real PICADE_HOST         # pull into the twin; the twin's own changes are set aside, never deleted
+```
+
+The real cabinet is only read, except by `seed`. Anything the twin made itself goes to `/var/lib/arcade/twin-sync/set-aside/<time>/` on the twin. `--real-dir` and `--twin-dir` work on two folders here instead.
 
 ## Bring up the virtual cabinet
 
