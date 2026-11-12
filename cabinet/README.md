@@ -67,6 +67,18 @@ node scripts/coin.mjs reset "Fresh start after the fix"
 
 `add` warns, and stops unless given `--yes`, when the month could pass the workspace's real $15 limit (D211). It goes through the cabinet's own SSH (`cabinet/vm/drive`), and the token only ever travels on stdin.
 
+## Keep the twin in sync with the Picade
+
+The virtual cabinet is the Picade's digital twin (D290-D297): the Picade is the truth, and the mini pulls its games, versions, sessions, logs, ledger, makers and downloaded games into the twin. Keys and config never move.
+
+```sh
+node scripts/twin.mjs seed --real PICADE_HOST --yes   # once, at bring-up: the Picade starts as a copy of the twin
+node scripts/twin.mjs status --real PICADE_HOST       # what differs: release, games, files (writes nothing)
+node scripts/twin.mjs sync --real PICADE_HOST         # pull into the twin; the twin's own changes are set aside, never deleted
+```
+
+The real cabinet is only read, except by `seed`. Anything the twin made itself goes to `/var/lib/arcade/twin-sync/set-aside/<time>/` on the twin. `--real-dir` and `--twin-dir` work on two folders here instead.
+
 ## Bring up the virtual cabinet
 
 Once per Mac, with someone there: `open /Applications/UTM.app`, click Open, quit UTM. The first `utmctl` call may ask to control UTM.
