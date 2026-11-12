@@ -11,6 +11,7 @@ import { potStore } from "../src/pot.js";
 import { cabinetState } from "../src/cabinet-state.js";
 import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
+import { cabinetSpeech } from "../src/speech-live.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, startGuestServer } from "../src/guests.js";
@@ -98,7 +99,8 @@ if (!replaying && !values.offline) {
   check();
   setInterval(check, 20_000).unref();
 }
-const speech = stubSpeech(); // D184: real speech is Phase 3.
+// D260: real speech where provisioning installed it (Moonshine, and Groq first with a key); the stub elsewhere.
+const speech = cabinetSpeech({ config, logsDir: paths.logs, online: () => online, log: (m) => console.log(m) }) ?? stubSpeech();
 
 /** @type {any} */
 let api = null;

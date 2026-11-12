@@ -30,6 +30,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/profiles/$PROFILE.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/boot-wait.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/speech.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
@@ -168,6 +170,7 @@ step_ssh
 step_node
 step_bundle
 step_carts
+step_speech
 hw_late
 step_boot_wait
 step_services

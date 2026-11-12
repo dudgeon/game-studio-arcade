@@ -78,7 +78,7 @@ Sources: code.claude.com/docs/en/{plugins-reference, plugins/create, plugins/ins
 ## Speech
 
 - **Groq `whisper-large-v3-turbo`:** $0.04/hour of audio with a **10-second minimum billed per request**, which is negligible at $0.0001 per clip. Uploads are capped at 25 MB. Inputs and outputs aren't retained by default, but abuse logs are kept for up to 30 days. **Turn on Zero Data Retention** at console.groq.com/settings/data-controls; the transcription endpoints are ZDR-eligible.
-- **Moonshine:** github.com/moonshine-ai/moonshine, pip package `moonshine-voice` v0.1.6 (2026-11-06). English streaming models: Tiny (34M), Small (123M) and Medium (245M). Pi 5 is officially supported; the published latencies are Tiny about 240 ms, Small about 530 ms and Medium about 800 ms. MIT licensed.
+- **Moonshine:** github.com/moonshine-ai/moonshine, pip package `moonshine-voice` v0.1.6 (2026-11-06). English streaming models: Tiny (34M), Small (123M) and Medium (245M). Pi 5 is officially supported; the published latencies are Tiny about 240 ms, Small about 530 ms and Medium about 800 ms. MIT licensed. Checked 2026-11-11: the wheel ships no model weights; models download from download.moonshine.ai (the English medium-streaming model is 267 MB, 8 files), so the cabinet pins them by SHA-256 (D261). There are wheels for manylinux_2_34 aarch64 (Pi OS trixie has glibc 2.41) and macOS arm64, and the package needs Python 3.10+ (it fails on macOS's own 3.9). `import moonshine_voice` doesn't load PortAudio; only its mic helper does.
 
 ## Guest players
 
