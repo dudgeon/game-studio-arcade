@@ -242,3 +242,25 @@ test("the seed list matches what build.mjs's seed has, less what only a VM needs
   const inBuild = [...build.matchAll(/join\(seed, "([^"]+)"\)/g)].map((m) => m[1]).filter((n) => !vmOnly.has(n));
   assert.deepEqual([...inBuild].sort(), [...SEED_FILES].sort());
 });
+
+test("the Picade's driver keyboard stays off unless its setting says on (D287)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drv-"));
+  const setting = path.join(dir, "driver-keyboard");
+  const modules = path.join(dir, "arcade-driver.conf");
+  const stubs = `install() { echo "install $*"; }; systemctl() { echo "systemctl $*"; }; modprobe() { echo "modprobe $*"; }; DRIVER_SETTING=${JSON.stringify(setting)}; DRIVER_MODULES=${JSON.stringify(modules)}; step_driver_keyboard`;
+  let out = profileBash(stubs);
+  assert.match(out, /systemctl disable --now arcade-keyd/);
+  assert.doesNotMatch(out, /systemctl enable|modprobe uinput/);
+  assert.match(out, /driver keyboard: off/);
+  assert.ok(!fs.existsSync(modules));
+  fs.writeFileSync(setting, "off\n");
+  assert.match(profileBash(stubs), /driver keyboard: off/);
+  fs.writeFileSync(setting, "on\n");
+  out = profileBash(stubs);
+  assert.match(out, /modprobe uinput/);
+  assert.match(out, /systemctl enable arcade-keyd/);
+  assert.match(out, /driver keyboard: on/);
+  assert.equal(fs.readFileSync(modules, "utf8").trim(), "uinput");
+  // It is part of every provisioning run on the Picade.
+  assert.match(fs.readFileSync(PROFILE, "utf8"), /hw_late\(\) \{[^}]*step_driver_keyboard/);
+});

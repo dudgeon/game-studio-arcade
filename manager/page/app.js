@@ -66,7 +66,7 @@ setInterval(() => {
 function drivable() {
   const off = status && status.can_drive === false;
   $("#pad").classList.toggle("off", Boolean(off));
-  $("#drivenote").textContent = off ? "This cabinet has no driver keyboard (D282): watch here and use the cabinet's own controls." : "";
+  $("#drivenote").textContent = off ? "This cabinet's driver keyboard is off (D287): watch here and use its own controls, or switch it on from the mini with scripts/cabinet-card/driver-keyboard.sh on." : "";
 }
 
 // ---- Keys (D282) ----
