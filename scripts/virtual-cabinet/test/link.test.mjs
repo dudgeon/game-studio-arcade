@@ -117,6 +117,12 @@ test("the firewall refuses new connections out to the shared network, apart from
   assert.ok(profile('firewall_rules "" ""').includes("192.168.64.0/24 ct state new counter reject"), "even with no seeded addresses");
 });
 
+test("every verify.sh check has a space between its runner and its quoted command", () => {
+  const verify = fs.readFileSync(path.join(HERE, "../verify.sh"), "utf8");
+  const glued = verify.split("\n").filter((l) => /^check \S+ \w+'/.test(l));
+  assert.deepEqual(glued, [], "a quote glued to the runner's name makes bash run a command that doesn't exist");
+});
+
 test("mini-link won't touch the config while UTM is running, since UTM would keep its cached copy", () => {
   const { root, config } = vm();
   const before = fs.readFileSync(config);
