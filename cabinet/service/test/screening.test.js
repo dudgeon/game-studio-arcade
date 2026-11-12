@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
-import { createScreener, listCheck, modelCheck, SYSTEM } from "../src/screening.js";
+import { createScreener, listCheck, modelCheck, summarize, SYSTEM } from "../src/screening.js";
 import { createServiceHandler } from "../src/server.js";
 import { makersStore } from "../src/makers.js";
 import { stubSpeech } from "../src/speech.js";
@@ -74,6 +74,19 @@ test("the model can't be reached: the word list's answer stands, and nothing wai
   const log = readLog(path.join(logs, "screening.jsonl"));
   assert.deepEqual(log.map((l) => [l.by, l.outcome]), [["list", "pass"], ["list", "redirected"]]);
   assert.ok(log.every((l) => l.model_error));
+});
+
+test("a timeout is logged as one, and the summary counts timeouts apart from other model errors (D273)", async () => {
+  const logs = tmp();
+  class APIConnectionTimeoutError extends Error {}
+  const errors = [new APIConnectionTimeoutError("Request timed out."), new Error("connection refused")];
+  const s = createScreener({ logsDir: logs, model: async () => Promise.reject(errors.shift()) });
+  await s.check({ text: "a zombie shooter", kind: "new" });
+  await s.check({ text: "a robot battle", kind: "new" });
+  const log = readLog(path.join(logs, "screening.jsonl"));
+  assert.deepEqual(log.map((l) => l.timed_out ?? false), [true, false]);
+  const sum = summarize([...log, { outcome: "redirected", by: "model", cost_usd: 0.0001 }]);
+  assert.deepEqual([sum.checks, sum.passed, sum.redirected, sum.timeouts, sum.model_errors, sum.by.list, sum.cost_usd], [3, 2, 1, 1, 1, 2, 0.0001]);
 });
 
 test("a model alternative that itself trips the list is replaced by a safe one", async () => {

@@ -96,6 +96,23 @@ export async function modelCheck(client, text, o) {
 }
 
 /**
+ * The summary of logs/screening.jsonl's lines (D273): checks, passes, redirects, timeouts and other
+ * model errors, which layer decided, and the model's cost. @param {any[]} lines
+ */
+export function summarize(lines) {
+  const n = (/** @type {(l: any) => boolean} */ f) => lines.filter(f).length;
+  return {
+    checks: lines.length,
+    passed: n((l) => l.outcome === "pass"),
+    redirected: n((l) => l.outcome === "redirected"),
+    timeouts: n((l) => l.timed_out === true),
+    model_errors: n((l) => l.model_error && !l.timed_out),
+    by: { model: n((l) => l.by === "model"), list: n((l) => l.by === "list"), offered: n((l) => l.by === "offered") },
+    cost_usd: Number(lines.reduce((s, l) => s + (l.cost_usd ?? 0), 0).toFixed(6)),
+  };
+}
+
+/**
  * @typedef {{ ok: true } | { ok: false, alternative: string, say: string }} Screened
  * @param {{
  *   logsDir: string,
@@ -138,7 +155,9 @@ export function createScreener(o) {
         const alternative = m.alternative && listCheck(m.alternative).ok ? m.alternative : list.ok ? "A silly version of my idea with funny made-up words" : list.alternative;
         return done({ ok: false, alternative, say: SAY }, extra);
       } catch (/** @type {any} */ e) {
-        const extra = { by: "list", model_error: String(e?.constructor?.name ?? "error") };
+        const name = String(e?.constructor?.name ?? "error");
+        // A timeout is counted on its own (D273): the summary shows how often a kid's check ran out of time.
+        const extra = { by: "list", model_error: name, ...(/timeout/i.test(`${name} ${e?.message ?? ""}`) ? { timed_out: true } : {}) };
         return list.ok ? done({ ok: true }, extra) : done({ ok: false, alternative: list.alternative, say: SAY }, { ...extra, hits: list.hits.length });
       }
     },
