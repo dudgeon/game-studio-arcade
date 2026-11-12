@@ -161,19 +161,32 @@ step_services() {
   systemctl restart --no-block arcade-kiosk
 }
 
+# "== N/M what": a line firstboot.sh puts on the cabinet's screen, so first boot isn't a blank screen (D257).
+STAGES=8
+STAGE=0
+stage() { STAGE=$((STAGE + 1)); log "== $STAGE/$STAGES $*"; }
+
 log "profile $PROFILE"
 step_hostname
+stage "Checking the clock"
 hw_early
+stage "Installing the screen and the browser (the longest step)"
 step_apt
 step_users
 step_ssh
+stage "Installing Node"
 step_node
+stage "Unpacking the arcade"
 step_bundle
 step_carts
+stage "Installing speech: Moonshine and its model, about 400 MB"
 step_speech
+stage "Setting up the cabinet's buttons, sound and screen"
 hw_late
 step_boot_wait
+stage "Starting the arcade"
 step_services
+stage "Finishing"
 install -d /etc/arcade
 echo "$RELEASE_NAME" > /etc/arcade/provisioned-version
 [ ! -f "$PAYLOAD/commit" ] || install -m 0644 "$PAYLOAD/commit" /etc/arcade/provisioned-commit

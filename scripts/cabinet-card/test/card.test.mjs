@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NETWORK_CONFIG_APPLIED, SEED_FILES, confirmPhrase, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, shellQuote, userData, wifiPsk } from "../lib.mjs";
+import { NETWORK_CONFIG_APPLIED, SEED_FILES, confirmPhrase, lockedWheels, describe, metaData, networkConfig, profileHostname, refusals, sameDisk, shellQuote, userData, wifiPsk } from "../lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../../..");
@@ -241,4 +241,59 @@ test("the seed list matches what build.mjs's seed has, less what only a VM needs
   const vmOnly = new Set(["kernel-modules.tar.gz", "mini-addrs"]);
   const inBuild = [...build.matchAll(/join\(seed, "([^"]+)"\)/g)].map((m) => m[1]).filter((n) => !vmOnly.has(n));
   assert.deepEqual([...inBuild].sort(), [...SEED_FILES].sort());
+});
+
+test("first boot puts each provisioning stage on the screen, and says so when it stops (D257)", () => {
+  const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
+  const declared = Number(prov.match(/^STAGES=(\d+)$/m)?.[1]);
+  assert.equal((prov.match(/^stage "/gm) ?? []).length, declared, "STAGES counts every stage");
+  const run = (exitCode) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "card-firstboot-"));
+    const seed = path.join(root, "seed");
+    const src = path.join(root, "src");
+    fs.mkdirSync(seed);
+    fs.mkdirSync(src);
+    fs.writeFileSync(path.join(seed, "profile"), "picade\n");
+    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] profile picade"\necho "[provision 10:00:01] == 1/2 Checking the clock"\necho "[provision 10:00:02] == 2/2 Installing speech: Moonshine"\nexit ${exitCode}\n`);
+    execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
+    const screen = path.join(root, "tty1");
+    fs.writeFileSync(screen, "");
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen } });
+    const out = { status: r.status, log: r.stdout, screen: fs.readFileSync(screen, "utf8"), ok: fs.existsSync(path.join(seed, "provision.ok")) };
+    fs.rmSync(root, { recursive: true, force: true });
+    return out;
+  };
+  const good = run(0);
+  assert.equal(good.status, 0, good.log);
+  assert.match(good.log, /== 2\/2 Installing speech/, "the log keeps every line");
+  assert.match(good.screen, /Step 1\/2\s+Checking the clock/);
+  assert.match(good.screen, /Step 2\/2\s+Installing speech: Moonshine/);
+  assert.match(good.screen, /Done\./);
+  assert.ok(good.ok);
+  const bad = run(3);
+  assert.notEqual(bad.status, 0, "a failed provision fails first boot, so it runs again at the next boot");
+  assert.match(bad.screen, /Setup stopped\./);
+  assert.ok(!bad.ok);
+});
+
+test("the Manager's driver keyboard is off on the Picade unless asked for (D258)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-keyd-"));
+  const want = (setup) => profileBash(`PAYLOAD=${JSON.stringify(path.join(dir, "seed"))}; DRIVER_KEYS_FLAG=${JSON.stringify(path.join(dir, "etc/driver-keys"))}; ${setup} driver_keys_wanted && echo yes || echo no`).trim();
+  fs.mkdirSync(path.join(dir, "seed"));
+  assert.equal(want(""), "no");
+  fs.writeFileSync(path.join(dir, "seed/driver-keys"), "yes\n");
+  assert.equal(want(""), "yes", "asked for on the card");
+  fs.rmSync(path.join(dir, "seed/driver-keys"));
+  fs.mkdirSync(path.join(dir, "etc"));
+  fs.writeFileSync(path.join(dir, "etc/driver-keys"), "");
+  assert.equal(want(""), "yes", "asked for on the cabinet");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("speech's lock reads as exact wheels, each with its hash (D257)", () => {
+  const wheels = lockedWheels(fs.readFileSync(path.join(REPO, "cabinet/service/speech/requirements.lock"), "utf8"));
+  assert.ok(wheels.length >= 5);
+  assert.ok(wheels.some((w) => w.name === "moonshine-voice"));
+  for (const w of wheels) assert.match(w.sha256, /^[0-9a-f]{64}$/);
+  assert.throws(() => lockedWheels("numpy>=2"), /can't read/);
 });

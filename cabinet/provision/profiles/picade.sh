@@ -18,6 +18,7 @@ hw_late() {
   step_config_txt
   step_input_rule
   step_sound
+  step_driver_keys
 }
 
 # The Pi has no battery clock. Until NTP answers, the clock says the image's date, and apt refuses
@@ -145,6 +146,25 @@ ALSA
 step_sound() {
   asound_conf > "$ASOUND_CONF"
   chmod 0644 "$ASOUND_CONF"
+}
+
+# D258: the Manager's driver keyboard (arcade-keyd, D144, D282), only when asked: the card's seed/driver-keys,
+# or /etc/arcade/driver-keys on the cabinet. Off by default, because it lets whoever holds the Manager's key
+# press buttons on the kids' cabinet. To turn it off: remove the file, then systemctl disable --now arcade-keyd.
+DRIVER_KEYS_FLAG="${DRIVER_KEYS_FLAG:-/etc/arcade/driver-keys}"
+driver_keys_wanted() {
+  [ -f "$PAYLOAD/driver-keys" ] || [ -f "$DRIVER_KEYS_FLAG" ]
+}
+step_driver_keys() {
+  driver_keys_wanted || return 0
+  install -d "$(dirname "$DRIVER_KEYS_FLAG")"
+  touch "$DRIVER_KEYS_FLAG"
+  install -m 0755 "$SELF_DIR/files/arcade-keyd" /usr/local/bin/arcade-keyd
+  install -m 0644 "$SELF_DIR/files/arcade-keyd.service" /etc/systemd/system/arcade-keyd.service
+  systemctl daemon-reload
+  systemctl enable arcade-keyd
+  systemctl restart arcade-keyd
+  log "driver keyboard on (D258)"
 }
 
 # Until connect-cabinet.sh gives it a key, the Picade plays offline: the shelf works, and Make waits (D252).

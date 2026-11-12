@@ -9,7 +9,7 @@
 # its own lock file (claude-lock.arcade.json), and refuses the mini's workspace and the virtual cabinet's.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-CABINET_DIR="${GSA_CABINET_DIR:-$HOME/game-studio-data/cabinets/arcade}"
+CABINET_DIR="${GSA_CABINET_DIR:-$HOME/game-studio-data/picade}"
 export CABINET=arcade
 export ARCADE_HOST="${ARCADE_HOST:-arcade.local}"
 export ARCADE_SSH_DIR="$CABINET_DIR/ssh"

@@ -59,11 +59,15 @@ export function bootEnd(dir) {
   };
 }
 
+/** The Picade's SSH key, where flash.mjs makes it and the Manager reads it (D254, D286). */
+export const PICADE_SSH = { ARCADE_SSH_DIR: path.join(process.env.GSA_PICADE_DIR || path.join(process.env.HOME ?? "", "game-studio-data/picade"), "ssh"), ARCADE_SSH_KEY_NAME: "arcade_ed25519" };
+
 /**
  * @param {string | undefined} host undefined: the virtual cabinet, found as cabinet/vm/drive finds it
+ * @param {Record<string, string>} [ssh] the driver's SSH key settings for this cabinet (the real one's: PICADE_SSH)
  * @returns {End}
  */
-export function cabinetEnd(host) {
+export function cabinetEnd(host, ssh = {}) {
   const code = Buffer.from(HELPER_SRC).toString("base64");
   const name = host ?? "the virtual cabinet";
   return {
@@ -72,7 +76,7 @@ export function cabinetEnd(host) {
       const r = spawnSync(DRIVE, ["ssh", `sudo -u arcade /usr/local/bin/node -e '${BOOT}'`], {
         input: JSON.stringify({ code, cmd, root: CABINET_DATA, input }),
         encoding: "utf8",
-        env: { ...process.env, ...(host ? { ARCADE_HOST: host } : {}), ARCADE_SSH_TIMEOUT_S: "300" },
+        env: { ...process.env, ...(host ? { ARCADE_HOST: host } : {}), ...ssh, ARCADE_SSH_TIMEOUT_S: "300" },
         maxBuffer: 2 ** 30,
       });
       if (r.status === 255) throw new Error(`can't reach ${name} over SSH. Is it up?`);
@@ -244,7 +248,7 @@ async function main() {
   const cmd = positionals[0];
   if (!["status", "sync", "seed"].includes(cmd ?? "")) throw new Error("usage: node scripts/twin.mjs status|sync|seed --real HOST [--twin HOST] [--yes]");
   if (!values.real && !values["real-dir"]) throw new Error("which real cabinet? --real HOST (the Picade, once it's on the network), or --real-dir D");
-  const real = values["real-dir"] ? folderEnd(values["real-dir"]) : cabinetEnd(/** @type {string} */ (values.real));
+  const real = values["real-dir"] ? folderEnd(values["real-dir"]) : cabinetEnd(/** @type {string} */ (values.real), PICADE_SSH);
   const twin = values["twin-dir"] ? folderEnd(values["twin-dir"]) : cabinetEnd(values.twin);
   if (real.name === twin.name) throw new Error("the real cabinet and the twin are the same place");
   const print = (/** @type {any} */ x, /** @type {string} */ text) => console.log(values.json ? JSON.stringify(x, null, 2) : text);
