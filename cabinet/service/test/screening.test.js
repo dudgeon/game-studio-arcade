@@ -42,7 +42,7 @@ test("the model's brief: violence passes, it never scolds, and the kid's words a
 });
 
 /** A fake model that answers from the table, as the real one should. */
-const tableModel = async (/** @type {string} */ text) => {
+const tableModel = async (/** @type {string} */ text, /** @type {any} */ _o) => {
   const row = TABLE.find((r) => r.text === text);
   return row?.expect === "redirect" ? { verdict: "redirect", alternative: "A shark game where it shouts BLUB when it eats a fish", why: "test", cost: 0.00031, tokens: { input: 600, output: 40 } } : { verdict: "pass", alternative: "", why: "", cost: 0.00028, tokens: { input: 600, output: 20 } };
 };
@@ -126,6 +126,11 @@ test("modelCheck: structured output from Haiku at low effort, its cost from usag
   assert.equal(sent[0].body.output_config.format.type, "json_schema");
   assert.equal(sent[0].opts.maxRetries, 0);
   assert.match(sent[0].body.messages[0].content, /<idea>\na zombie game\n<\/idea>/);
+  // An answer goes with its question, so the alternative still answers it (D276); a new idea has none.
+  await modelCheck(client({ stop_reason: "end_turn", usage: {}, content: [{ type: "text", text: JSON.stringify({ verdict: "pass", alternative: "", why: "" }) }] }), "purple", { kind: "answer", question: "What color is the ship?" });
+  assert.match(sent[1].body.messages[0].content, /<question>\nWhat color is the ship\?\n<\/question>[\s\S]*answer the kid typed or said to that question[\s\S]*<idea>\npurple\n<\/idea>/);
+  assert.doesNotMatch(sent[0].body.messages[0].content, /<question>/);
+  assert.match(SYSTEM, /must still answer that question/);
   const refused = await modelCheck(client({ stop_reason: "refusal", usage: { input_tokens: 700, output_tokens: 0 }, content: [] }), "x", { kind: "answer" });
   assert.equal(refused.verdict, "redirect");
   await assert.rejects(modelCheck(client({ stop_reason: "end_turn", usage: {}, content: [{ type: "text", text: "not json" }] }), "x", { kind: "new" }));
@@ -188,6 +193,11 @@ test("the service: a redirected idea starts no session; the alternative, picked,
     assert.equal(f.calls.answer.length, 2);
     const log = readLog(path.join(data, "logs", "screening.jsonl"));
     assert.deepEqual(log.map((l) => [l.kind, l.outcome]), [["new", "redirected"], ["new", "pass"], ["new", "pass"], ["answer", "redirected"], ["answer", "pass"]]);
+    assert.deepEqual(log.map((l) => l.question ?? null), [null, null, null, "What does the shark say?", "What does the shark say?"], "an answer is logged with its question (D276)");
+    // On the plan, "change" words go with what they change.
+    f.setPending({ id: 8, kind: "plan", summary: "A shark eats fish" });
+    assert.equal((await post("/api/studio/answer", { id: 8, choice: "change", said: "make it faster" })).body.ok, true);
+    assert.match(readLog(path.join(data, "logs", "screening.jsonl")).at(-1).question, /plan.*A shark eats fish/);
   } finally {
     await s.close();
   }
