@@ -50,7 +50,7 @@ The screens are the design canvas's boards, by id (docs/design/arcade-ux-handoff
 | R1-R8 a change | yes | `arcade`, `pot-low` |
 | L1-L5 the pot's limits | yes | `pot-low`, `pot-empty`, `overrun`, `over-usual`, `resting` |
 | E1-E9 errors | yes | `offline`, `failed`, `errors` |
-| E10 let's pick another idea | drawn, not reachable | request screening is Phase 3 |
+| E10 how about this? | built | request screening redirects an idea or a typed answer (D270-D275, `src/screening.js`, `launcher/redirect.js`) |
 | Manager coin pot page | no | the Manager isn't built; its API is (below) |
 
 ```sh
@@ -135,7 +135,7 @@ A version of a guest is its own folder whose `guest.json` names its `maker`, `pa
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** request screening (Phase 3, so E10 can't be reached), launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
+- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 

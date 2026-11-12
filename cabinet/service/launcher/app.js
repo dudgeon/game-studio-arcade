@@ -28,6 +28,7 @@ import {
   whatToChange,
   whoView,
 } from "./boards.js";
+import { REDIRECT_ACTIONS, redirectBoard } from "./redirect.js";
 import { checksFor, familyOfCart, gameRows } from "./shelf.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
@@ -85,7 +86,7 @@ const boardsSeen = [];
 async function post(url, body = {}) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true });
   const out = await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }));
-  if (!out.ok) throw Object.assign(new Error(out.error ?? `HTTP ${r.status}`), { why: out.why, status: r.status });
+  if (!out.ok) throw Object.assign(new Error(out.error ?? `HTTP ${r.status}`), { why: out.why, status: r.status, redirect: out.redirect });
   return out;
 }
 /** @param {string} url */
@@ -242,17 +243,22 @@ function showSay(o) {
   show({ screen: "say", board: o.purpose === "name" ? "M2" : o.purpose === "answer" ? "M8" : o.purpose === "change" ? "R4" : "M4", ...o, phase: o.typing ? "typing" : "idle", typed: "", transcript: "", sel: 0, max: o.max ?? WORDS_MAX });
 }
 
-/** @param {any} o @param {string} request */
-async function startMake(o, request) {
+/** @param {any} o @param {string} request @param {boolean} [offered] it's the alternative E10 offered */
+async function startMake(o, request, offered = false) {
   show({ screen: "progress", board: o.kind === "change" ? "R7" : "M10", kind: o.kind, lines: [], maker: o.maker.name, step: 0, used_cents: 0, usual: o.kind === "change" ? usual().change : usual().new });
   followRun = null;
   seenRunning = false;
   try {
     following = true;
-    followRun = (await post("/api/studio/start", { maker: o.maker.id, request, parent: o.parent?.id ?? null })).state.run_id ?? followRun;
+    followRun = (await post("/api/studio/start", { maker: o.maker.id, request, parent: o.parent?.id ?? null, offered })).state.run_id ?? followRun;
     followStudio();
   } catch (/** @type {any} */ e) {
     following = false;
+    // E10: the closest safe version of their idea, no coins used (D270-D275).
+    if (e.why === "redirect") {
+      const alt = e.redirect.alternative;
+      return showBoard(redirectBoard({ ...e.redirect, answer: false }), REDIRECT_ACTIONS, { onTake: () => startMake(o, alt, true), onAgain: () => askRequest(o), onBack: () => showShelf() });
+    }
     if (e.why === "low" || e.why === "empty") return showLimit(o.kind, e.why);
     if (e.why === "resting") return showBoard(resting(), ["shelf"]);
     if (e.why === "offline") return showBoard(offlineMake(), ["shelf"]);
@@ -324,12 +330,43 @@ function showGone() {
   showBoard({ screen: "board", board, title: n?.kind === "timed_out" ? "Put away for now" : "Sorry!", blocks: [{ text: n?.message ?? "This game stopped being made. Tell me your idea again!", rows: 8, keepLines: true }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["notice-shelf"], { noticeId: n?.id });
 }
 
-/** @param {string} choice @param {string} [said] */
-async function answer(choice, said) {
+/** @param {string} choice @param {string} [said] @param {boolean} [offered] it's the alternative E10 offered */
+async function answer(choice, said, offered = false) {
   const id = view.pendingId;
   answered.add(id);
   show({ screen: "progress", board: studio.kind === "change" ? "R7" : "M10", kind: studio.kind, lines: studio.lines ?? [], maker: studio.maker_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: studio.kind === "change" ? usual().change : usual().new });
-  await post("/api/studio/answer", { id, choice, said }).catch(() => {});
+  await post("/api/studio/answer", { id, choice, said, offered }).catch((/** @type {any} */ e) => {
+    if (e.why !== "redirect") return;
+    // E10 for their own words (D270-D275): the question keeps waiting while they choose.
+    following = false;
+    const resume = () => {
+      answered.delete(id);
+      following = true;
+      followStudio();
+    };
+    const again = () =>
+      showSay({
+        purpose: choice === "C" ? "answer" : "change",
+        prompt: choice === "C" ? (studio.pending?.question ?? "") : "What should be different?",
+        pendingId: id,
+        back: resume,
+        done: (/** @type {string} */ s) => {
+          following = true;
+          view = { ...view, pendingId: id };
+          answer(choice, s);
+        },
+      });
+    const alt = e.redirect.alternative;
+    showBoard(redirectBoard({ ...e.redirect, answer: true }), REDIRECT_ACTIONS, {
+      onTake: () => {
+        following = true;
+        view = { ...view, pendingId: id };
+        answer(choice, alt, true);
+      },
+      onAgain: again,
+      onBack: resume,
+    });
+  });
 }
 
 // ---------- play (G0-G5) ----------
@@ -709,6 +746,12 @@ function onBoard(v, action) {
       return;
     case "later":
       return showShelf(); // D187: the shelf's tile comes back here.
+    case "redirect-take":
+      return v.onTake();
+    case "redirect-again":
+      return v.onAgain();
+    case "redirect-back":
+      return v.onBack();
     case "stop":
       following = false;
       post("/api/studio/stop").catch(() => {});
@@ -770,6 +813,7 @@ function onBack() {
         return void showShelf();
       }
       if (v.board === "B2" || v.board === "B3" || v.board === "B4") return void onBoard(v, v.actions?.[0]);
+      if (v.board === "E10") return void v.onBack();
       onBoard(v, v.noticeId ? "notice-shelf" : "shelf");
       break;
     case "check":

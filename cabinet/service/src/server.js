@@ -10,6 +10,9 @@
 //   GET  /api/studio/events      the same, as server-sent events
 //   POST /api/studio/start       {maker, request, parent?}: parent makes it a change (D206); refused by the pot's gate (D203)
 //   POST /api/studio/answer      {id, choice, said?}
+//     Both are screened first (D270-D275, src/screening.js): an idea or a kid's own words that need
+//     redirecting come back {ok: false, why: "redirect", redirect: {say, alternative}}, with no session
+//     started, no coins used and the question still waiting. {offered: true} marks an offered alternative.
 //   POST /api/studio/result-seen {id}: someone has seen how a make ended (D192)
 //   POST /api/studio/still-here  a key was pressed: the walk-away clock starts again (D188)
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
@@ -83,6 +86,7 @@ function readJson(req) {
  *   pot?: ReturnType<typeof import("./pot.js").potStore>,
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
  *   managerToken?: string | null | (() => string | null),
+ *   screen?: ReturnType<typeof import("./screening.js").createScreener> | null,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -137,11 +141,19 @@ export function createServiceHandler(o) {
       const request = typeof body.request === "string" ? body.request.trim() : "";
       if (!request || request.length > MAX_WORDS) throw new HttpError(400, "the request must be some words");
       const parent = typeof body.parent === "string" && body.parent ? body.parent : null;
+      const screened = await o.screen?.check({ text: request, kind: parent ? "change" : "new", maker: maker.id, offered: body.offered === true });
+      if (screened && !screened.ok) return json(res, 200, { ok: false, why: "redirect", redirect: screened });
       o.studio.start({ maker: maker.id, request, parent });
       return json(res, 200, { ok: true, state: o.studio.state() });
     }
     if (pathname === "/api/studio/answer") {
       if (typeof body.said === "string" && body.said.length > MAX_WORDS) throw new HttpError(400, "that's too many words");
+      // The kid's own words for a question (C) or a plan (change). Only for the question that's waiting.
+      const st = o.studio.state();
+      if (typeof body.said === "string" && body.said.trim() && st.pending?.id === body.id) {
+        const screened = await o.screen?.check({ text: body.said, kind: "answer", maker: st.maker ?? null, offered: body.offered === true });
+        if (screened && !screened.ok) return json(res, 200, { ok: false, why: "redirect", redirect: screened });
+      }
       o.studio.answer({ id: body.id, choice: body.choice, said: body.said });
       return json(res, 200, { ok: true, state: o.studio.state() });
     }
