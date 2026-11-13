@@ -1102,6 +1102,45 @@ Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. 
 - `provision.sh` logs a `== N/8 what` line before each of 8 stages. `firstboot.sh` keeps every line in `seed/provision.log` and puts each stage on tty1: "Setting up the arcade", the step, when it started, and "please leave it switched on", in the console's 32×16 Terminus font (64×24 on 1024×768), with the login prompt stopped and kernel messages quietened. If provisioning fails the screen says "Setup stopped" and where the log is; the next boot runs it again (the seed service runs until `provisioned-version` exists).
 - **Timing:** measured so far only off the Pi. On the virtual cabinet, Moonshine's model came down in about 20 s and the first apt pass took about a minute. On the Pi apt goes over the basement Wi-Fi onto the SD card, so expect 10–20 minutes in all. The stage lines carry timestamps, so the first real boot times each stage; the checklist will be updated from it.
 - **Speech comes on the card.** `flash.mjs` puts speech's 14 wheels and Moonshine's model on the seed (`speech/wheels`, `speech/models`), each fetched once into `~/game-studio-data/vm/dl/speech/` and checked against its lock's SHA-256 (wheels found on PyPI by that hash). `speech.sh` already installs from there with `--no-index`. So first boot doesn't download them, and a failed download can't stop provisioning before the Picade's own setup. The seed is 324 MiB of the boot partition's 396 MiB free; `flash.mjs` checks the space and stops with `--no-speech-on-card` as the way out.
+- **Rehearsed, 2026-11-12** (`scripts/cabinet-card/rehearse.mjs`; the director's ask). `flash.mjs --image-file` wrote the card image, and a throwaway headless QEMU VM on the mini booted it: hvf, 4 cores, 4 GB, user-mode network, a virtio GPU at 1024×768. Debian's pinned arm64 kernel stood in for the Pi's, with an initramfs that only mounts the root and adds that kernel's modules. It plants nothing, so the seed had to come through cloud-init as on the card. The root partition was grown as the Pi's initramfs does. Two runs:
+  - **Run 1, as merged:** power-on to cloud-config took 2 min 4 s. cloud-config waited on `systemd-networkd-wait-online`, the stall D244 masks, because that mask lands only in `provision.sh`, after cloud-config. Then `provision.sh` took 30 s, and the shelf came up at 2 min 45 s.
+  - **Run 2, fixed:** provisioning started 9 s after power-on. Per stage:
+
+    | Stage | Time |
+    |---|---|
+    | 1. Clock (waiting for NTP) | 35 s |
+    | 2. Browser (apt, 257 MB of packages, 757 MB unpacked) | 32 s |
+    | 3. Node | 4 s |
+    | 4. The arcade | 4 s |
+    | 5. Speech, from the card | 8 s |
+    | 6. Cabinet setup | 1 s |
+    | 7–8. Starting, finishing | 1 s |
+
+    Then it restarted, booted in 4.1 s, and the shelf was up 2 min 2 s after power-on.
+  - On the Pi, stage 2 runs over the basement Wi-Fi and the SD card, so it will be the long one.
+- **Found and fixed:**
+  - The networkd stall: the card's `bootcmd` now masks and stops `systemd-networkd-wait-online` on first boot.
+  - systemd's `[ OK ] Started …` lines printed over the progress screen: `firstboot.sh` turns them off for that boot (`SIGRTMIN+21` to PID 1).
+  - `meta-data` said `instance_id`, copied from Pi OS's own template, but cloud-init reads `instance-id`, so every card came up as instance `nocloud`. It's `instance-id` now, and the rehearsal's id was the card's own.
+  - D287's settings read printed "No such file or directory" on a new cabinet. It now checks for the file first.
+- **Checked and fine:**
+  - The admin user is uid 1000, with the mini's key only; root and password logins are off.
+  - The rename wizard was masked.
+  - Time zone and locale were applied.
+  - The Wi-Fi connection was rendered with the 64-hex key. After `network-config` was scrubbed and the cabinet restarted, it was still there, kept by NetworkManager as its own netplan file.
+  - The overlay was built at the pinned commit, and config.txt, the udev rule and `asound.conf` were written.
+  - The offline service served the shelf, Moonshine loaded in about 0.6 s, the kiosk started on DRM, and a starter game played from the VM's keyboard.
+  - The only failed unit was `rpi-eeprom-update`, because a VM has no EEPROM.
+- **Only the Pi can prove these:**
+  - The Pi's own boot: firmware, `cmdline.txt` with `resize`, and its initramfs growing the root.
+  - The overlay loading and the buttons (the VM has no X HAT).
+  - The DAC card name and sound.
+  - The panel's EDID and the screen power.
+  - Wi-Fi itself: the country setting, signal in the basement, WPA2 or WPA3.
+  - The power button and the gpio-poweroff cut.
+  - Temperature.
+  - The timings on an SD card.
+- **The shelf's wording before connect:** with no key the shelf says "No Wi-Fi" and Make says "Needs Wi-Fi right now" (the service's offline state, D252). The checklist tells Geoff it means "not connected to Claude yet". A distinct message would be a launcher change, offered as a follow-up.
 
 **D258. The Manager's driver keyboard on the Picade is D287's.** *(Claude; replaces this worker's first draft, which put a flag on the card.)* The Manager worker's D287 stands: `arcade-keyd` is installed by the picade profile and runs only while `/etc/arcade/driver-keyboard` says `on`, switched from the mini by `scripts/cabinet-card/driver-keyboard.sh on|off`. Nothing on the card turns it on, so a new cabinet starts with it off. The first run doesn't need it: the cabinet's own controls play, and the Manager watches.
 

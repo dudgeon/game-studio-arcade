@@ -72,6 +72,8 @@ test("user-data makes the admin with the mini's key, plants the seed service, an
   assert.match(text, /^ {4}lock_passwd: true$/m);
   assert.ok(text.includes(JSON.stringify(KEY)));
   assert.ok(!/(^|\s)(plain_text_passwd|hashed_passwd|passwd|password):/m.test(text), "no password for anyone");
+  const bootcmd = lines.slice(lines.indexOf("bootcmd:") + 1, lines.indexOf("runcmd:"));
+  assert.ok(bootcmd.some((l) => /systemctl mask systemd-networkd-wait-online\.service; systemctl stop --no-block systemd-networkd-wait-online\.service/.test(l)), "first boot mustn't sit 2 minutes on networkd (D244)");
   const runcmd = lines.slice(lines.indexOf("runcmd:") + 1).filter((l) => l.startsWith("  - "));
   assert.equal(runcmd.length, 2);
   const cmd = (l) => JSON.parse(l.replace(/^ {2}- \[sh, -c, /, "").replace(/\]$/, ""));
@@ -87,7 +89,8 @@ test("user-data makes the admin with the mini's key, plants the seed service, an
 });
 
 test("meta-data names a new instance, and the hostname comes from the picade profile", () => {
-  assert.match(metaData("arcade-20261111T1700-abc123"), /^instance_id: arcade-20261111T1700-abc123$/m);
+  assert.match(metaData("arcade-20261111T1700-abc123"), /^instance-id: arcade-20261111T1700-abc123$/m);
+  assert.doesNotMatch(metaData("x"), /instance_id/, "cloud-init reads instance-id, not instance_id");
   assert.throws(() => metaData("a b"));
   assert.equal(profileHostname(fs.readFileSync(PROFILE, "utf8")), "arcade");
   assert.equal(shellQuote("it's"), `'it'\\''s'`);

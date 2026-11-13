@@ -95,7 +95,7 @@ step_config_txt() {
 DRIVER_SETTING="${DRIVER_SETTING:-/etc/arcade/driver-keyboard}"
 DRIVER_MODULES="${DRIVER_MODULES:-/etc/modules-load.d/arcade-driver.conf}"
 driver_keyboard_on() {
-  [ "$(tr -d '[:space:]' < "$DRIVER_SETTING" 2>/dev/null)" = on ]
+  [ -f "$DRIVER_SETTING" ] && [ "$(tr -d '[:space:]' < "$DRIVER_SETTING")" = on ]
 }
 
 step_driver_keyboard() {

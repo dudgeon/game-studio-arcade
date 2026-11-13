@@ -35,10 +35,14 @@ export function wifiPsk(ssid, passphrase) {
   return pbkdf2Sync(Buffer.from(passphrase, "utf8"), ssidBytes, 4096, 32, "sha1").toString("hex");
 }
 
-/** cloud-init's meta-data. A new instance id per card, so cloud-init treats each flash as a new machine. */
+/**
+ * cloud-init's meta-data. A new instance id per card, so cloud-init treats each flash as a new machine. The key is
+ * `instance-id`: Pi OS's own template says `instance_id`, which cloud-init ignores (the rehearsal came up as
+ * "nocloud", D300+ rehearsal).
+ */
 export function metaData(instanceId) {
   if (!/^[A-Za-z0-9._-]+$/.test(instanceId)) throw new Error("bad instance id");
-  return `# Written by scripts/cabinet-card (D250).\ndsmode: local\ninstance_id: ${instanceId}\n`;
+  return `# Written by scripts/cabinet-card (D250).\ndsmode: local\ninstance-id: ${instanceId}\n`;
 }
 
 /**
@@ -107,6 +111,8 @@ export function userData({ hostname, timezone, locale, authorizedKey, country })
     "bootcmd:",
     // Pi OS keeps Wi-Fi blocked until a country is set; network-config's regulatory-domain should do it.
     `  - [sh, -c, ${q(`raspi-config nonint do_wifi_country ${country} || true; rfkill unblock wifi || true`)}]`,
+    // D244's networkd wait, masked now: provision.sh masks it too, but only after cloud-config, which it holds 2 minutes.
+    `  - [sh, -c, ${q("systemctl mask systemd-networkd-wait-online.service; systemctl stop --no-block systemd-networkd-wait-online.service || true")}]`,
     "runcmd:",
     `  - [sh, -c, ${q(`printf '%s' ${shellQuote(NETWORK_CONFIG_APPLIED)} > /boot/firmware/network-config`)}]`,
     `  - [sh, -c, ${q(plant)}]`,

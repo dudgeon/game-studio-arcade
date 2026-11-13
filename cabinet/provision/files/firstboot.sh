@@ -18,6 +18,8 @@ SCREEN="${ARCADE_SCREEN:-/dev/tty1}"
 STARTED="$(date +%H:%M)"
 systemctl stop getty@tty1.service 2>/dev/null || true
 dmesg -n 1 2>/dev/null || true
+# systemd's own "[ OK ] Started ..." lines go to the console too; stop them for this boot (SIGRTMIN+21, systemd(1)).
+[ -z "${ARCADE_SCREEN:-}" ] && kill -s RTMIN+21 1 2>/dev/null || true
 setfont -C "$SCREEN" /usr/share/consolefonts/Lat15-TerminusBold32x16.psf.gz 2>/dev/null || true
 show() {
   [ -w "$SCREEN" ] || return 0

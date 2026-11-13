@@ -46,7 +46,7 @@ head -1 "$boot/user-data" | grep -qx '#cloud-config' || fail "user-data header"
 grep -q '^  - name: cabinet$' "$boot/user-data" || fail "no cabinet user"
 grep -q 'regulatory-domain: "US"' "$boot/network-config" || fail "no Wi-Fi country"
 grep -q '"Test \\"Mesh\\": Café":' "$boot/network-config" || fail "SSID not quoted as expected"
-grep -q "instance_id: arcade-" "$boot/meta-data" || fail "meta-data"
+grep -q "instance-id: arcade-" "$boot/meta-data" || fail "meta-data"
 # The password is nowhere on the card or in the output: only its WPA key is.
 if LC_ALL=C grep -a -q -F "$PASS" "$IMG" "$OUT/flash.log"; then fail "the Wi-Fi password is on the card or in the log"; fi
 psk="$("$NODE" -e 'const {wifiPsk}=await import(process.argv[1]); console.log(wifiPsk(process.argv[2], process.argv[3]))' "$REPO/scripts/cabinet-card/lib.mjs" "$SSID" "$PASS")"
