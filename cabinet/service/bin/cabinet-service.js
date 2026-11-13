@@ -14,7 +14,7 @@ import { stubSpeech } from "../src/speech.js";
 import { cabinetSpeech } from "../src/speech-live.js";
 import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
-import { createGuests, startGuestServer } from "../src/guests.js";
+import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
 import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate, stopGateRuns } from "../src/gate.js";
 
@@ -198,7 +198,9 @@ const s = await startService({
   host: values.host,
 });
 console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
-console.log(`guest games on ${guestServer.url}: ${guests.list("").map((g) => g.id).join(", ") || "none"}`);
+// Listing them also starts the publish gate's smoke check of any not checked yet (D312).
+const onShelf = guests.list("").map((g) => g.id);
+console.log(`guest games on ${guestServer.url}: ${guestDirs.flatMap(listGuests).map((g) => (onShelf.includes(g.id) ? g.id : `${g.id} (checking)`)).join(", ") || "none"}`);
 console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : values.config ? `Managed Agents, with the key in ${values.config} (D131)` : "OFFLINE with no key: the shelf plays, and Make waits until the cabinet is connected (D252)");
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
 console.log(gate ? `publish gate: on, ${gate.settings.host}, frame budget ${gate.settings.budgetMs} ms (cpu factor ${gate.settings.cpuFactor}, D128), nice ${gate.settings.nice} (D310)` : "publish gate: OFF");

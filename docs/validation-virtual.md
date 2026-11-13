@@ -136,3 +136,28 @@ The build itself: "Making your game" took about 4 minutes, and "Pepper's Bone Ca
 **Notes**
 1. **Two tiles both read "Something else".** D308's B tile, "Something else", sits right above C, the cabinet's own "Something else" (the mic). They look the same, but B sends no words, so Claude has to ask again. B would be clearer as "Not quite".
 2. **"Who's making?" lists the latest maker first.** Tester2 was at the top, and the first pass picked Tester2 by mistake. It was backed out at "Tell me your game idea" with ESC, before anything was sent or spent (`01/`), and Tester was picked (`02/`). That's by design, but the highlight starting on someone else is worth knowing.
+
+## The publish gate on the cabinet (2026-11-13, 00:27 to 00:43 EST)
+
+A live proof of D310-D313 on the virtual cabinet, updated in place to main c6f3516 by the director. Maker Tester, planned controls only (`flow.mjs`, `drive`, typing with F1). Screenshots are in `~/game-studio-data/vm/verify/gate-2026-11-13/`.
+
+**Result: pass. Cost: 35c (4 coins), from the ledger** (`sesn_01HomvHVi4GM3LyWYPMzc4PU`, charge 35c, "on the shelf", pot 670 → 635c).
+
+| # | Check | Result | Where |
+|---|---|---|---|
+| 1 | **Guests after their smoke checks.** At the service's start, teti passed in 5.7 s and teti by Geoff in 5.5 s. Both are on the shelf, with every made game: `/api/carts` still lists all 16. | Pass | `01-shelf/`, `publish_gate.jsonl` |
+| 2 | **The replay boards on the new code** (`replay-boards.sh`, its own service on 8341, `/tmp` data). All 11 flows passed. Inside them the gate passed Penguin Catch (12.1 to 12.5 s) and Log Hopper (6.7 s), and twice stopped a guest's check when a flow started a game, running it again after. Nothing was written under `/var/lib/arcade`. | Pass | `02-replay-boards/` |
+| 3 | **A live make, gated while a game was being played.** "a frog that catches flies, catch 10 to win", typed. The restate question got A; on the next question, D, Make it now; then the plan and Build it. During Claude's own test the kid pressed ESC and started teti by Geoff. The make came home while teti was being played: the gate waited, and no gate process ran. Leaving teti started it. | Pass | `03-live/` |
+
+**The make, built to ready.**
+- The session ended at 00:40:49.
+- The Test step's line went "Playing your game to test it", "Checking your game", "Bringing your game home", then **"Checking your game here at home"**.
+- The gate's record: **"Fly Catcher passed in 4.7 s on virtual (browser), after waiting 10 s for a game to end"**. Frame time p95 was 1.4 ms (budget 5.57 ms, advisory, D311).
+- The result was ready at 00:41:15: 26 s after the session ended, 10 of them waiting for teti.
+- Back on the shelf: "New game ready! by Tester - Fly Catcher", and Fly Catcher marked NEW. M11 said "This game used 4 coins (35c). That's about usual."
+- The record is in `studio_session` (`playtest.local.gate`: ok, host virtual, driver browser, seconds 4.7, waited_s 10, restarts 0) and in `publish_gate.jsonl`.
+- The Manager's Activity shows "cabinet re-test passed in 4.7 s (virtual, after 10 s waiting for a game to end)". The Manager on :8335 was started from an older worktree before the merge, so this view came from a second, read-only Manager on main's code, on :8336, stopped afterwards (`21-manager-activity-make.png`).
+
+**Notes**
+1. The service's startup line listed guests as "none" while their first check ran. It now names them, with "(checking)".
+2. The kid left teti only about 8 s after the build came home, so the wait was 10 s. A longer play waits longer; the gate starts within about a second of the play ending.
