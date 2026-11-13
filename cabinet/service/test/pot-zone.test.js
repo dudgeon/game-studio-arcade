@@ -46,6 +46,20 @@ test("a change across the 1st still gives each month exactly one refill", () => 
   assert.deepEqual(refills(dir), ["2026-11", "2026-12", "2027-01"]);
 });
 
+test("the history's dates are the cabinet's local days: an evening make in New York isn't tomorrow (D248)", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pot-"));
+  const code = `import { potStore } from ${JSON.stringify(POT)};
+    const p = potStore({ logsDir: process.argv[1], now: () => new Date("2026-11-13T03:08:10Z") });
+    console.log(JSON.stringify(p.history().map((e) => ({ at: e.at, day: e.day }))));`;
+  const h = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", code, dir], { encoding: "utf8", env: { ...process.env, TZ: "America/New_York" } }));
+  assert.deepEqual(h, [{ at: "2026-11-13T03:08:10.000Z", day: "2026-11-12" }]);
+  const { historyLines } = await import("../launcher/boards.js");
+  const text = (/** @type {any} */ e) => historyLines([e]).map((l) => l.text).join(" ");
+  const local = text({ kind: "refill", at: "2026-11-13T03:08:10Z", day: "2026-11-12", pot_after_cents: 1000 });
+  const utc = text({ kind: "refill", at: "2026-11-13T03:08:10Z", pot_after_cents: 1000 });
+  assert.notEqual(local, utc, "the screen uses the local day when the service gives one");
+});
+
 test("a change the other way, onto a zone already in the new month, refills at once, once", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pot-"));
   stateAt(dir, "America/New_York", "2026-12-01T03:00:00Z"); // Nov 30 in New York

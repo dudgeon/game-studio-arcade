@@ -250,10 +250,14 @@ export function potStore(o) {
       const total = s.spent_cents + Math.max(0, s.cents + added);
       return { dollars: added / 100, month_total_cents: total, over_limit: total > set.workspace_limit_cents, workspace_limit_cents: set.workspace_limit_cents };
     },
-    /** The ledger, newest first (A2, the Manager's History). @param {{ limit?: number }} [q] */
+    /**
+     * The ledger, newest first (A2, the Manager's History). Each entry gets `day`, its date in the cabinet's
+     * local time (D248): `at` is UTC, so an evening make in New York would otherwise read as tomorrow.
+     * @param {{ limit?: number }} [q]
+     */
     history(q = {}) {
       ensureMonth();
-      const all = read().reverse();
+      const all = read().reverse().map((e) => ({ ...e, day: dayOf(new Date(e.at)) }));
       return q.limit ? all.slice(0, q.limit) : all;
     },
     /** Whether a usual cost was gone over by a lot (L4). @param {number} costCents @param {MakeKind} kind */
