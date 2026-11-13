@@ -116,3 +116,23 @@ All three were archived at Anthropic after they finished (D301; each has its "th
 - Two players taking turns. The game offers it, but it wasn't played.
 - A real person judging the fun, and seeing a line clear, the sparkles and the happy dance.
 - The real cabinet (the Picade). Its run follows its bring-up.
+
+## After the fixes (2026-11-12, 22:58 to 23:05 EST)
+
+A short live check of D304-D308 on the virtual cabinet. The director had updated it in place to main a4da1b9 and reapplied the agent with the D308 brief. Maker Tester, planned controls only (`flow.mjs` and `drive`), and one new game from a spoken clip containing a name and a number, fed through `hear` as before. Screenshots are in `after-fixes/` beside the run's, one folder per step.
+
+**Result: pass. Cost: 25c (3 coins), from the ledger** (`sesn_01N1HZAs2DehqXJvxUXkpjbM`, charge 25c, "on the shelf", pot 695 → 670c).
+
+| # | Check | Result | Screenshots |
+|---|---|---|---|
+| 1 | **Claude says the idea back first (D308).** Spoken: "a puppy named Pepper … you win when you catch 15 bones … watch out for the rocks", heard word for word. Claude's first question: **"A puppy named Pepper catches falling bones. Catch 15 to win, dodge rocks?"**, A "Yes, that's it", B "Something else" | Pass | `03/`, `04/` |
+| 1a | **A spoken correction, taken before anything else.** C by voice: "Almost. You win when you catch 30 bones, not 15." (heard word for word). Claude's next question moved on to the rocks ("What happens when Pepper gets hit by a rock?"), and the plan says "catch 30 to win" and "Catch 30 bones and you win!" | Pass | `05/`, `05b/`, `06/` |
+| 2 | **The plan in plain words (D304).** The summary, how to play and all 13 rules (read in full with stick right): times in seconds ("about every 2/3 of a second"), no frames, milliseconds or code words | Pass | `06/`, `07/` |
+| 3 | **The coin history (D248, D305).** The new make is at the top as **"Nov 12 Tester: a new game, Pepper's Bone Catch, -3 coins (25c), on the shelf"**: the local day, though the ledger's time is 04:03 UTC on Nov 13. The earlier run's makes, shown as "Nov 13" then, now read Nov 12. The 1c stop reads **"less than 1 coin (1c), stopped"** | Pass | `09/`, `10/` |
+| 4 | **Menus stop at their ends (D306).** Up at the top of the shelf and of "Who's making?", down past the bottom of "Who's making?", of the question tiles (on D) and of the result screen: the highlight stayed put every time, checked with `expect-sel` | Pass | `01/`, `02/`, `06/`, `09/` |
+
+The build itself: "Making your game" took about 4 minutes, and "Pepper's Bone Catch" by Tester came back as "This game used 3 coins (25c). That's about usual."
+
+**Notes**
+1. **Two tiles both read "Something else".** D308's B tile, "Something else", sits right above C, the cabinet's own "Something else" (the mic). They look the same, but B sends no words, so Claude has to ask again. B would be clearer as "Not quite".
+2. **"Who's making?" lists the latest maker first.** Tester2 was at the top, and the first pass picked Tester2 by mistake. It was backed out at "Tell me your game idea" with ESC, before anything was sent or spent (`01/`), and Tester was picked (`02/`). That's by design, but the highlight starting on someone else is worth knowing.

@@ -78,7 +78,8 @@ test("the first question checks the idea was heard right, every time, for new ga
   const { body } = frontmatter(read("agents/studio.md"));
   const at = (s) => body.indexOf(s);
   assert.ok(body.includes("Your first question always checks you heard them right (D308)."));
-  assert.ok(body.includes('`option_a` "Yes, that\'s it", `option_b` "Something else"'), "the two tiles' words");
+  assert.ok(body.includes('`option_a` "Yes, that\'s it", `option_b` "Not quite"'), "the two tiles' words");
+  assert.ok(!body.includes('`option_b` "Something else"'), "B never repeats C's label (D309)");
   assert.ok(body.includes("Ask it once, every time"));
   assert.ok(at("Ask, before reading anything more") < at("(D308)") && at("(D308)") < at("Pick a starting point"), "it's part of asking");
   assert.ok(body.includes("Your first question restates the change they asked for, the same way (D308)."), "forks and changes too");
