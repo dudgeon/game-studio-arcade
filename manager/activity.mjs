@@ -17,13 +17,27 @@ export function activity(files) {
     if (!corrections.has(c.corrects)) corrections.set(c.corrects, []);
     corrections.get(c.corrects)?.push({ at: c.at, why: c.why });
   }
+  // One make, one row: a session a restart cut off has an early record and the one written when it was
+  // collected (D189, D191). The last record is the final outcome; the earlier ones only say a restart happened.
   /** @type {Map<string, any>} */
   const sessions = new Map();
-  for (const s of files.studio_session ?? []) if (s.id) sessions.set(s.id, s);
+  /** @type {Set<string>} */
+  const restarted = new Set();
+  /** @type {any[]} */
+  const noId = [];
+  for (const s of files.studio_session ?? []) {
+    if (!s.id) {
+      noId.push(s);
+      continue;
+    }
+    const before = sessions.get(s.id);
+    if (before || s.outcome === "service_restarted") restarted.add(s.id);
+    sessions.set(s.id, s);
+  }
   const playsBy = new Map();
   for (const p of files.play ?? []) if (p.session_id) playsBy.set(p.session_id, (playsBy.get(p.session_id) ?? 0) + 1);
 
-  const makes = (files.studio_session ?? []).map((s) => {
+  const makes = [...sessions.values(), ...noId].map((s) => {
     const charge = s.id ? charges.get(s.id) : undefined;
     const listCents = s.list_cost?.amount != null ? Math.round(Number(s.list_cost.amount)) : s.list_cost_usd != null ? Math.round(Number(s.list_cost_usd) * 100) : null;
     const cents = charge ? Number(charge.cost_cents ?? -charge.cents) : listCents;
@@ -48,6 +62,7 @@ export function activity(files) {
       minutes: s.wall_seconds != null ? Math.round(Number(s.wall_seconds) / 6) / 10 : null,
       errors: (s.errors ?? []).length,
       plays: s.id ? (playsBy.get(s.id) ?? 0) : 0,
+      restarted: Boolean(s.id && restarted.has(s.id)),
       corrections: s.id ? (corrections.get(s.id) ?? []) : [],
     };
   });

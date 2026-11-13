@@ -9,7 +9,8 @@ let status = null;
 let view = "screen";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const when = (iso) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+let timeZone; // the house's, from the Manager; until it's known, the device's
+const when = (iso) => (iso ? new Date(iso).toLocaleString([], { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
 const dollars = (c) => (c == null ? "?" : `${c < 0 ? "-" : ""}$${(Math.abs(c) / 100).toFixed(2)}`);
 const secs = (ms) => (ms < 10000 ? `${(ms / 1000).toFixed(1)} s` : ms < 120000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60000)} min`);
 
@@ -141,7 +142,7 @@ async function loadActivity() {
 function make(m) {
   const ok = m.outcome === "committed";
   const answers = m.answers.map((t) => `<li>${esc(t.question)} <span class=hint>A: ${esc(t.a)} · B: ${esc(t.b)}</span> → <span class=pick>${esc(t.choice)}${t.choice === "A" ? ` (${esc(t.a)})` : t.choice === "B" ? ` (${esc(t.b)})` : t.choice === "D" ? " (Make it now)" : ""}${t.said ? `: “${esc(t.said)}”` : ""}</span></li>`).join("");
-  return `<div class="make"><div class="top"><span class="who">${esc(m.who)}${m.with ? ` with ${esc(m.with)}` : ""}</span><span class="tag">${m.kind === "change" ? `change of ${esc(m.parent)}` : "new game"}</span><span class="hint">${when(m.at)}${m.minutes != null ? ` · ${m.minutes} min` : ""}</span><span class="tag ${ok ? "ok" : "no"}">${esc(m.kid_outcome ?? m.outcome)}</span>${m.cart ? `<span class="hint">${esc(m.cart.id)} v${esc(m.cart.version)}</span>` : ""}<span>${m.coins != null ? `${m.coins} coin${m.coins === 1 ? "" : "s"}` : ""} · ${dollars(m.cents)}${m.charged ? "" : " <span class=hint>(not charged)</span>"}</span></div><div class="said">“${esc(m.said)}”</div>${answers ? `<ol>${answers}</ol>` : ""}<div class="hint">Ended by ${esc(m.ended_by ?? "?")}${m.errors ? ` · <span class=bad>${m.errors} errors</span>` : ""}${m.plays ? ` · played ${m.plays}×` : ""}${m.corrections.map((c) => ` · ${esc(c.why)}`).join("")}</div></div>`;
+  return `<div class="make"><div class="top"><span class="who">${esc(m.who)}${m.with ? ` with ${esc(m.with)}` : ""}</span><span class="tag">${m.kind === "change" ? `change of ${esc(m.parent)}` : "new game"}</span><span class="hint">${when(m.at)}${m.minutes != null ? ` · ${m.minutes} min` : ""}</span><span class="tag ${ok ? "ok" : "no"}">${esc(m.kid_outcome ?? m.outcome)}</span>${m.cart ? `<span class="hint">${esc(m.cart.id)} v${esc(m.cart.version)}</span>` : ""}<span>${m.coins != null ? `${m.coins} coin${m.coins === 1 ? "" : "s"}` : ""} · ${dollars(m.cents)}${m.charged ? "" : " <span class=hint>(not charged)</span>"}</span></div><div class="said">“${esc(m.said)}”</div>${answers ? `<ol>${answers}</ol>` : ""}<div class="hint">Ended by ${esc(m.ended_by ?? "?")}${m.errors ? ` · <span class=bad>${m.errors} errors</span>` : ""}${m.plays ? ` · played ${m.plays}×` : ""}${m.restarted ? " · survived a service restart and was collected after it" : ""}${m.corrections.filter((c) => !(m.restarted && /restart/.test(c.why ?? ""))).map((c) => ` · ${esc(c.why)}`).join("")}</div></div>`;
 }
 $("#reload").addEventListener("click", loadActivity);
 
@@ -230,6 +231,7 @@ $("#cabinet").addEventListener("change", (e) => {
   const r = await fetch("/api/cabinets");
   const j = await r.json();
   controls = j.controls;
+  timeZone = j.time_zone || undefined;
   let saved = "", savedView = "screen";
   try { saved = localStorage.getItem("gsa-cabinet") || ""; savedView = localStorage.getItem("gsa-view") || "screen"; } catch {}
   $("#cabinet").innerHTML = j.cabinets.map((c) => `<option value="${esc(c.name)}">${esc(c.label)}</option>`).join("");
