@@ -15,7 +15,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUNDLE_PATHS, makeBundle, makeProvisionTar } from "./lib.mjs";
+import { BUNDLE_PATHS, makeBundle, makeProvisionTar, miniTimezone } from "./lib.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const DRIVE = join(REPO, "cabinet/vm/drive");
@@ -68,6 +68,8 @@ try {
   send("bundle.tar.gz", readFileSync(bundle));
   send("provision.tar.gz", readFileSync(provision));
   send("commit", readFileSync(join(work, "commit")));
+  // The mini's time zone, which the cabinet's dates and the pot's month follow (D246).
+  send("timezone", Buffer.from(`${miniTimezone()}\n`));
   send("update-on-cabinet.sh", update);
 
   const unit = `arcade-update-${payloadId}-${Date.now()}`;

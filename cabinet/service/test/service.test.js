@@ -578,31 +578,50 @@ test("the service won't start on a bad config, and doesn't quote it (D131, D185)
   assert.ok(!noAgent.stderr.includes(KEY));
 });
 
+/** Start the service binary with these flags; resolve with its URL once it says `ready`. @param {string[]} flags @param {RegExp} ready */
+async function startBin(flags, ready) {
+  const bin = path.resolve(import.meta.dirname, "../bin/cabinet-service.js");
+  const { spawn } = await import("node:child_process");
+  const child = spawn(process.execPath, [bin, "--port", "0", "--guest-port", "0", "--data", tmp(), ...flags], { stdio: ["ignore", "pipe", "pipe"] });
+  let out = "";
+  const url = await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`no start: ${out}`)), 20000);
+    child.stdout.on("data", (b) => {
+      out += b;
+      const m = out.match(/cabinet service on (\S+),/);
+      if (m && ready.test(out)) {
+        clearTimeout(t);
+        resolve(m[1]);
+      }
+    });
+    child.on("exit", (code) => reject(new Error(`exited ${code}: ${out}`)));
+  });
+  return { url: /** @type {string} */ (url), stop: () => child.kill() };
+}
+
 test("with no key and --offline, the service starts and Make can't reach the API (D252)", async () => {
   const bin = path.resolve(import.meta.dirname, "../bin/cabinet-service.js");
-  const dir = tmp();
-  const none = spawnSync(process.execPath, [bin, "--port", "0", "--data", dir], { encoding: "utf8", timeout: 20000 });
+  const none = spawnSync(process.execPath, [bin, "--port", "0", "--data", tmp()], { encoding: "utf8", timeout: 20000 });
   assert.equal(none.status, 2, "no key and no --offline still refuses");
-  const { spawn } = await import("node:child_process");
-  const child = spawn(process.execPath, [bin, "--port", "0", "--guest-port", "0", "--data", dir, "--offline"], { stdio: ["ignore", "pipe", "pipe"] });
+  const s = await startBin(["--offline"], /OFFLINE with no key/);
   try {
-    let out = "";
-    const url = await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`no start: ${out}`)), 20000);
-      child.stdout.on("data", (b) => {
-        out += b;
-        const m = out.match(/cabinet service on (\S+),/);
-        if (m && /OFFLINE with no key/.test(out)) {
-          clearTimeout(t);
-          resolve(m[1]);
-        }
-      });
-      child.on("exit", (code) => reject(new Error(`exited ${code}: ${out}`)));
-    });
-    const r = await fetch(url);
+    const r = await fetch(s.url);
     assert.equal(r.status, 200, "the shelf is served");
+    // The screens say "not connected to Claude yet", not "No Wi-Fi" (E11, E12).
+    const state = await (await fetch(new URL("/api/studio", s.url))).json();
+    assert.equal(state.offline, true);
+    assert.equal(state.unconnected, true);
   } finally {
-    child.kill();
+    s.stop();
+  }
+  // A cabinet that's only offline (here, replaying with --offline) is "No Wi-Fi" as before.
+  const r = await startBin(["--offline", "--replay", path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures/penguin-catch")], /REPLAYING/);
+  try {
+    const state = await (await fetch(new URL("/api/studio", r.url))).json();
+    assert.equal(state.offline, true);
+    assert.equal(state.unconnected, undefined);
+  } finally {
+    r.stop();
   }
 });
 

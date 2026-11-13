@@ -86,6 +86,7 @@ export function kidMessage(record) {
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
  *   findCart?: (cartId: string) => import("@game-studio-arcade/studio-cli/src/make.js").Parent | null,
  *   online?: () => boolean,
+ *   connected?: boolean,
  *   questionTimeoutMs?: number,
  *   warningMs?: number,
  *   recheckMs?: number,
@@ -168,6 +169,8 @@ export function createStudio(o) {
       ...(o.pot ? { pot: o.pot.state() } : {}),
       ...(o.cabinet?.resting() ? { resting: true } : {}),
       ...(o.online && !o.online() ? { offline: true } : {}),
+      // D252: no key yet. Offline too (nothing reaches the API), but the screens say why (E11, E12).
+      ...(o.connected === false ? { unconnected: true } : {}),
     };
     if (!run) return notice ? { phase: "idle", notice, ...ended, ...busy, ...extra } : { phase: "idle", ...ended, ...busy, ...extra };
     const waited = run.waitMs + (run.pendingSince ? Date.now() - run.pendingSince : 0);

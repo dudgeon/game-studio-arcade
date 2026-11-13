@@ -126,7 +126,7 @@ export function shellQuote(s) {
 }
 
 /** The files a picade seed holds, beside the cloud-init files at the FAT's root. */
-export const SEED_FILES = ["provision.tar.gz", "bundle.tar.gz", "commit", "firstboot.sh", "arcade-seed.service", "profile", "hostname", "authorized_keys"];
+export const SEED_FILES = ["provision.tar.gz", "bundle.tar.gz", "commit", "firstboot.sh", "arcade-seed.service", "profile", "hostname", "authorized_keys", "timezone"];
 
 /**
  * Whether a disk may be written. `info` is `diskutil info -plist` as JSON; `bootWholeDisks` are the whole

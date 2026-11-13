@@ -118,6 +118,8 @@ const studio = createStudio({
   pot,
   cabinet,
   online: () => online,
+  // No key and not replaying: the Picade before connect-picade.sh (D252). Its screens say so, not "No Wi-Fi".
+  connected: replaying || Boolean(values.config),
   findCart: (id) => {
     const c = listCarts(roots).find((x) => x.id === id);
     return c ? { id: c.id, dir: c.dir, version: c.version, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id } : null;

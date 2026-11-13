@@ -98,8 +98,9 @@ Each board id is on the canvas. "Today" names the existing screen in `screens.js
 - **L4 Cost more than usual:** the result screen when a make costs over 1.5 times its usual cost: "That's more than usual (about 6)" and a one-line reason in kid words, from the session's events (for example, "Claude had to fix it 3 times before every rule worked").
 - **L5 The Studio is resting:** only if the workspace's real limit refuses a session. Making stops until the 1st; playing works.
 
-### Errors (E1 to E10)
+### Errors (E1 to E12)
 - **E1, E2 No Wi-Fi:** the shelf header says "No Wi-Fi"; Make reads "Needs Wi-Fi right now"; picking it says Claude can't be reached, no coins were used, and the games all work.
+- **E11, E12 Not connected yet (D252):** a cabinet with no key yet (the Picade before `connect-picade.sh`). The shelf header says "Not connected"; Make reads "Not connected to Claude yet"; picking it says "Not connected to Claude yet. A grown-up needs to finish setting up.", that no coins were used, and that the games all work. Never "No Wi-Fi": the cabinet may have Wi-Fi.
 - **E3 A make failed:** "Sorry! It didn't come out right." It was Claude's slip, not the kid's; the idea and answers are saved; "The try still used <n> coins (<c>c). Real work costs real money, even when it doesn't work out." Then "Try again, same idea (about 6)" (back to M3, with the idea filled in) and "Back to the shelf". The same words go on its shelf entry (D192).
 - **E4 Restarting, E5 Restarted on a question, E6 Restarted while building:** D189 and D191's cases, in this wording. E5 says the idea is saved and what the questions used. E6 says Claude kept going and to look on the shelf.
 - **E7 Still there?:** D188's last minute, with a countdown on the hint line.

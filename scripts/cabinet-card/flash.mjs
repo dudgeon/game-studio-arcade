@@ -29,7 +29,7 @@ import { dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { makeBundle, makeProvisionTar } from "../virtual-cabinet/lib.mjs";
+import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/lib.mjs";
 import { PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
@@ -140,13 +140,6 @@ function wifiFromStdin() {
   return { ssid, psk: keyFor(ssid, pass) };
 }
 
-function miniTimezone() {
-  try {
-    return run("readlink", ["/etc/localtime"]).trim().replace(/^.*\/zoneinfo\//, "");
-  } catch {
-    return "America/New_York";
-  }
-}
 
 // ---- What goes on the card ----
 
@@ -165,7 +158,7 @@ function repoCommit() {
 }
 
 /** The seed folder, built on the mini: the same contents a virtual cabinet's seed has, for the picade profile (D143). */
-function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit }) {
+function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit, timezone }) {
   const prov = join(REPO, "cabinet/provision");
   makeProvisionTar(REPO, join(dir, "provision.tar.gz"));
   say(`bundle.tar.gz: ${makeBundle(REPO, join(dir, "bundle.tar.gz"))} files`);
@@ -175,6 +168,7 @@ function buildSeed(dir, { hostname, authorizedKey, nodeTarball, commit }) {
   cpSync(join(prov, "files/arcade-seed.service"), join(dir, "arcade-seed.service"));
   writeFileSync(join(dir, "profile"), `${PROFILE}\n`);
   writeFileSync(join(dir, "hostname"), `${hostname}\n`);
+  writeFileSync(join(dir, "timezone"), `${timezone}\n`); // provision keeps it (D246), as cloud-init sets it first
   writeFileSync(join(dir, "authorized_keys"), `${authorizedKey}\n`);
   for (const f of [...SEED_FILES, lock.node.name]) if (!existsSync(join(dir, f))) stop(`the seed is missing ${f}`);
 }
@@ -357,7 +351,7 @@ async function main() {
   try {
     const seedDir = join(work, "seed");
     mkdirSync(seedDir);
-    buildSeed(seedDir, { hostname, authorizedKey, nodeTarball, commit });
+    buildSeed(seedDir, { hostname, authorizedKey, nodeTarball, commit, timezone });
     if (!flag("--no-speech-on-card")) await speechPayload(seedDir);
     say(`seed: ${(folderBytes(seedDir) / 2 ** 20).toFixed(0)} MiB`);
     const instance = `${hostname}-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-${randomBytes(3).toString("hex")}`;

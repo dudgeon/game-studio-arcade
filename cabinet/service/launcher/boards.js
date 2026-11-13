@@ -204,7 +204,8 @@ const TAG_BG = { new: C.yellow, check: C.aqua, starter: C.gray, version: C.navy 
 
 /** @param {Painter} p @param {any} v */
 function shelf(p, v) {
-  if (v.offline) header(p, v.console ?? "Arcade", "No Wi-Fi");
+  if (v.unconnected) header(p, v.console ?? "Arcade", "Not connected");
+  else if (v.offline) header(p, v.console ?? "Arcade", "No Wi-Fi");
   else header(p, v.console ?? "Arcade", v.pot != null ? `Pot ${num(v.pot)}` : "", v.pot != null);
   /** @type {any[]} */
   const items = v.items;
@@ -593,6 +594,24 @@ export function resting() {
     tiles: [{ text: "Play a game", hue: C.green, center: true }],
     sel: 0,
     hint: "A grown-up can see why in the Manager",
+  };
+}
+
+/** E12: picking Make on a cabinet with no key yet (D252): true, plain, and not about Wi-Fi. */
+export function unconnectedMake() {
+  return {
+    screen: "board",
+    board: "E12",
+    title: "Not connected yet",
+    blocks: [
+      { text: "Not connected to Claude yet", scale: 2, color: C.yellow, rows: 2, after: 6, onCut: "ok" },
+      { text: "A grown-up needs to finish setting up.", rows: 2, onCut: "never" },
+      { text: "No coins were used.", color: C.lime, rows: 1, onCut: "never" },
+      { text: "All the games on the shelf still work.", color: C.lime, rows: 1, onCut: "never" },
+    ],
+    tiles: [{ text: "Back to the shelf", hue: C.green, center: true }],
+    sel: 0,
+    hint: "Ask a grown-up",
   };
 }
 
