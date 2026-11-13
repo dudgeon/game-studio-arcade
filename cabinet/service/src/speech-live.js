@@ -14,7 +14,14 @@ const MAX_BYTES = MAX_SECONDS * RATE * 2;
 export const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 export const GROQ_MODEL = "whisper-large-v3-turbo";
 /** Groq is skipped after this long, and Moonshine answers instead (D263). */
-export const GROQ_TIMEOUT_MS = 6000;
+export const GROQ_TIMEOUT_MS = 3000;
+/**
+ * How long Groq gets before Moonshine answers instead: 3 s, plus 0.1 s for each second of audio for the upload.
+ * On the virtual cabinet, 52 Groq calls all answered within 0.7 s (2026-11-13), while a Groq that never answers
+ * kept a kid waiting the whole timeout, so this is short.
+ * @param {Buffer} pcm
+ */
+export const groqTimeoutMs = (pcm) => GROQ_TIMEOUT_MS + Math.round((pcm.length / 2 / RATE) * 100);
 /** Where provisioning says what it installed (D261). */
 export const SPEECH_FILE = "/opt/arcade/speech/speech.json";
 
@@ -275,7 +282,7 @@ export function pcmOfWav(wav) {
 
 /**
  * Groq's whisper-large-v3-turbo (D263). The key comes from the cabinet's config, never an env var.
- * @param {{ key: string, fetchFn?: typeof fetch, timeoutMs?: number }} o
+ * @param {{ key: string, fetchFn?: typeof fetch, timeoutMs?: number, url?: string }} o
  * @returns {Engine}
  */
 export function groqEngine(o) {
@@ -289,11 +296,11 @@ export function groqEngine(o) {
       form.append("language", "en");
       form.append("temperature", "0");
       form.append("response_format", "json");
-      const res = await f(GROQ_URL, {
+      const res = await f(o.url ?? GROQ_URL, {
         method: "POST",
         headers: { authorization: `Bearer ${o.key}` },
         body: form,
-        signal: AbortSignal.timeout(o.timeoutMs ?? GROQ_TIMEOUT_MS),
+        signal: AbortSignal.timeout(o.timeoutMs ?? groqTimeoutMs(pcm)),
       });
       // The status only: an error body could quote the request.
       if (!res.ok) throw new Error(`Groq answered ${res.status}`);

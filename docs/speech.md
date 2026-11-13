@@ -6,7 +6,7 @@ How a kid's voice becomes the words on "Is this right? I heard:" (M6). Decisions
 
 1. A kid holds a player button on a screen that takes speech (M4/M5, R4). The launcher calls `/api/speech/start`.
 2. `arecord` captures 16 kHz mono from the cabinet's first capture device into the service's memory (D262).
-3. On release (`/api/speech/stop`), the clip goes to Groq if the cabinet has a key and is online, and to Moonshine on the cabinet otherwise. Moonshine also answers whenever Groq fails or takes more than 6 s (D263).
+3. On release (`/api/speech/stop`), the clip goes to Groq if the cabinet has a key and is online, and to Moonshine on the cabinet otherwise. Moonshine also answers whenever Groq fails, is rate-limited, or takes more than 3 s plus 0.1 s per second of audio (D263).
 4. The words go back to the launcher, which shows M6. An empty result shows E9 ("didn't hear that"). The clip is then zeroed and dropped. No audio is ever written anywhere.
 5. `speech.jsonl` in the cabinet's logs gets one line per hold. It records the engine, the hold and audio lengths, the latency, the word count, and any engines skipped and why. It never holds the words.
 
@@ -26,7 +26,16 @@ F1 typing is unchanged: it's the keyboard's way to answer.
 1. In the Groq console, go to **Settings → Data Controls** (console.groq.com/settings/data-controls) and turn on **Zero Data Retention**. Transcription is ZDR-eligible. Without it, Groq may keep requests for up to 30 days for abuse monitoring (Groq docs, checked 2026-11-11).
 2. Create an API key in the Groq console.
 3. In a Terminal window on the mini, run `scripts/virtual-cabinet/groq-key.sh`. It asks about ZDR, then for the key with no echo, checks the key with Groq, and puts it in the cabinet's `service.json`. The service restarts.
-4. For the Picade, run the same script with `ARCADE_HOST` set to the Picade's address.
+4. For the Picade, once it's connected (`connect-picade.sh`), run `scripts/cabinet-card/groq-picade.sh`. That's groq-key.sh over the Picade's own SSH key (D259). It works with the same key or a new one.
+
+**Rate limit:** on the free tier, Groq answered 429 after about 20 transcriptions in a minute. A kid's holds don't come near that. A 429 is just another failure, so Moonshine answers that hold. The bench takes `--pace 3500` to stay under the limit.
+
+**Fallback, measured on the virtual cabinet** (2026-11-13), using `bench.mjs --engine chain --groq-url`. It runs the service's own chain in a separate process, so the cabinet's network and service were untouched. Moonshine answered every clip in every case:
+- Groq unreachable (a blackholed address): Moonshine after Groq's timeout, 6.3 s a hold with the old 6 s timeout. That's why the timeout is now 3 s plus 0.1 s per second of audio.
+- Connection refused: Moonshine at once, 211 ms median.
+- An error from Groq (404): Moonshine, 388 ms median.
+- The real Groq through the same chain: Groq answered all 4, with no words wrong, at 336 ms median.
+- Fully offline (no DNS): Groq is skipped without trying (unit-tested).
 
 `groq-key.sh --off` takes the key off, and Moonshine carries on alone.
 
@@ -54,6 +63,9 @@ The Picade needs nothing more: plug a USB mic into the Pi.
 | Mac mini (M-series), Python 3.12 | medium-streaming | 48 TTS (4 voices) | 23.1% (Samantha 0%, Daniel 5.4%, Flo 22.6%, Junior 64.5%) | 148 / 199 / 306 ms |
 | **Virtual cabinet** (4 vCPU), Python 3.13, 2026-11-12 | medium-streaming | same | 23.4% (Samantha 0%, Daniel 4.3%, Flo 22.6%, Junior 66.7%) | 260 / 349 / 450 ms |
 | Virtual cabinet, live holds through the launcher (fed clips) | medium-streaming | 3 holds | 1 word wrong in 27 ("ice" heard as "eyes"; Say it again fixed it) | 1874 ms (the first, after 4 min idle), then 541, 488 ms |
+| **Virtual cabinet, Groq** `whisper-large-v3-turbo`, 2026-11-13 | (Groq) | same 48, paced 3.5 s apart | **4.3%** (Samantha 0%, Daniel 2.2%, Flo 9.7%, Junior 5.4%) | 239 / 346 / 553 ms |
+| Virtual cabinet, Moonshine, same day | medium-streaming | same 48 | 23.4% | 203 / 254 / 299 ms |
+| Virtual cabinet, live holds on M4 with Groq keyed (fed clips) | Groq | 2 holds | 0 wrong in 16 | 397, 437 ms |
 | Mac mini | small-streaming | same | 30.4% | 93 ms median |
 | Mac mini | tiny-streaming | same | 38.7% | 39 ms median |
 
