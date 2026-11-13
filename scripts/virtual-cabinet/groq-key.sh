@@ -1,7 +1,7 @@
 #!/bin/bash
 # Turns Groq on for a cabinet's speech (D263): puts a Groq API key in the cabinet's config, owned by
 # `arcade`, mode 0600. With a key, Groq transcribes first and Moonshine on the cabinet answers whenever
-# Groq can't (offline, an error, more than 6 seconds). Without one, Moonshine does it all.
+# Groq can't (offline, an error, a rate limit, more than about 3 seconds). Without one, Moonshine does it all.
 #
 # Before the first kid's voice goes to Groq: turn on Zero Data Retention for the Groq organization at
 # console.groq.com/settings/data-controls (docs/speech.md). This script asks first.

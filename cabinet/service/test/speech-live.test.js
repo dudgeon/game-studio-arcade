@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { alsaRecorder, cabinetSpeech, captureDevice, groqEngine, GROQ_MODEL, GROQ_URL, liveSpeech, moonshineEngine, pcmOfWav, RATE, wavOf } from "../src/speech-live.js";
+import { alsaRecorder, cabinetSpeech, captureDevice, groqEngine, groqTimeoutMs, GROQ_MODEL, GROQ_URL, liveSpeech, moonshineEngine, pcmOfWav, RATE, wavOf } from "../src/speech-live.js";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-speech-"));
 const second = (s = 1) => Buffer.alloc(Math.round(RATE * 2 * s), 1);
@@ -139,6 +139,8 @@ test("Groq: whisper-large-v3-turbo, the key as a bearer token, and errors don't 
   assert.equal(form.get("language"), "en");
   const file = /** @type {File} */ (form.get("file"));
   assert.equal(file.size, 44 + RATE * 2);
+  assert.equal(groqTimeoutMs(second(1)), 3100, "3 s, plus 0.1 s a second of audio");
+  assert.equal(groqTimeoutMs(second(30)), 6000);
   const bad = groqEngine({ key: "gsk_test", fetchFn: async () => new Response("gsk_test is invalid", { status: 401 }) });
   await assert.rejects(bad.transcribe(second()), (/** @type {any} */ e) => e.message === "Groq answered 401");
 });
