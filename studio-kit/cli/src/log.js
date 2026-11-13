@@ -4,7 +4,7 @@ import path from "node:path";
 
 /**
  * @param {string} logsDir
- * @param {"studio_session"|"studio_session_correction"|"cart_version"} type
+ * @param {"studio_session"|"studio_session_correction"|"cart_version"|"publish_gate"} type
  * @param {object} record
  */
 export function appendLog(logsDir, type, record) {

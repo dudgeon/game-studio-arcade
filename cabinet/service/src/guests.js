@@ -86,7 +86,9 @@ const readLog = (file) => {
 };
 
 /**
- * @param {{ dirs: string[], logsDir: string, guestPort?: number, now?: () => Date }} o
+ * @param {{ dirs: string[], logsDir: string, guestPort?: number, now?: () => Date, admit?: (id: string, meta: any) => boolean, checking?: () => number }} o
+ *   admit: is this guest on the shelf? The publish gate's smoke check (D310). It is still served, so it can be checked.
+ *   checking: how many guests are still being checked, for the launcher to look again
  */
 export function createGuests(o) {
   const now = o.now ?? (() => new Date());
@@ -101,7 +103,9 @@ export function createGuests(o) {
   const list = (/** @type {string} */ host) => {
     const plays = readLog(logFile());
     const hostname = (host || "127.0.0.1").replace(/:\d+$/, "");
-    return all().map(({ id, meta }) => {
+    return all()
+      .filter(({ id, meta }) => !o.admit || o.admit(id, meta))
+      .map(({ id, meta }) => {
       const mine = plays.filter((p) => p.guest_id === id);
       const scored = mine.filter((p) => Number.isInteger(p.score));
       return {
@@ -226,7 +230,7 @@ export function createGuests(o) {
       void res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(body));
     if (pathname === "/api/guests") {
       if (req.method !== "GET") return json(405, { ok: false, error: "method not allowed" }), true;
-      return json(200, { guests: list(String(req.headers.host ?? "")) }), true;
+      return json(200, { guests: list(String(req.headers.host ?? "")), checking: o.checking?.() ?? 0 }), true;
     }
     if (req.method !== "POST") return json(405, { ok: false, error: "method not allowed" }), true;
     // Only the launcher may log: a guest is on another origin (D232).

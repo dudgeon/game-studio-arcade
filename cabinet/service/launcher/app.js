@@ -5,7 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
-import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows } from "./guests.js";
+import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows, guestsChecking } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
 import { H, W, check } from "./text.js";
@@ -139,6 +139,8 @@ async function showShelf() {
     const v = { screen: "shelf", board: studio.phase === "running" ? "S2" : studio.unconnected ? "E11" : studio.offline ? "E1" : "S1", console: config.console, pot: pot()?.coins ?? null, offline: !!studio.offline, unconnected: !!studio.unconnected, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)), hint: SHELF_HINT };
     if (view.screen === "shelf") view = v;
     else show(v);
+    // A downloaded game still being checked joins the shelf when it passes (D310): look again shortly.
+    if (guestsChecking > 0) setTimeout(() => void (view.screen === "shelf" && showShelf()), 2000);
   } catch {
     offline();
   }
@@ -376,6 +378,8 @@ async function answer(choice, said, offered = false) {
 // ---------- play (G0-G5) ----------
 
 const newId = () => `pl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+/** How often a play says it's still going; the service stops counting it after 30 s of silence (D310). */
+const PLAY_BEAT_MS = 10_000;
 
 /** G0: how to play, before every game. @param {any} cart */
 function showHowTo(cart) {
@@ -398,6 +402,10 @@ function startPlay(cart) {
     },
   });
   playing = { cart, host, playId: newId(), startedAt, t0: performance.now(), errors: 0, sides: new Set(), ended: false };
+  // The publish gate waits while a game is being played (D310): say so now, and every few seconds.
+  const beat = () => post("/api/arcade/playing", { playing: true, what: cart.id }).catch(() => {});
+  beat();
+  playing.beat = setInterval(beat, PLAY_BEAT_MS);
   show({ screen: "play", board: "G1", cart });
   host.ready.catch(() => {
     if (playing) playing.failed = true;
@@ -411,6 +419,8 @@ async function endPlay(ended) {
   if (!p || p.ended) return;
   p.ended = true;
   playing = null;
+  clearInterval(p.beat);
+  post("/api/arcade/playing", { playing: false }).catch(() => {});
   returnTo = p.cart.id;
   const duration = (performance.now() - p.t0) / 1000;
   const ticks = p.host.ticks;

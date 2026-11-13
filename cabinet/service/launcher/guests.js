@@ -5,12 +5,17 @@
 import { COLORS as C } from "../../../runtime/src/palette.js";
 import { scoreLine } from "./boards.js";
 
+/** Guests the publish gate is still checking (D310): they join the shelf when they pass. A live binding. */
+export let guestsChecking = 0;
+
 /** The guests, as shelf entries shaped like carts (`guest: true`). Never throws: no guests is fine. */
 export async function fetchGuests() {
   try {
     const r = await fetch("/api/guests");
     if (!r.ok) return [];
-    return (await r.json()).guests.filter((/** @type {any} */ g) => g.url);
+    const body = await r.json();
+    guestsChecking = Number(body.checking ?? 0);
+    return body.guests.filter((/** @type {any} */ g) => g.url);
   } catch {
     return [];
   }

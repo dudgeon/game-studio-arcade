@@ -16,6 +16,7 @@ import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
+import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate } from "../src/gate.js";
 
 const { values } = parseArgs({
   options: {
@@ -37,6 +38,9 @@ const { values } = parseArgs({
     // Guest games (D230-D232): their own port, and the folders they live in.
     "guest-port": { type: "string" }, // else the config's guest_port, else 8340 (D232)
     guests: { type: "string", multiple: true },
+    // The publish gate (D310): the cabinet re-tests a game in its own Chromium before the shelf. Off only for development.
+    "no-gate": { type: "boolean", default: false },
+    profile: { type: "string" }, // else /etc/arcade/cabinet.conf: labels the gate's frame times (D128)
   },
 });
 
@@ -103,6 +107,10 @@ if (!replaying && !values.offline) {
 // D260: real speech where provisioning installed it (Moonshine, and Groq first with a key); the stub elsewhere.
 const speech = cabinetSpeech({ config, logsDir: paths.logs, online: () => online, log: (m) => console.log(m) }) ?? stubSpeech();
 
+// The publish gate (D310): one test at a time, at low priority, never while a game is being played.
+const plays = playTracker();
+const gate = values["no-gate"] || config.gate?.off ? null : createGate({ settings: gateSettings({ profile: values.profile ?? cabinetProfile(), gate: config.gate ?? {} }), playing: plays.playing, logsDir: paths.logs, log: (m) => console.log(m) });
+
 /** @type {any} */
 let api = null;
 const studio = createStudio({
@@ -111,7 +119,7 @@ const studio = createStudio({
   // Seconds a question or plan waits with no key pressed (D188).
   questionTimeoutMs: Number(values["question-timeout"] ?? config.question_timeout_s ?? QUESTION_TIMEOUT_MS / 1000) * 1000,
   model: config.model,
-  checker: defaultChecker(),
+  checker: gate ? gatedChecker(defaultChecker(), gate) : defaultChecker(),
   nameOf: (id) => makers.get(id)?.name ?? id,
   titleOf: (id) => readCart(paths.carts, id)?.title ?? null,
   onStart: (id) => makers.touch(id),
@@ -159,7 +167,9 @@ const studio = createStudio({
 
 // The guests that ship in the repo (D231), then any in the data folder.
 const guestDirs = values.guests ?? [path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../guests"), path.join(paths.root, "guests")];
-const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs });
+// A downloaded game is on the shelf once its version passes the gate's smoke check (D310).
+const guestChecks = guestGate({ file: path.join(paths.root, "gate", "guests.json"), gate, urlOf: (id, meta) => (guests.port ? `http://127.0.0.1:${guests.port}/${id}/${meta.entry}` : null) });
+const guests = createGuests({ dirs: guestDirs, logsDir: paths.logs, admit: (id, meta) => guestChecks.admitted(id, meta), checking: () => guestChecks.pending() });
 const guestServer = await startGuestServer(guests, { port: Number(values["guest-port"] ?? config.guest_port ?? 8340), host: values.host });
 guests.port = guestServer.port;
 
@@ -170,6 +180,7 @@ const screen = createScreener({ logsDir: paths.logs, model: client && config.scr
 const s = await startService({
   screen,
   guests,
+  plays,
   studio,
   makers,
   speech,
@@ -190,6 +201,7 @@ console.log(`cabinet service on ${s.url}, data in ${paths.root}`);
 console.log(`guest games on ${guestServer.url}: ${guests.list("").map((g) => g.id).join(", ") || "none"}`);
 console.log(replaying ? `REPLAYING ${values.replay}: no API calls, nothing spent (D186)` : values.config ? `Managed Agents, with the key in ${values.config} (D131)` : "OFFLINE with no key: the shelf plays, and Make waits until the cabinet is connected (D252)");
 console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
+console.log(gate ? `publish gate: on, ${gate.settings.host}, frame budget ${gate.settings.budgetMs} ms (cpu factor ${gate.settings.cpuFactor}, D128), nice ${gate.settings.nice} (D310)` : "publish gate: OFF");
 studio.collectLeft();
 
 for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => Promise.all([s.close(), guestServer.close()]).then(() => process.exit(0)));

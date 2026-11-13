@@ -4,7 +4,7 @@ const coinsOf = (/** @type {number} */ cents) => Math.sign(cents) * Math.round(M
 
 /**
  * @param {Record<string, any[]>} files  each log file's records, by name (studio_session, coin_ledger, …)
- * @returns {{ makes: any[], plays: any[], screened: any[], coins: any[] }}
+ * @returns {{ makes: any[], plays: any[], screened: any[], coins: any[], gates: any[] }}
  */
 export function activity(files) {
   const ledger = files.coin_ledger ?? [];
@@ -64,6 +64,8 @@ export function activity(files) {
       plays: s.id ? (playsBy.get(s.id) ?? 0) : 0,
       restarted: Boolean(s.id && restarted.has(s.id)),
       corrections: s.id ? (corrections.get(s.id) ?? []) : [],
+      // The cabinet's own re-test before the shelf (D310): passed, or why it kept the game off.
+      gate: gateOf(s.playtest?.local?.gate),
     };
   });
 
@@ -78,6 +80,26 @@ export function activity(files) {
 
   const coins = ledger.map((e) => ({ at: e.at, kind: e.kind, who: e.kind === "charge" ? (e.name ?? e.who) : e.kind === "refill" ? "the 1st" : `grown-up${e.by ? ` (${e.by})` : ""}`, what: e.what ?? null, reason: e.reason ?? null, cents: e.cents, pot_after_coins: coinsOf(Number(e.pot_after_cents ?? 0)) }));
 
+  // Downloaded games' smoke checks, and every gate run, newest first (D310).
+  const gates = (files.publish_gate ?? []).map((g) => ({ at: g.at, kind: g.kind, what: g.what, ...gateOf(g) }));
+
   const newest = (/** @type {any} */ a, /** @type {any} */ b) => String(b.at ?? "").localeCompare(String(a.at ?? ""));
-  return { makes: makes.sort(newest), plays: plays.sort(newest), screened: screened.sort(newest), coins: coins.sort(newest) };
+  return { makes: makes.sort(newest), plays: plays.sort(newest), screened: screened.sort(newest), coins: coins.sort(newest), gates: gates.sort(newest) };
+}
+
+/** A publish-gate run, for a person (D310). @param {any} g */
+function gateOf(g) {
+  if (!g) return null;
+  return {
+    ok: Boolean(g.ok),
+    host: g.host ?? null,
+    driver: g.driver ?? null,
+    seconds: g.seconds ?? null,
+    waited_s: g.waited_s ?? 0,
+    restarts: g.restarts ?? 0,
+    fallback: g.fallback ?? null,
+    failing: (g.failing ?? []).map((/** @type {any} */ f) => ({ id: f.id, reason: f.reason ?? null })),
+    frame_p95_ms: g.frame_time?.p95Ms ?? null,
+    budget_ms: g.budget_ms ?? null,
+  };
 }

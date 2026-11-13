@@ -315,7 +315,8 @@ export async function makeCart(o) {
     you_check_added: youCheckAdded,
     playtest: {
       sandbox: report ? { status: report.status ?? null, rules: report.rules ?? [], fix_rounds: report.fix_rounds ?? null } : null,
-      local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [] } : null,
+      // On a cabinet, `gate` is the publish gate's run: where, how long, and each failure's reason (D310).
+      local: local ? { ok: local.ok, unavailable: local.unavailable ?? false, failing: local.failing ?? [], ...(local.gate ? { gate: local.gate } : {}) } : null,
       validate: validation,
     },
     // list_cost is rounded to whole cents, so a cheap session reads "0" (D19):

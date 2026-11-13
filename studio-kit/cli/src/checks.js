@@ -13,7 +13,7 @@
 
 /**
  * @typedef {{ok: boolean, unavailable?: boolean, problems?: string[]}} ValidateResult
- * @typedef {{ok: boolean, unavailable?: boolean, report?: any, failing?: string[]}} PlaytestResult
+ * @typedef {{ok: boolean, unavailable?: boolean, report?: any, failing?: string[], gate?: any}} PlaytestResult   gate: the cabinet's publish-gate run (D310)
  * @typedef {{validate: (dir: string) => Promise<ValidateResult>, playtest: (dir: string) => Promise<PlaytestResult>}} Checker
  */
 

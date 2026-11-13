@@ -15,6 +15,7 @@
 //     started, no coins used and the question still waiting. {offered: true} marks an offered alternative.
 //   POST /api/studio/result-seen {id}: someone has seen how a make ended (D192)
 //   POST /api/studio/still-here  a key was pressed: the walk-away clock starts again (D188)
+//   POST /api/arcade/playing     {playing, what?}: a game started, is still going, or ended; the publish gate waits (D310)
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
@@ -87,6 +88,7 @@ function readJson(req) {
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
  *   managerToken?: string | null | (() => string | null),
  *   screen?: ReturnType<typeof import("./screening.js").createScreener> | null,
+ *   plays?: ReturnType<typeof import("./gate.js").playTracker>,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -162,6 +164,11 @@ export function createServiceHandler(o) {
     }
     if (pathname === "/api/studio/result-seen") {
       o.studio.viewResult(body.id);
+      return json(res, 200, { ok: true });
+    }
+    if (pathname === "/api/arcade/playing") {
+      // A game started, is still going (every few seconds), or ended: the publish gate waits for it (D310).
+      o.plays?.set(body.playing === true, typeof body.what === "string" ? body.what.slice(0, 80) : null);
       return json(res, 200, { ok: true });
     }
     if (pathname === "/api/studio/still-here") {
@@ -247,7 +254,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen"]);
+  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
