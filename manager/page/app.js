@@ -146,15 +146,15 @@ function make(m) {
 $("#reload").addEventListener("click", loadActivity);
 
 // ---- Coins (D284) ----
-async function loadPot() {
+async function loadPot(keepMessage = false) {
   $("#pair").hidden = true;
-  $("#coinmsg").textContent = "";
+  if (!keepMessage) $("#coinmsg").textContent = "";
   try {
     const v = await api("GET", "/pot");
     const p = v.pot;
     $("#pot").innerHTML = `<div class="card"><div><div class="potbig">${esc(p.coins)} coins</div><div class="hint">${dollars(p.cents)} of ${esc(p.full_coins)} coins · fills back up on ${esc(p.refill_on)} · this month ${dollars(p.spent_cents)} spent${p.added_cents ? `, ${dollars(p.added_cents)} added` : ""}</div>${p.makers.map((m) => `<div>${esc(m.name)}: ${esc(m.coins)} coins, ${esc(m.makes)} make${m.makes === 1 ? "" : "s"}</div>`).join("")}</div></div>`;
     $("#ledger").innerHTML = `<tr><th>When</th><th>Who</th><th>What</th><th class=n>Pot after</th></tr>` +
-      v.history.slice(0, 60).map((e) => `<tr><td>${when(e.at)}</td><td>${esc(e.kind === "charge" ? (e.name ?? e.who) : e.kind === "refill" ? "the 1st" : `grown-up${e.by ? ` (${e.by})` : ""}`)}</td><td>${esc(e.kind === "charge" ? `${e.what}, ${e.cost_cents}c, ${e.outcome}` : e.kind === "topup" ? `added ${Math.round(e.cents / 10)} coins: "${e.reason}"` : e.kind === "reset" ? `reset to 100: "${e.reason}"` : "refilled to 100")}</td><td class=n>${Math.round(e.pot_after_cents / 10)}</td></tr>`).join("");
+      v.history.slice(0, 60).map((e) => `<tr><td>${when(e.at)}</td><td>${esc(e.kind === "charge" ? (e.name ?? e.who) : e.kind === "refill" ? "the 1st" : `grown-up${e.by ? ` (${e.by})` : ""}`)}</td><td>${esc(e.kind === "charge" ? `${e.what}, ${e.cost_cents}c, ${e.outcome}` : e.kind === "topup" ? `added ${Math.round(e.cents / 10)} coin${Math.round(e.cents / 10) === 1 ? "" : "s"}: "${e.reason}"` : e.kind === "reset" ? `reset to 100: "${e.reason}"` : "refilled to 100")}</td><td class=n>${Math.round(e.pot_after_cents / 10)}</td></tr>`).join("");
   } catch (e) {
     if (e.unpaired) $("#pair").hidden = false;
     $("#pot").innerHTML = `<p class=bad>${esc(e.message)}</p>`;
@@ -177,8 +177,8 @@ $("#topup").addEventListener("submit", async (e) => {
     }
     confirmFor = null;
     $("#warn").hidden = true;
-    $("#coinmsg").textContent = `Added ${body.coins} coins: “${body.reason}”.`;
-    loadPot();
+    $("#coinmsg").textContent = `Added ${body.coins} coin${body.coins === 1 ? "" : "s"}: “${body.reason}”.`;
+    loadPot(true);
   } catch (err) {
     $("#coinmsg").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
   }
@@ -193,7 +193,7 @@ $("#reset").addEventListener("submit", async (e) => {
   try {
     await api("POST", "/pot/reset", { reason });
     $("#coinmsg").textContent = `Reset to 100 coins: “${reason}”.`;
-    loadPot();
+    loadPot(true);
   } catch (err) {
     $("#coinmsg").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
   }

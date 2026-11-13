@@ -244,7 +244,7 @@ export function createManager(o) {
         };
         if (req.method === "GET" && rest === "/pot") return json(res, 200, check(await c.service("GET", "/api/manager/pot")));
         const b = await readJson(req);
-        const by = `${os.userInfo().username} (Manager)`;
+        const by = `${os.userInfo().username}, in the Manager`;
         if (req.method === "POST" && rest === "/pot/topup") {
           const n = Number(b.coins);
           const reason = String(b.reason ?? "").trim();
