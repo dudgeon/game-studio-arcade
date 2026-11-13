@@ -46,6 +46,9 @@ check devtools-local-only guest '! ss -ltn | grep ":9222" | grep -qv "127.0.0.1"
 check console-not-on-serial guest '! grep -q hvc /proc/consoles'
 check swap-as-on-pi guest 'grep -q zram /proc/swaps'
 check sound-out guest 'sudo runuser -u arcade -- aplay -l | grep -q virtio-snd && head -c 96000 /dev/zero | sudo runuser -u arcade -- aplay -q -D hw:0 -f S16_LE -r 48000 -c 2 -t raw -'
+# D246: the family's time zone, the mini's, for the cabinet's dates and the pot's month (D202).
+MINI_TZ="$(/opt/homebrew/opt/node@22/bin/node -e 'import("'"$REPO"'/scripts/virtual-cabinet/lib.mjs").then((m) => console.log(m.miniTimezone()))')"
+check time-zone guest "echo \"\$(cat /etc/timezone) \$(date +%Z)\"; test \"\$(cat /etc/timezone)\" = '$MINI_TZ' && test \"\$(readlink /etc/localtime)\" = /usr/share/zoneinfo/$MINI_TZ"
 check no-failed-units guest 'test -z "$(systemctl --failed --no-legend --plain)" || { systemctl --failed --no-legend --plain; false; }'
 # D244: nothing holds boot behind networkd's wait-online. Proven only by a boot since the fix: online within 30 s.
 check boot-not-held guest 'test "$(systemctl is-enabled systemd-networkd-wait-online 2>&1)" = masked && t=$(systemctl show -p ActiveEnterTimestampMonotonic --value network-online.target) && echo "network-online at $((t / 1000000)) s" && test "$t" -gt 0 && test "$t" -lt 30000000'

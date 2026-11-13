@@ -4,6 +4,22 @@ import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
+/** An IANA zone name from /etc/localtime's link target, or null. "/var/db/timezone/zoneinfo/America/New_York". */
+export function zoneFromLink(target) {
+  const m = /\/zoneinfo\/([A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)*)$/.exec(String(target).trim());
+  return m ? m[1] : null;
+}
+
+/** The mini's time zone, which every cabinet takes (D246). ARCADE_TIMEZONE overrides it. */
+export function miniTimezone() {
+  if (process.env.ARCADE_TIMEZONE) return process.env.ARCADE_TIMEZONE;
+  try {
+    return zoneFromLink(execFileSync("readlink", ["/etc/localtime"], { encoding: "utf8" })) ?? "America/New_York";
+  } catch {
+    return "America/New_York";
+  }
+}
+
 /** What goes to a cabinet, for a build's seed and for an update (D195). */
 export const BUNDLE_PATHS = ["package.json", "package-lock.json", "runtime", "studio-kit", "cabinet/service", "cabinet/vm/guest", "guests"];
 

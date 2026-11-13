@@ -31,6 +31,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 # shellcheck source=/dev/null
 . "$SELF_DIR/boot-wait.sh"
 # shellcheck source=/dev/null
+. "$SELF_DIR/timezone.sh"
+# shellcheck source=/dev/null
 . "$SELF_DIR/speech.sh"
 
 step_hostname() {
@@ -168,6 +170,7 @@ stage() { STAGE=$((STAGE + 1)); log "== $STAGE/$STAGES $*"; }
 
 log "profile $PROFILE"
 step_hostname
+step_timezone
 stage "Checking the clock"
 hw_early
 stage "Installing the screen and the browser (the longest step)"
