@@ -336,7 +336,8 @@ export function historyLines(history) {
   /** @type {{ text: string, color?: number }[]} */
   const out = [];
   for (const e of history) {
-    const day = dayName(String(e.at).slice(0, 10));
+    // The service's `day` is the cabinet's local date (D248); `at` is UTC.
+    const day = dayName(e.day ?? String(e.at).slice(0, 10));
     if (e.kind === "charge") {
       const what = e.what === "change" ? "a change" : "a new game";
       const title = e.title ? `, ${e.title}` : "";

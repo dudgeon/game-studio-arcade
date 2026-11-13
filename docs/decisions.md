@@ -1086,6 +1086,11 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
   - The next refill comes at 00:00 on 1 December, New York time (05:00 UTC), not London's midnight.
 - **One oddity, only if the zone changes across a 1st:** the entries written in the hours between the two midnights take the month of whichever zone was in force. The balance stays right, because it's always the last entry's. It can't happen this month.
 
+**D248. The coin history shows the cabinet's local day.** *(Claude, 2026-11-13; found while delivering D246.)*
+- **D246 alone didn't fix the dates.** The history screen (A2, `historyLines`) took its day from the first 10 characters of each entry's `at`, which is UTC, so it showed the UTC date in any zone.
+- **The fix:** `pot.history()` now adds `day` to each entry, the date in the cabinet's local time, using the same `dayOf` as the refill date. The screen shows `day`, falling back to `at` for an older service. The ledger file is unchanged (D5): `day` is worked out when the history is read, not stored.
+- **Checked by** `pot-zone.test.js`: in New York, an entry at 03:08Z on the 13th reads as the 12th.
+
 ## 2026-11-11 — The Picade's card and bring-up (worker)
 
 Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. Geoff's direction is in [validation-direction.md](validation-direction.md); the checklist is [cabinet-bring-up.md](cabinet-bring-up.md).
