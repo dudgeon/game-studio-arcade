@@ -7,7 +7,7 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
-import { bootBoard, cardView, coinsWord, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { bootBoard, cardView, coinsWord, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, unconnectedMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
 import { redirectBoard } from "../launcher/redirect.js";
@@ -82,6 +82,7 @@ function boardsWith(s) {
     "S1 tags": { screen: "shelf", console: s, pot: 100, sel: 1, items: [{ kind: "make", title: "Make a new game", cost: 6 }, { kind: "cart", title: s, by: s, version: "v12", tags: [{ text: "NEW", kind: "new" }, { text: "2 to check", kind: "check" }], hasCard: true, cart }] },
     "S2 waiting": { screen: "shelf", console: s, pot: 50, sel: 0, items: [{ kind: "back", title: `Claude is waiting for ${s}`, note: s, urgent: true }, { kind: "waiting", title: "Make a new game", note: `After ${s}'s game is done` }] },
     "E1": { screen: "shelf", console: s, offline: true, sel: 0, items: [{ kind: "offline", title: "Make a new game", note: "Needs Wi-Fi right now", urgent: true }] },
+    "E11": { screen: "shelf", console: s, offline: true, unconnected: true, sel: 0, items: [{ kind: "unconnected", title: "Make a new game", note: "Not connected to Claude yet", urgent: true }] },
     "S3": cardView({ cart, family: fam.family, line: fam.line, nameOf, usual: { change: 3 } }),
     "A1": { screen: "pot", pot: pot(62) },
     "A1 nobody yet": { screen: "pot", pot: { ...pot(100), makers: [] } },
@@ -126,6 +127,7 @@ function boardsWith(s) {
     "L2 for a change": potLimit({ kind: "change", pot: pot(2), why: "low" }),
     "L5": resting(),
     "E2": offlineMake(),
+    "E12": unconnectedMake(),
     "E8": leaveView({ usedCents: 123 }),
     "gone, walked away, with the cost and a retry": goneView({ kind: "timed_out", message: s, cost_cents: 999, retry: { maker: "m", request: s, kind: "change" } }, { new: 6, change: 2 }),
     "E5 with a retry": goneView({ kind: "restarted", message: s, retry: { maker: "m", request: s, kind: "new" } }, { new: 6, change: 2 }),
@@ -372,4 +374,25 @@ test("a guest's G6 shows the score line only when it reported one (D235)", () =>
 test("R8 for someone else's own version names whose game stays the same (D302)", () => {
   const r = resultView({ id: 1, ok: true, kind: "change", version: 1, title: "Snowball Drop", maker_name: "Tester2", cost_cents: 13, pot_after_cents: 882, parent: { id: "rock-rain", maker: "tester", maker_name: "Tester" } }, null);
   assert.ok(r.blocks.some((b) => b.text === "Tester's game stays the same."));
+});
+
+test("a cabinet with no key yet says so, not \"No Wi-Fi\" (D252)", () => {
+  const b = unconnectedMake();
+  const words = [b.title, ...b.blocks.map((x) => x.text), b.hint].join(" ");
+  assert.match(words, /Not connected to Claude yet/);
+  assert.match(words, /A grown-up needs to finish setting up\./);
+  assert.doesNotMatch(words, /Wi-?Fi/i);
+  // The shelf header and the Make row, drawn at 1024x768 with the console's own name: whole, and not about Wi-Fi.
+  const p = new Painter();
+  draw(p, { screen: "shelf", console: "Quarter Deck", offline: true, unconnected: true, sel: 0, items: [{ kind: "unconnected", title: "Make a new game", note: "Not connected to Claude yet", urgent: true }] });
+  assert.deepEqual(check(p.boxes), []);
+  const shown = p.boxes.flatMap((b) => b.lines.map((l) => l.text)).join(" | ");
+  assert.match(shown, /Not connected(?! to)/, "the header");
+  assert.match(shown, /Not connected to Claude yet/, "the Make row, whole");
+  assert.doesNotMatch(shown, /Wi-?Fi/i);
+  // And the board, whole.
+  draw(p, b);
+  assert.deepEqual(check(p.boxes), []);
+  const board = p.boxes.flatMap((x) => x.lines.map((l) => l.text)).join(" ");
+  assert.match(board, /A grown-up needs to finish setting up\./);
 });
