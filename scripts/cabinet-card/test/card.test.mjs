@@ -250,36 +250,54 @@ test("first boot puts each provisioning stage on the screen, and says so when it
   const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
   const declared = Number(prov.match(/^STAGES=(\d+)$/m)?.[1]);
   assert.equal((prov.match(/^stage "/gm) ?? []).length, declared, "STAGES counts every stage");
-  const run = (exitCode) => {
+  const run = (exitCode, { tick = "30", slow = 0, reboot = false } = {}) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "card-firstboot-"));
     const seed = path.join(root, "seed");
     const src = path.join(root, "src");
     fs.mkdirSync(seed);
     fs.mkdirSync(src);
     fs.writeFileSync(path.join(seed, "profile"), "picade\n");
-    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] profile picade"\necho "[provision 10:00:01] == 1/2 Checking the clock"\necho "[provision 10:00:02] == 2/2 Installing speech: Moonshine"\nexit ${exitCode}\n`);
+    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] profile picade"\necho "[provision 10:00:01] == 1/2 Checking the clock"\necho "[provision 10:00:02] == 2/2 Installing speech: Moonshine"\nsleep ${slow}\nexit ${exitCode}\n`);
     execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
     const screen = path.join(root, "tty1");
     fs.writeFileSync(screen, "");
     const uptime = path.join(root, "uptime");
     fs.writeFileSync(uptime, "185.42 600.10\n"); // 3 minutes since power-on
-    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen, ARCADE_UPTIME: uptime } });
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen, ARCADE_UPTIME: uptime, ARCADE_TICK_S: tick, ARCADE_REBOOT_FLAG: path.join(root, reboot ? "seed/profile" : "no-flag"), ARCADE_RESTART: "echo restart-scheduled" } });
     const out = { status: r.status, log: r.stdout, screen: fs.readFileSync(screen, "utf8"), ok: fs.existsSync(path.join(seed, "provision.ok")) };
     fs.rmSync(root, { recursive: true, force: true });
     return out;
   };
   const good = run(0);
+  const ticked = run(0, { tick: "0.2", slow: 1 });
+  assert.ok((ticked.screen.match(/Switched on 3 minutes ago/g) ?? []).length > (good.screen.match(/Switched on 3 minutes ago/g) ?? []).length, "the ticker redraws between steps");
+  assert.match(ticked.log, /=== firstboot exit 0 /);
+  // With the restart wanted, it's scheduled, and first boot still finishes and logs exit 0 after it.
+  const restart = run(0, { reboot: true });
+  assert.match(restart.log, /restarting once[\s\S]*restart-scheduled[\s\S]*=== firstboot exit 0 /);
+  assert.doesNotMatch(fs.readFileSync(path.join(REPO, "cabinet/provision/files/firstboot.sh"), "utf8"), /^\s*systemctl reboot --no-block\s*$/m, "never a restart that stops first boot mid-script");
   assert.equal(good.status, 0, good.log);
   assert.match(good.log, /== 2\/2 Installing speech/, "the log keeps every line");
   assert.match(good.screen, /Step 1\/2\s+Checking the clock/);
   assert.match(good.screen, /Step 2\/2\s+Installing speech: Moonshine/);
   assert.match(good.screen, /Done\./);
-  assert.match(good.screen, /Switched on 3 minutes ago\./, "minutes since power-on: the Pi has no clock until NTP (D257)");
+  assert.match(good.screen, /Switched on 3 minutes ago\.\n/, "minutes since power-on, on its own line: the Pi has no clock until NTP (D257)");
   assert.doesNotMatch(good.screen, /Started at|\d{1,2}:\d{2}/, "no clock time on the screen");
+  assert.match(good.log, /=== firstboot exit 0 /, "first boot logs its own exit status (the journal doesn't outlive the restart)");
+  assert.doesNotMatch(good.log, /Terminated/, "the ticker stops cleanly");
   assert.ok(good.ok);
+  // Nothing wraps on the 64-column console: the longest stage title, the failure, and the longest minutes line.
+  const COLS = 64;
+  const titles = [...prov.matchAll(/^stage "([^"]+)"$/gm)].map((m) => m[1]);
+  const screenLines = (text) => text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "\n").split("\n");
+  for (const t of titles) assert.ok(`  ${t}`.length <= COLS, `stage title too wide for the console: ${t}`);
+  const wide = (o) => screenLines(o.screen).filter((l) => l.length > COLS);
+  assert.deepEqual(wide(good), []);
   const bad = run(3);
+  assert.deepEqual(wide(bad), []);
   assert.notEqual(bad.status, 0, "a failed provision fails first boot, so it runs again at the next boot");
   assert.match(bad.screen, /Setup stopped\./);
+  assert.match(bad.log, /=== firstboot exit [1-9]/);
   assert.ok(!bad.ok);
 });
 

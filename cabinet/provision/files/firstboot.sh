@@ -35,33 +35,45 @@ draw() {
   [ -w "$SCREEN" ] || return 0
   local a b
   { IFS= read -r a; IFS= read -r b; } < "$STEP_FILE"
-  printf '\033[2J\033[H\033[?25l\n\n  Setting up the arcade\n\n  %s\n\n  %s\n\n  Switched on %s ago. It restarts once when it is done.\n  Please leave it switched on.\n' "$a" "$b" "$(on_for)" >> "$SCREEN" 2>/dev/null || true
+  # The console is 64 columns in this font at 1024x768: every line here stays under that (card.test.mjs checks).
+  printf '\033[2J\033[H\033[?25l\n\n  Setting up the arcade\n\n  %s\n\n  %s\n\n  Switched on %s ago.\n  It restarts once when it is done.\n  Please leave it switched on.\n' "$a" "$b" "$(on_for)" >> "$SCREEN" 2>/dev/null || true
 }
 show() {
   printf '%s\n%s\n' "$1" "${2:-}" > "$STEP_FILE"
   draw
 }
 show "Getting ready" ""
-( while sleep "${ARCADE_TICK_S:-30}"; do draw; done ) </dev/null >/dev/null 2>&1 &
+# The ticker sleeps in the background and waits, so a TERM stops it at once and takes its sleep with it: nothing
+# of first boot is left running when the restart comes.
+( trap 'kill "$nap" 2>/dev/null; exit 0' TERM
+  while :; do sleep "${ARCADE_TICK_S:-30}" & nap=$!; wait "$nap"; draw; done ) </dev/null >/dev/null 2>&1 &
 TICKER=$!
-trap 'kill "$TICKER" 2>/dev/null || true; rm -f "$STEP_FILE"' EXIT
+stop_ticker() {
+  kill "$TICKER" 2>/dev/null || true
+  wait "$TICKER" 2>/dev/null || true
+}
+# First boot's own exit status, in its log: the Picade's journal doesn't outlive the restart.
+trap 'rc=$?; stop_ticker; rm -f "$STEP_FILE"; echo "=== firstboot exit $rc $(date -u) ==="' EXIT
 if ! /bin/bash "$WORK/provision.sh" --profile "$PROFILE" --payload "$SEED" 2>&1 | while IFS= read -r line; do
   printf '%s\n' "$line"
   case "$line" in
     *"] == "*) step="${line#*] == }"; show "Step ${step%% *}" "${step#* }" ;;
   esac
 done; then
-  kill "$TICKER" 2>/dev/null || true
-  show "Setup stopped." "Tell a grown-up. The details are in seed/provision.log on the card."
+  stop_ticker
+  show "Setup stopped." "Tell a grown-up. Details: seed/provision.log"
   exit 1
 fi
-kill "$TICKER" 2>/dev/null || true
+stop_ticker
 show "Done." "Restarting..."
 echo "=== firstboot ok $(date -u) ==="
 touch "$SEED/provision.ok"
 # The picade profile asks for one restart when it changed config.txt (D250): its overlay and screen power
 # only start at boot. The virtual profile never asks.
-if [ -f /run/arcade-reboot-wanted ]; then
-  echo "=== firstboot: restarting once for the new boot config $(date -u) ==="
-  systemctl reboot --no-block
+# The restart is scheduled a few seconds out, so this script finishes and logs its exit first: a restart asked
+# for now would stop this unit mid-script (the rehearsal of 2026-11-12 showed it). ARCADE_RESTART is for the test.
+if [ -f "${ARCADE_REBOOT_FLAG:-/run/arcade-reboot-wanted}" ]; then
+  echo "=== firstboot: restarting once for the new boot config, in 5 s $(date -u) ==="
+  ${ARCADE_RESTART:-systemd-run --quiet --unit=arcade-firstboot-restart --on-active=5 /usr/bin/systemctl reboot} \
+    || systemctl reboot --no-block
 fi
