@@ -1069,6 +1069,23 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
 - **Checks:** `netwatch.test.mjs`, `link.test.mjs`, and `verify.sh`'s `bridged-subnet-route`.
 - **The soak** (`path-soak.sh`) now outlasts a deliberate restart. It marks rounds with both paths down as `restart?`, reopens the held connection, and lists the cabinet's boots, so each gap can be matched to a restart.
 
+**D246. Every cabinet keeps the family's time zone, the mini's, by one route.** *(Claude, at the director's ask, 2026-11-13; both profiles.)*
+- **What was wrong:** the virtual cabinet ran on the image's default zone, Europe/London. So the coin history showed UTC dates: a make on the evening of the 12th in New York read "Nov 13". The pot's month and its 1st-of-the-month refill followed London too.
+- **One function picks the zone:** `miniTimezone()` in `scripts/virtual-cabinet/lib.mjs` reads the mini's `/etc/localtime` link (`ARCADE_TIMEZONE` overrides). The Picade's card script now uses it too, instead of its own copy.
+- **One file carries it:** every payload has a `timezone` file. That covers the virtual cabinet's build seed, the Picade's card seed, and each in-place update. The Picade also still gets it from cloud-init at its first boot, before provisioning runs.
+- **One step applies it** for both profiles: `provision.sh`'s `step_timezone` (`cabinet/provision/timezone.sh`). It links `/etc/localtime` and writes `/etc/timezone`. It runs before the service and kiosk restart, so both read the new zone. A payload with no zone, or a zone the system doesn't have, leaves the cabinet's zone alone.
+- **Checks:** `timezone.test.mjs` tests the step against stand-ins and checks every payload carries the zone. `verify.sh`'s `time-zone` check confirms the cabinet's zone is the mini's.
+
+**D247. The pot's month is the cabinet's local month, and a zone change can't refill twice or skip a refill.** *(Claude; checks D202.)*
+- **The month logic already used local time.** `pot.js` takes the month from `Date`'s local getters (`monthOf`, `nextRefill`), and nothing sets `TZ`, so it follows `/etc/localtime` once the service restarts.
+- **Each month gets one refill, whatever the zone:** the refill is keyed by the month string, and `ensureMonth` adds one only if that month has none yet. Changing zone mid-month leaves the month's refill alone and adds no second one. A change across the 1st still gives each month exactly one refill, in either direction. `cabinet/service/test/pot-zone.test.js` runs these cases in separate processes with `TZ` set.
+- **What happens to this month's ledger** on the virtual cabinet (read on 2026-11-13 at 03:23 GMT):
+  - It has 19 entries: one refill for 2026-11 (2026-11-11 15:09Z), two top-ups, one reset and 15 charges.
+  - Every entry's month is the same in New York as in London, so moving to America/New_York changes no month. There's no second November refill, and none is lost.
+  - Entries keep the month they were written with, and are never rewritten (D5).
+  - The next refill comes at 00:00 on 1 December, New York time (05:00 UTC), not London's midnight.
+- **One oddity, only if the zone changes across a 1st:** the entries written in the hours between the two midnights take the month of whichever zone was in force. The balance stays right, because it's always the last entry's. It can't happen this month.
+
 ## 2026-11-11 — The Picade's card and bring-up (worker)
 
 Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. Geoff's direction is in [validation-direction.md](validation-direction.md); the checklist is [cabinet-bring-up.md](cabinet-bring-up.md).
@@ -1290,20 +1307,3 @@ The director's validation run on the virtual cabinet, as Tester, typed input: wa
    - Then "New game ready!" appeared. M11 said "It finished while the cabinet was restarting.", with 3 coins (31c).
    - The ledger has "restart, on the shelf". The record says `resumed_after_restart`, and the correction "collected after a service restart", archive ok. The journal has the cut-off, re-attach and collect lines (D191, D199).
    - The run went to Tester2, not Tester: "Who's making?" lists the most recent maker first, and the drive script picked the top row.
-
-**D246. Every cabinet keeps the family's time zone, the mini's, by one route.** *(Claude, at the director's ask, 2026-11-13; both profiles.)*
-- **What was wrong:** the virtual cabinet ran on the image's default zone, Europe/London. So the coin history showed UTC dates: a make on the evening of the 12th in New York read "Nov 13". The pot's month and its 1st-of-the-month refill followed London too.
-- **One function picks the zone:** `miniTimezone()` in `scripts/virtual-cabinet/lib.mjs` reads the mini's `/etc/localtime` link (`ARCADE_TIMEZONE` overrides). The Picade's card script now uses it too, instead of its own copy.
-- **One file carries it:** every payload has a `timezone` file. That covers the virtual cabinet's build seed, the Picade's card seed, and each in-place update. The Picade also still gets it from cloud-init at its first boot, before provisioning runs.
-- **One step applies it** for both profiles: `provision.sh`'s `step_timezone` (`cabinet/provision/timezone.sh`). It links `/etc/localtime` and writes `/etc/timezone`. It runs before the service and kiosk restart, so both read the new zone. A payload with no zone, or a zone the system doesn't have, leaves the cabinet's zone alone.
-- **Checks:** `timezone.test.mjs` tests the step against stand-ins and checks every payload carries the zone. `verify.sh`'s `time-zone` check confirms the cabinet's zone is the mini's.
-
-**D247. The pot's month is the cabinet's local month, and a zone change can't refill twice or skip a refill.** *(Claude; checks D202.)*
-- **The month logic already used local time.** `pot.js` takes the month from `Date`'s local getters (`monthOf`, `nextRefill`), and nothing sets `TZ`, so it follows `/etc/localtime` once the service restarts.
-- **Each month gets one refill, whatever the zone:** the refill is keyed by the month string, and `ensureMonth` adds one only if that month has none yet. Changing zone mid-month leaves the month's refill alone and adds no second one. A change across the 1st still gives each month exactly one refill, in either direction. `cabinet/service/test/pot-zone.test.js` runs these cases in separate processes with `TZ` set.
-- **What happens to this month's ledger** on the virtual cabinet (read on 2026-11-13 at 03:23 GMT):
-  - It has 19 entries: one refill for 2026-11 (2026-11-11 15:09Z), two top-ups, one reset and 15 charges.
-  - Every entry's month is the same in New York as in London, so moving to America/New_York changes no month. There's no second November refill, and none is lost.
-  - Entries keep the month they were written with, and are never rewritten (D5).
-  - The next refill comes at 00:00 on 1 December, New York time (05:00 UTC), not London's midnight.
-- **One oddity, only if the zone changes across a 1st:** the entries written in the hours between the two midnights take the month of whichever zone was in force. The balance stays right, because it's always the last entry's. It can't happen this month.
