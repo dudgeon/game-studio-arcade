@@ -47,7 +47,12 @@ g.devicePixelRatio = 1;
 g.innerWidth = 1024;
 g.innerHeight = 768;
 g.location = { href: "http://127.0.0.1:8320/runtime/play.html" };
-g.requestAnimationFrame = () => 0;
+/** The live loop's frame callback, so a test can run it by hand. @type {((t: number) => void) | null} */
+let raf = null;
+g.requestAnimationFrame = (/** @type {(t: number) => void} */ fn) => {
+  raf = fn;
+  return 0;
+};
 g.window = g;
 
 const { createHost } = await import("../src/host.js");
@@ -98,4 +103,42 @@ test("players: default 1, passed to the frame at boot, bad values throw (D110)",
 
   assert.throws(() => createHost({ container: /** @type {any} */ (container()), cartUrl: "/x.js", test: true, players: 0 }), /whole number from 1 to 8/);
   assert.equal(count(), 0, "a host that failed to start leaves nothing attached");
+});
+
+test("a tap shorter than a frame still reaches the game, once; two taps a frame apart are two presses (D303)", async () => {
+  const { BIT } = await import("../src/input.js");
+  posted.length = 0;
+  const c = container();
+  const host = createHost({ container: /** @type {any} */ (c), cartUrl: "/carts/x/game.js", persist: false });
+  c.child.fire("load");
+  // The frame says it's ready, as a real one does.
+  for (const fn of windowListeners.get("message|false") ?? []) fn({ source: c.child.contentWindow, data: { type: "ready" } });
+  const key = (/** @type {string} */ type, /** @type {string} */ code) => {
+    for (const fn of windowListeners.get(`${type}|false`) ?? []) fn({ type, code, repeat: false, preventDefault() {} });
+  };
+  let t = 1000;
+  const frame = () => {
+    t += 1000 / 60;
+    /** @type {any} */ (raf)?.(t);
+    return posted.filter((m) => m.type === "tick").at(-1);
+  };
+  frame();
+  const ticks = () => posted.filter((m) => m.type === "tick");
+  const before = ticks().length;
+  // Down and up between two frames: the next tick still sees left, the one after doesn't.
+  key("keydown", "ArrowLeft");
+  key("keyup", "ArrowLeft");
+  assert.equal(frame().masks[0] & BIT.left, BIT.left, "the short tap is seen");
+  assert.equal(frame().masks[0] & BIT.left, 0, "and only once");
+  // Two taps with a frame between them are two separate presses.
+  key("keydown", "ArrowLeft");
+  key("keyup", "ArrowLeft");
+  const a = frame().masks[0] & BIT.left;
+  const gap = frame().masks[0] & BIT.left;
+  key("keydown", "ArrowLeft");
+  key("keyup", "ArrowLeft");
+  const b = frame().masks[0] & BIT.left;
+  assert.deepEqual([a, gap, b], [BIT.left, 0, BIT.left]);
+  assert.ok(ticks().length > before);
+  host.destroy();
 });

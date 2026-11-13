@@ -3,6 +3,7 @@
 // Studio-side role (tile relay); the CLI and later the cabinet service share it.
 import { planResult, questionResult } from "./tiles.js";
 import { LINE_STAGE, progressFor, progressGate, tellStage } from "./progress.js";
+import { kidWords } from "./kidwords.js";
 
 /**
  * @typedef {import("./api.js").StudioApi} StudioApi
@@ -60,14 +61,24 @@ export function requestMessage({ request, maker, withPlayer }) {
  * @param {any} input
  */
 export function planOf(input) {
-  const controls = typeof input.controls === "string" ? input.controls.trim() : "";
+  // Kid words on the screen (D304): no frames or milliseconds, whatever the agent wrote.
+  let reworded = 0;
+  const kid = (/** @type {unknown} */ t) => {
+    const k = kidWords(String(t ?? ""));
+    if (k.changed) reworded++;
+    return k.text;
+  };
+  const controls = typeof input.controls === "string" ? kid(input.controls.trim()) : "";
   const top = Array.isArray(input.top_rules) ? input.top_rules.filter((/** @type {unknown} */ x) => typeof x === "string").slice(0, 4) : [];
+  const rules = (Array.isArray(input.rules) ? input.rules : []).map((/** @type {any} */ r) => (r && typeof r === "object" ? { ...r, text: kid(r.text), ...(r.was != null ? { was: kid(r.was) } : {}) } : r));
+  const changes = Array.isArray(input.changes) && input.changes.length ? input.changes.map((/** @type {any} */ c) => (c && typeof c === "object" ? { ...c, text: kid(c.text) } : c)) : null;
   return {
-    summary: String(input.summary ?? ""),
+    summary: kid(input.summary),
     ...(controls ? { controls } : {}),
     ...(top.length ? { top_rules: top } : {}),
-    rules: Array.isArray(input.rules) ? input.rules : [],
-    ...(Array.isArray(input.changes) && input.changes.length ? { changes: input.changes } : {}),
+    rules,
+    ...(changes ? { changes } : {}),
+    ...(reworded ? { reworded } : {}),
   };
 }
 
@@ -151,6 +162,7 @@ export async function runSession(o) {
     }
     if (ev.name === "show_plan") {
       const p = planOf(input);
+      if (p.reworded) notes.add("plan_reworded_for_kids"); // the brief asks for seconds; this says when it wasn't followed (D304)
       const a = await o.answerer.plan(p);
       planTurns.push({ ...p, choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
       return reply(ev, planResult(a));

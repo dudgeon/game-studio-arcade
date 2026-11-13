@@ -186,3 +186,23 @@ test("an unknown custom tool gets an error result instead of hanging", async () 
   assert.match(m.results.get("x1"), /unknown tool launch_rocket/);
   assert.ok(r.notes.includes("unknown_tool:launch_rocket"));
 });
+
+test("the plan reaches the screen in kid words: seconds, never frames or milliseconds (D304)", async () => {
+  const { kidWords } = await import("../src/kidwords.js");
+  assert.equal(kidWords("After rows are cleared the cat dances for 90 frames.").text, "After rows are cleared the cat dances for 1.5 seconds.");
+  assert.equal(kidWords("the frog is back at the start 30 frames later").text, "the frog is back at the start half a second later");
+  assert.equal(kidWords("Holding down drops one row every 3 frames.").text, "Holding down drops one row every split second.");
+  assert.equal(kidWords("It speeds up by 0.25 pixels per frame.").text, "It speeds up by 15 pixels a second.");
+  assert.equal(kidWords("A flash for 500 ms.").text, "A flash for half a second.");
+  assert.equal(kidWords("Catch a fish: 10 points.").changed, false, "plain words stay as they are");
+  const input = { summary: "s", controls: "Stick: hop.", rules: [{ id: "R1", kind: "auto", text: "The cat dances for 90 frames." }, { id: "R2", kind: "auto", text: "Back in 30 frames.", was: "Back in 60 frames." }], changes: [{ id: "R2", text: "Now 30 frames, not 60." }] };
+  const m = mockApi({ steps: [{ await_message: true }, toolUse("p1", "show_plan", input), { await_result: "p1", expect: { choice: "build" } }, idle("i", "end_turn")] });
+  /** @type {any[]} */
+  const shown = [];
+  const { r } = await run(m.api, { async question() { return /** @type {const} */ ({ choice: "D" }); }, async plan(p) { shown.push(p); return /** @type {const} */ ({ choice: "build" }); } });
+  const words = JSON.stringify(shown[0]);
+  assert.doesNotMatch(words, /frame/i, "no frames on the kid's screen");
+  assert.equal(shown[0].rules[0].text, "The cat dances for 1.5 seconds.");
+  assert.equal(shown[0].rules[1].was, "Back in 1 second.");
+  assert.ok(r.notes.includes("plan_reworded_for_kids"), "the record says the brief wasn't followed");
+});

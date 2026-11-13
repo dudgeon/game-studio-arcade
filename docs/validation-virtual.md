@@ -87,9 +87,13 @@ All three were archived at Anthropic after they finished (D301; each has its "th
   - I didn't clear a single line, so I never saw a line go POP with sparkles or the cat's happy dance, and every score was 0.
   - The reason is me, not the game. Each look-then-decide turn of mine takes 20 to 30 seconds. A piece falls to the stack in about 10, so it lands before I've decided. Scripted placements (left wall, right wall, centre, with turns) stack without clearing.
   - Whether it's fun to play needs a person at the controls. That's for Alina, or Geoff, on the cabinet.
-- **One thing that looked wrong:** a single short tap of left often didn't move the piece. A second tap, or holding, did. Right taps worked.
-  - It may be the game's left-repeat handling or the timing of a tap through uinput. Other games took the same taps fine, so it's more likely the game.
-  - It's worth a person checking. A you-check can't catch it, because it isn't one of the game's rules.
+- **Correction (D303): the left-tap fault isn't real.** I first noted that a single short left tap often didn't move the piece. Measured afterwards, every tap lands: locally with real key events (72 of 72) and on the cabinet through `drive` (each tap one cell, already moved 150 ms later). The one probe that looked wrong was most likely a screenshot taken before the screen caught up.
+- **Played properly afterwards (D307):** a falling-blocks bot playing with button presses only cleared 58 lines in 150 pieces, reaching level 12 with a score of 37,700.
+  - Every clear made a POP and sparkles, and the cat danced.
+  - The cat is sad when the stack passes 12 rows.
+  - The score follows the spec exactly (100, 300, 500, 800, times the level).
+  - At game over it reported its score.
+  - So the game is correct to its spec; whether it's fun still needs a person.
 
 ## Surprises and notes (nothing fixed mid-run)
 

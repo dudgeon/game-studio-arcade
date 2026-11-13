@@ -478,7 +478,9 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
           sleep 400
           press esc
           wait check
-          press up
+          press down
+          press down
+          press down
           press a
           wait G4
           press a

@@ -47,6 +47,8 @@ shot something-else-heard
 press a
 wait plan
 shot plan-top
+press right
+wait reader
 press down
 press down
 press down
@@ -56,6 +58,9 @@ press down
 press down
 press down
 shot plan-scrolled
+press esc
+wait plan
+press up
 press a
 wait progress
 shot progress-early

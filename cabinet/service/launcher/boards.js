@@ -40,6 +40,8 @@ export function dayName(day) {
 }
 /** "November" from "2026-11". @param {string} month */
 export const monthName = (month) => ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][Number(String(month).split("-")[1] || 1) - 1];
+/** What a cost was in coins, for a kid: "1 coin", "6 coins", or "less than 1 coin" for a few cents; never "0" or "-0" (D305). @param {number} c cents */
+export const usedCoins = (c) => (c > 0 && Math.round(c / 10) === 0 ? "less than 1 coin" : coinsWord(Math.sign(c) * Math.round(Math.abs(c) / 10)));
 /** "1 coin" / "6 coins". @param {number} n */
 export const coinsWord = (n) => `${num(n)} coin${Math.abs(Math.round(n)) === 1 ? "" : "s"}`;
 
@@ -340,7 +342,7 @@ export function historyLines(history) {
       const what = e.what === "change" ? "a change" : "a new game";
       const title = e.title ? `, ${e.title}` : "";
       out.push(...flow(`${day} ${e.name ?? e.who}: ${what}${title}`, C.white));
-      out.push(...flow(`  -${coinsWord(e.coins)} (${cents(e.cost_cents ?? 0)}), ${e.outcome ?? ""}${e.cost_known === false ? ", cost not known" : ""}`, e.outcome === "on the shelf" || /on the shelf/.test(e.outcome ?? "") ? C.silver : C.peach));
+      out.push(...flow(`  ${(e.cost_cents ?? 0) > 0 && e.coins === 0 ? "" : "-"}${usedCoins(e.cost_cents ?? 0)} (${cents(e.cost_cents ?? 0)}), ${e.outcome ?? ""}${e.cost_known === false ? ", cost not known" : ""}`, e.outcome === "on the shelf" || /on the shelf/.test(e.outcome ?? "") ? C.silver : C.peach));
     } else if (e.kind === "topup") {
       out.push(...flow(`${day} A grown-up added ${coinsWord(e.cents / 10)}`, C.lime));
       out.push(...flow(`  "${e.reason}"`, C.mint));
@@ -616,7 +618,7 @@ export function offlineMake() {
 export function resultView(r, pot) {
   const by = r.maker_name ?? r.maker;
   const has = r.cost_cents != null;
-  const used = has ? `${coinsWord(coinsOfCents(r.cost_cents))} (${cents(r.cost_cents)})` : null;
+  const used = has ? `${usedCoins(r.cost_cents)} (${cents(r.cost_cents)})` : null;
   const kind = r.kind === "change" ? "change" : "new";
   const usual = pot ? (kind === "change" ? pot.usual.change : pot.usual.new) : kind === "change" ? 3 : 6;
   const after = r.pot_after_cents != null ? Math.round(r.pot_after_cents / 10) : null;
@@ -772,7 +774,7 @@ export function postGame(o) {
 /** How a make ended, as its shelf row (D192, E3): whose it was, and what a failed try used. @param {any} r */
 export function resultItem(r) {
   const title = r.ok ? (r.kind === "change" ? "A change is ready!" : "New game ready!") : r.failed ? "Sorry! It didn't come out right" : "A new game didn't finish";
-  const note = r.ok ? r.title : r.failed && r.cost_cents != null ? `used ${coinsWord(coinsOfCents(r.cost_cents))}` : undefined;
+  const note = r.ok ? r.title : r.failed && r.cost_cents != null ? `used ${usedCoins(r.cost_cents)}` : undefined;
   return { kind: "result", result: r, title, by: `by ${r.maker_name ?? r.maker}`, note, urgent: true };
 }
 
@@ -908,7 +910,7 @@ export function goneView(n, usual) {
   const board = n?.kind === "restarted" ? (/may still finish/.test(n.message ?? "") ? "E6" : "E5") : "gone";
   /** @type {any[]} */
   const blocks = [{ text: n?.message ?? "This game stopped being made. Tell me your idea again!", rows: 5, keepLines: true }];
-  if (n?.cost_cents != null) blocks.push({ text: `It used ${coinsWord(coinsOfCents(n.cost_cents))} (${cents(n.cost_cents)}) before it stopped.`, color: C.silver, rows: 2 });
+  if (n?.cost_cents != null) blocks.push({ text: `It used ${usedCoins(n.cost_cents)} (${cents(n.cost_cents)}) before it stopped.`, color: C.silver, rows: 2 });
   if (n?.retry?.request) blocks.push({ text: "Your idea is saved.", color: C.lime, rows: 1, onCut: "never" });
   const retry = n?.retry?.request ? n.retry : null;
   const cost = retry?.kind === "change" ? usual.change : usual.new;

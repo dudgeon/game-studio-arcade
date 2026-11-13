@@ -7,7 +7,7 @@ import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { ASK_LIMITS, Painter, draw, flow, planLines, questionText } from "../launcher/screens.js";
 import { GLYPH_H, H, W, check, clean, fit, widthOf, wrap } from "../launcher/text.js";
 import { LONG } from "../test-support/stress.js";
-import { bootBoard, cardView, coinsWord, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
+import { bootBoard, cardView, coinsWord, usedCoins, resultItem, scoreLine, goneView, coinCheck, historyLines, howtoView, leaveView, notYours, offlineMake, postGame, potLimit, resting, resultView, whatToChange, whoView } from "../launcher/boards.js";
 import { familyOfCart, gameRows } from "../launcher/shelf.js";
 import { guestHowto, guestPostGame, guestRows } from "../launcher/guests.js";
 import { redirectBoard } from "../launcher/redirect.js";
@@ -372,4 +372,16 @@ test("a guest's G6 shows the score line only when it reported one (D235)", () =>
 test("R8 for someone else's own version names whose game stays the same (D302)", () => {
   const r = resultView({ id: 1, ok: true, kind: "change", version: 1, title: "Snowball Drop", maker_name: "Tester2", cost_cents: 13, pot_after_cents: 882, parent: { id: "rock-rain", maker: "tester", maker_name: "Tester" } }, null);
   assert.ok(r.blocks.some((b) => b.text === "Tester's game stays the same."));
+});
+
+test("a few cents read as less than 1 coin, never 0 or -0 (D305)", () => {
+  assert.equal(usedCoins(1), "less than 1 coin");
+  assert.equal(usedCoins(4), "less than 1 coin");
+  assert.equal(usedCoins(5), "1 coin");
+  assert.equal(usedCoins(109), "11 coins");
+  const lines = historyLines([{ kind: "charge", at: "2026-11-12T10:00:00Z", who: "tester", name: "Tester", what: "new game", coins: 0, cost_cents: 1, outcome: "stopped" }, { kind: "charge", at: "2026-11-12T10:00:00Z", who: "tester", name: "Tester", what: "new game", coins: 7, cost_cents: 68, outcome: "on the shelf" }]).map((l) => l.text).join(" | ");
+  assert.match(lines, /less than 1 coin \(1c\), stopped/);
+  assert.doesNotMatch(lines, /-0 coin/);
+  assert.match(lines, /-7 coins \(68c\)/);
+  assert.equal(resultItem({ ok: false, failed: true, cost_cents: 3, maker_name: "T", request: "x" }).note, "used less than 1 coin");
 });

@@ -515,7 +515,8 @@ async function showHistory() {
 
 /** @param {any} v @param {number} d @param {number} n */
 const moveSel = (v, d, n) => {
-  v.sel = (v.sel + d + n) % n;
+  // Every menu stops at its ends, like the shelf: no wrapping from the bottom tile to the top (D306).
+  v.sel = Math.max(0, Math.min(n - 1, v.sel + d));
 };
 
 const somethingCut = () => painter.boxes.some((b) => b.cut && b.onCut === "reader");
@@ -554,7 +555,7 @@ function onStick(dir) {
     case "plan":
       // Stick right: every rule, in the reader (D201). Up, down or left: choose.
       if (dir === "right") show({ screen: "reader", title: "All the rules", flowed: v.flowed, top: 0, back: v, pendingId: v.pendingId });
-      else moveSel(v, 1, 2);
+      else v.sel = dir === "down" ? 1 : 0; // up or left: Build it; down: Change it (D306)
       break;
     case "say":
       if (v.phase === "confirm") {
@@ -564,10 +565,10 @@ function onStick(dir) {
       break;
     case "board":
       if (ud && v.tiles?.length) {
-        let s = v.sel;
-        do s = (s + ud + v.tiles.length) % v.tiles.length;
-        while (v.tiles[s]?.dim && s !== v.sel);
-        v.sel = s;
+        // Stop at the ends, skipping tiles that can't be picked (D306).
+        let s = v.sel + ud;
+        while (s >= 0 && s < v.tiles.length && v.tiles[s]?.dim) s += ud;
+        if (s >= 0 && s < v.tiles.length) v.sel = s;
       }
       break;
     case "check":

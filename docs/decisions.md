@@ -1289,3 +1289,46 @@ The director's validation run on the virtual cabinet, as Tester, typed input: wa
    - Then "New game ready!" appeared. M11 said "It finished while the cabinet was restarting.", with 3 coins (31c).
    - The ledger has "restart, on the shelf". The record says `resumed_after_restart`, and the correction "collected after a service restart", archive ok. The journal has the cut-off, re-attach and collect lines (D191, D199).
    - The run went to Tester2, not Tester: "Who's making?" lists the most recent maker first, and the drive script picked the top row.
+
+## 2026-11-12 — Fixes from the end-to-end run (D303-D307)
+
+From docs/validation-virtual.md, on the director's list.
+
+**D303. The left-tap "fault" wasn't one: every tap lands, on the cabinet and locally.** *(Claude. Corrects the validation write-up's note.)*
+- **Locally:** a copy of Candy Cat Drop with logging, in the real launcher in headless Chromium, with real key events.
+  - Taps of 80, 5 and 0 ms: all 72 left and right taps moved the piece one cell.
+  - Four quick taps (60 ms down, 30 ms apart) moved four cells.
+- **On the virtual cabinet** (read-only, playing only), through `drive` and keyd:
+  - An in-memory recorder in the kiosk page saw every tap arrive as its own down and up, 60-80 ms long, at least 80 ms apart. The page ran at a steady 60 frames a second (median 17 ms, worst 24 ms).
+  - Screenshots 600 ms after each tap, read for the piece's column: every tap moved it exactly one cell, left 5→4→3→2 and right 2→3→4. A screenshot 150 ms after a tap had already moved.
+  - Three quick taps moved it as far as the wall allowed.
+- **So:** the game, the starter library's repeat (`timers.repeatTick`), the runtime's input and the drive path are all sound. No shelf game is affected.
+  - The run's single probe that looked like a lost tap is unexplained, most likely a screenshot taken before the screen had caught up.
+  - On review, the run's own board shows its "left x4" pieces did reach the left wall.
+- **A guard anyway:** `runtime/test/host.test.js` now proves that a tap whose press and release both fall between two frames still reaches the game once, and that two taps a frame apart are two presses.
+
+**D304. The plan screen never shows frames or milliseconds.** *(Claude.)*
+- The live sessions' plans said "dances for 90 frames" and "back at the start 30 frames later".
+- **The brief** now says plan rules give times in seconds, never frames or milliseconds, with no code words. That's a brief change; the director reapplies it.
+- **And the screen can't show them anyway:** the driver rewrites what `show_plan` sends before it reaches the kid (`studio-kit/cli/src/kidwords.js`).
+  - N frames becomes seconds at 60 a second ("1.5 seconds", "half a second", "a split second").
+  - Milliseconds become seconds, "pixels per frame" becomes "pixels a second", and a stray "frame" becomes "moment".
+  - Each rewrite is noted on the session (`plan_reworded_for_kids`), so the record shows when the brief wasn't followed.
+- **Not taken:** handing the plan back to the agent to reword. It costs a turn, and recorded replays can't answer it.
+
+**D305. A few cents read as "less than 1 coin", never "0" or "-0".** *(Claude.)* `usedCoins(cents)` is used everywhere a cost is shown: the coin history ("less than 1 coin (1c), stopped"), results, the shelf's failed-make row, and the walk-away screen.
+
+**D306. Every menu stops at its ends.** *(Claude; D182 left wrapping unsaid.)*
+- The shelf, "Who's making?" and the game card stopped at the ends; the question tiles, the plan, "Is this right?", the you-checks and every board's tiles wrapped. In the run, a "down" from "Back to the shelf" wrapped to "Play again" and restarted a game.
+- Now all of them stop at their ends. On the plan, up or left is Build it and down is Change it, as its hint says.
+
+**D307. A falling-blocks player for the headless runtime, and what it found in Candy Cat Drop.** *(Claude.)*
+- `studio-kit/playtest/bin/stack-bot.js` plays with button presses only (A turns, left and right taps move, up drops), choosing each placement by the usual heuristic (lines, holes, height, bumps). It reads the board from the cart's probe and never pokes.
+- **Candy Cat Drop** (Tester's make, now a playtest fixture):
+  - 150 pieces cleared 58 lines, reaching level 12 with a score of 37,700.
+  - Every clear made a POP and sparkles, and the cat was happy after each.
+  - The cat is calm on an empty board and sad when the stack passes 12 rows.
+  - The score follows the spec exactly: one row 100 and two rows 300, times the level (+600 at level 2, +2,700 at level 9). The level rises every 5 lines.
+  - At game over it reported its score with `g.score` (D215).
+  - Version 2 (the party hat) plays the same.
+- So the game is correct to the spec. Whether it's fun still needs a person at the controls.
