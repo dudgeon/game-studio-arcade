@@ -22,6 +22,7 @@ import {
   leaveView,
   notYours,
   offlineMake,
+  unconnectedMake,
   postGame,
   potLimit,
   resting,
@@ -135,7 +136,7 @@ async function showShelf() {
     const keyOf = (/** @type {any} */ it) => it.cart?.id ?? (it.result ? `r${it.result.id}` : it.kind === "waiting" ? "waiting" : "tile");
     const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
     returnTo = null;
-    const v = { screen: "shelf", board: studio.phase === "running" ? "S2" : studio.offline ? "E1" : "S1", console: config.console, pot: pot()?.coins ?? null, offline: !!studio.offline, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)), hint: SHELF_HINT };
+    const v = { screen: "shelf", board: studio.phase === "running" ? "S2" : studio.unconnected ? "E11" : studio.offline ? "E1" : "S1", console: config.console, pot: pot()?.coins ?? null, offline: !!studio.offline, unconnected: !!studio.unconnected, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)), hint: SHELF_HINT };
     if (view.screen === "shelf") view = v;
     else show(v);
   } catch {
@@ -147,6 +148,7 @@ async function showShelf() {
 function makeTiles() {
   const cost = usual().new;
   if (studio.phase === "idle" && studio.collecting) return [{ kind: "busy", title: "Make a new game", note: "Finishing the last game first", cost }];
+  if (studio.phase === "idle" && studio.unconnected) return [{ kind: "unconnected", title: "Make a new game", note: "Not connected to Claude yet", urgent: true }];
   if (studio.phase === "idle" && studio.offline) return [{ kind: "offline", title: "Make a new game", note: "Needs Wi-Fi right now", urgent: true }];
   if (studio.phase === "idle" && studio.resting) return [{ kind: "resting", title: "Make a new game", note: "Claude is resting until the 1st" }];
   if (studio.phase === "idle") return [{ kind: "make", title: "Make a new game", note: studio.notice?.short ?? "Tell Claude your idea", urgent: !!studio.notice, cost }];
@@ -186,6 +188,7 @@ async function showWho(change = undefined) {
 
 /** What stops a make before the coin check: no Wi-Fi, resting, or the pot (L1, L2, L5, E2). @param {"new" | "change"} kind */
 function blocker(kind) {
+  if (studio.unconnected) return () => showBoard(unconnectedMake(), ["shelf"]);
   if (studio.offline) return () => showBoard(offlineMake(), ["shelf"]);
   if (studio.resting) return () => showBoard(resting(), ["shelf"]);
   const p = namedPot();
@@ -262,7 +265,7 @@ async function startMake(o, request, offered = false) {
     }
     if (e.why === "low" || e.why === "empty") return showLimit(o.kind, e.why);
     if (e.why === "resting") return showBoard(resting(), ["shelf"]);
-    if (e.why === "offline") return showBoard(offlineMake(), ["shelf"]);
+    if (e.why === "offline") return showBoard(studio.unconnected ? unconnectedMake() : offlineMake(), ["shelf"]);
     if (e.status === 409) return showBoard({ screen: "board", board: "busy", title: "One at a time", blocks: [{ text: "Another game is being made right now. Try again when it's done!", rows: 3 }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["shelf"]);
     offline();
   }
@@ -599,6 +602,7 @@ function onButton() {
       } else if (it.kind === "result") showResult(it.result);
       else if (it.kind === "busy") showBoard({ screen: "board", board: "busy", title: "One at a time", blocks: [{ text: "The last game is still being finished. You can make a new one when it's done!", rows: 4 }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["shelf"]);
       else if (it.kind === "waiting") showBoard({ screen: "board", board: "S2-wait", title: "One at a time", blocks: [{ text: `Claude is making ${studio.maker_name ?? "someone"}'s game. You can make one after it's done!`, rows: 4 }, { text: "Playing games is free, any time.", color: C.lime, rows: 1 }], tiles: [{ text: "Back to the shelf", hue: C.green, center: true }], sel: 0 }, ["shelf"]);
+      else if (it.kind === "unconnected") showBoard(unconnectedMake(), ["shelf"]);
       else if (it.kind === "offline") showBoard(offlineMake(), ["shelf"]);
       else if (it.kind === "resting") showBoard(resting(), ["shelf"]);
       else showHowTo(it.cart);
