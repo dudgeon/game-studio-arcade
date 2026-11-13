@@ -16,7 +16,7 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { cpioNewc, dir, file, growSecondPartition, link, loadOrder, makeBundle, makeProvisionTar, modinfoValues, normalizeModule, partition, unwrapZboot, utmConfig } from "./lib.mjs";
+import { cpioNewc, dir, file, growSecondPartition, link, loadOrder, makeBundle, makeProvisionTar, modinfoValues, normalizeModule, partition, unwrapZboot, miniTimezone, utmConfig } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../..");
@@ -170,6 +170,7 @@ function writeSeed(mount, { modulesTgz, nodeTarball, profile }) {
   cpSync(join(provDir, "files/arcade-seed.service"), join(seed, "arcade-seed.service"));
   writeFileSync(join(seed, "profile"), `${profile}\n`);
   writeFileSync(join(seed, "hostname"), `${NAME}\n`);
+  writeFileSync(join(seed, "timezone"), `${miniTimezone()}\n`); // the mini's, as the Picade gets (D246)
   writeFileSync(join(seed, "mini-addrs"), `${miniAddrs().join("\n")}\n`);
   cpSync(sshKey(), join(seed, "authorized_keys"));
   // macOS leaves AppleDouble files beside anything with extended attributes on FAT.
