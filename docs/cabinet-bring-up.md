@@ -100,7 +100,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 ## Part C: first boot (unattended, about 10–25 minutes)
 
 **C1. Power on and wait** 🔧
-- Look for, in order: text scrolling, a reboot or two (the Pi grows its partition), then **"Setting up the arcade"** in large letters with the step it's on (8 steps: the clock, the screen and browser, Node, the arcade, speech, the cabinet's buttons and sound, starting, finishing) and the time it started (D257). The browser step downloads from the internet and is the slow one; speech comes from the card. If it says **"Setup stopped"**, tell Claude; a power cycle runs it again from where it can.
+- Look for, in order: text scrolling, a reboot or two (the Pi grows its partition), then **"Setting up the arcade"** in large letters with the step it's on (8 steps: the clock, the screen and browser, Node, the arcade, speech, the cabinet's buttons and sound, starting, finishing) and how many minutes since it was switched on (D257). The browser step downloads from the internet and is the slow one; speech comes from the card. If it says **"Setup stopped"**, tell Claude; a power cycle runs it again from where it can.
 - It restarts once by itself at the end (so the Picade driver and screen power take effect), then **the shelf** appears: the cabinet's game list. Claude checks it from the mini over SSH.
 - If it never reaches the shelf after 30 minutes: tell Claude. The log is on the card's boot partition at `seed/provision.log` (readable on the mini), and on the cabinet over SSH.
 

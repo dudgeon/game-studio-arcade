@@ -261,7 +261,9 @@ test("first boot puts each provisioning stage on the screen, and says so when it
     execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
     const screen = path.join(root, "tty1");
     fs.writeFileSync(screen, "");
-    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen } });
+    const uptime = path.join(root, "uptime");
+    fs.writeFileSync(uptime, "185.42 600.10\n"); // 3 minutes since power-on
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, "work"), ARCADE_SCREEN: screen, ARCADE_UPTIME: uptime } });
     const out = { status: r.status, log: r.stdout, screen: fs.readFileSync(screen, "utf8"), ok: fs.existsSync(path.join(seed, "provision.ok")) };
     fs.rmSync(root, { recursive: true, force: true });
     return out;
@@ -272,6 +274,8 @@ test("first boot puts each provisioning stage on the screen, and says so when it
   assert.match(good.screen, /Step 1\/2\s+Checking the clock/);
   assert.match(good.screen, /Step 2\/2\s+Installing speech: Moonshine/);
   assert.match(good.screen, /Done\./);
+  assert.match(good.screen, /Switched on 3 minutes ago\./, "minutes since power-on: the Pi has no clock until NTP (D257)");
+  assert.doesNotMatch(good.screen, /Started at|\d{1,2}:\d{2}/, "no clock time on the screen");
   assert.ok(good.ok);
   const bad = run(3);
   assert.notEqual(bad.status, 0, "a failed provision fails first boot, so it runs again at the next boot");

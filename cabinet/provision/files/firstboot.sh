@@ -15,26 +15,47 @@ mv "$WORK.new" "$WORK"
 # The cabinet's screen says what's happening (D257). The kiosk isn't there yet, so this writes to the console
 # on tty1, in a large font, over the login prompt and kernel messages. A VM with no screen just ignores it.
 SCREEN="${ARCADE_SCREEN:-/dev/tty1}"
-STARTED="$(date +%H:%M)"
+# Minutes since power-on, not a clock time: the Pi has no battery clock, so until NTP answers its clock says the
+# image's date (D257). /proc/uptime counts from boot whatever the clock says. ARCADE_UPTIME is for the test.
+UPTIME="${ARCADE_UPTIME:-/proc/uptime}"
+STEP_FILE="$(mktemp)"
 systemctl stop getty@tty1.service 2>/dev/null || true
 dmesg -n 1 2>/dev/null || true
 # systemd's own "[ OK ] Started ..." lines go to the console too; stop them for this boot (SIGRTMIN+21, systemd(1)).
 [ -z "${ARCADE_SCREEN:-}" ] && kill -s RTMIN+21 1 2>/dev/null || true
 setfont -C "$SCREEN" /usr/share/consolefonts/Lat15-TerminusBold32x16.psf.gz 2>/dev/null || true
-show() {
+on_for() {
+  local s m
+  s="$(cut -d. -f1 "$UPTIME" 2>/dev/null)"
+  m=$(( ${s:-0} / 60 ))
+  case "$m" in 0) echo "less than a minute" ;; 1) echo "1 minute" ;; *) echo "$m minutes" ;; esac
+}
+# Draws the step held in STEP_FILE. show() changes the step; the ticker redraws every 30 s so the minutes move.
+draw() {
   [ -w "$SCREEN" ] || return 0
-  printf '\033[2J\033[H\033[?25l\n\n  Setting up the arcade\n\n  %s\n\n  %s\n\n  Started at %s. It restarts once when it is done.\n  Please leave it switched on.\n' "$1" "${2:-}" "$STARTED" >> "$SCREEN" 2>/dev/null || true
+  local a b
+  { IFS= read -r a; IFS= read -r b; } < "$STEP_FILE"
+  printf '\033[2J\033[H\033[?25l\n\n  Setting up the arcade\n\n  %s\n\n  %s\n\n  Switched on %s ago. It restarts once when it is done.\n  Please leave it switched on.\n' "$a" "$b" "$(on_for)" >> "$SCREEN" 2>/dev/null || true
+}
+show() {
+  printf '%s\n%s\n' "$1" "${2:-}" > "$STEP_FILE"
+  draw
 }
 show "Getting ready" ""
+( while sleep "${ARCADE_TICK_S:-30}"; do draw; done ) </dev/null >/dev/null 2>&1 &
+TICKER=$!
+trap 'kill "$TICKER" 2>/dev/null || true; rm -f "$STEP_FILE"' EXIT
 if ! /bin/bash "$WORK/provision.sh" --profile "$PROFILE" --payload "$SEED" 2>&1 | while IFS= read -r line; do
   printf '%s\n' "$line"
   case "$line" in
     *"] == "*) step="${line#*] == }"; show "Step ${step%% *}" "${step#* }" ;;
   esac
 done; then
+  kill "$TICKER" 2>/dev/null || true
   show "Setup stopped." "Tell a grown-up. The details are in seed/provision.log on the card."
   exit 1
 fi
+kill "$TICKER" 2>/dev/null || true
 show "Done." "Restarting..."
 echo "=== firstboot ok $(date -u) ==="
 touch "$SEED/provision.ok"
