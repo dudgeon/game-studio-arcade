@@ -151,7 +151,10 @@ export function createServiceHandler(o) {
       // The kid's own words for a question (C) or a plan (change). Only for the question that's waiting.
       const st = o.studio.state();
       if (typeof body.said === "string" && body.said.trim() && st.pending?.id === body.id) {
-        const screened = await o.screen?.check({ text: body.said, kind: "answer", maker: st.maker ?? null, offered: body.offered === true });
+        // What they're answering goes too, so an alternative still answers it (D276).
+        const p = st.pending;
+        const question = p.kind === "question" ? (p.question ?? null) : `What should be different in this game's plan?${p.summary ? ` (The plan: ${p.summary})` : ""}`;
+        const screened = await o.screen?.check({ text: body.said, kind: "answer", maker: st.maker ?? null, offered: body.offered === true, question });
         if (screened && !screened.ok) return json(res, 200, { ok: false, why: "redirect", redirect: screened });
       }
       o.studio.answer({ id: body.id, choice: body.choice, said: body.said });

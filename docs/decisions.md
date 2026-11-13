@@ -1148,6 +1148,11 @@ Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. 
 
 **D275. E10 says "How about this?"** *(Claude; replaces the handoff's "Let's pick another idea".)* One friendly line ("Let's make it a little different. How about this?"), the alternative in yellow, and for a new idea "No coins were used." Tiles: **Make this one** (or **Use this one** for an answer), **Say it a new way** (back to the talk screen, F1 still types), **Back to the shelf** (or **Back to the question**, which keeps waiting). ESC does what the last tile does. One alternative, not the handoff's two: it's the closest version of their own idea, and "Say it a new way" covers the rest.
 
+**D276. An answer is screened with the question it answers.** *(Claude, at the director's ask, 2026-11-12.)*
+- **The problem:** on the virtual cabinet, a slur typed for "How do you steer the shark?" got an alternative about what the shark calls the fish. It was safe, but it didn't answer the question.
+- **The fix:** the service sends the waiting question with the kid's words: the question's text, or for "change" on the plan, "What should be different in this game's plan?" with the plan's summary. The model's brief says an answer's alternative must still answer that question. The question also goes in the log line.
+- **Checked:** the table has three answer rows with their questions, and the live run checks that each alternative answers its question. 23 of 23 right, $0.0025 (`~/game-studio-data/vm/verify/screening-2026-11-12/table-live-d276.txt`). The steering answer now reads "You steer the shark by tilting it left and right, and it zooms after the little fish saying "Wheee, come back!"".
+
 **D280. Cabinet Manager v0: one process on the mini, a page on the home network.** *(Claude, Manager worker, 2026-11-11; carries out HANDOFF §3.1 and Geoff's validation direction.)*
 - `manager/` in this repo: Node 22's standard library only, no packages. `scripts/manager.sh start` starts it in the background (`stop`, `status`, `url`); no window opens on the mini. It listens on port 8335.
 - Four views: the cabinet's **screen** with its controls, **activity**, **coins**, and a **cabinet picker** (virtual, real). Carts, push and updates come later.
