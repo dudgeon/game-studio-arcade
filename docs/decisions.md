@@ -1355,3 +1355,16 @@ From docs/validation-virtual.md, on the director's list.
   - At game over it reported its score with `g.score` (D215).
   - Version 2 (the party hat) plays the same.
 - So the game is correct to the spec. Whether it's fun still needs a person at the controls.
+
+## 2026-11-12 — Claude checks it heard the idea right (D308)
+
+**D308. Claude's first question always restates the idea, as an A/B.** *(Claude's idea from the end-to-end run, the director's go.)*
+- In the run, speech-to-text turned "happy when you clear lines" into "after every 20 lines" and "Owen" into "oh and", and the mishearing became a question's option A. "Is this right?" shows the transcript, but a kid skims it.
+- **So the first `ask_player` is one short line saying the idea back,** in Claude's words, with any number or name the kid said: "A falling-candy game with a cat who's happy when you clear a line?" A is "Yes, that's it"; B is "Something else".
+  - **Always, once:** even when the idea seems clear. It costs one question, and kids like being understood.
+  - **B or C means Claude misheard.** C carries the fix in the kid's words; after B, Claude asks what it got wrong. Either way, before any other question.
+  - **D still means stop asking:** Claude builds from the idea as it heard it.
+  - **Changes and forks too:** the first question restates the change asked for.
+- **Where:** the brief (`studio-kit/managed-agent/agents/studio.md`, step 2 and Forks). That's a brief change; the director reapplies the agent. The driver relays it like any question, so the cabinet needs no change.
+- **Tests:** `agent-def.test.js` holds the brief to it; `driver.test.js` drives a restate answered by voice and checks the fix reaches Claude word for word and lands on the record.
+- **Not taken:** a separate "Did I hear you?" screen on the cabinet. The tiles already do it, and Claude restating in its own words catches more than showing the transcript again.

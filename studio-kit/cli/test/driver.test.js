@@ -206,3 +206,36 @@ test("the plan reaches the screen in kid words: seconds, never frames or millise
   assert.equal(shown[0].rules[1].was, "Back in 1 second.");
   assert.ok(r.notes.includes("plan_reworded_for_kids"), "the record says the brief wasn't followed");
 });
+
+test("the first question checks Claude heard the idea right, and a spoken fix reaches Claude word for word (D308)", async () => {
+  const restate = { question: "A falling-candy game where the cat is happy after 20 lines?", option_a: "Yes, that's it", option_b: "Something else" };
+  const m = mockApi({
+    steps: [
+      { await_message: true },
+      toolUse("q1", "ask_player", restate),
+      { await_result: "q1", expect: { choice: "C", said: "every time you clear a line he dances" } },
+      ask("q2", "How fast does it fall?"),
+      { await_result: "q2", expect: { choice: "D" } },
+      toolUse("p1", "show_plan", { summary: "s", controls: "Stick: slide.", rules: [{ id: "R1", kind: "auto", text: "The cat dances after each line." }] }),
+      { await_result: "p1", expect: { choice: "build" } },
+      idle("i1", "end_turn"),
+    ],
+  });
+  /** @type {any[]} */
+  const asked = [];
+  const answerer = {
+    /** @param {any} q */
+    async question(q) {
+      asked.push(q);
+      return asked.length === 1 ? /** @type {const} */ ({ choice: "C", said: "every time you clear a line he dances" }) : /** @type {const} */ ({ choice: "D" });
+    },
+    async plan() {
+      return /** @type {const} */ ({ choice: "build" });
+    },
+  };
+  const { r } = await run(m.api, answerer);
+  assert.deepEqual(m.problems, []);
+  assert.deepEqual(asked[0], restate, "the restated idea reaches the screen as Claude wrote it, with its two tiles");
+  assert.deepEqual(r.turns[0].question, restate.question);
+  assert.deepEqual([r.turns[0].choice, r.turns[0].said], ["C", "every time you clear a line he dances"], "the correction is on the record");
+});
