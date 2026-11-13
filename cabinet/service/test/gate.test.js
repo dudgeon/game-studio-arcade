@@ -9,7 +9,7 @@ import { dataPaths } from "@game-studio-arcade/studio-cli/src/config.js";
 import { defaultChecker } from "@game-studio-arcade/studio-cli/src/checks.js";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { findChromium, findPlaywright } from "@game-studio-arcade/playtest";
-import { createGate, gateSettings, gatedChecker, playTracker, guestGate, cabinetProfile, PI_BUDGET_MS } from "../src/gate.js";
+import { createGate, gateSettings, gatedChecker, playTracker, guestGate, cabinetProfile, PI_BUDGET_MS, liveGateRuns } from "../src/gate.js";
 import { createStudio } from "../src/studio.js";
 import { potStore } from "../src/pot.js";
 import { startService } from "../src/server.js";
@@ -161,6 +161,45 @@ test("one test at a time, in order", async () => {
   assert.deepEqual(order, ["/a", "/b", "/c"]);
   assert.deepEqual([a.ok, b.ok, c.ok], [true, false, true]);
   assert.deepEqual(b.failing, [{ id: "R1", passed: false, reason: "the basket didn't move" }]);
+});
+
+test("before calibration a slow frame time is logged, never blocking; once calibrated it blocks (D311)", async () => {
+  const slow = () => {
+    const r = report(true);
+    return { ...r, ok: false, generic: [...r.generic, { id: "frame-time", status: "fail", reason: "the slowest 5% took 9 ms" }] };
+  };
+  const run = async () => ({ driver: "browser", fallback: null, report: slow() });
+  for (const profile of ["virtual", "picade"]) {
+    const g = createGate({ settings: gateSettings({ profile }), playing: () => false, logsDir: tmp(), run });
+    const r = await g.cart("/a");
+    assert.equal(r.ok, true, `${profile}: a guessed budget doesn't keep a game off the shelf`);
+    assert.equal(r.frame_time_blocks, false);
+    assert.deepEqual(r.advisory?.map((f) => f.id), ["generic:frame-time"]);
+  }
+  const calibrated = createGate({ settings: gateSettings({ profile: "picade", gate: { calibrated: true } }), playing: () => false, logsDir: tmp(), run });
+  const r = await calibrated.cart("/a");
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.failing.map((f) => f.id), ["generic:frame-time"]);
+});
+
+test("real Chromium: a game started mid-test stops the run and its Chromium; it runs again after (D310)", { skip: noChromium, timeout: 180000 }, async () => {
+  let playing = false;
+  const gate = createGate({ settings: realSettings(), playing: () => playing, logsDir: tmp(), pollMs: 100 });
+  const r = gate.cart(path.join(PT_FIXTURES, "dot-catch"));
+  try {
+    await sleep(1500);
+    assert.equal(liveGateRuns(), 1, "the test is running");
+    playing = true;
+    await sleep(1500);
+    // Its whole process group (gate-run and Chromium) was killed, not just asked.
+    assert.equal(liveGateRuns(), 0, "nothing of the gate runs while a game is being played");
+  } finally {
+    playing = false;
+  }
+  const done = await r;
+  assert.equal(done.ok, true, JSON.stringify(done.failing));
+  assert.equal(done.restarts, 1);
+  assert.ok(done.waited_s >= 1, String(done.waited_s));
 });
 
 test("a run that can't happen fails the gate with the reason, and never throws", async () => {

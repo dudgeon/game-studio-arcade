@@ -98,6 +98,7 @@ function gateOf(g) {
     waited_s: g.waited_s ?? 0,
     restarts: g.restarts ?? 0,
     fallback: g.fallback ?? null,
+    advisory: (g.advisory ?? []).map((/** @type {any} */ f) => ({ id: f.id, reason: f.reason ?? null })),
     failing: (g.failing ?? []).map((/** @type {any} */ f) => ({ id: f.id, reason: f.reason ?? null })),
     frame_p95_ms: g.frame_time?.p95Ms ?? null,
     budget_ms: g.budget_ms ?? null,

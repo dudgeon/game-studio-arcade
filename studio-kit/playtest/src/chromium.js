@@ -55,6 +55,9 @@ export async function launchChromium(o = {}) {
   // Low priority (D8, D310): nice applies to Chromium and everything it starts.
   const [cmd, argv] = o.nice ? ["nice", ["-n", String(o.nice), exe, ...args]] : [exe, args];
   const child = spawn(cmd, argv, { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
+  // Never left behind: if this process exits without close(), Chromium goes too.
+  const reap = () => child.kill("SIGKILL");
+  process.once("exit", reap);
   const toBrowser = /** @type {import("node:stream").Writable} */ (child.stdio[3]);
   const fromBrowser = /** @type {import("node:stream").Readable} */ (child.stdio[4]);
   let stderr = "";
@@ -145,6 +148,7 @@ export async function launchChromium(o = {}) {
     async close() {
       if (closed) return;
       closed = true;
+      process.removeListener("exit", reap);
       const exited = new Promise((r) => child.once("exit", r));
       send("Browser.close").catch(() => {});
       const t = setTimeout(() => child.kill("SIGKILL"), 3000);

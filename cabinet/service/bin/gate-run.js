@@ -25,6 +25,18 @@ const done = (doc, code = 0) => {
   process.stdout.write(`${JSON.stringify(doc)}\n`, () => process.exit(code));
 };
 
+// The service went away (killed, not stopped): stop too, with Chromium. This run leads
+// its own process group (src/gate.js starts it detached), so that's the whole group.
+const parent = process.ppid;
+setInterval(() => {
+  if (process.ppid === parent) return;
+  try {
+    process.kill(0, "SIGKILL");
+  } catch {
+    process.exit(3);
+  }
+}, 1000).unref();
+
 const t0 = Date.now();
 const seconds = () => Math.round((Date.now() - t0) / 100) / 10;
 

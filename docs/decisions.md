@@ -33,6 +33,7 @@ Every rule is still written so it's checkable, by a machine or by a person. The 
 - For cabinet builds, the gate is a fast smoke test: the cart loads, 10 seconds of random input, frame-time budget. The full auto rules already passed in the sandbox.
 - Desktop publishes run the full playtest on the Pi.
 - The gate runs at low priority and waits while a game is being played.
+- *Built as D310-D313 (2026-11-13): cabinet builds now get the full auto rules in the cabinet's Chromium, not only a smoke test, and frame time blocks only once calibrated (D311).*
 
 **D9. Node 22 everywhere**, matching the sandbox default. *(Claude.)* Pinned with `.nvmrc` and `engines`. The mini currently runs Node 26, so install `node@22`.
 
@@ -1376,3 +1377,46 @@ From docs/validation-virtual.md, on the director's list.
 - **Not taken:** a separate "Did I hear you?" screen on the cabinet. The tiles already do it, and Claude restating in its own words catches more than showing the transcript again.
 
 **D309. On the restate question, B reads "Not quite".** *(Claude, from the live check after the fixes; the director's go.)* D308's B was "Something else", right above C, the cabinet's own "Something else" that opens the mic. The two looked the same, but B sends no words. Now B is "Not quite": Claude then asks what it got wrong, and C still carries the fix in the kid's words. A brief change (`studio.md` step 2); the director reapplies the agent. `agent-def.test.js` checks B's words and that B never repeats C's label.
+
+## 2026-11-13 — The publish gate (D310-D313)
+
+**D310. The cabinet re-tests every made game in its own Chromium before the shelf.** *(Director's brief, 2026-11-12; design by Claude. Builds D8; changes D8's "fast smoke test" for cabinet builds to the full auto rules, as the brief asks.)*
+- **What runs:** when a make or a change comes home, makeCart's existing "Checking your game here at home" step validates the cart as before, then the gate plays it. The gate runs the spec's auto rules and the generic checks (`studio-kit/playtest`) in the cabinet's system Chromium, through the browser driver. The gate replaces the node-driver home playtest there, so the kid's wait isn't doubled. Only a pass is committed to the library, so only a pass reaches the shelf.
+- **No Playwright on the cabinet:** the harness has a second browser driver (`studio-kit/playtest/src/chromium.js`, `--chromium PATH`). It starts Chromium headless with `--remote-debugging-pipe` and speaks DevTools over the pipe, with no port, no WebSocket and no package. Its reports match Playwright's exactly on three fixtures (a test checks this).
+- **Low priority:** each run is a child process (`cabinet/service/bin/gate-run.js`) under `nice -n 19` in its own process group, with its Chromium and a time limit (600 s). Runs go one at a time. Nothing is left running: the service stops its runs when it stops, a run whose service was killed kills its own process group, and Chromium is killed if its parent exits without closing it.
+- **Never while a game is being played:** the launcher posts `/api/arcade/playing` when a play starts, every 10 s while it lasts, and when it ends. After 30 s of silence a play stops counting, so a crashed launcher can't hold the gate. A test waits for the play to end. If a play starts mid-test, the run and its Chromium are killed at once, and the test runs again after the play. The log records the seconds waited and the restarts.
+- **A game that fails:** outcome `checks_failed`, so nothing is committed and the session's folder keeps everything (D5). The kid gets the E3 result ("Sorry! It didn't come out right", "Try again, same idea"). The make is charged its real cost, as designed (D202: no refunds).
+- **The reason, for Geoff:** each failing check's id and reason is in the session record (`playtest.local.gate`) and in `logs/publish_gate.jsonl`. The Manager's Activity shows "cabinet re-test passed in N s" or "kept it off the shelf: R3: …".
+- **When the cabinet can't run Chromium,** that's the cabinet's fault, not the game's. The same checks run on the node driver, logged with the reason (`fallback`). A run that couldn't happen at all fails the gate, with the reason.
+- **What the kid sees meanwhile:** nothing new. The track's Test step stays lit with "Checking your game here at home", and then the result.
+  - **On the virtual cabinet** that wait is 4.5 to 7.6 s per game (median 6.4 s, 16 shelf games, 2026-11-13). The node run it replaces took about 0.25 s, so the gate adds about 6 s.
+  - **If the maker is off playing** when the build ends, the test waits for that game to end, then takes those few seconds. Meanwhile "Back to your game" on the shelf shows the same line.
+- **A make picked up after a restart** (D191) goes through the same checker, so it's gated and deferred the same way. That closes D191's "not built".
+- **Settings** (service config `gate`): `cpu_factor`, `calibrated`, `chromium`, `nice`, `timeout_s`, `watch_s`, `off`. `--no-gate` is for development only. The cabinet's profile (`/etc/arcade/cabinet.conf`) labels results `virtual` or `picade`.
+
+**D311. Until a cabinet is calibrated, frame time never keeps a game off the shelf.** *(Director's instruction, 2026-11-12: "it must not block games on a guessed budget"; Claude.)*
+- The budget is the Pi's whole frame (16.7 ms, D64), divided on the virtual cabinet by `gate.cpu_factor`. That's 3 by default: a guess, giving 5.57 ms (D128).
+- **Each run still measures, judges and logs frame time.** While the cabinet's `gate.calibrated` isn't true, a frame-time failure is `advisory`: logged, shown in the Manager, never blocking. This holds on the virtual cabinet and on the Picade alike, and on the Picade even its 16.7 ms is unmeasured on a real Pi until bring-up.
+- **Calibration (Phase 2):** run `cabinet/vm/guest/gate-shelf.mjs` on the Picade and on the virtual cabinet over the same carts. Set `cpu_factor` from the ratio, then `calibrated: true` on each.
+- **On the virtual cabinet now** (2026-11-13), every shelf game's p95 is 1.1 to 1.5 ms, well inside even the guessed 5.57 ms. The worst single frame is 22 to 40 ms: a first-frame or GC spike, which the p95 ignores.
+
+**D312. A downloaded game gets a smoke check, once per version.** *(Director's brief; Claude.)*
+- The check (`gate-run.js --guest URL`): its page on the guest server loads, throws no page errors in its first 5 s, and asks for nothing beyond the cabinet's guest origin (`data:` and `blob:` are fine).
+- **Results are kept** in the data folder (`gate/guests.json`) by id and `version`. A guest is on the shelf once its version has passed; a new version is checked again. It's still served while unchecked, so it can be checked.
+- `/api/guests` says how many are still being checked, and the shelf looks again every 2 s while any are, so a guest appears as soon as it passes. On the virtual cabinet: teti and teti by Geoff pass in 5.5 s each.
+- If the check can't run (no Chromium), the guest stays on the shelf, unchecked, and it's tried again at the next start: the cabinet's fault isn't the game's.
+- **Not covered:** a guest whose files change without a new `version` isn't re-checked. Updates bump the version (D231).
+
+**D313. What the gate costs, and what it doesn't cover yet.** *(Claude.)*
+- **Virtual cabinet, 2026-11-13,** at nice 19, run from `/tmp` without touching the service (16 carts on its shelf, Chromium 156):
+
+| Cart | s | Cart | s | Cart | s | Cart | s |
+|---|---|---|---|---|---|---|---|
+| apple-catch | 6.8 | cloud-popper | 6.4 | fruit-cat-drop | 6.4 | pepper-bone-catch | 7.6 |
+| bee-buzz | 4.8 | comet-dodge | 4.8 | log-hopper | 6.5 | rock-rain | 4.6 |
+| candy-cat-drop | 6.3 | frog-flicker | 5.8 | log-hopper-v2 | 6.5 | shark-chomp | 6.1 |
+| candy-cat-drop-v2 | 6.4 | penguin-slide | 6.7 | snowball-drop | 4.5 | wall-ball | 6.2 |
+
+- All 16 pass: 96 s for the whole shelf. teti and teti-geoff: 5.5 s each.
+- **The Pi will be slower;** how much is what calibration measures.
+- **Not built:** the desktop path. `publish_cart` over MCP runs the same gate once MCP exists (HANDOFF §9.4). The gate doesn't re-run when a cabinet update changes the runtime. Games already on the shelf stay there.

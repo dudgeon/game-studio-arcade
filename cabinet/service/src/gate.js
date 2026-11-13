@@ -35,6 +35,10 @@ export function gateSettings({ profile, gate = {} }) {
     host,
     cpuFactor,
     budgetMs: Math.round((PI_BUDGET_MS / cpuFactor) * 100) / 100,
+    // Until a cabinet is calibrated (the Picade against the virtual one, D128), its frame
+    // budget is a guess, and a guess never keeps a game off the shelf: frame time is
+    // measured, judged and logged, but only blocks once `gate.calibrated` is true (D311).
+    frameTimeBlocks: gate.calibrated === true,
     chromium: typeof gate.chromium === "string" ? gate.chromium : null,
     nice: Number(gate.nice ?? 19),
     timeoutMs: Number(gate.timeout_s ?? 600) * 1000,
@@ -57,6 +61,7 @@ export function cabinetProfile(file = "/etc/arcade/cabinet.conf") {
  *   ok: boolean, kind: "cart" | "guest", what: string, host: string, driver: string, fallback: string | null,
  *   failing: GateCheck[], seconds: number, waited_s: number, restarts: number,
  *   budget_ms?: number, cpu_factor?: number, frame_time?: any, report?: any, error?: string,
+ *   advisory?: GateCheck[], frame_time_blocks?: boolean,
  * }} GateResult
  */
 
@@ -161,12 +166,17 @@ export function createGate(o) {
           ];
           const anyAuto = report.rules.some((/** @type {any} */ r) => r.kind === "auto");
           if (!anyAuto) failing.push({ id: "no-auto-rules", passed: false, reason: "the spec has no rule the test can check" });
+          // A guessed budget is advice, not a gate (D311).
+          const advisory = s.frameTimeBlocks ? [] : failing.filter((f) => f.id === "generic:frame-time");
+          const blocking = failing.filter((f) => !advisory.includes(f));
           return record({
             ...base,
-            ok: report.ok && failing.length === 0,
+            ok: blocking.length === 0,
+            ...(advisory.length ? { advisory } : {}),
+            frame_time_blocks: s.frameTimeBlocks,
             driver: a.out.driver,
             fallback: a.out.fallback,
-            failing,
+            failing: blocking,
             seconds: Math.round(a.seconds * 10) / 10,
             waited_s: a.waited_s,
             restarts: a.restarts,
@@ -200,6 +210,22 @@ export function createGate(o) {
   };
 }
 
+/** Gate runs in flight, by process group: the service stops them when it stops. @type {Set<number>} */
+const LIVE = new Set();
+
+/** How many gate runs are going right now. */
+export const liveGateRuns = () => LIVE.size;
+
+/** Stop every gate run now (the service is stopping). */
+export function stopGateRuns() {
+  for (const pid of LIVE) {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {}
+  }
+  LIVE.clear();
+}
+
 /**
  * Run gate-run.js under nice, in its own process group, so stopping it stops its Chromium too.
  * @param {string[]} args @param {{ nice: number, timeoutMs: number, signal: AbortSignal }} o
@@ -207,6 +233,7 @@ export function createGate(o) {
 export function runChild(args, o) {
   return new Promise((resolve, reject) => {
     const child = spawn("nice", ["-n", String(o.nice), process.execPath, RUN, ...args], { stdio: ["ignore", "pipe", "pipe"], detached: true });
+    if (child.pid) LIVE.add(child.pid);
     let out = "";
     let err = "";
     child.stdout.on("data", (d) => (out += d));
@@ -231,6 +258,7 @@ export function runChild(args, o) {
     });
     child.on("close", () => {
       clearTimeout(timer);
+      if (child.pid) LIVE.delete(child.pid);
       o.signal.removeEventListener("abort", onAbort);
       if (o.signal.aborted) return reject(new Error("stopped: a game started"));
       if (timedOut) return reject(new Error(`the test didn't finish within ${Math.round(o.timeoutMs / 1000)} s`));

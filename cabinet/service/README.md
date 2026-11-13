@@ -131,11 +131,19 @@ Downloaded web games sit on the shelf after the carts. Each is a folder in the r
 
 A version of a guest is its own folder whose `guest.json` names its `maker`, `parent` and `family`; the shelf indents it under the original (D234). `guests/teti-geoff` is Geoff's teti that keeps score. A guest reports a round's score by posting `{gsa: "score", n}` to the launcher; the play log keeps it, and G6 shows the score and the best (D235). A grown-up maker is added only by `node scripts/maker.mjs add-grown-up NAME` on the mini (token-gated, like coin.mjs); the service never writes `makers.json` itself, and the kids' who's-making list leaves grown-ups out (D236).
 
+## The publish gate (D310-D313)
+
+Before a made game goes on the shelf, the cabinet re-tests it itself (`src/gate.js`, `bin/gate-run.js`). It runs the spec's auto rules and the generic checks in the cabinet's own Chromium, through the playtest harness's pipe driver (no Playwright). Each run is its own process under `nice -n 19`, one at a time. A test waits while a game is being played (the launcher's `/api/arcade/playing` heartbeat), and one already running when a play starts is stopped and run again afterwards.
+
+A failing game stays off the shelf: the kid sees E3, the make is charged, and each reason goes in the session record and `logs/publish_gate.jsonl`. A downloaded game gets a smoke check per version (it loads, no page errors, nothing fetched off the cabinet) before it shows (D312). Frame time is measured and logged, but blocks only once the cabinet's config says `gate.calibrated: true` (D311).
+
+On the virtual cabinet a game takes 4.5 to 7.6 s (D313). `node cabinet/vm/guest/gate-shelf.mjs` on a cabinet times the gate over its whole shelf. `--no-gate` is for development only.
+
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), publish gate, `studio fork` on the desktop CLI.
+- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 

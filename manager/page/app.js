@@ -246,6 +246,7 @@ function gateLine(g) {
   if (!g) return "";
   const where = `${esc(g.host ?? "?")}${g.driver === "node" ? ", node driver (no Chromium)" : ""}`;
   const waited = g.waited_s ? `, after ${g.waited_s} s waiting for a game to end` : "";
-  if (g.ok) return ` · cabinet re-test passed in ${esc(g.seconds)} s (${where}${waited})`;
+  const slow = g.advisory?.length ? `; frame time over the uncalibrated budget, not blocking: ${esc(g.advisory[0].reason ?? "")}` : "";
+  if (g.ok) return ` · cabinet re-test passed in ${esc(g.seconds)} s (${where}${waited}${slow})`;
   return ` · <span class=bad>cabinet re-test kept it off the shelf</span> (${where}): ${g.failing.map((f) => `${esc(f.id)}: ${esc(f.reason ?? "")}`).join("; ")}`;
 }

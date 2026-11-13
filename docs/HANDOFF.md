@@ -66,7 +66,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 - A per-build spending cap via Managed Agents session budgets, set from Phase 0 data.
 - Screening each request with a small, fast model before a build starts.
 - Nightly backup of the cabinet's cart library to a private GitHub repo.
-- Desktop publishes pass the publish gate on the Pi; cabinet builds are already tested in the sandbox.
+- Every game passes the publish gate on the cabinet before the shelf: its auto rules in the cabinet's own Chromium, at low priority, never during play (D310-D313). Desktop publishes too, once MCP exists.
 - No raw audio stored; transcripts are kept.
 - Optional quiet hours: make and fork off, play on.
 - TypeScript and Node across runtime, service, launcher and Manager.
@@ -301,7 +301,7 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 
 *Done when:* Falling Blocks exists as `spec.md` plus `game.js`, every rule passes, it plays in a browser with the keyboard, real cost per build is recorded, and Sonnet 5.5 vs Opus 5.5 has been compared once. Stretch: one fork ("make it lava") end to end.
 
-**Phase 1 — cabinet service and Cabinet Manager (2–3 weekends), in the virtual cabinet.** Develop and run the service in the virtual cabinet on the mini (virtual-cabinet.md steps V0–V2; production play on the real cabinet never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. Check Playwright's Chromium on Raspberry Pi OS arm64, or point it at system Chromium, for the publish gate (doable in the VM, which is arm64 on the same OS; speed still needs the Pi). Run the gate at low priority and defer it while a game is being played.
+**Phase 1 — cabinet service and Cabinet Manager (2–3 weekends), in the virtual cabinet.** Develop and run the service in the virtual cabinet on the mini (virtual-cabinet.md steps V0–V2; production play on the real cabinet never depends on the mini): launcher, local server, git cart library, tile relay, logs, MCP, Manager API. Manager v0: simulator, carts, activity, push. The publish gate drives the system Chromium over its DevTools pipe, with no Playwright, at low priority and deferred while a game is being played (built 2026-11-13, D310-D313; speed still needs the Pi).
 
 **Phase 2 — hardware bring-up (on arrival).** Hardware ordered 2026-11-07 (D80). The software already runs in the virtual cabinet on the same script, so this phase is the hardware layer (virtual-cabinet.md V3): assemble the Picade (check the edition, fit the Active Cooler), the same script with the `picade` profile on a new card, the overlay and key map (D82, D83), the X HAT's DAC and speaker, the panel and power button, the USB mic in the case (D89), basement Wi-Fi, Manager pairing, the day-one library, and calibrating the publish gate against the virtual cabinet (D128).
 

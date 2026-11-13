@@ -16,7 +16,7 @@ import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
-import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate } from "../src/gate.js";
+import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate, stopGateRuns } from "../src/gate.js";
 
 const { values } = parseArgs({
   options: {
@@ -204,4 +204,4 @@ console.log(`speech: ${speech.kind} (D184). Kit source: ${MANAGED_AGENT_DIR}`);
 console.log(gate ? `publish gate: on, ${gate.settings.host}, frame budget ${gate.settings.budgetMs} ms (cpu factor ${gate.settings.cpuFactor}, D128), nice ${gate.settings.nice} (D310)` : "publish gate: OFF");
 studio.collectLeft();
 
-for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => Promise.all([s.close(), guestServer.close()]).then(() => process.exit(0)));
+for (const sig of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => (stopGateRuns(), Promise.all([s.close(), guestServer.close()]).then(() => process.exit(0))));

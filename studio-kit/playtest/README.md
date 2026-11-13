@@ -35,6 +35,7 @@ const report = await playtest(cartDir, { driver: "node", out: null }); // out: n
 ## Drivers
 
 - `node` uses the runtime's `headless()`. It's fast and needs no browser.
+- `browser` with `--chromium PATH` (or `chromium: true`, which finds one) drives a system Chromium over `--remote-debugging-pipe`, with no Playwright at all (D310). That's the cabinet's publish gate, since the cabinet has Chromium but no Playwright. `--nice N` starts it at low priority. It gives the same report as Playwright's (a test checks this).
 - `browser` uses Playwright against `runtime/play.html?…&test=1` through `window.arcade.test`, served by `runtime/dev-server.js`. It gives the same report as `node` (the tests check this). The harness never installs Playwright (D63): it uses the copy it finds (`GSA_PLAYWRIGHT`, local `node_modules`, the global npm root, `/opt/npm-tools/node_modules`). For development, `npm install` gets 1.56.0, the sandbox's version, and `node node_modules/playwright/cli.js install --only-shell chromium` gets its browser.
 
 ## The report
