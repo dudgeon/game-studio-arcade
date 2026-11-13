@@ -1149,6 +1149,12 @@ Decided by Claude (the SD-card worker) unless marked, after the Picade arrived. 
   - The overlay was built at the pinned commit, and config.txt, the udev rule and `asound.conf` were written.
   - The offline service served the shelf, Moonshine loaded in about 0.6 s, the kiosk started on DRM, and a starter game played from the VM's keyboard.
   - The only failed unit was `rpi-eeprom-update`, because a VM has no EEPROM.
+- **Rehearsed again from main 8a8a512 (with D246's time zone route) plus this branch's first-boot fixes, 2026-11-12, run 7:**
+  - Power-on to first boot's restart took 1 min 28 s. The shelf came up "not connected" 15 s later.
+  - First boot logged `=== firstboot exit 0 ===` before its restart. The restart is now scheduled 5 s out (`systemd-run`) instead of `systemctl reboot --no-block`, because run 5 showed the latter stopped the seed unit mid-script ("Terminated", no exit line). The exit line is the record, since the Picade's journal doesn't outlive the restart.
+  - The minutes line ("Switched on less than a minute ago.", "Switched on 1 minute ago.") has its own line; "less than a minute" had wrapped at the console's 64 columns.
+  - The time zone, through both routes, from the mini's own zone (no `--timezone`): cloud-init set America/New_York on first boot. Provisioning's `step_timezone` (D246) read the same name from the seed, found it already set, and changed nothing. After the restart, `/etc/timezone`, `/etc/localtime` and `timedatectl` all said America/New_York. `flash.mjs` writes both from one value, so they can't differ on a card.
+  - Left as it is (cosmetic): systemd's "The system will reboot now!" broadcast shows on the screen for those 5 s.
 - **Only the Pi can prove these:**
   - The Pi's own boot: firmware, `cmdline.txt` with `resize`, and its initramfs growing the root.
   - The overlay loading and the buttons (the VM has no X HAT).

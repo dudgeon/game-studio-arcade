@@ -129,7 +129,7 @@ function prepare(out) {
   const img = join(out, "card.img");
   if (!existsSync(img)) {
     // The real flash path, into a file; a stand-in Wi-Fi network (there's no Wi-Fi in the VM).
-    const r = spawnSync(NODE, [join(HERE, "flash.mjs"), "--image-file", img, "--allow-dirty", "--timezone", "America/New_York"], {
+    const r = spawnSync(NODE, [join(HERE, "flash.mjs"), "--image-file", img, "--allow-dirty"], {
       input: "Rehearsal network\nrehearsal-password-123\n",
       stdio: ["pipe", "inherit", "inherit"],
       env: { ...process.env, GSA_CABINET_DIR: join(out, "cabinet") },
