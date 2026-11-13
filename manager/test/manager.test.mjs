@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { activity } from "../activity.mjs";
 import { loadCabinets } from "../cabinet.mjs";
 import { toLinux } from "../keys.mjs";
-import { createManager, goodHost, homeAddress, managerKey } from "../server.mjs";
+import { createManager, goodHost, homeAddress, houseTimeZone, managerKey } from "../server.mjs";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000", "hex");
 
@@ -249,4 +249,42 @@ test("cabinets: virtual reads the VM's host; cabinets.json overrides and adds (D
   cabs = loadCabinets(d, path.join(d, "cfg"));
   assert.deepEqual(cabs.map((c) => [c.name, c.host]), [["virtual", "192.168.64.2"], ["real", "192.168.86.50"], ["spare", "spare.local"]]);
   assert.match(cabs[2].tokenFile, /manager-token-spare$/);
+});
+
+test("a make a restart cut off is one row, with its final outcome and a restart note (D283)", () => {
+  const a = activity({
+    studio_session: [
+      { id: "s1", maker: "tester", request: "frogs", outcome: "service_restarted", started_at: "2026-11-12T23:35:00Z", ended_at: "2026-11-12T23:38:45Z" },
+      { id: "s2", maker: "tester", request: "bees", outcome: "committed", cart_id: "bee", cart_version: "1", started_at: "2026-11-12T23:40:00Z" },
+      { id: "s1", maker: "tester", request: "frogs", outcome: "committed", cart_id: "frog", cart_version: "1", started_at: "2026-11-12T23:35:00Z", ended_at: "2026-11-12T23:41:41Z" },
+      { id: "s3", maker: "tester", request: "cut off, never collected", outcome: "service_restarted", started_at: "2026-11-12T23:30:00Z" },
+    ],
+    coin_ledger: [{ kind: "charge", session_id: "s1", cost_cents: 31, coins: 3, outcome: "restart, on the shelf", at: "2026-11-12T23:41:42Z" }],
+  });
+  assert.equal(a.makes.length, 3);
+  const frog = a.makes.find((m) => m.id === "s1");
+  assert.deepEqual([frog.outcome, frog.cart.id, frog.restarted, frog.coins, frog.kid_outcome], ["committed", "frog", true, 3, "restart, on the shelf"]);
+  assert.equal(a.makes.find((m) => m.id === "s2").restarted, false);
+  assert.deepEqual([a.makes.find((m) => m.id === "s3").outcome, a.makes.find((m) => m.id === "s3").restarted], ["service_restarted", true]);
+});
+
+test("times are shown in the house's time zone: the mini's, or MANAGER_TZ (D283)", async () => {
+  const was = process.env.MANAGER_TZ;
+  try {
+    process.env.MANAGER_TZ = "America/New_York";
+    assert.equal(houseTimeZone(), "America/New_York");
+    process.env.MANAGER_TZ = "Not/AZone";
+    assert.equal(houseTimeZone(), "UTC");
+    delete process.env.MANAGER_TZ;
+    assert.equal(houseTimeZone(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+    process.env.MANAGER_TZ = "America/New_York";
+    await withManager({ virtual: fakeCabinet() }, async (base) => {
+      const cookie = await login(base);
+      const j = await (await fetch(`${base}/api/cabinets`, { headers: { Cookie: cookie } })).json();
+      assert.equal(j.time_zone, "America/New_York");
+    });
+  } finally {
+    if (was === undefined) delete process.env.MANAGER_TZ;
+    else process.env.MANAGER_TZ = was;
+  }
 });

@@ -85,6 +85,17 @@ function readJson(req) {
   });
 }
 
+/** The house's time zone: the mini's own, or MANAGER_TZ. Pages show times in it, whatever the viewer's device says. */
+export function houseTimeZone() {
+  const tz = process.env.MANAGER_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return "UTC";
+  }
+}
+
 const dollars = (/** @type {number} */ c) => `${c < 0 ? "-" : ""}$${(Math.abs(c) / 100).toFixed(2)}`;
 
 /**
@@ -195,7 +206,7 @@ export function createManager(o) {
         res.writeHead(200, { "Content-Type": `${type}; charset=utf-8`, "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'" });
         return res.end(fs.readFileSync(path.join(page, file)));
       }
-      if (req.method === "GET" && p === "/api/cabinets") return json(res, 200, { cabinets: [...o.cabinets.keys()].map(status), controls: CONTROLS });
+      if (req.method === "GET" && p === "/api/cabinets") return json(res, 200, { cabinets: [...o.cabinets.keys()].map(status), controls: CONTROLS, time_zone: houseTimeZone() });
       const m = /^\/api\/c\/([a-z][a-z0-9-]*)(\/.*)$/.exec(p);
       if (!m || !o.cabinets.has(m[1])) return json(res, 404, { error: "no such page" });
       const [, name, rest] = m;

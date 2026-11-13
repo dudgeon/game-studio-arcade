@@ -40,7 +40,7 @@ test("the provisioning tar holds the update script", () => {
   const out = path.join(dir, "p.tgz");
   makeProvisionTar(REPO, out);
   const names = execFileSync("tar", ["-tzf", out], { encoding: "utf8" }).split("\n");
-  for (const f of ["./provision.sh", "./update-on-cabinet.sh", "./boot-wait.sh", "./data-check.mjs", "./lock.json", "./files/arcade-keyd", "./files/arcade-netwatch", "./files/arcade-netwatch.service"]) assert.ok(names.includes(f), f);
+  for (const f of ["./provision.sh", "./update-on-cabinet.sh", "./boot-wait.sh", "./timezone.sh", "./data-check.mjs", "./lock.json", "./files/arcade-keyd", "./files/arcade-netwatch", "./files/arcade-netwatch.service"]) assert.ok(names.includes(f), f);
 });
 
 // update-on-cabinet.sh records all the data before provisioning and checks it after, on every path (D196).
