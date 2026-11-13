@@ -368,3 +368,8 @@ test("a guest's G6 shows the score line only when it reported one (D235)", () =>
   assert.match(words(guestPostGame({ id: "teti-geoff", title: "teti" }, { score: 340, best: 340, bestBefore: null })), /Score: 340\. A new best!/);
   assert.match(words(guestPostGame({ id: "teti-geoff", title: "teti" }, { score: 120, best: 340, bestBefore: 340 })), /Score: 120\. Best: 340\./);
 });
+
+test("R8 for someone else's own version names whose game stays the same (D302)", () => {
+  const r = resultView({ id: 1, ok: true, kind: "change", version: 1, title: "Snowball Drop", maker_name: "Tester2", cost_cents: 13, pot_after_cents: 882, parent: { id: "rock-rain", maker: "tester", maker_name: "Tester" } }, null);
+  assert.ok(r.blocks.some((b) => b.text === "Tester's game stays the same."));
+});

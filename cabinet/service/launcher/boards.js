@@ -663,7 +663,7 @@ export function resultView(r, pot) {
     title = r.version > 1 ? `Version ${r.version} is ready!` : "Your own version is ready!";
     blocks.push({ text: r.title, scale: 2, color: C.yellow, rows: 1, after: 2, align: "center" });
     if (r.changed) blocks.push({ text: r.changed, rows: 2, align: "center" });
-    blocks.push({ text: r.version > 1 ? `Version ${r.version - 1} is still saved.` : `${r.parent?.maker_name ?? "The old"} game stays the same.`, color: C.mint, rows: 1, align: "center", onCut: "ok" });
+    blocks.push({ text: r.version > 1 ? `Version ${r.version - 1} is still saved.` : (r.parent?.maker_name ? `${r.parent.maker_name}'s game stays the same.` : "The old game stays the same."), color: C.mint, rows: 1, align: "center", onCut: "ok" });
   } else {
     blocks.push({ text: r.title, scale: 2, color: C.yellow, rows: 2, after: 2, align: "center" }, { text: `by ${clean(by)}`, color: C.silver, rows: 1, align: "center", after: 5 });
   }
