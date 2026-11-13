@@ -208,7 +208,7 @@ test("the plan reaches the screen in kid words: seconds, never frames or millise
 });
 
 test("the first question checks Claude heard the idea right, and a spoken fix reaches Claude word for word (D308)", async () => {
-  const restate = { question: "A falling-candy game where the cat is happy after 20 lines?", option_a: "Yes, that's it", option_b: "Something else" };
+  const restate = { question: "A falling-candy game where the cat is happy after 20 lines?", option_a: "Yes, that's it", option_b: "Not quite" };
   const m = mockApi({
     steps: [
       { await_message: true },

@@ -1374,3 +1374,5 @@ From docs/validation-virtual.md, on the director's list.
 - **Where:** the brief (`studio-kit/managed-agent/agents/studio.md`, step 2 and Forks). That's a brief change; the director reapplies the agent. The driver relays it like any question, so the cabinet needs no change.
 - **Tests:** `agent-def.test.js` holds the brief to it; `driver.test.js` drives a restate answered by voice and checks the fix reaches Claude word for word and lands on the record.
 - **Not taken:** a separate "Did I hear you?" screen on the cabinet. The tiles already do it, and Claude restating in its own words catches more than showing the transcript again.
+
+**D309. On the restate question, B reads "Not quite".** *(Claude, from the live check after the fixes; the director's go.)* D308's B was "Something else", right above C, the cabinet's own "Something else" that opens the mic. The two looked the same, but B sends no words. Now B is "Not quite": Claude then asks what it got wrong, and C still carries the fix in the kid's words. A brief change (`studio.md` step 2); the director reapplies the agent. `agent-def.test.js` checks B's words and that B never repeats C's label.
