@@ -11,6 +11,7 @@ import { rulesOf, checkCoverage, readCheckIds } from "../../spec/index.js";
 import { encodePng } from "./png.js";
 import { frameStats } from "./soak.js";
 import { HarnessError, openBrowser, runtimeHost, pageMessage } from "./browser.js";
+import { openChromiumBrowser } from "./chromium.js";
 
 export { HarnessError };
 
@@ -84,14 +85,15 @@ export async function playtest(cartDir, opts = {}) {
   const palette = runtime.PALETTE;
 
   // --- the browser, if asked for
-  /** @type {Awaited<ReturnType<typeof openBrowser>> | null} */
+  /** @type {Awaited<ReturnType<typeof openBrowser>> | Awaited<ReturnType<typeof openChromiumBrowser>> | null} */
   let browser = null;
   /** @type {import("./browser.js").HostAdapter | null} */
   let host = null;
   if (driver === "browser") {
     host = opts.host ? await opts.host(cartDir) : await runtimeHost({ cartDir, runtimeDevServer: opts.runtimeDevServer ?? new URL("../../../runtime/dev-server.js", import.meta.url).href });
     try {
-      browser = await openBrowser({ host });
+      // A system Chromium over its DevTools pipe (D310), or Playwright's.
+      browser = opts.chromium ? await openChromiumBrowser({ host, executable: opts.chromium === true ? null : opts.chromium, nice: opts.nice }) : await openBrowser({ host });
     } catch (e) {
       await host.close();
       throw e;

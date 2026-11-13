@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // gsa-playtest <cart-dir> [--driver node|browser] [--rules R1,R3] [--out dir]
 //   [--no-frames] [--budget-ms N] [--soak-frames N] [--seed N] [--runtime dir] [--json]
+//   [--chromium PATH] [--nice N]: the browser driver on a system Chromium, no Playwright (D310)
 // --runtime points at a runtime folder other than the installed one (dev only).
 // Exit: 0 ok, 1 a rule or generic check failed, 2 the harness couldn't run (D62).
 import { parseArgs } from "node:util";
@@ -8,7 +9,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { playtest, HarnessError } from "../index.js";
 
-const USAGE = "usage: gsa-playtest <cart-dir> [--driver node|browser] [--rules R1,R3] [--out dir] [--no-frames] [--budget-ms N] [--soak-frames N] [--seed N] [--runtime dir] [--json]";
+const USAGE = "usage: gsa-playtest <cart-dir> [--driver node|browser] [--rules R1,R3] [--out dir] [--no-frames] [--budget-ms N] [--soak-frames N] [--seed N] [--runtime dir] [--chromium PATH] [--nice N] [--json]";
 
 let args;
 try {
@@ -23,6 +24,8 @@ try {
       "soak-frames": { type: "string" },
       seed: { type: "string" },
       runtime: { type: "string" },
+      chromium: { type: "string" },
+      nice: { type: "string" },
       json: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -46,7 +49,7 @@ const num = (s) => (s === undefined ? undefined : Number(s));
 
 try {
   const report = await playtest(positionals[0], {
-    driver: v.driver,
+    driver: v.chromium !== undefined ? "browser" : v.driver,
     rules: v.rules ? v.rules.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
     out: v.out,
     frames: !v["no-frames"],
@@ -54,6 +57,8 @@ try {
     soakFrames: num(v["soak-frames"]),
     seed: num(v.seed),
     runtime: v.runtime ? pathToFileURL(resolve(v.runtime, "index.js")).href : undefined,
+    chromium: v.chromium === undefined ? undefined : v.chromium || true,
+    nice: num(v.nice),
     runtimeDevServer: v.runtime ? pathToFileURL(resolve(v.runtime, "dev-server.js")).href : undefined,
   });
   if (v.json) {

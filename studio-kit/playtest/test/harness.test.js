@@ -252,6 +252,30 @@ test("real runtime: browser driver gives the same report as headless", { skip: b
   }
 });
 
+// The cabinet's gate (D310): a system Chromium over its DevTools pipe, no Playwright.
+// Here it's Playwright's own full Chromium if it's downloaded, else the machine's own.
+let pipeChromium = null;
+if (!browserSkip) {
+  const { findPlaywright, findChromium } = await import("../index.js");
+  const own = findPlaywright().playwright.chromium.executablePath();
+  pipeChromium = existsSync(own) ? own : findChromium();
+}
+const pipeSkip = browserSkip || (!pipeChromium && "there's no Chromium here to start over its pipe");
+
+test("real runtime: a system Chromium over the DevTools pipe gives Playwright's report (D310)", { skip: pipeSkip, timeout: 180000 }, async () => {
+  for (const cart of ["dot-catch", "dot-catch-broken", "candy-cat-drop"]) {
+    const a = comparable(await playtest(fixture(cart), { ...real, driver: "browser" }));
+    const full = await playtest(fixture(cart), { ...real, driver: "browser", chromium: pipeChromium, nice: 10 });
+    assert.equal(full.env.playwright, null);
+    assert.match(full.env.browser, /chrom/i);
+    assert.deepEqual(comparable(full), a, cart);
+  }
+});
+
+test("the pipe driver says plainly when there's no Chromium (D310)", async () => {
+  await assert.rejects(playtest(fixture("dot-catch"), { ...opts, driver: "browser", chromium: "/nowhere/chromium" }), /there's no Chromium here/);
+});
+
 /** A minimal decoder for our own PNGs (filter 0 only). */
 function decodeIndexedPng(buf) {
   assert.deepEqual([...buf.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

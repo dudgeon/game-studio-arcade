@@ -88,6 +88,10 @@ export interface PlaytestOptions {
   runtimeDevServer?: string;
   /** Replace the default host (the runtime dev server + play.html). */
   host?: (cartDir: string) => Promise<HostAdapter>;
+  /** Browser driver on a system Chromium over its DevTools pipe instead of Playwright (D310): its path, or true to find one. */
+  chromium?: string | true;
+  /** With `chromium`: start it under `nice -n N`, so it runs at low priority (D8). */
+  nice?: number;
 }
 
 export const GENERIC: readonly string[];
@@ -100,3 +104,20 @@ export function soakScript(frames: number, seed: number): Arcade.InputStep[];
 export function frameStats(times: number[], budgetMs: number): FrameTime;
 export function findPlaywright(): { playwright: any; version: string; from: string };
 export function runtimeHost(o: { cartDir: string; runtimeDevServer: string }): Promise<HostAdapter>;
+export interface Chromium {
+  product: string;
+  executable: string;
+  send(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<any>;
+  on(fn: (m: any) => void): () => boolean;
+  close(): Promise<void>;
+}
+export interface ChromiumPage {
+  evaluate(expression: string): Promise<any>;
+  goto(url: string, timeoutMs?: number): Promise<void>;
+  waitFor(expression: string, timeoutMs?: number): Promise<void>;
+  close(): Promise<void>;
+}
+/** A system Chromium: GSA_CHROMIUM, then the usual places, or null (D310). */
+export function findChromium(): string | null;
+export function launchChromium(o?: { executable?: string | null; nice?: number; args?: string[]; startMs?: number }): Promise<Chromium>;
+export function openPage(chrome: Chromium, o?: { onException?: (message: string) => void; onRequest?: (url: string) => void }): Promise<ChromiumPage>;
