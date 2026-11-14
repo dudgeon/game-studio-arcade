@@ -109,6 +109,8 @@ step_node() {
     echo "$sha  $tarball" | sha256sum -c -
     install -d "$dest.tmp"
     tar -xJf "$tarball" -C "$dest.tmp" --strip-components=1
+    # On disk before it has its final name: a power cut must not leave a named folder of empty files (D334).
+    sync
     mv "$dest.tmp" "$dest"
   fi
   ln -sfn "$dest/bin/node" /usr/local/bin/node
@@ -124,6 +126,9 @@ step_bundle() {
     tar -xzf "$PAYLOAD/bundle.tar.gz" -C "$release.tmp"
     # Exact versions from the repo's lock file, each checked by its hash; no install scripts run.
     (cd "$release.tmp" && PATH="$ARCADE_HOME/node/$(lock_value version)/bin:$PATH" npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+    # On disk before it has its final name: a named release is never unpacked again, so a power cut must not
+    # leave one of empty files (D334, found in the rehearsal of 2026-11-13).
+    sync
     mv "$release.tmp" "$release"
   fi
   ln -sfn "$release" "$ARCADE_HOME/current"

@@ -57,7 +57,16 @@ net_ok() {
   return 1
 }
 
-# key=value lines, so a half-written file is never read: written beside, then moved (rename is atomic on ext4).
+# A file that must survive a power cut: written beside, flushed to disk, then renamed over (D334). A plain write is
+# lost whole after a cut: the rehearsal of 2026-11-13 found every file an update had just written empty after one,
+# and an empty unit file is a masked unit. Unchanged files aren't rewritten. PUT_FILE SRC DEST MODE
+put_file() {
+  cmp -s "$1" "$2" 2>/dev/null && { chmod "$3" "$2"; return 0; }
+  install -d "$(dirname "$2")"
+  cp "$1" "$2.new" && chmod "$3" "$2.new" && sync "$2.new" && mv "$2.new" "$2" && sync "$(dirname "$2")"
+}
+
+# key=value lines, so a half-written file is never read: written beside, flushed, then moved (rename is atomic on ext4).
 state_write() { # FILE key=value...
   local f="$1"; shift
   install -d -m 0755 "$(dirname "$f")"

@@ -93,7 +93,8 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 "$N" "$REPO/scripts/cabinet-card/rehearse.mjs" stop "$DIR" >/dev/null
-kill "$up" 2>/dev/null; wait "$up" 2>/dev/null
+# The mini's side goes too, as if it had been asleep: its node first, or the subshell waits on it.
+pkill -P "$up" 2>/dev/null; kill "$up" 2>/dev/null; wait "$up" 2>/dev/null
 sleep 3
 "$N" "$REPO/scripts/cabinet-card/rehearse.mjs" start "$DIR" >/dev/null
 look 'systemctl is-active arcade-launcher' >/dev/null

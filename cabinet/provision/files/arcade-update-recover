@@ -8,7 +8,8 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=../update-lib.sh
-. "$HERE/update-lib.sh" 2>/dev/null || . /usr/local/lib/arcade-update/update-lib.sh
+# Beside it when installed; one folder up in an update's payload (check/files/).
+if [ -s "$HERE/update-lib.sh" ]; then . "$HERE/update-lib.sh"; elif [ -s "$HERE/../update-lib.sh" ]; then . "$HERE/../update-lib.sh"; else . /usr/local/lib/arcade-update/update-lib.sh; fi
 DATA="${ARCADE_DATA:-/var/lib/arcade}"
 BOOT=no
 [ "${1:-}" = --boot ] && BOOT=yes

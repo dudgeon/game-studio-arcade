@@ -17,7 +17,7 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=../update-lib.sh
-. "$HERE/update-lib.sh" 2>/dev/null || . /usr/local/lib/arcade-update/update-lib.sh
+if [ -s "$HERE/update-lib.sh" ]; then . "$HERE/update-lib.sh"; elif [ -s "$HERE/../update-lib.sh" ]; then . "$HERE/../update-lib.sh"; else . /usr/local/lib/arcade-update/update-lib.sh; fi
 BOOT_DIR="${ARCADE_BOOT_DIR:-/boot/firmware}"
 CMDLINE="${ARCADE_CMDLINE:-/proc/cmdline}"
 TRY="$STATE/boot-try"

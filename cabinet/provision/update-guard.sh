@@ -7,21 +7,25 @@
 #   arcade-boot-confirm.service     Picade: keep a tried boot or go back to the last one (D336)
 #   boot packages held, and the bootloader's own self-update at boot masked (D335)
 #   Picade: systemd kicks the hardware watchdog, so a hung kernel restarts the Pi (D336)
+# Every file goes through put_file: flushed before it's renamed into place, so a power cut can't leave it empty.
 UPDATE_LIB="${UPDATE_LIB:-/usr/local/lib/arcade-update}"
 
 step_update_guard() {
-  install -d -m 0755 "$UPDATE_LIB" /var/lib/arcade-update
-  install -m 0644 "$SELF_DIR/update-lib.sh" "$UPDATE_LIB/update-lib.sh"
-  install -m 0755 "$SELF_DIR/files/arcade-update-recover" "$UPDATE_LIB/arcade-update-recover"
-  install -m 0755 "$SELF_DIR/files/arcade-boot" "$UPDATE_LIB/arcade-boot"
-  ln -sfn "$UPDATE_LIB/arcade-boot" /usr/local/sbin/arcade-boot
-  install -m 0644 "$SELF_DIR/files/arcade-update-recover.service" /etc/systemd/system/arcade-update-recover.service
   # shellcheck source=update-lib.sh
-  ( . "$UPDATE_LIB/update-lib.sh"; hold_boot )
+  . "$SELF_DIR/update-lib.sh"
+  local tmp
+  tmp="$(mktemp -d)"
+  install -d -m 0755 "$UPDATE_LIB" /var/lib/arcade-update
+  put_file "$SELF_DIR/update-lib.sh" "$UPDATE_LIB/update-lib.sh" 0644
+  put_file "$SELF_DIR/files/arcade-update-recover" "$UPDATE_LIB/arcade-update-recover" 0755
+  put_file "$SELF_DIR/files/arcade-boot" "$UPDATE_LIB/arcade-boot" 0755
+  ln -sfn "$UPDATE_LIB/arcade-boot" /usr/local/sbin/arcade-boot
+  put_file "$SELF_DIR/files/arcade-update-recover.service" /etc/systemd/system/arcade-update-recover.service 0644
+  hold_boot
   # The bootloader updates itself at boot when apt brings a newer one; on the Picade that's a deliberate step (D335).
   systemctl mask rpi-eeprom-update.service >/dev/null 2>&1 || true
   if [ "${PROFILE:-$(sed -n 's/^profile=//p' /etc/arcade/cabinet.conf 2>/dev/null)}" = picade ]; then
-    cat > /etc/systemd/system/arcade-boot-confirm.service <<'UNIT'
+    cat > "$tmp/confirm" <<'UNIT'
 [Unit]
 Description=Keep a tried boot, or go back to the last good one (D336)
 After=local-fs.target NetworkManager.service
@@ -35,12 +39,15 @@ TimeoutStartSec=20min
 [Install]
 WantedBy=multi-user.target
 UNIT
-    install -d /etc/systemd/system.conf.d
-    printf '[Manager]\nRuntimeWatchdogSec=15s\nRebootWatchdogSec=2min\n' > /etc/systemd/system.conf.d/arcade-watchdog.conf
+    put_file "$tmp/confirm" /etc/systemd/system/arcade-boot-confirm.service 0644
+    printf '[Manager]\nRuntimeWatchdogSec=15s\nRebootWatchdogSec=2min\n' > "$tmp/watchdog"
+    put_file "$tmp/watchdog" /etc/systemd/system.conf.d/arcade-watchdog.conf 0644
     systemctl daemon-reload
     systemctl enable arcade-boot-confirm.service >/dev/null 2>&1
   else
     systemctl daemon-reload
   fi
   systemctl enable arcade-update-recover.service >/dev/null 2>&1
+  rm -rf "$tmp"
+  sync
 }

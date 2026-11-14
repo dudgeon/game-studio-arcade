@@ -77,10 +77,14 @@ COMMIT_BEFORE="$(cat /etc/arcade/provisioned-commit 2>/dev/null)"
 CONFIG_BEFORE="$(config_print)"
 PREVIOUS="$(readlink -f /opt/arcade/current)"
 
-# An earlier update cut off without a restart since: put that right first (D334).
+# The update's own checks and guards come from this payload, so they're the ones it ships.
+install -d "$PAYLOAD/check"
+tar -xzf "$PAYLOAD/provision.tar.gz" -C "$PAYLOAD/check" ./data-check.mjs ./update-guard.sh ./update-lib.sh ./apt.lock ./files/arcade-update-recover ./files/arcade-update-recover.service ./files/arcade-boot || finish false "couldn't unpack the update's own checks"
+
+# An earlier update cut off without a restart since: put that right first, with this payload's recovery (D334).
 if [ -e "$STATE/pending" ]; then
   log "an earlier update didn't finish: recovering it first"
-  /bin/bash "$(dirname "$0")/arcade-update-recover" 2>/dev/null || /bin/bash /usr/local/lib/arcade-update/arcade-update-recover || true
+  /bin/bash "$PAYLOAD/check/files/arcade-update-recover" || true
   BEFORE="$(cat /etc/arcade/provisioned-version 2>/dev/null)"
   COMMIT_BEFORE="$(cat /etc/arcade/provisioned-commit 2>/dev/null)"
   PREVIOUS="$(readlink -f /opt/arcade/current)"
@@ -97,9 +101,6 @@ fi
 PROFILE="$(sed -n 's/^profile=//p' /etc/arcade/cabinet.conf)"
 case "$PROFILE" in picade|virtual) ;; *) finish false "this cabinet doesn't say which profile it is" ;; esac
 
-# The checker comes from this payload, so it's the one the update ships.
-install -d "$PAYLOAD/check"
-tar -xzf "$PAYLOAD/provision.tar.gz" -C "$PAYLOAD/check" ./data-check.mjs ./update-guard.sh ./update-lib.sh ./files/arcade-update-recover ./files/arcade-update-recover.service ./files/arcade-boot || finish false "couldn't unpack the update's own checks"
 node "$PAYLOAD/check/data-check.mjs" record "$DATA" "$PAYLOAD/data.before" || finish false "couldn't record the data before updating"
 net_ok 5 && NET_BEFORE=yes || NET_BEFORE=no
 log "from $BEFORE, profile $PROFILE, commit $(cat "$PAYLOAD/commit"), network ${NET_BEFORE}"
@@ -108,7 +109,6 @@ log "from $BEFORE, profile $PROFILE, commit $(cat "$PAYLOAD/commit"), network ${
 ( SELF_DIR="$PAYLOAD/check"; . "$PAYLOAD/check/update-guard.sh"; step_update_guard ) || finish false "couldn't install the power-cut guard"
 
 # 1. Packages the provisioning script will move (apt.lock, D335): a copy of each as it is now.
-tar -xzf "$PAYLOAD/provision.tar.gz" -C "$PAYLOAD/check" ./apt.lock 2>/dev/null
 mapfile -t lock_lines < <(grep -vE '^[[:space:]]*(#|$)' "$PAYLOAD/check/apt.lock" 2>/dev/null)
 locked=()
 moving=()
@@ -122,6 +122,8 @@ if [ ${#moving[@]} -gt 0 ]; then
   apt_save "$PAYLOAD/lock-before" "${moving[@]}" || finish false "couldn't keep a copy of the packages apt.lock moves: nothing was changed"
 fi
 
+# Everything so far on disk before the first change: the payload, the data record, the guard and the package copies.
+sync
 state_write "$STATE/pending" "payload=$PAYLOAD" "stage=software" "previous=$PREVIOUS" "version=$BEFORE" "commit=$COMMIT_BEFORE" "profile=$PROFILE" "net=$NET_BEFORE"
 
 software_rollback() {
