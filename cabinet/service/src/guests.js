@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -163,7 +164,7 @@ export function createGuests(o) {
   const logPlay = (body) => {
     const record = playRecord(body);
     fs.mkdirSync(o.logsDir, { recursive: true });
-    fs.appendFileSync(logFile(), JSON.stringify(record) + "\n");
+    appendLineDurable(logFile(), JSON.stringify(record));
     return record;
   };
 

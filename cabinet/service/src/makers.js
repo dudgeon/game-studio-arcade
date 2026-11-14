@@ -2,6 +2,7 @@
 // repo. An open list of first names; never deleted (D5), hidden from the Manager.
 import fs from "node:fs";
 import path from "node:path";
+import { writeJsonDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 /** Longest first name kept. A long one is cut here and fitted again on screen. */
 export const NAME_MAX = 16;
@@ -40,10 +41,7 @@ export function makersStore({ file, now = () => new Date() }) {
   };
   /** @param {Maker[]} list */
   const write = (list) => {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(list, null, 2) + "\n");
-    fs.renameSync(tmp, file);
+    writeJsonDurable(file, list);
   };
   return {
     read,

@@ -31,7 +31,8 @@ const TEXT_EXT = new Set([".md", ".js", ".json", ".txt", ".ts", ".csv", ".svg"])
 /** How long launch_on_cabinet waits for the launcher to say yes or no. */
 export const LAUNCH_WAIT_MS = 8000;
 
-const GIT_ENV = { GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid" };
+// core.fsync: a commit is on disk before it returns, as in the Studio's library (D337a).
+const GIT_ENV = { GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid", GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsync", GIT_CONFIG_VALUE_0: "added", GIT_CONFIG_KEY_1: "core.fsyncMethod", GIT_CONFIG_VALUE_1: "fsync" };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ args, /** @type {any} */ o = {}) => execFileSync("git", args, { cwd, env: { ...process.env, ...GIT_ENV }, maxBuffer: 2 ** 26, ...o });
 
 /** A bundle path is safe and belongs in a cart folder. @param {string} p */

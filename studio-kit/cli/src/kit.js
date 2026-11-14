@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { buildKit } from "../../managed-agent/scripts/pack-kit.js";
+import { writeFileDurable } from "./durable.js";
 
 /**
  * @param {{api: import("./api.js").StudioApi, cacheFile: string, out: string,
@@ -21,7 +22,7 @@ export async function ensureKitUploaded(o) {
   const file = await o.api.uploadFile(kit.out, "studio-kit.tgz");
   cache[kit.hash] = { file_id: file.id, uploaded_at: new Date().toISOString(), files: kit.fileCount, bytes: kit.bytes };
   fs.mkdirSync(path.dirname(o.cacheFile), { recursive: true });
-  fs.writeFileSync(o.cacheFile, JSON.stringify(cache, null, 2) + "\n");
+  writeFileDurable(o.cacheFile, JSON.stringify(cache, null, 2) + "\n");
   log(`kit ${kit.hash.slice(0, 12)} uploaded as ${file.id}`);
   return { fileId: file.id, hash: kit.hash, uploaded: true, missing: kit.missing };
 }

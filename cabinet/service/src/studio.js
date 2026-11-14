@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { makeCart } from "@game-studio-arcade/studio-cli/src/make.js";
 import { appendLog } from "@game-studio-arcade/studio-cli/src/log.js";
+import { writeFileDurable, writeJsonDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 /** Progress lines kept for the screen. */
 const KEEP_LINES = 12;
@@ -143,9 +144,7 @@ export function createStudio(o) {
     }
   };
   const writeJson = (file, data) => {
-    fs.mkdirSync(o.paths.root, { recursive: true });
-    fs.writeFileSync(`${file}.tmp`, JSON.stringify(data, null, 2) + "\n");
-    fs.renameSync(`${file}.tmp`, file);
+    writeJsonDurable(file, data);
   };
 
   // ---------- how makes ended (D192) ----------
@@ -441,8 +440,7 @@ export function createStudio(o) {
       const dir = path.join(o.paths.sessions, current.sessionId);
       try {
         const events = await api.listEvents(current.sessionId);
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, "events.jsonl"), events.map((/** @type {any} */ e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
+        writeFileDurable(path.join(dir, "events.jsonl"), events.map((/** @type {any} */ e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
       } catch (/** @type {any} */ e) {
         errors.push(`events: ${e?.message ?? e}`);
       }

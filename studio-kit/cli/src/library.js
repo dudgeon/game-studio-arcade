@@ -4,12 +4,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { writeFileDurable } from "./durable.js";
 
 const GIT_ENV = {
   GIT_AUTHOR_NAME: "Studio",
   GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid",
   GIT_COMMITTER_NAME: "Studio",
   GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid",
+  // Objects, refs and the index on disk before a commit returns: a power cut must not leave the library with an
+  // empty object file, which breaks the whole repository (D337a). Through the environment, so .git/config, which
+  // is the family's data, is never touched.
+  GIT_CONFIG_COUNT: "2",
+  GIT_CONFIG_KEY_0: "core.fsync",
+  GIT_CONFIG_VALUE_0: "added",
+  GIT_CONFIG_KEY_1: "core.fsyncMethod",
+  GIT_CONFIG_VALUE_1: "fsync",
 };
 
 function git(cwd, args) {
@@ -67,7 +76,7 @@ export function commitNewCart(o) {
   const dest = path.join(o.root, id);
   // Key frames are regenerable (D62): the library keeps playtest.json, never the PNGs.
   fs.cpSync(o.cartDir, dest, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
-  fs.writeFileSync(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
+  writeFileDurable(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
   git(o.root, ["add", "--", id]);
   git(o.root, ["commit", "-q", "-m", o.message.replace("{id}", id)]);
   return { id, dir: dest, commit: git(o.root, ["rev-parse", "HEAD"]) };
