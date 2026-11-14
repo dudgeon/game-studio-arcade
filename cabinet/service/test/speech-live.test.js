@@ -391,3 +391,51 @@ test("a 25-minute hold: arecord keeps every second, Groq gets it in pieces under
   for (const n of sizes) assert.ok(n <= 44 + GROQ_CHUNK_SECONDS * RATE * 2 && n < 25 * 1000 * 1000, `a piece of ${n} bytes`);
   assert.equal(most, 2);
 });
+
+// ---------- D491: fast holds and cancelled holds (a game's voice actions) ----------
+
+test("D491: stop({ fast }) asks Moonshine first and Groq only if it fails; the log says fast", async () => {
+  const dir = tmp();
+  const logFile = path.join(dir, "speech.jsonl");
+  const groq = engine("groq", async () => "from groq");
+  let moonUp = true;
+  const moon = engine("moonshine", async () => (moonUp ? "from moonshine" : Promise.reject(new Error("down"))));
+  const s = liveSpeech({ recorder: fakeRecorder(second()), engines: [groq, moon], logFile });
+  s.start();
+  assert.equal((await s.stop({ fast: true })).text, "from moonshine");
+  assert.equal(groq.calls, 0);
+  moonUp = false;
+  s.start();
+  assert.equal((await s.stop({ fast: true })).text, "from groq", "Groq when Moonshine fails");
+  s.start();
+  assert.equal((await s.stop()).text, "from groq", "a talk screen's hold is Groq first, as before");
+  const lines = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => [l.engine, l.fast ?? false]), [["moonshine", true], ["groq", true], ["groq", false]]);
+});
+
+test("D491: cancel() transcribes nothing, sends nothing, wipes the audio, and the next hold is clean", async () => {
+  const dir = tmp();
+  const logFile = path.join(dir, "speech.jsonl");
+  const pcm = second();
+  const rec = fakeRecorder(pcm);
+  const e = engine("groq", async () => "never");
+  const s = liveSpeech({ recorder: rec, engines: [e], logFile });
+  s.start();
+  s.cancel?.();
+  await settle(20);
+  assert.equal(e.calls, 0);
+  assert.ok(pcm.every((b) => b === 0), "the audio is wiped");
+  assert.equal(rec.stopped, 1, "the recorder stopped");
+  assert.match(fs.readFileSync(logFile, "utf8"), /"result":"cancelled"/);
+  assert.deepEqual(await s.stop(), { text: "" }, "nothing is left open");
+  s.cancel?.(); // cancelling with nothing held is harmless
+  // Many short holds in a row, as a game makes: each starts and ends its own recording.
+  const rec2 = fakeRecorder(second());
+  const s2 = liveSpeech({ recorder: rec2, engines: [engine("moonshine", async () => "jump")] });
+  for (let i = 0; i < 20; i++) {
+    s2.start();
+    if (i % 2) s2.cancel?.();
+    else assert.equal((await s2.stop({ fast: true })).text, "jump");
+  }
+  assert.equal(rec2.started, 20);
+});

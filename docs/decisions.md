@@ -2153,4 +2153,9 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **Code:** `launcher/pages.js` (the page state, pure), `Painter.box({ page })` and `paginate()` in `text.js`, and one line on each of the three stick cases and on M6's Yes in `app.js`.
 - **Tests:** a 400-word transcript read page by page (every word once, in order, nothing faulted, Yes waiting for the last page), Add more's pages, a long rule, and the stress flow in a real browser turning every page.
 
+**D491. The Speech interface gains a fast hold and a cancelled hold, for a game's voice actions (D489) and the talk screens.** *(Claude, agreed with the AI-in-games worker.)*
+- **`stop({ fast: true })`** asks Moonshine on the cabinet first, and Groq only if Moonshine fails. That's Geoff's choice for voice actions: speed and offline over the last word. A plain `stop()` keeps Groq first (D263). `speech.jsonl` marks a fast hold.
+- **`cancel()`**, and `POST /api/speech/cancel` from the page, drop a hold: the recorder stops, the audio is wiped, and nothing is transcribed or sent anywhere. It's logged as `result: "cancelled"`. Before this, a cancelled talk screen called stop and paid for a Groq request (10 s minimum) whose words nobody read. The launcher's cancel now uses it.
+- **Live words (D454) will be opt-in** with `start({ live: true })` from the talk screens. A game's `start()` streams nothing, so many short holds a minute are fine; a test runs 20 in a row.
+
 ## 2026-11-14 — Security updates to pinned packages (D375)

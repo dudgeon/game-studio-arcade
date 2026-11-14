@@ -226,6 +226,12 @@ export function createServiceHandler(o) {
       o.speech.start();
       return json(res, 200, { ok: true });
     }
+    if (pathname === "/api/speech/cancel") {
+      // D491: a hold thrown away (a cancelled talk screen, a game's too-short voice hold): nothing is transcribed.
+      if (o.speech.cancel) o.speech.cancel();
+      else await o.speech.stop();
+      return json(res, 200, { ok: true });
+    }
     if (pathname === "/api/speech/stop") {
       const { text } = await o.speech.stop();
       return json(res, 200, { ok: true, text });
@@ -326,7 +332,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume"]);
+  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/cancel", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;

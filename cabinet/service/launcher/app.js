@@ -924,7 +924,7 @@ async function endTalk(v) {
 async function cancelTalk(v) {
   v.phase = "idle";
   await v.talking;
-  post("/api/speech/stop").catch(() => {});
+  post("/api/speech/cancel").catch(() => {}); // D491: thrown away, not transcribed
 }
 
 const anyButtonHeld = () => [...held].some((c) => BUTTONS.has(c));
