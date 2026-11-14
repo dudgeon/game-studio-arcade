@@ -1,0 +1,20 @@
+{
+  "name": "@game-studio-arcade/game-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The game-studio Claude Code plugin's code: the arcade bridge to a cabinet's MCP server and the local studio tools (HANDOFF 9.2, 9.3; D340-D349).",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "test": "tsc -p tsconfig.json && node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "@game-studio-arcade/cabinet-service": "0.1.0",
+    "@game-studio-arcade/playtest": "0.1.0",
+    "@game-studio-arcade/runtime": "0.0.0",
+    "@game-studio-arcade/spec": "0.1.0",
+    "@game-studio-arcade/studio-cli": "0.0.0"
+  }
+}

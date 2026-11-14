@@ -31,6 +31,10 @@
 //   POST /api/manager/pot/reset  {reason, by?}
 //   GET  /api/manager/makers     every maker, grown-ups included (D236)
 //   POST /api/manager/makers/grown-up  {name}: add a grown-up maker; one already there is left as is
+//   The arcade MCP server, for desktop Claude Code through the game-studio plugin (D340-D346), with the Manager's token:
+//   POST /mcp                    JSON-RPC (src/arcade-mcp.js)
+//   GET  /api/arcade/launch      the launcher listens here for launch_on_cabinet (D344), as server-sent events
+//   POST /api/arcade/launch/answer  {launch, ok, why?}: the launcher opened the game, or why not
 //   everything else              createPlayerHandler (/api/carts, /api/plays, /api/you-check, /runtime/…, /carts/…)
 import fs from "node:fs";
 import http from "node:http";
@@ -40,6 +44,7 @@ import { createPlayerHandler } from "@game-studio-arcade/player";
 import { timingSafeEqual } from "node:crypto";
 import { StudioBusy, StudioGone, StudioRefused } from "./studio.js";
 import { PotError } from "./pot.js";
+import { serveMcpHttp } from "./arcade-mcp.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -89,6 +94,8 @@ function readJson(req) {
  *   managerToken?: string | null | (() => string | null),
  *   screen?: ReturnType<typeof import("./screening.js").createScreener> | null,
  *   plays?: ReturnType<typeof import("./gate.js").playTracker>,
+ *   mcp?: ReturnType<typeof import("./arcade-mcp.js").createArcadeMcp> | null,
+ *   launches?: ReturnType<typeof import("./arcade-mcp.js").launchRelay> | null,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -169,6 +176,10 @@ export function createServiceHandler(o) {
     if (pathname === "/api/arcade/playing") {
       // A game started, is still going (every few seconds), or ended: the publish gate waits for it (D310).
       o.plays?.set(body.playing === true, typeof body.what === "string" ? body.what.slice(0, 80) : null);
+      return json(res, 200, { ok: true });
+    }
+    if (pathname === "/api/arcade/launch/answer") {
+      o.launches?.answer(String(body.launch ?? ""), body.ok === true, typeof body.why === "string" ? body.why : undefined);
       return json(res, 200, { ok: true });
     }
     if (pathname === "/api/studio/still-here") {
@@ -254,7 +265,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen"]);
+  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
@@ -268,6 +279,14 @@ export function createServiceHandler(o) {
     if (pathname.startsWith("/api/manager/")) {
       return void manager(req, res, pathname, url).catch((e) => json(res, e instanceof HttpError ? e.status : e instanceof PotError ? 400 : 500, { ok: false, error: e.message }));
     }
+    if (pathname === "/mcp" && o.mcp) {
+      // Desktop Claude Code, paired like the Manager (D341): its token, on the service's loopback port, through the mini's SSH.
+      const mcp = o.mcp;
+      return void Promise.resolve()
+        .then(() => managerOk(req))
+        .then(() => serveMcpHttp(mcp, req, res))
+        .catch((e) => json(res, e instanceof HttpError ? e.status : 500, { jsonrpc: "2.0", id: null, error: { code: -32001, message: e.message } }));
+    }
     if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) return sendFile(res, path.join(LAUNCHER, "index.html"));
     const m = /^\/launcher\/([A-Za-z0-9_-]+\.(?:js|css|html))$/.exec(pathname);
     if (req.method === "GET" && m) return sendFile(res, path.join(LAUNCHER, m[1]));
@@ -280,6 +299,13 @@ export function createServiceHandler(o) {
       if (pathname === "/api/boot") return json(res, 200, o.cabinet?.boot() ?? { intro: false, new_month: false });
       if (pathname === "/api/studio") return json(res, 200, o.studio.state());
       if (pathname === "/api/studio/events") return events(res);
+      if (pathname === "/api/arcade/launch") {
+        if (!o.launches) return json(res, 404, { ok: false, error: "no launches here" });
+        res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive" });
+        res.write(": listening\n\n");
+        const stop = o.launches.subscribe((m) => res.write(`data: ${JSON.stringify(m)}\n\n`));
+        return void res.on("close", () => stop());
+      }
       return json(res, 405, { ok: false, error: "method not allowed" });
     }
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "method not allowed" });

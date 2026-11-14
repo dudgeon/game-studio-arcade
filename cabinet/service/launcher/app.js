@@ -1020,6 +1020,24 @@ function connect() {
 }
 connect();
 
+// ---------- launch_on_cabinet (D344): the desktop asks for a game's how-to-play screen, only from the shelf ----------
+(function listenForLaunches() {
+  const launches = new EventSource("/api/arcade/launch");
+  launches.onmessage = async (e) => {
+    const l = JSON.parse(e.data);
+    const answer = (/** @type {boolean} */ ok, /** @type {string} */ why = "") => post("/api/arcade/launch/answer", { launch: l.launch, ok, why }).catch(() => {});
+    if (view.screen !== "shelf" || playing || studio.phase === "running") return answer(false, `the cabinet is on another screen (${view.board ?? view.screen})`);
+    await refresh().catch(() => {});
+    const cart = carts.find((c) => c.id === l.cart);
+    if (!cart) return answer(false, "the shelf doesn't have that game");
+    showHowTo(cart);
+    answer(true);
+  };
+  launches.onerror = () => {
+    if (launches.readyState === EventSource.CLOSED) setTimeout(listenForLaunches, 1000);
+  };
+})();
+
 setInterval(() => {
   if (offlineSince && Date.now() - offlineSince >= OFFLINE_NOTICE_MS && view.screen !== "play" && !view.restarting) offline();
 }, 500);

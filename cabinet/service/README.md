@@ -139,11 +139,26 @@ A failing game stays off the shelf: the kid sees E3, the make is charged, and ea
 
 On the virtual cabinet a game takes 4.5 to 7.6 s (D313). `node cabinet/vm/guest/gate-shelf.mjs` on a cabinet times the gate over its whole shelf. `--no-gate` is for development only.
 
+## The arcade MCP server (D340-D346)
+
+Desktop Claude Code on the mini reaches the cabinet through the `game-studio` plugin (`game-studio/`). `POST /mcp` (`src/arcade-mcp.js`, with the JSON-RPC core in `src/mcp-rpc.js`) is on the service's own loopback port, behind the Manager's token, so only the mini can call it, over its SSH (D341). Requests with an `Origin` header are refused.
+
+| Tool | |
+| --- | --- |
+| `list_carts` | every version in the library, with `on_shelf` for the latest of each line, and the makers |
+| `get_cart` | a cart's files, now or at a library commit (`ref`) |
+| `publish_cart` | `{bundle, parent?, maker, with?, summary}`: validate, then the publish gate, then a new folder and commit. The cabinet writes the provenance (`origin: desktop`, `desk_…` session). Lineage follows a cabinet change. A failure is kept in `sessions/` and logged. |
+| `launch_on_cabinet` | the game's G0 board, only from the shelf; refused while a make is running or a game is being played (D344) |
+| `get_activity` | the logs, newest first, filtered by type, cart, maker or time |
+| `cabinet_status` | online, release, profile, what's running, the gate |
+
+The launcher listens on `GET /api/arcade/launch` and answers on `POST /api/arcade/launch/answer`. Tests: `test/arcade-mcp.test.js`.
+
 ## What's stubbed or not here
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), MCP, the Cabinet Manager (its coin pot endpoints are built), `studio fork` on the desktop CLI.
+- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 

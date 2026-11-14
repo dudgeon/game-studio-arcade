@@ -16,6 +16,7 @@ import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
+import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
 import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate, stopGateRuns } from "../src/gate.js";
 
 const { values } = parseArgs({
@@ -120,6 +121,9 @@ const speech = cabinetSpeech({ config, logsDir: paths.logs, online: () => online
 const plays = playTracker();
 const gate = values["no-gate"] || config.gate?.off ? null : createGate({ settings: gateSettings({ profile: values.profile ?? cabinetProfile(), gate: config.gate ?? {} }), playing: plays.playing, logsDir: paths.logs, log: (m) => console.log(m) });
 
+/** The cabinet's checks: validate, then the publish gate's re-test where it's on (D310). */
+const gatedOrNot = () => (gate ? gatedChecker(defaultChecker(), gate) : defaultChecker());
+
 /** @type {any} */
 let api = null;
 const studio = createStudio({
@@ -128,7 +132,7 @@ const studio = createStudio({
   // Seconds a question or plan waits with no key pressed (D188).
   questionTimeoutMs: Number(values["question-timeout"] ?? config.question_timeout_s ?? QUESTION_TIMEOUT_MS / 1000) * 1000,
   model: config.model,
-  checker: gate ? gatedChecker(defaultChecker(), gate) : defaultChecker(),
+  checker: gatedOrNot(),
   nameOf: (id) => makers.get(id)?.name ?? id,
   titleOf: (id) => readCart(paths.carts, id)?.title ?? null,
   onStart: (id) => makers.touch(id),
@@ -187,7 +191,31 @@ guests.port = guestServer.port;
 // config.screening: false turns the model off (the list stays).
 const screen = createScreener({ logsDir: paths.logs, model: client && config.screening !== false ? (text, o) => modelCheck(client, text, o) : null });
 
+// The arcade MCP server (D340-D346): desktop Claude Code's way in, behind the Manager's token. Desktop publishes
+// go through the same checks and gate as a make.
+const launches = launchRelay();
+const release = (() => {
+  try {
+    return path.basename(fs.realpathSync("/opt/arcade/current"));
+  } catch {
+    return null;
+  }
+})();
+const mcp = createArcadeMcp({
+  paths,
+  makers,
+  checker: gatedOrNot(),
+  roots,
+  studio,
+  plays,
+  launches,
+  online: () => online,
+  status: () => ({ console: config.console_name ?? "Quarter Deck", profile: values.profile ?? cabinetProfile(), release, replaying, gate: gate ? { host: gate.settings.host, budget_ms: gate.settings.budgetMs, cpu_factor: gate.settings.cpuFactor, frame_time_blocks: gate.settings.frameTimeBlocks } : null }),
+});
+
 const s = await startService({
+  mcp,
+  launches,
   screen,
   guests,
   plays,

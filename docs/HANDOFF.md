@@ -150,12 +150,12 @@ game-studio-arcade/
     context-pack/      short catalog, guides read on demand, 4 templates and a blank start (D160, D161)
     playtest/          Playwright harness: scripted input, frames, per-rule JSON report
     tools/             new_cart, validate_cart, import_asset
-    plugin/            Claude Code plugin "game-studio": skill build-cart + studio.* tools
     managed-agent/     agent .md, environment.yaml, kit packaging, claude-lock.json
   cabinet/
     service/           Arcade side + Studio side; launcher/ inside it is the cabinet screen's UI (D180, D183)
     image/             reproducible Pi OS Lite build: kiosk, systemd, players
   manager/             Cabinet Manager web app + menu bar launcher
+  game-studio/         Claude Code plugin "game-studio" (plugin/: skill build-cart, servers arcade + studio; src/: their code; D347)
   carts-examples/      Falling Blocks and other seed carts
 ```
 
@@ -211,10 +211,10 @@ Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by t
 ### 8.3 Desktop-initiated
 
 1. Geoff and a kid start Claude Code in a new cart project with the `game-studio` plugin.
-2. Optionally pull an existing cart from the cabinet (`arcade.get_cart`) and build on it.
-3. Iterate `spec.md`, then code, then `studio.playtest`. Play in the Cabinet Manager's simulator with the keyboard or a USB stick. Import found images with `studio.import_asset`.
-4. Publish with `arcade.publish_cart`: cart, lineage, session summary, `origin: desktop`. The Pi re-runs the playtest before it reaches the shelf.
-5. `arcade.launch_on_cabinet` shows it on the cabinet screen.
+2. Optionally pull an existing cart from the cabinet (`arcade.get_cart`, `into` a folder) and build on it.
+3. Iterate `spec.md`, then code, then `studio.playtest`. Play it with `studio.play` in a local browser with the keyboard (or in the Cabinet Manager's simulator). Import found images with `studio.import_asset`.
+4. Publish with `arcade.publish_cart` (`dir` the folder): cart, lineage, session summary, `origin: desktop`. The cabinet validates it and re-runs the playtest (the publish gate) before it reaches the shelf, as a new version (D343).
+5. `arcade.launch_on_cabinet` opens its how-to-play screen on the cabinet, only while the cabinet is on its shelf (D344).
 
 ## 9. Interfaces (first sketch; refine in Phases 0–1)
 
@@ -241,9 +241,13 @@ Result content (JSON text): `{"choice":"A"}`, `{"choice":"B"}`, `{"choice":"C","
 
 `list_carts`, `get_cart(id, ref)`, `publish_cart(bundle, parent?, maker, with?, summary)` (runs the publish gate), `launch_on_cabinet(id)`, `get_activity(filter)`, `cabinet_status()`.
 
+Built (D340-D344): `POST /mcp` inside the cabinet service, on its loopback port, behind the Manager's pairing token, and reached only through the mini's SSH (the Manager's connection). On the mini, the plugin's `arcade` server is a bridge that adds `get_cart(into)` and `publish_cart(dir)` for local folders.
+
 ### 9.3 Studio plugin tools on the Mac mini (`game-studio`)
 
 `studio.new_cart(from?, id, maker, with?)`, `studio.playtest(path, rules?)`, `studio.import_asset(file, size)`, `studio.validate_cart(path)`. The `build-cart` skill explains working spec-first on a cart.
+
+Built (D346): the `studio` server's `new_cart`, `playtest`, `import_asset` and `validate_cart` (Claude Code shows them as `mcp__plugin_game-studio_studio__<tool>`), plus `read_kit` (the context pack) and `play` (a local browser, keyboard as joystick).
 
 ### 9.4 Manager API (cabinet service to Cabinet Manager)
 
