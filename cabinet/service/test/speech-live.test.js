@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { alsaRecorder, cabinetSpeech, captureDevice, groqEngine, groqTimeoutMs, GROQ_MODEL, GROQ_URL, liveSpeech, moonshineEngine, pcmOfWav, RATE, wavOf } from "../src/speech-live.js";
+import { alsaRecorder, cabinetSpeech, captureDevice, groqEngine, groqTimeoutMs, GROQ_CHUNK_SECONDS, GROQ_MODEL, MOONSHINE_CHUNK_SECONDS, splitPcm, GROQ_URL, liveSpeech, moonshineEngine, pcmOfWav, RATE, wavOf } from "../src/speech-live.js";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-speech-"));
 const second = (s = 1) => Buffer.alloc(Math.round(RATE * 2 * s), 1);
@@ -131,7 +131,7 @@ test("Groq: whisper-large-v3-turbo, the key as a bearer token, and errors don't 
       return new Response(JSON.stringify({ text: " a racing game " }), { status: 200 });
     },
   });
-  assert.equal(await g.transcribe(second()), " a racing game ");
+  assert.equal(await g.transcribe(second()), "a racing game");
   assert.equal(seen.url, GROQ_URL);
   assert.equal(seen.init.headers.authorization, "Bearer gsk_test");
   const form = /** @type {FormData} */ (seen.init.body);
@@ -152,8 +152,11 @@ test("the capture device is the first one ALSA lists", () => {
   assert.equal(captureDevice("card 0: SoundCard [VirtIO SoundCard], device 1: virtio-snd [VirtIO PCM 1]\n"), "plughw:0,1");
 });
 
-/** A stand-in for arecord: -l lists a device; recording writes samples until SIGINT. */
-function fakeArecord(dir, { device = true } = {}) {
+/**
+ * A stand-in for arecord: -l lists a device; recording writes samples until SIGINT. burst: that many seconds of
+ * "speech" at once (2 s loud, 0.3 s quiet, over and over), as if held that long, then nothing until SIGINT.
+ */
+function fakeArecord(dir, { device = true, burst = 0 } = {}) {
   const bin = path.join(dir, "arecord");
   fs.writeFileSync(
     bin,
@@ -161,8 +164,17 @@ function fakeArecord(dir, { device = true } = {}) {
 const args = process.argv.slice(2);
 if (args[0] === "-l") { ${device ? 'console.log("card 1: Mic [USB Mic], device 0: USB Audio [USB Audio]");' : 'console.log("**** List of CAPTURE Hardware Devices ****");'} process.exit(0); }
 require("fs").writeFileSync(${JSON.stringify(path.join(dir, "args"))}, JSON.stringify(args));
+if (${burst}) {
+  const n = ${Math.round(burst * 16000)};
+  const b = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) b.writeInt16LE(i % 36800 < 32000 ? (i % 2 ? 3000 : -3000) : 0, i * 2);
+  for (let at = 0; at < b.length; at += 65536) process.stdout.write(b.subarray(at, at + 65536));
+  process.on("SIGINT", () => process.exit(0));
+  setInterval(() => {}, 1000);
+} else {
 const t = setInterval(() => process.stdout.write(Buffer.alloc(3200, 7)), 20);
 process.on("SIGINT", () => { clearInterval(t); process.stdout.write(Buffer.alloc(3200, 7), () => process.exit(0)); });
+}
 `,
   );
   fs.chmodSync(bin, 0o755);
@@ -266,4 +278,102 @@ test("cabinetSpeech: the stub without provisioning's speech.json; Groq first onl
   assert.equal(b?.kind, "groq+moonshine");
   /** @type {any} */ (b).close();
   assert.equal(cabinetSpeech({ config: { speech: "stub" }, speechFile: file, logsDir: dir }), null);
+});
+
+// ---------- no length cutoff (D470) ----------
+
+/** Speech-like PCM: 2 s loud, 0.3 s quiet, over and over. @param {number} seconds */
+function speechLike(seconds) {
+  const n = Math.round(seconds * RATE);
+  const b = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) b.writeInt16LE(i % 36800 < 32000 ? (i % 2 ? 3000 : -3000) : 0, i * 2);
+  return b;
+}
+/** A short wait, for the fake arecord to hand over what it wrote. @param {number} ms */
+const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test("splitPcm: pieces no longer than the limit, cut in the quiet, and together exactly the audio", () => {
+  const pcm = speechLike(95);
+  const pieces = splitPcm(pcm, 30);
+  assert.equal(pieces.length, 4);
+  for (const p of pieces) assert.ok(p.length <= 30 * RATE * 2, `a piece of ${p.length / 2 / RATE} s`);
+  assert.ok(Buffer.concat(pieces).equals(pcm));
+  for (const p of pieces.slice(0, -1)) {
+    const last = p.readInt16LE(p.length - 2);
+    assert.equal(last, 0, "each cut lands in a quiet stretch");
+  }
+  assert.equal(splitPcm(speechLike(12), 30).length, 1, "short audio is one piece");
+});
+
+test("a 3-minute hold: arecord keeps it all, Groq gets it whole, and Moonshine falls back in 30 s pieces", async () => {
+  const dir = tmp();
+  const rec = alsaRecorder({ arecord: fakeArecord(dir, { burst: 180 }) });
+  /** @type {number[]} */
+  const groqSizes = [];
+  let groqUp = true;
+  const groq = groqEngine({
+    key: "gsk_x",
+    fetchFn: async (_u, init) => {
+      const file = /** @type {File} */ (/** @type {FormData} */ (init?.body).get("file"));
+      groqSizes.push(file.size);
+      if (!groqUp) return new Response("", { status: 503 });
+      return new Response(JSON.stringify({ text: `heard ${(file.size - 44) / 2 / RATE} seconds` }), { status: 200 });
+    },
+  });
+  const m = moonshineEngine({ python: process.execPath, helper: fakeHelper(dir), modelDir: "/m", arch: "medium-streaming" });
+  const logFile = path.join(dir, "speech.jsonl");
+  const s = liveSpeech({ recorder: rec, engines: [groq, m], logFile });
+
+  s.start();
+  await settle(1500); // the fake writes all 3 minutes at once
+  let out = await s.stop();
+  assert.equal(out.text, "heard 180 seconds", "all 180 s reached Groq, in one piece");
+  assert.deepEqual(groqSizes, [44 + 180 * RATE * 2]);
+  assert.deepEqual(Object.keys(out), ["text"]);
+
+  groqUp = false;
+  s.start();
+  await settle(1500);
+  out = await s.stop();
+  const pieces = [...out.text.matchAll(/bytes (\d+)/g)].map((x) => Number(x[1]));
+  assert.ok(pieces.length >= 6, `Moonshine got ${pieces.length} pieces`);
+  for (const b of pieces) assert.ok(b <= MOONSHINE_CHUNK_SECONDS * RATE * 2);
+  assert.equal(pieces.reduce((a, b) => a + b, 0), 180 * RATE * 2, "every sample reached Moonshine");
+  const last = JSON.parse(fs.readFileSync(logFile, "utf8").trim().split("\n").pop() ?? "{}");
+  assert.equal(last.engine, "moonshine");
+  assert.equal(last.audio_ms, 180000);
+  m.close?.();
+  s.close();
+});
+
+test("a 25-minute hold: arecord keeps every second, Groq gets it in pieces under its file limit, two at a time, in order", async () => {
+  let inFlight = 0;
+  let most = 0;
+  /** @type {number[]} */
+  const sizes = [];
+  const groq = groqEngine({
+    key: "gsk_x",
+    fetchFn: async (_u, init) => {
+      const file = /** @type {File} */ (/** @type {FormData} */ (init?.body).get("file"));
+      const i = sizes.push(file.size);
+      inFlight++;
+      most = Math.max(most, inFlight);
+      await settle(30 * (4 - i)); // later pieces answer first: the order must still hold
+      inFlight--;
+      return new Response(JSON.stringify({ text: `piece${i}` }), { status: 200 });
+    },
+  });
+  const dir = tmp();
+  const logFile = path.join(dir, "speech.jsonl");
+  const s = liveSpeech({ recorder: alsaRecorder({ arecord: fakeArecord(dir, { burst: 25 * 60 }) }), engines: [groq], logFile });
+  s.start();
+  await settle(4000); // the fake writes all 25 minutes at once
+  const { text } = await s.stop();
+  assert.equal(text, "piece1 piece2 piece3");
+  const entry = JSON.parse(fs.readFileSync(logFile, "utf8").trim());
+  assert.equal(entry.audio_ms, 25 * 60 * 1000, "not a second cut");
+  assert.equal(entry.pieces, 3);
+  assert.equal(sizes.length, 3);
+  for (const n of sizes) assert.ok(n <= 44 + GROQ_CHUNK_SECONDS * RATE * 2 && n < 25 * 1000 * 1000, `a piece of ${n} bytes`);
+  assert.equal(most, 2);
 });

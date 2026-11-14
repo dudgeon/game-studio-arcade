@@ -30,6 +30,7 @@ UI_DEV_CREATE = 0x5501
 UI_DEV_DESTROY = 0x5502
 EV_SYN, EV_KEY, BUS_VIRTUAL = 0, 1, 6
 KEY_LEFTSHIFT = 42
+KEY_F13 = 183  # the Picade's ENT (D433)
 TYPE_GAP = 0.02
 LOG = "/run/arcade/keys.log"
 KEEP_IDS = 8192
@@ -47,7 +48,7 @@ def key(fd, code, value):
 def open_device():
     fd = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
     fcntl.ioctl(fd, UI_SET_EVBIT, EV_KEY)
-    for code in range(1, 120):
+    for code in (*range(1, 120), KEY_F13):
         fcntl.ioctl(fd, UI_SET_KEYBIT, code)
     setup = struct.pack("HHHH80sI", BUS_VIRTUAL, 0x1209, 0x0ADE, 1, b"arcade-driver-keyboard", 0)
     fcntl.ioctl(fd, UI_DEV_SETUP, setup)

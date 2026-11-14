@@ -244,6 +244,8 @@ const s = await startService({
   managerToken: values["manager-token"] ?? config.manager_token ?? tokenFile(values.config ? path.join(path.dirname(values.config), "manager-token") : "/etc/arcade/manager-token"),
   players: config.players,
   consoleName: config.console_name,
+  // The Picade has no keyboard, so its talk screens type with the stick (D430); the virtual cabinet and the mini have one.
+  keyboard: (values.profile ?? cabinetProfile()) !== "picade",
   examples: values.examples,
   port: Number(values.port),
   host: values.host,

@@ -1,0 +1,180 @@
+# cx-audit: every house game on the day-one-like shelf: start, play, try START and the spare keys, leave.
+# Written by make-games-flow.sh.
+#seed family.json
+wait S1
+press down
+press a
+wait G0
+shot candy-cat-drop-G0
+press a
+wait play
+sleep 1500
+shot candy-cat-drop-title
+press start
+sleep 700
+shot candy-cat-drop-after-start
+hold left 500
+press a
+hold right 700
+press b
+hold up 300
+shot candy-cat-drop-playing
+press start
+sleep 600
+shot candy-cat-drop-start-again
+press f1
+press f2
+press q
+press e
+sleep 300
+shot candy-cat-drop-after-ENT-COIN-pinks
+sleep 6000
+shot candy-cat-drop-left-alone
+press esc
+sleep 900
+shot candy-cat-drop-after-esc
+press esc
+sleep 700
+press esc
+wait S1
+press down
+press a
+wait G0
+shot log-hopper-G0
+press a
+wait play
+sleep 1500
+shot log-hopper-title
+press start
+sleep 700
+shot log-hopper-after-start
+hold left 500
+press a
+hold right 700
+press b
+hold up 300
+shot log-hopper-playing
+press start
+sleep 600
+shot log-hopper-start-again
+press f1
+press f2
+press q
+press e
+sleep 300
+shot log-hopper-after-ENT-COIN-pinks
+sleep 6000
+shot log-hopper-left-alone
+press esc
+sleep 900
+shot log-hopper-after-esc
+press esc
+sleep 700
+press esc
+wait S1
+press down
+press a
+wait G0
+shot apple-catch-G0
+press a
+wait play
+sleep 1500
+shot apple-catch-title
+press start
+sleep 700
+shot apple-catch-after-start
+hold left 500
+press a
+hold right 700
+press b
+hold up 300
+shot apple-catch-playing
+press start
+sleep 600
+shot apple-catch-start-again
+press f1
+press f2
+press q
+press e
+sleep 300
+shot apple-catch-after-ENT-COIN-pinks
+sleep 6000
+shot apple-catch-left-alone
+press esc
+sleep 900
+shot apple-catch-after-esc
+press esc
+sleep 700
+press esc
+wait S1
+press down
+press a
+wait G0
+shot comet-dodge-G0
+press a
+wait play
+sleep 1500
+shot comet-dodge-title
+press start
+sleep 700
+shot comet-dodge-after-start
+hold left 500
+press a
+hold right 700
+press b
+hold up 300
+shot comet-dodge-playing
+press start
+sleep 600
+shot comet-dodge-start-again
+press f1
+press f2
+press q
+press e
+sleep 300
+shot comet-dodge-after-ENT-COIN-pinks
+sleep 6000
+shot comet-dodge-left-alone
+press esc
+sleep 900
+shot comet-dodge-after-esc
+press esc
+sleep 700
+press esc
+wait S1
+press down
+press a
+wait G0
+shot wall-ball-G0
+press a
+wait play
+sleep 1500
+shot wall-ball-title
+press start
+sleep 700
+shot wall-ball-after-start
+hold left 500
+press a
+hold right 700
+press b
+hold up 300
+shot wall-ball-playing
+press start
+sleep 600
+shot wall-ball-start-again
+press f1
+press f2
+press q
+press e
+sleep 300
+shot wall-ball-after-ENT-COIN-pinks
+sleep 6000
+shot wall-ball-left-alone
+press esc
+sleep 900
+shot wall-ball-after-esc
+press esc
+sleep 700
+press esc
+wait S1
+shot shelf-after-plays

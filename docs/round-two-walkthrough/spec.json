@@ -1,0 +1,191 @@
+{
+  "id": "studio-round-two-2026-11",
+  "title": "Studio round two",
+  "subtitle": "Decision walkthrough · 14 Nov 2026 · narrated by the house voice",
+  "posterLine": "What I found on the Picade, then eight decisions. Tap play and listen; it stops when it needs you.",
+  "footer": "Built with the decision-walkthrough skill from docs/round-two-walkthrough/spec.json. The plan is docs/round-two-plan.md. Answers are saved in this page and sent to director-game-studio-arcade.",
+  "source": { "label": "docs/round-two-plan.md", "url": "https://github.com/dudgeon/game-studio-arcade/blob/main/docs/round-two-plan.md" },
+  "director": "director-game-studio-arcade",
+  "sendPrefix": "Studio round two walkthrough",
+  "voice": "house",
+  "styles": "scenes.css",
+  "out": "page",
+  "said": { "v3": "vee three", "3D": "three D", "Picade": "Pie-cade", "Groq": "Grock" },
+  "chapters": [
+    { "id": "why", "title": "Why now", "short": "Why now", "sceneFile": "scenes/why.html",
+      "lines": [
+        { "text": "The kids have made two games at the cabinet by voice, and changed one. The flow works.", "cues": [ { "at": 0, "do": "show", "sel": "#r1, #r2, #r3" }, { "on": "flow works", "do": "show", "sel": "#works" } ] },
+        { "text": "You came back with four things.", "cues": [ { "at": 0, "do": "focus", "sel": "#shelf", "soft": true } ] },
+        { "text": "Speech gets cut off, and you can't read back what was heard.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "Speech", "do": "show", "sel": "#g1" } ] },
+        { "text": "Versions are only numbers.", "cues": [ { "at": 0, "do": "show", "sel": "#g2" } ] },
+        { "text": "The games move in a basic way.", "cues": [ { "at": 0, "do": "show", "sel": "#g3" } ] },
+        { "text": "And you'd like games to call a small AI model while they run.", "cues": [ { "on": "call", "do": "show", "sel": "#g4" } ] },
+        { "text": "I looked into each one on the real Picade. Nothing is built yet. There are eight decisions for you, and I'll say what I'd pick at each.", "cues": [ { "on": "eight", "do": "show", "sel": "#eight" } ] }
+      ] },
+    { "id": "speech", "title": "Why speech got cut off", "short": "Cut off", "sceneFile": "scenes/speech.html",
+      "lines": [
+        { "text": "First, the cut-off. The Picade logs every hold: how long it was, never the words.", "cues": [ { "on": "logs", "do": "show", "sel": "#h1, #h2, #h3, #h4, #h5, #h6" } ] },
+        { "text": "Six holds were made today. Four were short and came through whole.", "cues": [] },
+        { "text": "Two ran long. One was held for thirty-nine seconds, and one for eighty-three.", "cues": [ { "at": 0, "do": "focus", "sel": "#h5, #h6", "soft": true } ] },
+        { "text": "The recorder stops keeping audio at thirty seconds. So nine seconds of one were lost, and fifty-three of the other.", "cues": [ { "on": "thirty", "do": "show", "sel": "#capline, #caplab" }, { "on": "nine", "do": "show", "sel": "#lost1" }, { "on": "fifty-three", "do": "show", "sel": "#lost2" } ] },
+        { "text": "Groq wasn't the problem. It answered every hold within about two seconds, with no timeouts and no fallbacks.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "answered", "do": "show", "sel": "#ok1" }, { "on": "no timeouts", "do": "show", "sel": "#ok2" } ] },
+        { "text": "The real fault is that the screen kept saying listening, and never said it had stopped.", "cues": [ { "on": "never", "do": "show", "sel": "#silent" }, { "on": "never", "do": "focus", "sel": "#silent" } ] }
+      ] },
+    { "id": "cap", "kind": "decision", "q": "D450", "title": "How long a kid can talk", "short": "Limit",
+      "ask": "How long should a kid be able to talk in one hold?",
+      "why": "Today it's 30 seconds, with no sign. Two of six holds hit it. Whatever the limit, the screen will show the time running and say when it stops.",
+      "sceneFile": "scenes/cap.html",
+      "lines": [
+        { "text": "So, the first decision. How long can a kid talk in one go?", "cues": [ { "at": 0, "do": "show", "sel": "#now" } ] },
+        { "text": "Whatever the limit, I'd show it. A bar fills while they talk, and the screen says so when it stops.", "cues": [ { "on": "A bar", "do": "show", "sel": "#tbar, #tnum" }, { "on": "fills", "do": "state", "value": "run" }, { "on": "says so", "delay": 0.8, "do": "state", "value": "run end" }, { "on": "says so", "delay": 0.8, "do": "show", "sel": "#stopmsg" } ] }
+      ],
+      "options": [
+        { "id": "one-minute", "label": "1 minute", "desc": "A small step. Today's 83-second hold would still be cut.",
+          "lines": [ { "text": "One minute. A small step, but today's longest hold would still be cut.", "cues": [ { "at": 0, "do": "show", "sel": "#c60" }, { "at": 0, "do": "focus", "sel": "#c60" }, { "at": 0, "do": "text", "sel": "#tnum", "value": "1:00" } ] } ] },
+        { "id": "two-minutes", "label": "2 minutes", "desc": "Covers every hold so far, with room. 0.13 cents to transcribe a full one.", "recommended": true,
+          "lines": [ { "text": "Two minutes, which I'd pick. It covers every hold so far with room to spare, and costs a tenth of a cent.", "cues": [ { "at": 0, "do": "show", "sel": "#c120" }, { "at": 0, "do": "focus", "sel": "#c120" }, { "at": 0, "do": "text", "sel": "#tnum", "value": "2:00" }, { "on": "costs", "do": "show", "sel": "#cost" } ] } ] },
+        { "id": "five-minutes", "label": "5 minutes", "desc": "Never cuts a kid off. A button held by accident records the room.",
+          "lines": [ { "text": "Five minutes. It never cuts a kid off, but a button held by accident records the room.", "cues": [ { "at": 0, "do": "show", "sel": "#c300" }, { "at": 0, "do": "focus", "sel": "#c300" }, { "at": 0, "do": "text", "sel": "#tnum", "value": "5:00" } ] } ] }
+      ] },
+    { "id": "review", "kind": "decision", "q": "D453", "title": "Reading back a long idea", "short": "Review",
+      "ask": "How should a long transcript be read back?",
+      "why": "About 75 words fit on \"Is this right? I heard:\". The rest is behind stick right today, and nobody found it.",
+      "sceneFile": "scenes/review.html",
+      "lines": [
+        { "text": "Next, reading back a long idea. Today about seventy-five words fit, and the rest ends in three dots.", "cues": [ { "on": "Today", "do": "show", "sel": "#bug" } ] },
+        { "text": "The whole text is one stick-right away, but only the small hint line says so, and you didn't find it.", "cues": [ { "on": "hint", "do": "focus", "sel": "#bug" } ] },
+        { "text": "And when recording did stop early, the review will now say where.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "say where", "do": "show", "sel": "#stop" } ] }
+      ],
+      "options": [
+        { "id": "pages", "label": "Pages, turned with stick left and right", "desc": "A page count on the box. \"Yes! That's it\" lights only once the last page has been seen.", "recommended": true,
+          "lines": [ { "text": "Pages, which I'd pick. Stick left and right turn them, and Yes only lights once you've seen the last one.", "cues": [ { "at": 0, "do": "hide", "sel": "#stop" }, { "at": 0, "do": "state", "value": "dimyes" }, { "at": 0, "do": "show", "sel": "#pg, #oa" }, { "at": 0, "do": "text", "sel": "#pg", "value": "1 of 3 >" }, { "at": 0, "do": "focus", "sel": "#oa" }, { "on": "turn", "do": "state", "value": "dimyes p2" }, { "on": "turn", "do": "text", "sel": "#pg", "value": "< 2 of 3 >" }, { "on": "Yes only", "do": "state", "value": "dimyes p3" }, { "on": "Yes only", "do": "text", "sel": "#pg", "value": "< 3 of 3" }, { "on": "last one", "do": "state", "value": "p3" }, { "on": "last one", "do": "show", "sel": "#guard" } ] } ] },
+        { "id": "scroll", "label": "A scrolling box", "desc": "Up and down scroll the words, then move on to the tiles.",
+          "lines": [ { "text": "A scrolling box. Up and down scroll the words, then move on to the tiles, so the stick does two jobs.", "cues": [ { "at": 0, "do": "hide", "sel": "#stop, #pg, #guard" }, { "at": 0, "do": "state", "value": "" }, { "at": 0, "do": "show", "sel": "#ob" }, { "at": 0, "do": "focus", "sel": "#ob" }, { "on": "scroll the words", "do": "state", "value": "scroll" } ] } ] },
+        { "id": "reader", "label": "Keep the second screen, add a big MORE tile", "desc": "The smallest change. Still a second screen, still easy to skip.",
+          "lines": [ { "text": "Or keep today's second screen and add a big More tile. It's the smallest change, and still easy to skip.", "cues": [ { "at": 0, "do": "hide", "sel": "#stop, #pg, #guard" }, { "at": 0, "do": "state", "value": "" }, { "at": 0, "do": "show", "sel": "#oc" }, { "at": 0, "do": "focus", "sel": "#oc" } ] } ] }
+      ] },
+    { "id": "live", "kind": "decision", "q": "D454", "title": "Words as they're heard", "short": "Live words",
+      "ask": "Should words appear on screen while a kid is talking?",
+      "why": "Your idea: seeing the words live shows a mishearing, and shows when it stops hearing. Groq can't stream; Moonshine on the cabinet can.",
+      "sceneFile": "scenes/live.html",
+      "lines": [
+        { "text": "You suggested writing the words out live, so a kid sees a mistake, and sees when it stops hearing.", "cues": [ { "at": 0, "do": "show", "sel": "#lw1" }, { "on": "mistake", "do": "show", "sel": "#lw2" }, { "on": "stops", "do": "show", "sel": "#lw3" } ] },
+        { "text": "Groq can't do that. It only takes a finished clip.", "cues": [ { "at": 0, "do": "show", "sel": "#src" }, { "at": 0, "do": "focus", "sel": "#src" } ] },
+        { "text": "But Moonshine, which is already on the cabinet, can stream words about twice a second, for free.", "cues": [ { "at": 0, "do": "show", "sel": "#moon" }, { "at": 0, "do": "focus", "sel": "#moon" } ] }
+      ],
+      "options": [
+        { "id": "meter", "label": "A timer and a sound level only", "desc": "Small. Shows the mic is alive and when it stopped. No words until the end.",
+          "lines": [ { "text": "A timer and a sound level only. It shows the mic is alive, but no words until the end.", "cues": [ { "at": 0, "do": "unfocus" }, { "at": 0, "do": "hide", "sel": "#lw1, #lw2, #lw3, #final" }, { "at": 0, "do": "show", "sel": "#meter, #lbar" } ] } ] },
+        { "id": "moonshine", "label": "Live words from Moonshine, final text from Groq", "desc": "Free and offline. The live words are rougher, so they show dimmer. Needs measuring on the Pi first.", "recommended": true,
+          "lines": [ { "text": "Live words from Moonshine, which I'd pick. They're rougher than Groq's, so they show dimmer, and Groq still writes the final text.", "cues": [ { "at": 0, "do": "show", "sel": "#lw1, #lw2, #lw3, #meter, #lbar" }, { "at": 0, "do": "focus", "sel": "#moon" }, { "on": "final text", "do": "show", "sel": "#final" } ] } ] },
+        { "id": "groq-resend", "label": "Live words from Groq, re-sent every few seconds", "desc": "Matches the final text. About 2.7 cents for a long hold, hits the free limit, arrives in jumps.",
+          "lines": [ { "text": "Or live words from Groq, by re-sending the clip every few seconds. They match the final text, but cost more and arrive in jumps.", "cues": [ { "at": 0, "do": "show", "sel": "#lw1, #lw2, #lw3, #groq" }, { "at": 0, "do": "hide", "sel": "#final" }, { "at": 0, "do": "focus", "sel": "#groq" } ] } ] }
+      ] },
+    { "id": "names", "kind": "decision", "q": "D456", "title": "Names for versions", "short": "Names",
+      "ask": "How should a maker pick a version's name?",
+      "why": "The name is offered when the change's plan is agreed, lives in the spec and cart.json, and replaces v2, v3 on the shelf and in the Manager. The number stays as the order.",
+      "sceneFile": "scenes/names.html",
+      "lines": [
+        { "text": "Now version names. When a change's plan is agreed, Claude knows what it is, so that's the moment to name it.", "cues": [ { "on": "name it", "do": "show", "sel": "#q, #ta, #tb, #tc, #td" } ] },
+        { "text": "The name is written into the spec and the cart, and the number stays underneath as the order.", "cues": [ { "on": "spec", "do": "show", "sel": "#nwhere" }, { "on": "spec", "do": "focus", "sel": "#nwhere" } ] },
+        { "text": "Then it replaces v3 on the shelf, the result screen and the Manager.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "replaces", "do": "state", "value": "named" }, { "on": "shelf", "do": "show", "sel": "#lin" } ] }
+      ],
+      "options": [
+        { "id": "question-board", "label": "On the question board: two names, say your own, or \"You pick\"", "desc": "No new screen. A and B are Claude's names, C opens the mic, D lets Claude choose.", "recommended": true,
+          "lines": [ { "text": "I'd use the question board they know. Two names from Claude, Something else to say their own, and You pick.", "cues": [ { "at": 0, "do": "state", "value": "named" }, { "at": 0, "do": "hide", "sel": "#te, #late" }, { "on": "Two names", "do": "tap", "sel": "#ta" }, { "on": "Two names", "delay": 0.8, "do": "add", "sel": "#ta", "cls": "lit" } ] } ] },
+        { "id": "three-names", "label": "A new screen with three names", "desc": "As you described it. About a day more: a new board to build and test.",
+          "lines": [ { "text": "Or a new screen with three names, as you described. It's about a day more work.", "cues": [ { "at": 0, "do": "cursor-off" }, { "at": 0, "do": "remove", "sel": "#ta", "cls": "lit" }, { "at": 0, "do": "state", "value": "named three" }, { "at": 0, "do": "hide", "sel": "#late" }, { "on": "three names", "do": "show", "sel": "#te" } ] } ] },
+        { "id": "after-build", "label": "Name it after it's built, on the result screen", "desc": "The kid has played it. But the make is over, so the cabinet needs its own model call for names.",
+          "lines": [ { "text": "Or name it after it's built. But Claude has gone by then, so the cabinet would need its own model call.", "cues": [ { "at": 0, "do": "cursor-off" }, { "at": 0, "do": "remove", "sel": "#ta", "cls": "lit" }, { "at": 0, "do": "state", "value": "named after" }, { "at": 0, "do": "hide", "sel": "#te" }, { "on": "Claude has gone", "do": "show", "sel": "#late" }, { "on": "Claude has gone", "do": "focus", "sel": "#late" } ] } ] }
+      ] },
+    { "id": "motion-found", "title": "What the Pi 5 can draw", "short": "Measured", "sceneFile": "scenes/motion.html",
+      "lines": [
+        { "text": "On to motion. I measured what the Picade can draw, in the runtime's own software drawing.", "cues": [ { "at": 0, "do": "show", "sel": ".bl, #mo-s" }, { "on": "measured", "do": "show", "sel": "#budget, #budlab" } ] },
+        { "text": "A game on the shelf today takes about six milliseconds a frame, out of nearly seventeen.", "cues": [ { "at": 0, "do": "show", "sel": "#b0, #v0" }, { "at": 0, "do": "focus", "sel": "#b0", "soft": true } ] },
+        { "text": "A thousand sprites, or a floor in perspective, take about half a millisecond.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "thousand", "do": "show", "sel": "#b1, #v1" }, { "on": "floor", "do": "show", "sel": "#b2, #v2" } ] },
+        { "text": "A first-person maze takes one and a half. Forty stacked 3D objects take four, and fifteen hundred triangles under six.", "cues": [ { "on": "maze", "do": "show", "sel": "#b3, #v3" }, { "on": "Forty", "do": "show", "sel": "#b4, #v4" }, { "on": "fifteen", "do": "show", "sel": "#b5, #v5" } ] },
+        { "text": "So the Pi isn't the limit. The games look basic because the library gives Claude nothing for movement.", "cues": [ { "on": "basic", "do": "show", "sel": "#today" }, { "on": "nothing", "do": "show", "sel": "#why2" } ] },
+        { "text": "One gap. I couldn't measure the real graphics chip without taking over the screen, and the plan doesn't need it.", "cues": [ { "at": 0, "do": "unfocus" } ] }
+      ] },
+    { "id": "motion", "kind": "decision", "q": "D459", "title": "How far motion and depth go", "short": "Motion",
+      "ask": "How far should motion and depth go?",
+      "why": "The pixel look stays in every option. The question is how much machinery sits under it.",
+      "sceneFile": "scenes/motion.html",
+      "setup": [ { "do": "text", "sel": "#mo-h", "value": "Motion and depth" } ],
+      "lines": [
+        { "text": "So how far should we go? I'd stay in software and give Claude a motion kit: easing, gravity, a camera that follows, parallax, particles.", "cues": [ { "at": 0, "do": "show", "sel": "#demo" }, { "on": "motion kit", "do": "show", "sel": "#oA" }, { "on": "easing", "do": "show", "sel": "#m1" }, { "on": "gravity", "do": "show", "sel": "#m2" }, { "on": "camera", "do": "show", "sel": "#m3" }, { "on": "parallax", "do": "show", "sel": "#m4" } ] },
+        { "text": "Then three ways to get depth: a perspective floor like this one, a first-person maze, and stacked sprites. All still in the pixel look.", "cues": [ { "on": "depth", "do": "show", "sel": "#m5" }, { "on": "perspective floor", "do": "focus", "sel": "#demo, #m5", "soft": true }, { "on": "All still", "do": "unfocus" } ] }
+      ],
+      "options": [
+        { "id": "kit-software", "label": "A motion kit and 2.5D modules, in software", "desc": "Easing, physics, camera, parallax, particles; then floor, maze, sprite stacking. The playtest is unchanged.", "recommended": true,
+          "lines": [ { "text": "That's my pick. The playtest keeps working unchanged, because it's still one picture, the same in tests and on the cabinet.", "cues": [ { "at": 0, "do": "focus", "sel": "#oA" } ] } ] },
+        { "id": "plus-subpixel", "label": "Also sub-pixel glide", "desc": "Scrolling stops stepping a big pixel at a time. Changes the runtime's core; I'd look after the kit.",
+          "lines": [ { "text": "Option two adds sub-pixel glide, so scrolling doesn't step a big pixel at a time. It changes the runtime's core, so I'd look after the kit.", "cues": [ { "at": 0, "do": "show", "sel": "#oB" }, { "at": 0, "do": "focus", "sel": "#oB" } ] } ] },
+        { "id": "plus-webgl", "label": "Also real 3D with WebGL", "desc": "Lit 3D models. The headless playtest can't draw it; needs the on-screen GPU measurement first.",
+          "lines": [ { "text": "Option three adds real 3D on the graphics chip. The tests can't draw it, and the pixel look has to be forced.", "cues": [ { "at": 0, "do": "show", "sel": "#oC" }, { "at": 0, "do": "focus", "sel": "#oC" } ] } ] }
+      ] },
+    { "id": "ai-found", "title": "AI inside a running game", "short": "AI: how", "sceneFile": "scenes/ai.html",
+      "lines": [
+        { "text": "Last, AI inside a running game. Your example was a duck that tells a new joke each time it crosses the road.", "cues": [ { "on": "joke", "do": "show", "sel": "#bubble" } ] },
+        { "text": "A game has no key and no network. It asks the cabinet service, which holds the key and calls Haiku.", "cues": [ { "at": 0, "do": "focus", "sel": "#n-cart", "soft": true }, { "on": "asks", "do": "unfocus" }, { "on": "asks", "do": "show", "sel": "#a1, #n-svc" }, { "on": "calls", "do": "show", "sel": "#a2, #n-ai" } ] },
+        { "text": "Every game carries built-in lines. They're used offline, over the cap, and in every test, so a game never depends on the network.", "cues": [ { "on": "built-in", "do": "show", "sel": "#fb" }, { "on": "offline", "do": "state", "value": "offline" }, { "on": "never depends", "do": "state", "value": "" } ] },
+        { "text": "For safety, a house brief goes on every ask, the word list checks every answer, and a player's own words never reach the model.", "cues": [ { "on": "house brief", "do": "show", "sel": "#k1" }, { "on": "word list", "do": "show", "sel": "#k2" }, { "on": "player's", "do": "show", "sel": "#k3" } ] },
+        { "text": "Everything is logged on the cabinet. And it's cheap. Twelve jokes cost a fortieth of a cent.", "cues": [ { "on": "logged", "do": "show", "sel": "#k4" }, { "on": "Twelve", "do": "show", "sel": "#price" } ] }
+      ] },
+    { "id": "ai-pay", "kind": "decision", "q": "D464", "title": "Who pays for AI in games", "short": "AI: cost",
+      "ask": "Who pays for AI in games, and what's the cap?",
+      "why": "A heavy month is 30 to 50 cents. The family pot is 100 coins ($10) a month; a new game uses about 6 coins.",
+      "sceneFile": "scenes/ai.html",
+      "setup": [ { "do": "show", "sel": "#a1, #n-svc, #a2, #n-ai, #price, #fb" } ],
+      "lines": [
+        { "text": "Two decisions on this. First, who pays. A heavy month of AI in games comes to thirty to fifty cents.", "cues": [ { "on": "thirty", "do": "focus", "sel": "#price", "soft": true } ] },
+        { "text": "That's less than one make, which is about six coins.", "cues": [ { "at": 0, "do": "unfocus" } ] }
+      ],
+      "options": [
+        { "id": "outside-capped", "label": "Outside the coin pot, capped at $1 a month", "desc": "Playing never costs the kids coins. Also 40 calls a play and 300 a day per game. Over a cap, games use their built-in lines.", "recommended": true,
+          "lines": [ { "text": "I'd keep it outside the kids' coin pot, with a hard cap of one dollar a month. Over the cap, games use their built-in lines.", "cues": [ { "at": 0, "do": "hide", "sel": "#capB, #capC" }, { "at": 0, "do": "show", "sel": "#capA" }, { "on": "built-in", "do": "focus", "sel": "#fb" } ] } ] },
+        { "id": "from-pot", "label": "From the coin pot: 1 coin per 1,000 calls", "desc": "Shows AI isn't free. But playing a game can then take a coin, and a friend playing spends the maker's coins.",
+          "lines": [ { "text": "Or take it from the pot, a coin for a thousand calls. It shows AI isn't free, but then playing can cost a coin.", "cues": [ { "at": 0, "do": "unfocus" }, { "at": 0, "do": "hide", "sel": "#capA, #capC" }, { "at": 0, "do": "show", "sel": "#capB" } ] } ] },
+        { "id": "outside-uncapped", "label": "Outside the pot, daily limits only", "desc": "Nothing falls back for money reasons. Worst case a few dollars a month.",
+          "lines": [ { "text": "Or outside the pot with daily limits only. Nothing falls back for money, and the worst month is a few dollars.", "cues": [ { "at": 0, "do": "unfocus" }, { "at": 0, "do": "hide", "sel": "#capA, #capB" }, { "at": 0, "do": "show", "sel": "#capC" } ] } ] }
+      ] },
+    { "id": "ai-scope", "kind": "decision", "q": "D468", "title": "What games may ask for", "short": "AI: scope",
+      "ask": "What may games ask the model for, in the first version?",
+      "why": "Lines and choices cover both of your examples: the duck's jokes, and characters or levels that feel different.",
+      "sceneFile": "scenes/ai.html",
+      "setup": [ { "do": "show", "sel": "#a1, #n-svc, #a2, #n-ai, #bubble" } ],
+      "lines": [
+        { "text": "Second, what games may ask for. Lines cover your duck. Choices cover a character deciding what to do next.", "cues": [ { "on": "Lines", "do": "show", "sel": "#s-lines" }, { "on": "Choices", "do": "show", "sel": "#s-choice" } ] }
+      ],
+      "options": [
+        { "id": "lines-choices", "label": "Lines and choices only", "desc": "Covers both examples. Nothing a player says or types reaches the model.", "recommended": true,
+          "lines": [ { "text": "I'd start with just those two. They cover both your examples, and nothing a player says reaches the model.", "cues": [ { "at": 0, "do": "focus", "sel": "#s-lines, #s-choice" } ] } ] },
+        { "id": "plus-numbers", "label": "Also numbers for level settings", "desc": "Each level built differently. More to check: a generated level has to be playable.",
+          "lines": [ { "text": "Or add numbers for level settings, so each level is built differently. There's more to check, since a generated level has to be playable.", "cues": [ { "at": 0, "do": "show", "sel": "#s-nums" }, { "at": 0, "do": "focus", "sel": "#s-nums" } ] } ] },
+        { "id": "open-chat", "label": "Also open chat with a character", "desc": "The most magical. A kid's own words go to the model; needs its own safety design. I wouldn't plan it.",
+          "lines": [ { "text": "Open chat with a character is the most magical, and I wouldn't plan it. It sends a kid's own words to the model.", "cues": [ { "at": 0, "do": "show", "sel": "#s-chat" }, { "at": 0, "do": "focus", "sel": "#s-chat" } ] } ] }
+      ] },
+    { "id": "order", "kind": "decision", "q": "D469", "title": "The order of work", "short": "Order",
+      "ask": "Is this the right order?",
+      "why": "A session is one worker's focused run with tests, on the virtual cabinet first. The first three steps can run alongside the motion work.",
+      "sceneFile": "scenes/order.html",
+      "lines": [
+        { "text": "Last decision, the order. I'd fix what's losing the kids' words first: the speech limit, then pages.", "cues": [ { "on": "speech limit", "do": "show", "sel": "#s1" }, { "on": "pages", "do": "show", "sel": "#s2" } ] },
+        { "text": "Then version names, the motion kit, live words, depth, and AI in games last. It's the largest, and the only one with a running cost.", "cues": [ { "on": "version names", "do": "show", "sel": "#s3" }, { "on": "motion kit", "do": "show", "sel": "#s4" }, { "on": "live words", "do": "show", "sel": "#s5" }, { "on": "depth", "do": "show", "sel": "#s6" }, { "on": "AI in games", "do": "show", "sel": "#s7" } ] }
+      ],
+      "options": [
+        { "id": "as-planned", "label": "As planned: speech, pages, names, motion, live words, 2.5D, AI", "desc": "What hurts the kids most first, then by size.", "recommended": true,
+          "lines": [ { "text": "That's my order. The first three steps are small, and can run alongside the motion work.", "cues": [ { "at": 0, "do": "state", "value": "" }, { "at": 0, "do": "focus", "sel": "#s1, #s2, #s3", "soft": true } ] } ] },
+        { "id": "motion-first", "label": "Motion and 2.5D first", "desc": "If how the games feel matters most. Speech stays cut off a little longer.",
+          "lines": [ { "text": "Or motion first, if how the games feel matters most to you. Speech stays broken a little longer.", "cues": [ { "at": 0, "do": "state", "value": "motionfirst" }, { "at": 0, "do": "focus", "sel": "#s4, #s6", "soft": true } ] } ] },
+        { "id": "ai-sooner", "label": "AI in games sooner, ahead of motion", "desc": "The most new for the kids, and the most work.",
+          "lines": [ { "text": "Or bring AI in games forward, ahead of motion. It's the most new for the kids, and the most work.", "cues": [ { "at": 0, "do": "state", "value": "aifirst" }, { "at": 0, "do": "focus", "sel": "#s7", "soft": true } ] } ] }
+      ] },
+    { "id": "wrap", "title": "That's all eight", "short": "Done", "final": true, "sceneFile": "scenes/wrap.html",
+      "lines": [
+        { "text": "That's all eight.", "cues": [ { "at": 0, "do": "show", "sel": "#done, #list" } ] },
+        { "text": "Each answer went to the director as you saved it, and Copy decisions puts them all on the clipboard.", "cues": [ { "at": 0, "do": "focus", "sel": "#list", "soft": true } ] },
+        { "text": "Nothing gets built until you've answered. The full plan, with the measurements, is in the repo.", "cues": [ { "at": 0, "do": "unfocus" }, { "on": "full plan", "do": "show", "sel": "#wnext" } ] }
+      ] }
+  ]
+}

@@ -728,3 +728,30 @@ test("the volume stream: each level arcade-volkey writes reaches the launcher, a
     await s.close();
   }
 });
+
+test("no length cutoff (D470): an hour's idea is taken whole", async () => {
+  const data = tmp();
+  const paths = dataPaths(data);
+  const { studio } = setup();
+  /** @type {string[]} */
+  const started = [];
+  const realStart = studio.start.bind(studio);
+  studio.start = (/** @type {any} */ a) => (started.push(a.request), realStart(a));
+  const speech = stubSpeech();
+  const s = await startService({ studio, makers: makersStore({ file: path.join(data, "makers.json") }), speech, libraryDir: paths.carts, logsDir: paths.logs, port: 0 });
+  /** @param {string} u @param {any} [body] */
+  const post = (u, body = {}) => fetch(s.url + u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  try {
+    await post("/api/makers", { name: "alina" });
+    // About what an hour of talking makes: 9,000 words, 60,000 characters. The old limits refused a tenth of it.
+    const long = Array.from({ length: 9000 }, (_, i) => `word${i % 100}`).join(" ");
+    assert.equal((await post("/api/speech/feed", { text: long })).status, 200);
+    await post("/api/speech/start");
+    assert.equal((await (await post("/api/speech/stop")).json()).text, long);
+    const r = await post("/api/studio/start", { maker: "alina", request: long });
+    assert.equal(r.status, 200, await r.text());
+    assert.equal(started[0], long, "every word reached the Studio");
+  } finally {
+    await s.close();
+  }
+});

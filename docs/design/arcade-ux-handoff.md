@@ -7,7 +7,7 @@ This file says what each screen shows and does, and the coin rules and their num
 ## 1. Rules that apply everywhere
 
 - The screen is 256 x 192 at 4x (D81, D180). Every string goes through `text.js`, with its fit rules and tests (D181). Copy on the canvas was written to about 40 columns; where it doesn't fit the real font, shorten it rather than shrink it.
-- Controls: the stick chooses; any of the six player buttons (or START) picks what's lit (D182); ESC goes back (D88); F1 types on talk screens (D184). **The one exception is the coin check (M3, R3): only COIN starts spending** (D205). COIN is the X HAT's F2 (D82). On the shelf, COIN opens the coin pot (A1).
+- Controls: the stick chooses; any of the six player buttons (or START) picks what's lit (D182); ESC goes back (D88); ENT (F13 on the Picade, F1 on a keyboard; D433) types on talk screens (D184): on a keyboard where there is one, else with the stick on the grid keyboard (D430, D431). **The one exception is the coin check (M3, R3): only COIN starts spending** (D205). COIN is the X HAT's F2 (D82). On the shelf, COIN opens the coin pot (A1).
 - Kid-language only. No "cart", "kit", "session", "tokens" or "spec" on screen (D183, D190).
 - Names, not initials (D87). Disclose AI on the first make screen ("Hi! I'm Claude, an AI.").
 - Every error and edge screen says what happened, that the game or idea is kept, and what it cost. No "Oh no" over hopeful news.
@@ -71,7 +71,7 @@ Each board id is on the canvas. "Today" names the existing screen in `screens.js
 
 ### Make a new game (M1 to M11)
 - **M1 Who's making?** (today: `who`): known makers, most recent first, each with "used <n> this month"; then "Someone new". The header shows the pot.
-- **M2 Someone new:** say or type a first name, then confirm it (D87). Their makes come from the family pot.
+- **M2 Someone new:** say a first name, then confirm it (D87); "Type it" opens the letters keyboard (D430, D431). Their makes come from the family pot.
 - **M3 Coin check** (new): "Ready to make?", "A new game uses about 6 coins", "Some use more. It takes about 7 min", "The family pot has <n> coins", "It always finishes, even if it costs more than usual." The big lit tile is "Press COIN to start"; any other button does nothing there; "Not now" goes back. Footer: "1 coin = 10 cents. About 60 cents." If the pot holds less than 6, show L1 instead.
 - **M4 Tell me, M5 Listening** (today: `say`): as today, with the AI disclosure and hold to talk (D87, D184).
 - **M6 I heard / Is this right?** (today: `say`'s heard state): shown for spoken **and typed** ideas, so Enter never starts a build directly. "Yes! That's it", "Say it again", "Add more".
@@ -105,7 +105,7 @@ Each board id is on the canvas. "Today" names the existing screen in `screens.js
 - **E4 Restarting, E5 Restarted on a question, E6 Restarted while building:** D189 and D191's cases, in this wording. E5 says the idea is saved and what the questions used. E6 says Claude kept going and to look on the shelf.
 - **E7 Still there?:** D188's last minute, with a countdown on the hint line.
 - **E8 ESC during a question** (today: `leave`): "Keep going", "Come back later" (it waits about 10 minutes), "Stop making this game" (coins used so far stay used).
-- **E9 Didn't hear:** hold a button the whole time you talk; "Try again" and "Type it instead (F1)".
+- **E9 Didn't hear:** hold a button the whole time you talk; "Try again" and "Type it instead (F1, the Picade's ENT)" (D431).
 - **E10 Let's pick another idea:** when screening refuses an idea (Phase 3): two suggested ideas, "Something else", "Back to the shelf". No coins are used.
 
 ### Cabinet Manager: Coin pot page

@@ -34,7 +34,8 @@ import {
 import { REDIRECT_ACTIONS, redirectBoard } from "./redirect.js";
 import { checksFor, familyOfCart, gameRows } from "./shelf.js";
 import { holdOverlay } from "./wifi.js";
-import { WIFI_HINT, createWifiFlow } from "./wifi-flow.js";
+import { WIFI_HINT, asEnt, createWifiFlow } from "./wifi-flow.js";
+import { openKeys, sayKey } from "./say-keys.js";
 import { listenForVolume } from "./volume.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
@@ -58,7 +59,7 @@ const WORDS_MAX = 300;
 let view = { screen: "boot", console: "" };
 /** @type {any} */
 let studio = { phase: "idle" };
-let config = { console: "Arcade", players: 1, speech: "stub" };
+let config = { console: "Arcade", players: 1, speech: "stub", keyboard: true };
 /** @type {any[]} */
 let makers = [];
 /** Every maker's name, those not offered in "Who's making?" too (grown-ups, hidden names, D363). @type {Record<string, string>} */
@@ -264,13 +265,21 @@ function confirmIdea(o, words) {
 }
 
 /**
- * The talk screen (D87): hold a button, talk, let go, confirm. F1 types (D184).
+ * The talk screen (D87): hold a button, talk, let go, confirm. F1 (the Picade's ENT) types (D184): on a
+ * keyboard where the cabinet has one, and with the stick on the grid keyboard either way (D430, D431).
  * Typed words get the same confirm step as spoken ones (D201).
  * @param {{ purpose: string, prompt?: string, typing?: boolean, max?: number, pendingId?: number, back: () => void, done: (text: string) => void }} o
  */
 function showSay(o) {
-  show({ screen: "say", board: o.purpose === "name" ? "M2" : o.purpose === "answer" ? "M8" : o.purpose === "change" ? "R4" : "M4", ...o, phase: o.typing ? "typing" : "idle", typed: "", transcript: "", sel: 0, max: o.max ?? WORDS_MAX });
+  const v = { screen: "say", board: o.purpose === "name" ? "M2" : o.purpose === "answer" ? "M8" : o.purpose === "change" ? "R4" : "M4", ...o, phase: "idle", typed: "", transcript: "", sel: 0, max: o.max ?? WORDS_MAX, typeKey: config.keyboard ? "F1" : "ENT" };
+  show(o.typing ? typeIt(v) : v);
 }
+
+/** Can this cabinet hear? Not with the stub, nor with no speech engine set up. */
+const canHear = () => config.speech !== "stub" && config.speech !== "none";
+
+/** A talk screen turned to typing: a keyboard's own keys where the cabinet has one, else the stick's (D430). @param {any} v */
+const typeIt = (v) => (config.keyboard ? { ...v, phase: "typing", typed: "", transcript: "", added: "", sel: 0 } : { ...openKeys(v), transcript: "", added: "", sel: 0 });
 
 /** @param {any} o @param {string} request @param {boolean} [offered] it's the alternative E10 offered */
 async function startMake(o, request, offered = false) {
@@ -615,7 +624,7 @@ function onStick(dir) {
 }
 
 /** The confirm step's tiles (M6; names have two). @param {any} v */
-export const confirmTiles = (v) => (v.purpose === "name" ? ["Yes, that's me", "Type it again"] : ["Yes! That's it", "Say it again", "Add more"]);
+export const confirmTiles = (v) => (v.purpose !== "name" ? ["Yes! That's it", "Say it again", "Add more"] : canHear() ? ["Yes, that's me", "Say it again", "Type it"] : ["Yes, that's me", "Type it again"]);
 
 /** S3. @param {any} cart */
 function showCard(cart) {
@@ -660,7 +669,7 @@ function onButton() {
       else
         showSay({
           purpose: "name",
-          typing: true, // D184: names by typing for now; hold-to-talk comes with real speech.
+          typing: !canHear(), // D430: a name is said, like everything else (D87); typed only where the cabinet can't hear.
           max: NAME_MAX,
           back: () => (v.change ? startChange(v.change.cart, v.fix) : showWho()),
           done: async (name) => {
@@ -711,7 +720,8 @@ function onButton() {
     case "say":
       if (v.phase === "confirm") {
         if (v.sel === 0) v.done(v.added ? `${v.added} ${v.transcript}` : v.transcript);
-        else if (v.sel === 1) show({ ...v, phase: v.purpose === "name" ? "typing" : "idle", transcript: "", typed: "", added: "", sel: 0 });
+        else if (v.sel === 1 && (v.purpose !== "name" || canHear())) show({ ...v, phase: "idle", transcript: "", typed: "", added: "", sel: 0 });
+        else if (v.purpose === "name") show({ ...typeIt(v), startedTyping: canHear() }); // "Type it": ESC from there is back to the mic
         else show({ ...v, phase: "idle", added: [v.added, v.transcript].filter(Boolean).join(" "), transcript: "", sel: 0 }); // Add more: the next words join these
       }
       break;
@@ -848,8 +858,9 @@ function onBack() {
       break;
     case "say":
       if (v.phase === "listening") cancelTalk(v);
-      else if (v.phase === "typing" && !v.startedTyping) v.back();
-      else if (v.phase === "typing") show({ ...v, phase: "idle", typed: "" });
+      else if (v.phase === "keys" && v.fromTyping) show({ ...v, phase: "typing", typed: v.text }); // back to the keyboard's own keys
+      else if ((v.phase === "typing" || v.phase === "keys") && !v.startedTyping) v.back();
+      else if (v.phase === "typing" || v.phase === "keys") show({ ...v, phase: "idle", typed: "" });
       else v.back();
       break;
     case "question":
@@ -923,19 +934,23 @@ function noteActivity() {
   post("/api/studio/still-here").catch(() => {});
 }
 
-addEventListener("keydown", (e) => {
+addEventListener("keydown", (ev) => {
+  const e = asEnt(ev); // the Picade's ENT (F13) reads as F1 (D433)
   noteActivity();
+  // Before anything else, and during a game too: no key at the cabinet is ever Chromium's (F1 is its Help, D433).
+  e.preventDefault();
   if (view.screen === "play") {
     if (e.code === "Escape" && !e.repeat) endPlay("star");
     else if (playing && !e.repeat && (e.code in STICK || BUTTONS.has(e.code))) playing.sides.add("p1");
     return;
   }
-  e.preventDefault();
   if (!e.repeat) held.add(e.code);
   if (wifiNow.available && wifi.keydown(e, held)) return;
   if (PINKS.has(e.code) && held.has("F1") && !held.has(COIN)) return void (volumeChord = true);
   const v = view;
   if (v.screen === "say" && v.phase === "typing") return onTyping(e, v);
+  // The stick's keyboard (D431). The button that opened it types nothing until it's let go (D182).
+  if (v.screen === "say" && v.phase === "keys" && e.code !== "Escape" && e.code !== "F1") return void ((armed || !BUTTONS.has(e.code)) && sayKey(e, v) && typed(v, v.text));
   if (e.code in STICK) return onStick(/** @type {any} */ (STICK)[e.code]);
   if (e.code === "Escape") return void (e.repeat || onBack());
   if (e.code === COIN && !e.repeat) {
@@ -952,11 +967,14 @@ addEventListener("keydown", (e) => {
   onButton();
 });
 
-addEventListener("keyup", (e) => {
+addEventListener("keyup", (ev) => {
+  const e = asEnt(ev);
   held.delete(e.code);
-  if (e.code === "F1" && !volumeChord && view.screen === "say" && ["idle", "silence"].includes(view.phase)) {
-    view.phase = "typing";
-    view.startedTyping = true;
+  if (e.code === "F1" && !volumeChord && view.screen === "say") {
+    if (["idle", "silence"].includes(view.phase)) view = { ...typeIt(view), startedTyping: true };
+    // With a keyboard, F1 again swaps its keys for the stick's and back, keeping the words (D431).
+    else if (view.phase === "typing") view = { ...openKeys(view, view.typed), fromTyping: true };
+    else if (view.phase === "keys" && view.fromTyping) view = { ...view, phase: "typing", typed: view.text };
   }
   if (!anyButtonHeld()) {
     armed = true;
@@ -970,15 +988,18 @@ addEventListener("blur", () => {
   if (view.screen === "say" && view.phase === "listening") endTalk(view);
 });
 
+/** Typed words get the same "is this right?" step as spoken ones, so Enter can't start a build (D201). @param {any} v @param {string} words */
+function typed(v, words) {
+  const text = words.trim();
+  if (text) show({ ...v, board: v.purpose === "name" ? "M2" : "M6", phase: "confirm", transcript: text, typed: "", sel: 0 });
+}
+
 /** @param {KeyboardEvent} e @param {any} v */
 function onTyping(e, v) {
   if (e.code === "Escape") return void (e.repeat || onBack());
   if (e.code === "Enter") {
     if (e.repeat) return;
-    const text = v.typed.trim();
-    // Typed words get the same "is this right?" step as spoken ones, so Enter can't start a build (D201).
-    if (text) show({ ...v, board: v.purpose === "name" ? "M2" : "M6", phase: "confirm", transcript: text, typed: "", sel: 0 });
-    return;
+    return typed(v, v.typed);
   }
   if (e.code === "Backspace") v.typed = v.typed.slice(0, -1);
   else if (e.key.length === 1 && e.key >= " " && e.key <= "~" && v.typed.length < v.max) v.typed += e.key;

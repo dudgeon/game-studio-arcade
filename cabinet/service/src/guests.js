@@ -38,8 +38,15 @@ const ENDED = new Set(["star", "back"]);
 
 // Runs before anything else on a guest's page: Escape never reaches the game;
 // it tells the launcher, which ends the play and goes back to the shelf (D88, D232).
+// ENT (F1 on a keyboard, F13 on the Picade) is the launcher's and never the game's or Chromium's: F1 would
+// open Chromium's Help page over the game, with no way to close it at the cabinet (D433).
 export const ESCAPE_JS = `(() => {
   const stop = (e) => {
+    if (e.code === "F1" || e.code === "F13" || e.key === "F1") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     if (e.key !== "Escape" && e.code !== "Escape") return;
     e.preventDefault();
     e.stopImmediatePropagation();

@@ -57,8 +57,10 @@ import { gameLines } from "./shelf-marks.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
-const MAX_BODY = 16 * 1024;
-const MAX_WORDS = 4000;
+// No length cutoff on what a kid says (D470): an hour of talking is about 9,000 words, 55,000 characters.
+// These only stop a runaway request: 2 million characters is days of talking.
+const MAX_BODY = 8 * 1024 * 1024;
+const MAX_WORDS = 2_000_000;
 
 class HttpError extends Error {
   /** @param {number} status @param {string} message */
@@ -97,6 +99,7 @@ function readJson(req) {
  *   speech: import("./speech.js").Speech,
  *   libraryDir: string, logsDir: string,
  *   players?: number, consoleName?: string, examples?: boolean,
+ *   keyboard?: boolean, // false on the Picade, which has no keyboard: typing there is the stick's (D430)
  *   guests?: ReturnType<typeof import("./guests.js").createGuests>,
  *   pot?: ReturnType<typeof import("./pot.js").potStore>,
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
@@ -351,7 +354,7 @@ export function createServiceHandler(o) {
     if (o.guests?.api(req, res, pathname)) return;
     if (!OURS.has(pathname)) return player(req, res);
     if (req.method === "GET") {
-      if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind });
+      if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind, keyboard: o.keyboard ?? true });
       // The list "Who's making?" offers, and every maker's name for the shelf's "by …", hidden ones too (D363).
       if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list().filter((m) => !o.marks?.makerOff(m.id)), names: Object.fromEntries(o.makers.read().map((m) => [m.id, m.name])) });
       if (pathname === "/api/pot") return json(res, 200, potView(60));

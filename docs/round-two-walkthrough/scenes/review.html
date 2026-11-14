@@ -1,0 +1,52 @@
+<style>
+#rv { left: 24px; top: 64px; }
+#rv #lbl { left: 8px; top: 26px; }
+#rv #pg { right: 8px; top: 26px; color: #73eff7; }
+#rv #box { left: 8px; right: 8px; top: 46px; height: 92px; overflow: hidden; }
+#rv #roll { position: absolute; left: 0; right: 0; top: 0; transition: top .8s cubic-bezier(.45,0,.2,1); }
+#rv .ln { height: 18px; white-space: nowrap; }
+#rv .ln i { display: inline-block; height: 9px; border-radius: 2px; background: #f4f4f4; margin: 4px 5px 0 0; }
+#rv #dots { right: 10px; top: 120px; color: #f4f4f4; background: #1a1c2c; padding-left: 4px; transition: opacity .3s; }
+#rv #t1 { top: 144px; } #rv #t2 { top: 170px; } #rv #t3 { top: 196px; }
+#rv #stop { left: 8px; top: 120px; color: #ef7d57; background: #1a1c2c; }
+[data-state~="p2"] #roll { top: -90px; }
+[data-state~="p3"] #roll { top: -180px; }
+[data-state~="p2"] #dots, [data-state~="p3"] #dots, [data-state~="scroll"] #dots { opacity: 0; }
+[data-state~="scroll"] #roll { top: -70px; transition-duration: 2.2s; }
+[data-state~="dimyes"] #t1 { background: #1a1c2c; border-color: #333c57; color: #566c86; }
+#rv-h { left: 24px; top: 20px; }
+#bug { left: 376px; top: 70px; width: 240px; }
+#oa { left: 376px; top: 170px; } #ob { left: 376px; top: 214px; } #oc { left: 376px; top: 258px; }
+#guard { left: 376px; top: 312px; width: 240px; }
+</style>
+<div class="h" id="rv-h">Reading back a long idea</div>
+<div class="cab" id="rv" data-f>
+  <div class="hd">Tell me your game idea</div>
+  <div id="lbl" class="y">Is this right? I heard:</div>
+  <div id="pg" data-in="fade">1 of 3 &gt;</div>
+  <div id="box"><div id="roll">
+    <div class="ln"><i style="width:40px"></i><i style="width:24px"></i><i style="width:58px"></i><i style="width:30px"></i><i style="width:44px"></i><i style="width:26px"></i></div>
+    <div class="ln"><i style="width:28px"></i><i style="width:60px"></i><i style="width:36px"></i><i style="width:22px"></i><i style="width:52px"></i></div>
+    <div class="ln"><i style="width:50px"></i><i style="width:30px"></i><i style="width:42px"></i><i style="width:64px"></i><i style="width:20px"></i></div>
+    <div class="ln"><i style="width:34px"></i><i style="width:46px"></i><i style="width:26px"></i><i style="width:56px"></i><i style="width:32px"></i></div>
+    <div class="ln"><i style="width:60px"></i><i style="width:22px"></i><i style="width:38px"></i><i style="width:48px"></i></div>
+    <div class="ln"><i style="width:26px"></i><i style="width:54px"></i><i style="width:40px"></i><i style="width:30px"></i><i style="width:44px"></i></div>
+    <div class="ln"><i style="width:44px"></i><i style="width:28px"></i><i style="width:62px"></i><i style="width:24px"></i><i style="width:36px"></i></div>
+    <div class="ln"><i style="width:30px"></i><i style="width:50px"></i><i style="width:34px"></i><i style="width:58px"></i></div>
+    <div class="ln"><i style="width:56px"></i><i style="width:26px"></i><i style="width:42px"></i><i style="width:32px"></i><i style="width:46px"></i></div>
+    <div class="ln"><i style="width:38px"></i><i style="width:60px"></i><i style="width:22px"></i><i style="width:48px"></i></div>
+    <div class="ln"><i style="width:24px"></i><i style="width:44px"></i><i style="width:54px"></i><i style="width:30px"></i><i style="width:40px"></i></div>
+    <div class="ln"><i style="width:52px"></i><i style="width:34px"></i><i style="width:28px"></i></div>
+    <div class="ln"></div><div class="ln"></div><div class="ln"></div>
+  </div></div>
+  <div id="dots">...</div>
+  <div id="stop" data-in="fade">I stopped listening here.</div>
+  <div class="tile lit" id="t1">Yes! That's it</div>
+  <div class="tile" id="t2">Say it again</div>
+  <div class="tile" id="t3">Add more</div>
+</div>
+<div class="card" id="bug" data-in="left" data-f><div class="lab">Today</div><div class="s">About 75 words fit, then "...". The rest is behind stick right, which only the hint line mentions.</div></div>
+<div class="chip" id="oa" data-in="left" data-f>Pages, with left and right</div>
+<div class="chip" id="ob" data-in="left" data-f>A scrolling box</div>
+<div class="chip" id="oc" data-in="left" data-f>Keep the reader, add a MORE tile</div>
+<div class="card" id="guard" data-in="up" data-f><div class="s">"Yes" lights only once the last page has been seen.</div></div>

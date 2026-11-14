@@ -74,7 +74,8 @@ dtparam=button5=16
 dtparam=button6=18
 dtparam=start=28
 dtparam=escape=1
-dtparam=enter=59
+# D433: ENT is F13 (183), not F1 (59): Chromium opens its Help page on F1, and nothing at the cabinet can close it.
+dtparam=enter=183
 dtparam=coin=60
 # D396: the USB-C port as a network port for the mini (rpi-usb-gadget; harden.sh)
 dtoverlay=dwc2,dr_mode=peripheral
@@ -83,16 +84,26 @@ CONF
 }
 
 # Pass the file, so a test can run this on a copy of the image's own config.txt.
+# Our block is replaced where it stands (appended only if missing), so a later block, such as the boot slot's (D336),
+# stays last. Unchanged text means no write to the FAT partition and no restart.
 step_config_txt() {
-  local file="${1:-$CONFIG_TXT}" before
-  before="$(cat "$file")"
-  sed -i '/^# BEGIN arcade provision$/,/^# END arcade provision$/d' "$file"
-  sed -i -E 's/^dtoverlay=vc4-kms-v3d$/dtoverlay=vc4-kms-v3d,noaudio/; s/^dtparam=audio=on$/dtparam=audio=off/' "$file"
-  config_block >> "$file"
-  if [ "$(cat "$file")" != "$before" ]; then
+  local file="${1:-$CONFIG_TXT}" new
+  new="$(mktemp)"
+  config_block > "$new.block"
+  awk -v bf="$new.block" '
+    function block(  l) { while ((getline l < bf) > 0) print l; close(bf); done = 1 }
+    $0 == "# BEGIN arcade provision" { skip = 1; if (!done) block(); next }
+    skip { if ($0 == "# END arcade provision") skip = 0; next }
+    $0 == "dtoverlay=vc4-kms-v3d" { print "dtoverlay=vc4-kms-v3d,noaudio"; next }
+    $0 == "dtparam=audio=on" { print "dtparam=audio=off"; next }
+    { print }
+    END { if (!done) block() }' "$file" > "$new"
+  if ! cmp -s "$new" "$file"; then
+    cat "$new" > "$file"
     log "config.txt changed: the Picade's driver and screen power start at the next boot"
     touch "$REBOOT_FLAG"
   fi
+  rm -f "$new" "$new.block"
 }
 
 # Pimoroni's installer adds this rule: it tells udev, and so libinput and the kiosk, that the

@@ -14,6 +14,7 @@
 #   drive ssh [COMMAND]       a shell on the cabinet as its admin
 #
 # Keys: up down left right a b x y q e start enter esc star f1 f2 (D82). coin is f2, the COIN button (D205).
+# ent is the Picade's ENT button, F13 (D433); f1 is ENT on a keyboard.
 # ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124). ARCADE_SSH_DIR picks the folder with its
 # SSH key and known_hosts (default the virtual cabinet's); the Picade's card script makes its own (D251).
 # ARCADE_SSH_PORT reaches a rehearsal VM's forwarded port (D337).
@@ -69,8 +70,8 @@ keycode() {
     a) echo 44 ;; b) echo 45 ;; x) echo 46 ;; y) echo 47 ;;
     q) echo 16 ;; e) echo 18 ;;
     start|enter) echo 28 ;; esc|star) echo 1 ;;
-    f1) echo 59 ;; f2|coin) echo 60 ;; backspace) echo 14 ;;
-    *) echo "unknown key: $1 (up down left right a b x y q e start enter esc star f1 f2 coin backspace)" >&2; return 1 ;;
+    f1) echo 59 ;; ent) echo 183 ;; f2|coin) echo 60 ;; backspace) echo 14 ;;
+    *) echo "unknown key: $1 (up down left right a b x y q e start enter esc star f1 ent f2 coin backspace)" >&2; return 1 ;;
   esac
 }
 

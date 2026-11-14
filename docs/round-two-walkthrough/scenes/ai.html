@@ -1,0 +1,36 @@
+<style>
+#ai-h { left: 24px; top: 20px; }
+.node { width: 150px; height: 78px; text-align: center; padding-top: 12px; }
+#n-cart { left: 24px; top: 80px; } #n-svc { left: 245px; top: 80px; } #n-ai { left: 466px; top: 80px; }
+.arrow { height: 2px; background: #1f2328; top: 118px; }
+.arrow::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left-color: #1f2328; }
+#a1 { left: 180px; width: 58px; } #a2 { left: 401px; width: 58px; }
+#bubble { left: 34px; top: 176px; width: 250px; background: #1a1c2c; color: #f4f4f4; font: 700 13px/18px ui-monospace, "SF Mono", Menlo, monospace; border-radius: 8px; padding: 8px 10px; }
+#fb { left: 24px; top: 250px; width: 262px; }
+#k1 { left: 310px; top: 176px; } #k2 { left: 310px; top: 214px; } #k3 { left: 310px; top: 252px; } #k4 { left: 310px; top: 290px; }
+#price { left: 24px; top: 336px; }
+#capA { left: 310px; top: 336px; } #capB { left: 310px; top: 336px; } #capC { left: 310px; top: 336px; }
+#s-lines { left: 310px; top: 176px; } #s-choice { left: 310px; top: 214px; } #s-nums { left: 310px; top: 252px; } #s-chat { left: 310px; top: 290px; }
+[data-state~="offline"] #a2, [data-state~="offline"] #n-ai { opacity: .2; }
+[data-state~="offline"] #fb { box-shadow: 0 0 0 3px #1f2328; }
+</style>
+<div class="h" id="ai-h">AI inside a running game</div>
+<div class="card node" id="n-cart" data-f><b>The game</b><div class="s">no key, no network</div></div>
+<div class="arrow" id="a1" data-in="grow"></div>
+<div class="card node" id="n-svc" data-in="scale" data-f><b>Cabinet service</b><div class="s">key, caps, log</div></div>
+<div class="arrow" id="a2" data-in="grow"></div>
+<div class="card node" id="n-ai" data-in="scale" data-f><b>Haiku</b><div class="s">about a second</div></div>
+<div id="bubble" data-in="up" data-f>Why did the duck cross the road? To prove he wasn't chicken!</div>
+<div class="card" id="fb" data-in="up" data-f><div class="lab">Built-in lines</div><div class="s">Used offline, over the cap, and in every test.</div></div>
+<div class="chip" id="k1" data-in="left" data-f>A house safety brief on every ask</div>
+<div class="chip" id="k2" data-in="left" data-f>The word list on every answer</div>
+<div class="chip" id="k3" data-in="left" data-f>Players' words never reach the model</div>
+<div class="chip" id="k4" data-in="left" data-f>Every ask and answer logged on the cabinet</div>
+<div class="chip good" id="price" data-in="up" data-f>12 jokes: 0.024 cents</div>
+<div class="stamp" id="capA" data-in="scale">Outside the pot · $1 a month at most</div>
+<div class="stamp" id="capB" data-in="scale">From the pot · 1 coin per 1,000 calls</div>
+<div class="stamp" id="capC" data-in="scale">Outside the pot · daily limits only</div>
+<div class="chip good" id="s-lines" data-in="left" data-f>Lines: jokes, taunts, hints</div>
+<div class="chip good" id="s-choice" data-in="left" data-f>Choices: what a character does next</div>
+<div class="chip" id="s-nums" data-in="left" data-f>Numbers: level settings in a range</div>
+<div class="chip bad" id="s-chat" data-in="left" data-f>Open chat with a character</div>

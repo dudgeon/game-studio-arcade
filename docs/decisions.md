@@ -343,7 +343,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   | player buttons 5–6 | button5–6 | Q E (16 18) | not given to carts in v0; spare for the launcher or later |
   | utility 1UP | start | Enter (28) | START |
   | utility ESC | escape | Escape (1) | ★, provisionally (D84) |
-  | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
+  | utility ENT, COIN | enter, coin | F13, F2 (183 60) *(ENT was F1 (59) until D433)* | launcher only, never reach carts |
   | power button | (KEY_POWER) | | safe shutdown |
 - Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then. *(Set 2026-11-14 before assembly, in [hardware/picade-wiring.png](hardware/picade-wiring.png): A B on the near row, blue then yellow; X Y on the far row; pink 5 and 6 spare; 1UP front left, COIN front right, ESC left side, ENT right side. Replaces the plan in ca35d25.)*
 - P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet; implemented by D110–D112, so P2 gets input only when it is 2 or more.)*
@@ -1022,6 +1022,7 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
   - The shelf takes his name from the version's `guest.json`, so his row reads "by Geoff" whether or not he's in `makers.json`.
   - The entry is there so the logs can name him.
 - Playing a guest stays free: no coins, no Studio session.
+- **Note, 2026-11-14 (director's ask): a kid maker from the mini, too.** `node scripts/maker.mjs add Alina` adds a regular kid maker: the same entry the cabinet's "Someone new" makes (D87), from the cabinet's own new-name slot, after checking the Manager's token. It's for a kid's game made on the mini (desktop-initiated) while the cabinet's name screen can't be used. A name already there is left as is. `--cabinet real` (or `ARCADE_CABINET=real`) reaches the Picade with its own key and token, as the Manager does (D369), for `list` and `add-grown-up` too. Alina was added on the Picade this way, so her game reads "by Alina" and she's on its "Who's making?" list like any kid.
 
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
 - **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.
@@ -1919,6 +1920,16 @@ The kids will switch the cabinet off at the wall, and Geoff accepted that the ca
   - a 2.5 s hold powered the guest off cleanly, with no ext4 journal replay at the next boot.
 - 🔧 **Only the Picade can show** the HAT's 3 s cut against the shutdown (C6).
 
+**D375. A security fix to a package apt.lock pins comes through the repo: bump its line, prove it on the virtual cabinet, then a plain update.** *(Director's instruction, 2026-11-14; Claude.)*
+- **Why `--os` can't take them:** `--os` deliberately holds apt.lock's packages (D335), so the next provisioning never finds them past their pin.
+- **The routine** is in cabinet/README.md, "Security updates to pinned packages":
+  1. see what's newer (`apt-cache policy` on the twin, or `apt-get -s upgrade` on the Picade);
+  2. bump the line;
+  3. prove it with an update of the virtual cabinet;
+  4. merge, then F1 to the Picade.
+- **Rollback:** the update keeps a copy of the old package first and puts it back if the cabinet isn't healthy (D335).
+- **First use, 2026-11-14:** `xz-utils` 5.8.1-1+deb13u1 → deb13u2 (Debian-Security). Every other package in apt.lock was current.
+
 ## 2026-11-14 — The day-one card (SD-card worker)
 
 Geoff chose a clean start for the kids' first switch-on (through the director, 2026-11-13): a full pot, a short shelf, and no Tester names. The "off the shelf" mark is the Manager worker's (D360). Its format was relayed by the director and confirmed with the Manager worker directly: its reader takes any `via`, and `"by": "geoff"` is right.
@@ -2044,20 +2055,6 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **So the next one can be named:** the card worker makes the journal persistent; the watch logs every Wi-Fi change as `arcade-wifi ...`; the shelf tells "No Wi-Fi" from "No internet" (D415).
 - **Also found, not the cause:** NetworkManager rewrote the 90-NM YAML at 09:31:32, that boot. It rewrites the only copy of the home Wi-Fi at every start, which is the exposure D410 closes.
 
-**D420. Every card starts quiet: the speaker at 30%, stored, and a chosen level is never reset.** *(Geoff's ask, 2026-11-14: the X HAT's speaker is far too loud as it comes, and the screen's own volume buttons do nothing for it. Claude.)*
-- **One tool, `arcade-volume`** (`cabinet/provision/files/`, installed in `/usr/local/bin`, run as root): `get`, `default`, `set N` (0 to 100), `up` and `down`. It drives the softvol `PCM` control on card `sndrpihifiberry` (D253) and stores each change with `alsactl store`, as the Manager's slider does (D366).
-- **`default` sets 30% only when no level is stored** for the speaker's `PCM` control in `/var/lib/alsa/asound.state` (only the speaker's own block: the mic is a sound card too). A stored level is someone's choice, so it's kept.
-- **When it runs:** in the picade profile's `hw_late` (`step_volume`, so an update runs it too), and from `arcade-volume-default.service` at every boot, after `alsa-restore` and before the kiosk. The boot run is the one that counts on a new card: at first boot the DAC isn't there until the restart (D250).
-- **A card already running** has a stored level if anything has set one (the card worker set 30% by hand on the first Picade), so an update keeps it.
-- **`up` and `down` are for the cabinet's own controls (D421):** steps of 10, down to 0, up to a cap of 60. A level above the cap (set from the Manager) only comes down. The cap is a first guess, to tune by ear on the Picade.
-- The Manager's `control.sh` is unchanged and still works on a cabinet without the tool.
-- **Tested** with stand-ins for `amixer`, `aplay` and `alsactl` (`scripts/cabinet-card/test/volume.test.mjs`). **Not yet proven on the Picade:** that the boot run sets 30% on a new card, and that `alsa-restore` brings a softvol level back after a restart (D366 left that for the hardware too).
-
-**D421. Open, for Geoff: how the volume is changed at the cabinet.** *(Claude proposes; the choice is Geoff's.)* Three options, mocked up for him 2026-11-14. Each shows a small bar for a second and stops at D420's cap.
-1. **The two pink buttons (5 and 6) are quieter and louder, anywhere.** Claude's pick: nothing to remember, works mid-game, and house games never see those buttons (D82). It uses up the spare buttons, and they stop counting as "any button picks" (D182).
-2. **Hold COIN and push the stick up or down, anywhere.** Keeps the pink buttons spare. A hidden combination, the stick still moves the player mid-game, and COIN on the shelf would open the pot on letting go.
-3. **A Sound tile on the shelf.** Visible and labelled, but only from the shelf, and the largest change to the launcher.
-
 **D418. Proven against a real NetworkManager on a QEMU copy of the card; the Picade's own proof is `wifi-proof.sh`.** *(Director's brief; Claude.)*
 - **The rehearsal:** `scripts/cabinet-card/test/wifi-rehearsal.sh DIR [CUTS] [RESTARTS]`, on a card image booted in QEMU (`rehearse.mjs`). The VM has no Wi-Fi chip, so the kernel's simulated radios (`mac80211_hwsim`) stand in: `wlan0` is the cabinet's, and two more are access points (hostapd, with dnsmasq for addresses) that start at every boot. NetworkManager, wpa_supplicant, netplan and our helper are the real ones.
 - **Provisioning's own step ran on that card's first boot** and kept the card's network as a keyfile of ours.
@@ -2079,6 +2076,20 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **Still to do on the Picade:** the 10 power cycles (`wifi-proof.sh cycles 10`, with a person at the cabinet), and opening the Wi-Fi screens with the two buttons and joining a network from them, which nobody has done on the real cabinet yet.
 - **The Picade's proof:** `scripts/cabinet-card/wifi-proof.sh restarts 5` restarts the cabinet itself; `wifi-proof.sh cycles 10` counts ten power cycles a person does, and says when. Each boot's line is the seconds from power-on until NetworkManager had `wlan0` activated, read from the cabinet's own journal, so a cable being in doesn't mask it. A pass is 60 s or less. Results are kept in the Picade's folder on the mini.
 
+**D420. Every card starts quiet: the speaker at 30%, stored, and a chosen level is never reset.** *(Geoff's ask, 2026-11-14: the X HAT's speaker is far too loud as it comes, and the screen's own volume buttons do nothing for it. Claude.)*
+- **One tool, `arcade-volume`** (`cabinet/provision/files/`, installed in `/usr/local/bin`, run as root): `get`, `default`, `set N` (0 to 100), `up` and `down`. It drives the softvol `PCM` control on card `sndrpihifiberry` (D253) and stores each change with `alsactl store`, as the Manager's slider does (D366).
+- **`default` sets 30% only when no level is stored** for the speaker's `PCM` control in `/var/lib/alsa/asound.state` (only the speaker's own block: the mic is a sound card too). A stored level is someone's choice, so it's kept.
+- **When it runs:** in the picade profile's `hw_late` (`step_volume`, so an update runs it too), and from `arcade-volume-default.service` at every boot, after `alsa-restore` and before the kiosk. The boot run is the one that counts on a new card: at first boot the DAC isn't there until the restart (D250).
+- **A card already running** has a stored level if anything has set one (the card worker set 30% by hand on the first Picade), so an update keeps it.
+- **`up` and `down` are for the cabinet's own controls (D421):** steps of 10, down to 0, up to a cap of 60. A level above the cap (set from the Manager) only comes down. The cap is a first guess, to tune by ear on the Picade.
+- The Manager's `control.sh` is unchanged and still works on a cabinet without the tool.
+- **Tested** with stand-ins for `amixer`, `aplay` and `alsactl` (`scripts/cabinet-card/test/volume.test.mjs`). **Not yet proven on the Picade:** that the boot run sets 30% on a new card, and that `alsa-restore` brings a softvol level back after a restart (D366 left that for the hardware too).
+
+**The question behind D421 (answered below), for Geoff: how the volume is changed at the cabinet.** *(Claude proposes; the choice is Geoff's.)* Three options, mocked up for him 2026-11-14. Each shows a small bar for a second and stops at D420's cap.
+1. **The two pink buttons (5 and 6) are quieter and louder, anywhere.** Claude's pick: nothing to remember, works mid-game, and house games never see those buttons (D82). It uses up the spare buttons, and they stop counting as "any button picks" (D182).
+2. **Hold COIN and push the stick up or down, anywhere.** Keeps the pink buttons spare. A hidden combination, the stick still moves the player mid-game, and COIN on the shelf would open the pot on letting go.
+3. **A Sound tile on the shelf.** Visible and labelled, but only from the shelf, and the largest change to the launcher.
+
 **D421. The volume at the cabinet: hold ENT and press a pink button.** *(Geoff, 2026-11-14: "enter plus pink buttons", from three mocked-up options: the pinks alone, COIN plus the stick, a Sound tile on the shelf. Claude built it.)*
 - **What it does:** while ENT (F1) is held, pink 5 (Q) is quieter and pink 6 (E) is louder. One press is one step of 10, from 0 up to the cabinet's cap of 60% (D420). The Manager's slider still goes to 100, and a level above 60 only comes down at the cabinet. Which pink sits nearer the player is checked on the Picade; swapping them is two constants.
 - **The pinks alone stay spare** and still count for "any button picks" (D182). ENT held alone does nothing new.
@@ -2099,3 +2110,50 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - 🔧 **Only a person at the cabinet can confirm** the glass itself: full screen, no border, sharp pixels. If the panel hadn't taken the mode it would be blank, and restarting `arcade-kiosk` puts it back.
 - **`drive screenshot` now** keeps any PNG of at least 1024x768 and notes a larger screen on stderr ("the cabinet's screen is 1152x864, not 1024x768: the launcher sits in the middle of it"). It still refuses what isn't a PNG or is too small to hold the launcher, keeping what came back beside the name asked for. Tested with a stand-in SSH, and run against the Picade (a 1152x864 PNG, with the note).
 - Until the mode is fixed, anything that compares a Picade grab with a 1024x768 one must crop the middle 1024x768 (offset 64, 48).
+
+## 2026-11-14 — Nothing at the cabinet needs a keyboard (D430-D439, name-entry worker)
+
+Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabinet OFFERS NO AFFORDANCES to enter a name." The Picade has no keyboard, and "Someone new" opened a typing screen (D184).
+
+**D430. A new name is said, like everything else; typing is the fallback.** *(D87, as Geoff set it; D184's flag flipped. Claude.)*
+- "Someone new" opens the mic: "Hold any button and say your name". The name heard is shown, "Is this your name?", with **Yes, that's me**, **Say it again** and **Type it**.
+- This is so wherever the cabinet can hear: the Picade and the virtual cabinet (Groq and Moonshine, D260). Where it can't (the speech stub on the mini and in tests, or no speech engine set up), a new name starts in typing as before.
+- The service tells the launcher whether the cabinet has a keyboard: `keyboard` in `/api/config`, false for the `picade` profile and true elsewhere. With a keyboard, typing is the keyboard's screen as it was (F1, D184), so the virtual cabinet keeps F1 typing. With none, typing is the stick's keyboard (D431), and the hint names the button: "ENT: type instead" (D82, D433).
+
+**D431. One on-screen keyboard: the Wi-Fi screens' grid (D414), on every talk screen.** *(Geoff chose the grid for Wi-Fi; the director's brief: reuse it, don't build a second. Claude.)*
+- ENT on a talk screen ("Tell me your game idea", "Something else", "What should change?", a new name, and "I didn't hear anything") opens the grid keyboard. The stick moves, A types, B deletes, X changes page, 1UP is DONE, ESC goes back to the mic.
+- **A name:** letters only, on one page of three rows, with delete and DONE. The first letter is a capital and the rest small. The limit is the 16 the service already keeps (D87's `NAME_MAX`); the header counts down what's left.
+- **An idea or an answer:** the Wi-Fi keyboard's three pages (abc, ABC, symbols), with space, delete and DONE, up to 300 characters. The line over the field is the question being answered.
+- DONE goes to the same "Is this right?" step as spoken or typed words (D201), so it can't start a build.
+- The button that opened the keyboard types nothing until it's let go (D182).
+- With a keyboard (the virtual cabinet, the mini), F1 on the typing screen swaps to the stick's keyboard and back, keeping the words, so the grid can be tried there too.
+- **How it's built:** `wifi.js` now exports the field and the grid (`fieldTop`, `keyGrid`) and `wifi-flow.js` the keys' logic (`moveKey`, `pressKey`, `keyboardKey`), each taking a keyboard's pages and action row; the Wi-Fi password screen is one user and `say-keys.js` the other. The Wi-Fi screens draw and behave as they did.
+
+**D432. What else needed a keyboard at the cabinet: the list.** *(Claude's sweep of the launcher, the runtime and the cabinet's docs, 2026-11-14.)*
+- **Fixed here:** the new maker's name (D430); F1 "type instead" on the idea, "Something else" and "what should change" screens; "Type it" after the cabinet didn't hear (E9). All are ENT and the stick now (D431).
+- **Already had a way:** the Wi-Fi password (D414), the volume (D421), back to the shelf (ESC, D88), starting a make (COIN, D205), shutting down (the power button, D372).
+- **Never at the cabinet, by design:** the API key, the Groq key, pairing, coins and hiding a maker are the Manager's and the mini's scripts.
+- **Left as it is:** a second player's keys (W A S D) exist only on a keyboard; the Picade has one player's controls and the controller count defaults to 1 (D85). Guest players read the same keys the Picade sends (D82) and their own menus aren't opened from the cabinet.
+
+**D433. ENT is F13, not F1: no key at the cabinet is one Chromium acts on.** *(Geoff, 2026-11-14: "you need to prevent this from happening in the future". The director's brief; Claude.)*
+- **What happened:** Alina pressed ENT after a game. ENT was F1 (D82), and Chromium opened its Help page over the kiosk, which nothing at the cabinet could close; the kiosk had to be restarted. The launcher stopped F1 on its own screens, but not while a game was up.
+- **The key:** the overlay's `enter` is now 183 (KEY_F13), in `picade.sh`'s block of `config.txt`. It takes effect at the next restart; until then the old F1 still works, since the launcher takes either. Checked on the virtual cabinet (trixie, Chromium 156, the same packages): F13 tapped twice on the shelf through a uinput keyboard leaves the screen pixel for pixel the same. xkb calls the key XF86Tools, which Chromium has no shortcut for.
+- **Every other Picade key, against Chromium's shortcuts:** F1 Help, F3 find, F5 reload, F6 the address bar, F7 caret browsing, F10 the menu, F11 full screen, F12 DevTools; everything else needs Ctrl, Alt, Shift, Super, Tab, Backspace or Space. The Picade sends none of them: arrows, Z X C V Q E, Enter, Escape, F13, and F2 for COIN, which Chromium does nothing on. A test holds the block to that list.
+- **Who reads ENT:** the launcher reads F13 as F1 at the door (`asEnt`, `wifi-flow.js`), so typing, the volume chord and the Wi-Fi hold (ENT and COIN) are unchanged, and the virtual cabinet's F1 works as before. `arcade-volkey` takes F13 or F1 as the held key. The driver keyboard (`arcade-keyd`) can press 183; `drive press ent` sends it, and the Manager's on-screen button is now "ENT" and sends it too. F1 on Geoff's own keyboard through the Manager is still F1.
+- **The second guard, for an F1 that comes anyway** (a plugged-in keyboard, the Manager): the launcher stops every key's default before anything else, during a game too; the guest bridge script stops F1 and F13 before a guest's page sees them; the house runtime's host stops them as well (its cart frame already stopped every key). A guest that nests its own frames is beyond the bridge, which is why the key itself changed.
+- **Not yet proven on the Picade:** that its Chromium reports the button as `F13` after the restart (Geoff's check: ENT on the shelf and in a game opens nothing; ENT on a talk screen opens the keyboard; ENT with a pink changes the volume).
+
+## 2026-11-14 — No length cutoff on speech (speech worker)
+
+**D470. A hold records for exactly as long as the button is held: no length cap and no silence stop. Where a provider has a limit, the audio is split, never cut.** *(Geoff, 2026-11-14: "There is no reason for a cutoff in length of transcription"; then "No limit at all" and "No silence stop". Claude's build. Replaces the 30 s cap in D262 and the cap proposed as D450.)*
+- **What was cutting it:** the recorder kept the first 30 s and silently dropped the rest. On the Picade, 2 of 6 holds were cut this way (held 39 s and 83 s). Behind it, the service refused a request over 4,000 characters or a body over 16 KB, which is about 4–5 minutes of talking.
+- **The recorder** keeps everything arecord gives it, in memory only (D262). Memory doesn't force a limit: 16 kHz mono is 1.9 MB a minute, 115 MB an hour, on an 8 GB Pi.
+- **Splitting** (`splitPcm`): long audio goes in pieces cut at the quietest 20 ms in the last stretch before each piece's limit, so a word is rarely split. Joined back, the pieces are the audio exactly.
+- **Groq:** its free tier takes up to 25 MB a file, and its docs give no duration limit (checked 2026-11-14). Pieces are at most 10 minutes (19.2 MB of WAV), sent two at a time (the free tier allows 20 requests a minute), with the texts joined in order. Each piece's timeout is 3 s plus 0.1 s per second of audio (D263). If any piece fails, Moonshine does the whole hold. Groq's other limits are per hour and per day: 7,200 audio seconds an hour and 28,800 a day on the Developer plan's base limits. That's 2 hours of talk an hour, which a family won't reach; past it, Groq answers 429 and Moonshine takes over.
+- **Moonshine** gets pieces of at most 30 s, the length its models are trained on. On the mini, a 162 s TTS clip took 13 s (0.08× real time) with 7.2% WER. A Pi is slower, so a long hold that falls back to Moonshine shows "Writing that down..." for a while.
+- **The service** takes a request or an answer of up to 2 million characters, and a body of up to 8 MB. That's days of talking: the limits only stop a runaway request.
+- **The screens are unchanged.** Paging a long transcript (D453) and live words while talking (D454) are their own decisions.
+- **speech.jsonl** gains `pieces` when a hold was split.
+- **Tests:** a 3-minute and a 25-minute hold through a stand-in arecord (every second kept, Groq in 1 and 3 pieces, Moonshine in 30 s pieces), the splitter, and an hour's idea taken whole by the service.
+
+## 2026-11-14 — Security updates to pinned packages (D375)
