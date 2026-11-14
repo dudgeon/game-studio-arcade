@@ -3,8 +3,8 @@
 // nothing starts or stops in one frame. Bodies and springs are plain objects
 // the cart keeps in its state; time is frames.
 
-/** Something that moves: position, speed in pixels per frame, and a size if it has one. */
-/** @typedef {{ x: number, y: number, vx: number, vy: number, w?: number, h?: number }} Body */
+/** Something that moves: its top-left, its speed in pixels per frame, and its size (0 by 0 for a point). Also a collide Box. */
+/** @typedef {{ x: number, y: number, vx: number, vy: number, w: number, h: number }} Body */
 
 /** A value on a spring: `x` chases a target and overshoots a little; `v` is its speed. */
 /** @typedef {{ x: number, v: number }} Spring */
@@ -140,9 +140,7 @@ export function drive(b, dx, dy, o = {}) {
  * @param {(x: number, y: number, w: number, h: number) => boolean} solid
  */
 function stepAxis(b, axis, d, solid) {
-  const w = b.w ?? 0;
-  const h = b.h ?? 0;
-  const at = (/** @type {number} */ v) => (axis === "x" ? solid(v, b.y, w, h) : solid(b.x, v, w, h));
+  const at = (/** @type {number} */ v) => (axis === "x" ? solid(v, b.y, b.w, b.h) : solid(b.x, v, b.w, b.h));
   let left = d;
   for (let i = 0; i < 64 && left !== 0; i++) {
     const step = Math.abs(left) > 1 ? Math.sign(left) : left;
@@ -194,8 +192,8 @@ export function move(b, o = {}) {
  */
 export function bounce(b, box, bounciness = 0.7) {
   const hit = { x: 0, y: 0 };
-  const right = box.x + box.w - (b.w ?? 0);
-  const bottom = box.y + box.h - (b.h ?? 0);
+  const right = box.x + box.w - b.w;
+  const bottom = box.y + box.h - b.h;
   if (b.x < box.x) {
     b.x = box.x;
     b.vx = Math.abs(b.vx) * bounciness;

@@ -2262,3 +2262,56 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
   - With no model (offline, an error, off, the guard), an action's own word counts if it's the only one said.
   - **Every hold's words are kept on the cabinet** in `logs/game_talk.jsonl` with the action and outcome, and listed in the Manager under "Said to games". Geoff's "Everything" was about chat; I've applied it to voice too, since both are a kid talking to a game. The cost log still holds no words (D482). Chat turns will use the same log.
   - In a playtest nothing is ever heard, so the guide requires a button for every action.
+
+## 2026-11-14 — Round two: motion, glide and 2.5D (D475-D479, motion worker)
+
+Geoff chose D459 on the round-two walkthrough: "the kit in software, plus sub-pixel glide", with the 2.5D modules in the plan's order (docs/round-two-plan.md section 4). These five say how it was built. Everything stays one software picture in the 32 colors; no WebGL.
+
+**D475. The motion kit: five library modules, and `g.spr` turns and zooms.** *(D459 and D461, as Geoff chose; Claude's design.)*
+- **`g.lib.motion`:** `drive` (speed builds toward the stick and dies away), `move` (gravity, and stopping flush against anything a `solid(x, y, w, h)` function says is in the way, a pixel at a time so nothing tunnels), `bounce`, `mapHit` (solid tiles of a text map), `approach`, `damp`, `ease` (seven curves), `tween`, `spring`, `stick`, `body`, `lerp`, `clamp`. A body is `{ x, y, vx, vy, w, h }`, so it's also a collide box.
+- **`g.lib.camera`:** `follow` (a soft zone in the middle, an eased chase, the world's bounds), `shake`, `use`, `view`. **`g.lib.parallax`:** `layer`. **`g.lib.anim`:** `loop`, `once`, `done`, `pingpong`, `walk` (by distance). **`g.lib.particles`:** `burst`, `tick`, `draw`, capped at 400.
+- **Polish never uses the game's dice.** Particles and the shake have their own seeded numbers (from the frame and the place), not `g.rand`. Adding a burst to a finished game can't change what spawns next, so it can't break a check.
+- **`g.spr` takes `rot`, `zoom`, `zoomX`, `zoomY`, `pivot` and `shade`.** Radians, clockwise; the pivot stays put. Sampled nearest, in whole game pixels, so a turned sprite is still pixel art. With no turn and no zoom it draws exactly what plain `g.spr` draws (a test holds that), and a call without the new options takes the old code path untouched. `scale` keeps its meaning (whole numbers, 1 to 8).
+- Angles are radians everywhere. `Math.sin` and the rest of `Math` were always allowed in carts; the guides now say so. V8's are the same in Node and Chromium, so runs still repeat.
+- Each module has tests and a reference page (`runtime/lib/ref/`), like the rest of the library (D50, D160).
+
+**D476. Glide: the same drawing, a second time, on the display's grid.** *(Geoff: "plus sub-pixel glide", the plan's option B. Claude's design.)*
+- **What the kids get:** a thing moving half a pixel a frame used to wait and then jump a whole "big pixel" (4 display pixels on the Picade). Now it moves a display pixel at a time, and a scrolling world slides. Each game pixel is still a 4×4 block and the colors are the same 32: the art is as chunky as before, only its position is finer.
+- **How:** a cart calls `g.glide()` once in `init`. From then on every drawing call is made twice: into the 256×192 framebuffer exactly as before (positions floored), and into a glide buffer `k` times bigger each way, where positions are kept to 1/`k` of a pixel. The cart frame shows the glide buffer on a canvas of that size. `k` is the host page's whole-number scale, so one buffer pixel is one display pixel: 4 on the Picade and the virtual cabinet. Scales above 6 use their largest whole divisor (8 gives 4); a scale with none (7, 11) gets no glide and looks as it always did.
+- **The plan's worry, "the headless run can't see what the screen shows", answered:** the framebuffer is still the picture of record. `pget`, checks, hashes, the palette scan, saved frames, thumbnails and the determinism check all read it, and it's drawn identically with glide on or off (a test runs one cart both ways and compares every hash). The glide picture is never more than one game pixel from it, and at whole-pixel positions it is the framebuffer with each pixel a block (tests hold both). And it isn't hidden from headless runs: it's software too, so `headless(cart, { fine: 4 })` draws it in Node, and the playtest's node driver does that, so a crash or a slow frame in it shows up there.
+- **Opt-in, so nothing already made changes.** A cart that doesn't call `g.glide()` has no glide buffer and takes the old paths. Every cart in the repo (5 templates, the hello example, 9 fixtures) was hashed over 1,200 frames of random input on two seeds before and after: identical.
+- **Where it lives:** `runtime/src/fine.js` (the buffer), `runtime/src/xform.js` (drawing shared by both buffers), a few lines each in `machine.js`, `frame.js` and `host.js`. `play.html?glide=0` and `createHost({ glide: false })` turn it off, to compare.
+- **Not yet proven on the Picade:** what it costs there (D479), and that it looks right on the panel.
+
+**D477. Three 2.5D modules, in software, in the plan's order: `floor`, `raycast`, `stack`.** *(D460; Claude's design.)*
+- **`g.lib.floor`:** a ground in perspective to a horizon ("mode 7"). `texture` builds the ground picture from a small tile map, `draw` lays it out, `sky` draws bands and a horizon strip that slides as you turn, `sprites` stands things on it sorted by distance, `project` says where a place is on screen. Distance fades into a haze color in an ordered dither (day), or darkens in steps (night).
+- **`g.lib.raycast`:** a first-person maze from a text map: `draw` (textured walls, flat or textured floor and ceiling, things standing in it and hidden behind walls, darker with distance), `walk` (sliding along walls), `open`, `cast`.
+- **`g.lib.stack`:** sprite stacking: `draw` turns a list of slices together, with a shadow and darker lower slices; `height`.
+- **Two new drawing calls carry them:** `g.texRow` and `g.texCol` copy a stepped, wrapping row or column of a sprite, with a shade. And a **darker table** in the palette (`DARKER`, `SHADES`): each color's next step down its own ramp, then night, then black; five steps reach black from anywhere.
+- **`g.lib.mesh` (flat-shaded triangles) isn't built.** The plan made it "only if a game asks for it". The catalog says 3D models aren't in the library.
+
+**D478. Teaching the Studio's Claude to use them.** *(D461; Claude.)*
+- **The catalog** (always read) lists the eight modules under "Movement and depth", a new guide and a new template, and has a new house rule: "Nothing starts or stops in one frame... A world bigger than the screen scrolls. A hit shakes." The line "nothing here does 3D or scrolling worlds" is gone.
+- **A `movement` guide** (`studio-kit/context-pack/modules/movement.md`): the seven house rules of movement, which depth module fits which idea, how to write movement as rules a check can read, and what's costly. (Named `movement`, not `motion`, because the catalog keys guides and modules by one name each.)
+- **The cart API guide's example no longer moves with `s.x += 2`:** it calls `g.glide()` and drives a body. The runtime README and `cart.d.ts` examples changed the same way.
+- **A `scroller` template** ("Star Run"): run and jump through a world three screens wide, with a text map, a following camera, two parallax layers, stars, spikes, a pit and a flag. Seven auto rules, with speeds written as numbers ("speeds up by 0.2 pixels per frame each frame, up to 2"). It passes the pack's tests like the others, at both screen sizes.
+- **The template budget is 5,000 tokens, up from 4,500** (D164): a scrolling game carries a map and a camera, and the scroller is 4,928 after trimming. The others are unchanged.
+- **What a make costs now:** the catalog is 1,609 tokens (was 1,239) and the cart API guide 1,442 (was 1,080), so every make reads about 730 tokens more; a game that moves reads the `movement` guide (1,379) and one to three module pages (435 to 1,320 each). In line with the plan's 2,000 to 4,000 for a game that uses them.
+- **No change to the agent's brief** (`studio-kit/managed-agent/agents/studio.md`), so no `ant apply`. The kit's contents changed, so cabinets get it with the next update (D330).
+
+**D479. Proof, and frame times.** *(The director's brief; D462 is still Geoff's to set. Claude.)*
+- **The showcase cart, `runtime/examples/motion/`:** four scenes that use every module, gliding: RUN (a scroller), DRIVE (a ring road on the perspective floor), MAZE (first person), SPIN (stacked cars round a tower). A full cart with a spec and eight auto rules, not on any shelf. `node runtime/dev-server.js`, then `/runtime/play.html?cart=/carts/motion/game.js`.
+- **The playtest's frame time now leaves out the first 30 frames of each of its four runs** (`WARMUP_FRAMES`). Each run is a fresh cart in a fresh worker or page, and those frames run cold code: on a pixel-heavy cart they swung the 95th percentile between 1 and 10 ms from run to run on the mini while the median never moved. The report's `frameTime.frames` is 2,280, not 2,400. The gate's budget and D311's "advisory until calibrated" are unchanged.
+- **The node driver draws a gliding cart's glide buffer** at the cabinet's 4×, so its time includes that work.
+- **Measured on the Mac mini, 2026-11-14** (Node 22 and Playwright's Chromium at 1024×768; the mini was busy with other work, so these are a guide):
+
+| Cart | Node driver, median | Chromium, median | Chromium, 95th |
+| --- | --- | --- | --- |
+| The five older templates, before this change | 0.010 to 0.023 ms | | |
+| The five older templates, after | 0.010 to 0.024 ms | 1.0 ms | 1.7 to 2.0 ms |
+| `scroller` (gliding) | 0.10 ms | 1.4 ms | 2.5 ms |
+| The showcase, all four scenes (gliding) | 0.65 ms | 1.7 ms | 3.0 ms |
+
+- The Chromium figures include the round trip to the page and putting the picture on the canvas, as the gate's do; its clock ticks in 0.1 ms. Scene by scene in Node with the glide buffer, after warm-up: RUN 0.13 ms, DRIVE 0.61, MAZE 0.52, SPIN 0.49 (medians).
+- **So on the mini, glide costs about 0.4 ms a frame in Chromium** (a 1024×768 picture to convert and show instead of 256×192), and the heaviest scene about 0.7 ms more than a plain game. The plan measured the Picade's own games at 2 ms median and 5 to 7 ms at the 95th percentile, and "just showing the buffer" at 0.2 ms; sixteen times the pixels suggests 2 to 4 ms more for a gliding game there. That's inside 16.7 ms, but it's an estimate, not a measurement.
+- **Not yet proven on the Picade or the virtual cabinet:** these frame times on the real hardware, and how glide looks on the panel. Neither cabinet was touched. The check is the showcase through the gate on each, which needs a turn from the director. D462's 12 ms line should wait for it.

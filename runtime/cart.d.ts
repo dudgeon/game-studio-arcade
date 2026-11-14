@@ -9,7 +9,7 @@
 //   /** @type {Arcade.Cart<State>} */
 //   export default {
 //     init(g) { return { x: g.W / 2, score: 0 }; },
-//     update(g, s) { if (g.btn("right")) s.x += 1; },
+//     update(g, s) { s.x = g.lib.motion.damp(s.x, g.btn("right") ? g.W - 8 : 8); },
 //     draw(g, s) { g.cls(0); g.text("HI", s.x, 120, g.colors.white); },
 //     probe(g, s) { return { x: s.x, score: s.score }; },
 //   };

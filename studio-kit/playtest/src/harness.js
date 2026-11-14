@@ -18,6 +18,8 @@ export { HarnessError };
 const WORKER = new URL("./worker.js", import.meta.url);
 const SOAK_INPUT_SEED = 0x5eed;
 export const GENERIC = ["loads", "no-errors", "soak", "palette", "frame-time", "deterministic"];
+/** Frames at the start of each soak run that frame time leaves out (D479): half a second. */
+export const WARMUP_FRAMES = 30;
 
 /**
  * @typedef {import("../index.js").PlaytestOptions} PlaytestOptions
@@ -266,7 +268,9 @@ export async function playtest(cartDir, opts = {}) {
       : b0 && `frame ${b0.frame} has ${b0.count} pixel${b0.count === 1 ? "" : "s"} of color ${b0.value}, which isn't in the 32-color palette (0-31)${bad.length > 1 ? `; ${bad.length - 1} more like it` : ""}`,
   );
 
-  const times = [soakA, soakB, idleA, idleB].flatMap((r) => r.times ?? []);
+  // Each run is a fresh cart in a fresh worker or page, so its first frames run cold code: that's the
+  // machine warming up, not the game's frame rate. They don't count toward frame time (D479).
+  const times = [soakA, soakB, idleA, idleB].flatMap((r) => (r.times ?? []).slice(WARMUP_FRAMES));
   const frameTime = frameStats(times, budgetMs);
   g("frame-time", times.length > 0 && frameTime.p95Ms <= budgetMs, times.length === 0 ? "no soak frames ran, so there's nothing to time" : `95% of frames should take at most ${budgetMs} ms for update+draw; the slowest 5% took ${frameTime.p95Ms} ms or more (max ${frameTime.maxMs} ms)`);
 

@@ -30,11 +30,11 @@ const report = await playtest(cartDir, { driver: "node", out: null }); // out: n
 ## What it checks
 
 - **Rules:** each auto rule's check runs on a fresh cart (seed 1) in its own worker thread. It passes by returning and fails by throwing; the message is the reason. If the game itself throws, the reason says "the game crashed …" instead. Limits per check: 10 s of wall time (30 s in the browser) and 18,000 stepped frames.
-- **Generic checks (ours, D61):** `loads`, `no-errors`, `soak` (600 frames of seeded random input on both players, plus 600 with no input), `palette` (pixels and the runtime's color warnings), `frame-time` (p95 update+draw per frame) and `deterministic` (the same seed and input must draw the same screens).
+- **Generic checks (ours, D61):** `loads`, `no-errors`, `soak` (600 frames of seeded random input on both players, plus 600 with no input), `palette` (pixels and the runtime's color warnings), `frame-time` (p95 update+draw per frame, leaving out each run's first 30 frames, which run cold code, D479) and `deterministic` (the same seed and input must draw the same screens).
 
 ## Drivers
 
-- `node` uses the runtime's `headless()`. It's fast and needs no browser.
+- `node` uses the runtime's `headless()`. It's fast and needs no browser. A cart that glides (`g.glide()`, D476) is run with its glide buffer at the cabinet's 4×, so its frame time includes drawing it; rules, hashes and frames come from the 256×192 framebuffer as for any cart.
 - `browser` with `--chromium PATH` (or `chromium: true`, which finds one) drives a system Chromium over `--remote-debugging-pipe`, with no Playwright at all (D310). That's the cabinet's publish gate, since the cabinet has Chromium but no Playwright. `--nice N` starts it at low priority. It gives the same report as Playwright's (a test checks this).
 - `browser` uses Playwright against `runtime/play.html?…&test=1` through `window.arcade.test`, served by `runtime/dev-server.js`. It gives the same report as `node` (the tests check this). The harness never installs Playwright (D63): it uses the copy it finds (`GSA_PLAYWRIGHT`, local `node_modules`, the global npm root, `/opt/npm-tools/node_modules`). For development, `npm install` gets 1.56.0, the sandbox's version, and `node node_modules/playwright/cli.js install --only-shell chromium` gets its browser.
 

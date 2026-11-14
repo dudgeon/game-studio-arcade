@@ -16,7 +16,7 @@ import * as lib from "../../../runtime/lib/index.js";
 import { packSize, PACK_DIR, BUDGETS, CALIBRATION, MD_CHARS_PER_TOKEN, CODE_CHARS_PER_TOKEN } from "../bin/pack-size.js";
 
 const RUNTIME = path.resolve(PACK_DIR, "../../runtime");
-const TEMPLATES = ["blank", "catch", "dodge", "maze", "paddle"];
+const TEMPLATES = ["blank", "catch", "dodge", "maze", "paddle", "scroller"];
 const dirOf = (/** @type {string} */ c) => path.join(PACK_DIR, "templates", c);
 const read = (/** @type {string} */ f) => fs.readFileSync(f, "utf8");
 const CATALOG = read(path.join(PACK_DIR, "CATALOG.md"));
@@ -74,6 +74,27 @@ for (const c of TEMPLATES) {
     assert.ok(t && t.tokens <= BUDGETS.template, `${c} is ~${t?.tokens} tokens`);
   });
 }
+
+// The motion showcase (runtime/examples/motion, D475-D479) isn't a template, but it's the one cart that uses
+// every motion and depth module, so it's held to the same standard here. Its frame time is left out: it
+// draws a lot on purpose, and a busy machine shouldn't fail the suite.
+test("the motion showcase is a valid cart and passes its playtest", async () => {
+  const dir = path.join(RUNTIME, "examples/motion");
+  const v = await validateCart(dir);
+  assert.deepEqual(formatIssues(v), []);
+  const report = await playtest(dir, { driver: "node", out: null });
+  assert.deepEqual(failures(report).filter((f) => !f.startsWith("frame-time:")), []);
+  assert.equal(report.rules.filter((/** @type {any} */ r) => r.kind === "auto" && r.passed).length, 8);
+  assert.match(read(path.join(dir, "game.js")), /g\.glide\(\)/);
+});
+
+test("the scroller template moves the way the movement guide says", () => {
+  const src = read(path.join(dirOf("scroller"), "game.js"));
+  for (const used of [/g\.glide\(\)/, /motion\.drive\(/, /motion\.move\(/, /camera\.follow\(/, /camera\.use\(/, /camera\.shake\(/, /parallax\.layer\(/, /particles\.burst\(/, /motion\.spring\(/]) assert.match(src, used);
+  assert.doesNotMatch(src, /\.x [+-]= \d/, "nothing moves a fixed number of pixels on a button");
+  assert.doesNotMatch(CATALOG, /nothing here does 3D or scrolling/);
+  assert.doesNotMatch(read(path.join(PACK_DIR, "modules/cart-api.md")), /s\.x \+= 2/);
+});
 
 // A check that a broken game still passes proves nothing. poke (D163) and the bot
 // must not have made these checks weak, so break each number and see the right rule fail.

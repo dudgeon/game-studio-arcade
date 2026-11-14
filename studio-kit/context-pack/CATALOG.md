@@ -11,6 +11,7 @@ Copy one into the cart folder, then change it in small edits; don't rewrite what
 - `dodge/`: free movement; things fly at you; lives, safe time, speed-up.
 - `maze/`: tile-by-tile walking, walls from a text map, pickups, a timed round.
 - `paddle/`: a ball off the walls, a paddle, serves.
+- `scroller/`: run and jump through a world wider than the screen: a map, a camera, parallax hills, stars, spikes, a flag.
 - `blank/`: title, play, game over, best score, a dot. Use it when the idea fits none of the others.
 
 Choose only after you've finished asking: the one the player's idea fits, otherwise `blank`. Its rules and numbers are defaults that the player's answers override. Read only its files.
@@ -31,6 +32,16 @@ no-templates -->
 - `timers`: frame timers, spawners, held-button repeat.
 - `turns`: two or more people taking turns on one controller.
 
+Movement and depth (the `movement` guide says which to use):
+- `motion`: speed that builds and dies away, gravity, bouncing, landing on a tile map, easing, springs.
+- `camera`: follows through a bigger world; shakes.
+- `parallax`: background layers scrolling at different speeds.
+- `anim`: which animation frame, by time or distance walked.
+- `particles`: sparks, dust, smoke.
+- `floor`: a ground in perspective, things standing on it: racing, flying.
+- `raycast`: a first-person maze from a text map.
+- `stack`: chunky 3D objects from stacked slices, turned to any angle.
+
 ### Guides: `studio-kit/context-pack/modules/<name>.md`
 
 - `cart-api`: everything on `g`: drawing, text, colors, input, sound, saves. Read it unless you only change numbers.
@@ -38,6 +49,7 @@ no-templates -->
 - `sprites`: drawing with `g.sprite` rows, in sizes that read at 256×192.
 - `spec`: writing rules a machine or a person can check. Read it when not starting from a template's spec.
 - `game-ai`: `g.ai`, for made-up lines (new jokes), choices (a boss's mood) and spoken commands (hold a button and say "fire") while the game is played. Only when it's a strong fit; read it before using or offering it.
+- `movement`: how things should move, and depth, in the 8-bit look. Read it for anything that moves freely, scrolls or goes into the screen.
 
 ## House rules
 
@@ -47,5 +59,6 @@ no-templates -->
 - One player unless the spec says otherwise; more people take turns with `turns`.
 - Randomness only from `g` (`g.rand`, `g.rnd`, `g.pick`). No `Math.random`, no clock, no timers, no DOM.
 - Probe what the rules talk about (mode, positions, score, lives, counts). Checks read state, not pixels.
+- Nothing starts or stops in one frame: speed builds and dies away (`motion`). A world bigger than the screen scrolls (`camera`). A hit shakes.
 
-Not in this library yet: nothing here does 3D or scrolling worlds, so build those from `g` directly and keep them simple.
+Not in this library yet: 3D models. Get depth from `parallax`, `floor`, `raycast` or `stack`.

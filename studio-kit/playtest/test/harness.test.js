@@ -32,7 +32,7 @@ test("a good cart passes every auto rule and generic check", async () => {
   });
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.coverage, []);
-  assert.equal(r.frameTime.frames, 2400);
+  assert.equal(r.frameTime.frames, 2280, "four runs of 600 frames, less each one's first 30 (D479)");
 });
 
 test("a deliberately broken cart fails the right rules with readable reasons", async () => {
