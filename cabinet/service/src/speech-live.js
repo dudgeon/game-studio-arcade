@@ -9,9 +9,15 @@ import path from "node:path";
 import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 export const RATE = 16000;
-/** A kid holding the button down forever doesn't fill the memory: 30 s is plenty for an idea. */
-export const MAX_SECONDS = 30;
-const MAX_BYTES = MAX_SECONDS * RATE * 2;
+// No length cutoff and no silence stop (D470, Geoff 2026-11-14): a hold records for exactly as long as the
+// button is held. Memory doesn't force a limit: 16 kHz mono is 1.9 MB a minute, 115 MB an hour, on an 8 GB Pi.
+// Where a provider has a limit, the audio is split into pieces, never cut.
+/** Groq takes up to 25 MB a file on the free tier; 10 minutes of 16 kHz mono WAV is 19.2 MB (D470). */
+export const GROQ_CHUNK_SECONDS = 600;
+/** Moonshine is given pieces of at most 30 s, the length its models are trained on (D470). */
+export const MOONSHINE_CHUNK_SECONDS = 30;
+/** Groq's free tier allows 20 requests a minute; two pieces at a time is plenty. */
+const GROQ_PARALLEL = 2;
 export const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 export const GROQ_MODEL = "whisper-large-v3-turbo";
 /** Groq is skipped after this long, and Moonshine answers instead (D263). */
@@ -90,7 +96,6 @@ export function alsaRecorder(o = {}) {
       let err = "";
       c.stderr?.on("data", (d) => (err = (err + d).slice(-400)));
       c.stdout?.on("data", (/** @type {Buffer} */ d) => {
-        if (size >= MAX_BYTES) return;
         chunks.push(d);
         size += d.length;
       });
@@ -115,7 +120,8 @@ export function alsaRecorder(o = {}) {
         await ended;
         clearTimeout(t);
       }
-      const pcm = Buffer.concat(chunks).subarray(0, MAX_BYTES);
+      const pcm = Buffer.concat(chunks, size);
+      for (const c of chunks) c.fill(0);
       chunks = [];
       size = 0;
       return pcm;
@@ -125,6 +131,59 @@ export function alsaRecorder(o = {}) {
       child = null;
     },
   };
+}
+
+/**
+ * Long audio in pieces of at most maxSeconds, each cut at the quietest moment in the last searchSeconds
+ * before its limit, so a word is rarely split (D470). The pieces are views of pcm, not copies, and joined
+ * back they are pcm exactly.
+ * @param {Buffer} pcm  16-bit mono at RATE
+ * @param {number} maxSeconds
+ * @param {number} [searchSeconds]
+ * @returns {Buffer[]}
+ */
+export function splitPcm(pcm, maxSeconds, searchSeconds = Math.min(10, maxSeconds / 3)) {
+  const total = Math.floor(pcm.length / 2);
+  const max = Math.floor(maxSeconds * RATE);
+  const search = Math.floor(searchSeconds * RATE);
+  const frame = RATE / 50; // 20 ms
+  /** @type {Buffer[]} */
+  const out = [];
+  let at = 0;
+  while (total - at > max) {
+    let best = at + max;
+    let bestEnergy = Infinity;
+    for (let f = at + max - frame; f >= at + max - search; f -= frame) {
+      let e = 0;
+      for (let i = f; i < f + frame; i++) e += Math.abs(pcm.readInt16LE(i * 2));
+      if (e < bestEnergy) {
+        bestEnergy = e;
+        best = f + frame / 2;
+      }
+    }
+    out.push(pcm.subarray(at * 2, best * 2));
+    at = best;
+  }
+  out.push(pcm.subarray(at * 2, total * 2));
+  return out;
+}
+
+/** How many pieces an engine's split makes of this audio, for the log. @param {string} name @param {Buffer} pcm */
+const pieces = (name, pcm) => Math.ceil(pcm.length / 2 / RATE / (name === "groq" ? GROQ_CHUNK_SECONDS : MOONSHINE_CHUNK_SECONDS) - 1e-9) || 1;
+
+/** Each piece, at most `parallel` at a time, the texts joined in order. @param {Buffer[]} pieces @param {number} parallel @param {(p: Buffer) => Promise<string>} fn */
+async function eachPiece(pieces, parallel, fn) {
+  /** @type {string[]} */
+  const texts = new Array(pieces.length).fill("");
+  let next = 0;
+  const worker = async () => {
+    while (next < pieces.length) {
+      const i = next++;
+      texts[i] = (await fn(pieces[i])).trim();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(parallel, pieces.length) }, worker));
+  return texts.filter(Boolean).join(" ");
 }
 
 /**
@@ -212,8 +271,8 @@ export function moonshineEngine(o) {
       return ready;
     },
     transcribe(pcm) {
-      // One clip at a time, in order: the helper answers in the order it's asked.
-      const r = queue.then(() => once(pcm));
+      // One clip at a time, in order: the helper answers in the order it's asked. A long one goes in 30 s pieces (D470).
+      const r = queue.then(() => eachPiece(splitPcm(pcm, MOONSHINE_CHUNK_SECONDS), 1, once));
       queue = r.then(
         () => {},
         () => {},
@@ -290,25 +349,30 @@ export function groqEngine(o) {
   const f = o.fetchFn ?? fetch;
   return {
     name: "groq",
-    async transcribe(pcm) {
-      const form = new FormData();
-      form.append("file", new Blob([wavOf(pcm)], { type: "audio/wav" }), "speech.wav");
-      form.append("model", GROQ_MODEL);
-      form.append("language", "en");
-      form.append("temperature", "0");
-      form.append("response_format", "json");
-      const res = await f(o.url ?? GROQ_URL, {
-        method: "POST",
-        headers: { authorization: `Bearer ${o.key}` },
-        body: form,
-        signal: AbortSignal.timeout(o.timeoutMs ?? groqTimeoutMs(pcm)),
-      });
-      // The status only: an error body could quote the request.
-      if (!res.ok) throw new Error(`Groq answered ${res.status}`);
-      const body = /** @type {any} */ (await res.json());
-      return String(body.text ?? "");
+    transcribe(pcm) {
+      // Long audio in pieces under Groq's 25 MB file limit, two at a time; any piece failing fails the lot (D470).
+      return eachPiece(splitPcm(pcm, GROQ_CHUNK_SECONDS), GROQ_PARALLEL, once);
     },
   };
+  /** @param {Buffer} pcm */
+  async function once(pcm) {
+    const form = new FormData();
+    form.append("file", new Blob([wavOf(pcm)], { type: "audio/wav" }), "speech.wav");
+    form.append("model", GROQ_MODEL);
+    form.append("language", "en");
+    form.append("temperature", "0");
+    form.append("response_format", "json");
+    const res = await f(o.url ?? GROQ_URL, {
+      method: "POST",
+      headers: { authorization: `Bearer ${o.key}` },
+      body: form,
+      signal: AbortSignal.timeout(o.timeoutMs ?? groqTimeoutMs(pcm)),
+    });
+    // The status only: an error body could quote the request.
+    if (!res.ok) throw new Error(`Groq answered ${res.status}`);
+    const body = /** @type {any} */ (await res.json());
+    return String(body.text ?? "");
+  }
 }
 
 /**
@@ -367,7 +431,7 @@ export function liveSpeech(o) {
           const t = now();
           try {
             const text = (await engine.transcribe(pcm)).trim();
-            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped });
+            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
             return { text };
           } catch (/** @type {any} */ e) {
             skipped.push(`${engine.name}: ${e.name === "TimeoutError" ? "timed out" : e.message}`);
