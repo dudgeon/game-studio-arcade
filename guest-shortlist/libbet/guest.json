@@ -1,0 +1,31 @@
+{
+  "id": "libbet",
+  "title": "Libbet and the Magic Floor",
+  "by": "Damian Yerrick",
+  "version": "0.08-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "retroarch",
+    "core": "gambatte"
+  },
+  "upstream": {
+    "source": "https://github.com/pinobatch/libbet",
+    "licence": "zlib",
+    "licence_source": "https://github.com/pinobatch/libbet README, \"Legal\": \"Copyright 2002, 2012 Martin Korth / Copyright 2018, 2024 Damian Yerrick. This program is free software. Permission is granted to use it subject to the terms of the zlib License.\"",
+    "file": {
+      "name": "libbet.gb",
+      "url": "https://github.com/pinobatch/libbet/releases/download/v0.08/libbet.gb",
+      "sha256": "3607412031c8287cf878299ce96e581e85b852dde703806343b95576fa3ff1a9"
+    }
+  },
+  "howToPlay": {
+    "goal": "Roll Libbet over the floor tiles until every one has been visited.",
+    "controls": [
+      "Stick: roll",
+      "A and stick: jump over a tile",
+      "START: start"
+    ]
+  }
+}

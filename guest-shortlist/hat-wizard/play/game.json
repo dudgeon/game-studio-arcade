@@ -1,0 +1,13 @@
+{
+  "id": "hat-wizard",
+  "core": "mgba",
+  "rom": "rom.bin",
+  "rom_name": "game.gba",
+  "keys": {
+    "a": "z",
+    "b": "x",
+    "l": "c",
+    "r": "v",
+    "start": "enter"
+  }
+}

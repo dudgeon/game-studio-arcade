@@ -2440,3 +2440,60 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
   - Every arcade result carries `cabinet` (for example "real: Real cabinet (Picade) (arcade.local)"), and an error names it too, so a wrong cabinet shows at once.
 - Checked with real Claude Code (`claude -p --plugin-dir`): the file was found from a subfolder with no variable set, and the variable still wins when it is set.
 - **For the director:** when starting a desk session for the Picade, write `real` into its folder's `.arcade-cabinet` first.
+
+## 2026-11-14 — Guest players: TIC-80, RetroArch homebrew, PICO-8 (D380–D387)
+
+The brief's locked "guest players TIC-80, PICO-8, RetroArch homebrew", built on D230–D236. The shortlist, licences and captures: [docs/guest-players.md](guest-players.md). Code: `scripts/guests/`, `guest-shortlist/`.
+
+**D380. Guest players come in as web players in the kiosk's Chromium, not as native programs.** *(Claude; applies D230, which already said so for TIC-80 and PICO-8, and extends it to RetroArch.)*
+- A game that needs a player is a guest folder like any other (D231). Its `play/` holds the player (JavaScript and WebAssembly), the game's own file, and a small page of ours that starts them. `guest.json` gains `player` (which player, and for RetroArch which core) and `upstream.file` (the cart or ROM: name, url, sha256).
+- **So nothing else changes:** the shelf row, how-to-play, Escape back to the shelf (D232), the play log, the smoke check (D312) and family rows all work as for teti. The launcher has no new code.
+- **Nothing is installed on a cabinet.** No apt packages, nothing on the boot partition, no second program on the screen. The director's brief expected an install step in the provisioning script; there isn't one, because the players arrive in the bundle, inside each guest's folder. The only provisioning change is one Chromium flag on the virtual profile (D383).
+- **Native RetroArch was the fallback and wasn't needed.** Debian trixie has `retroarch` 1.20.0 and the gambatte, nestopia and mgba cores for arm64. It would have added Qt5 and ffmpeg libraries, a second program to stack on the kiosk's screen, and its own Escape, logging and lock-down work.
+- **Pinned and reproducible:** `scripts/guests/players.lock.json` names each player's version, download and sha256. `node scripts/guests/build.mjs GUEST_DIR` builds `play/` and `NOTICE.md` from `guest.json`; the game's file must match its sha256. A test rebuilds two guests and compares every byte. The built folders are committed, so a cabinet never downloads anything.
+
+**D381. TIC-80 carts play in TIC-80 1.4.1's own web player.** *(Claude.)*
+- The player is the per-language export player from TIC-80's release (`tic80-v1.4-players.tar.gz`, MIT): `tic80.js` and one `.wasm` for the cart's language, about 1.5 to 2.2 MB. `guest.json`'s `player.script` names the language (`lua`, `moon`, …). The cart is served unchanged as `play/cart.tic`.
+- **Keys (D82):** TIC-80 reads the arrows and Z, X, A, S as the stick and A, B, X, Y. The cabinet sends Z X C V, so the page passes the arrows, Z and X, sends C and V on as A and S, and drops every other key. Nothing on the cabinet can open TIC-80's menu or console. START does nothing in a TIC-80 cart. Escape is the cabinet's (D232).
+- **Carts say "press Z"** where they mean A. The how-to-play screen gives the cabinet's names; the carts aren't changed.
+
+**D382. Homebrew ROMs play in RetroArch 1.22.2's web build.** *(Claude.)*
+- From libretro's own stable build (`buildbot.libretro.com/stable/1.22.2/emscripten/RetroArch.7z`, 749 MB, kept only in the mini's cache). A guest takes one core's two files, 3 to 4.5 MB: **gambatte** (Game Boy, Game Boy Color; GPL-2.0), **nestopia** (NES; GPL-2.0), **mgba** (Game Boy Advance; MPL-2.0). RetroArch itself is GPL-3.0. Each core's sha256 is in the lock.
+- RetroArch's own web page, menus and asset bundle aren't used. Our page (`scripts/guests/retroarch/`) writes a small config and the ROM into the player's memory and starts the game directly.
+- **Keys (D82):** A and B are Z and X; START is Enter. The cabinet has no SELECT, so on the two-button systems (GB, GBC, NES) X is SELECT. On GBA, X and Y are L and R, and SELECT is unset unless `guest.json`'s `player.keys` sets it for that game.
+- **Locked down:** every RetroArch hotkey is unbound (menu, pause, save states, fast-forward, reset), and only the stick, Z X C V and Enter reach it at all.
+- **Picture:** whole-number scaling, no smoothing. A Game Boy game is 800×720 of the 1024×768.
+- **Battery saves** are kept in the page's own storage every 5 seconds and put back at the next play, per guest. Not tested with a game that saves.
+- **A fix it needed:** RetroArch asks the browser to keep the screen awake and doesn't catch the refusal, which counted as a page error. The page answers the request itself.
+
+**D383. Software WebGL where there's no GPU, and the smoke check now requires a player's guest to draw.** *(Claude; the director's order of 2026-11-14.)*
+- **The finding:** both players draw with WebGL 2. The virtual cabinet's kiosk runs with `--disable-gpu`, where Chromium 156 has no WebGL at all. TIC-80 then shows a black screen and throws nothing, so the smoke check passed a game that couldn't be seen.
+- **Virtual profile only:** `kiosk_env` adds `--enable-unsafe-swiftshader`, Chromium's software WebGL. The Picade's profile is unchanged: it has a real GPU. Whether WebGL 2 works in the Picade's kiosk is unproven until bring-up; if it doesn't, the same flag is the fallback there.
+- **The gate's own Chromium** (headless, on every cabinet) gets the same flag, so its answer doesn't depend on the cabinet's GPU. It also gets the kiosk's `--autoplay-policy=no-user-gesture-required`: without it RetroArch kept asking to start its sound, and the ask left hanging when the check closed the page failed one game in eight.
+- **The new check, `draws`:** for a guest whose `guest.json` has `player`, the screen after the watch must not be one flat colour ("its player didn't start"). A plain web game isn't asked (D312 unchanged for teti).
+- **Tests:** `gate.test.js` (a real TIC-80 guest passes, a flat one fails, a plain flat page isn't asked) and `players.browser.test.js` (D387).
+
+**D384. Proven in a throwaway VM with the virtual cabinet's kiosk settings.** *(Claude, 2026-11-14.)*
+- The rehearsal VM (`scripts/cabinet-card/rehearse.mjs`, the Picade's card image) with its kiosk set to the virtual profile's: headless, pixman, `--disable-gpu` and the new flag.
+- All eight candidates passed the gate there in Debian's Chromium 156, 5.4 to 6 s each, with `draws`.
+- Grow Quickly (TIC-80) and Tobu Tobu Girl Deluxe (RetroArch, gambatte) were played from the shelf with the VM's keyboard: how-to-play, the game, buttons, Escape, the post-game board, back to the shelf. Both plays are in `logs/guest_play.jsonl`. Captures: `docs/guests/vm-*.png`.
+- **Not proven:** sound (the VM has none), the frame rate under software WebGL (not measured), the live virtual cabinet (needs the director's turn), and the Picade.
+
+**D385. The shortlist lives in `guest-shortlist/`, off the shelf and out of the bundle, until Geoff picks.** *(Claude; the day-one shelf is Geoff's call.)*
+- Eight candidates, built and licence-checked: four TIC-80 carts and four homebrew ROMs across all three cores. Each has `guest.json`, `play/`, `NOTICE.md` and, where the author's repo has one, the licence text.
+- A pick is one move: `git mv guest-shortlist/ID guests/ID`. The service doesn't read `guest-shortlist/`, and a cabinet's bundle doesn't carry it (26 MB for all eight). A test checks a game is never in both places.
+- **Licences:** every candidate is under a licence that allows redistribution, read from the author's own repo, cart, manual or itch page, and quoted in its `guest.json`. Non-commercial licences were left out. What each licence asks for (credit, a link to the source) is in its `NOTICE.md`.
+
+**D386. PICO-8: carts come in as PICO-8's own web export, made on the mini with Geoff's copy. Nothing of PICO-8's goes on a cabinet's system or in git as a program.** *(Claude; designed, not run: no PICO-8 was on the mini.)*
+- **Why an export:** PICO-8's exporter turns a cart into a web player (`game.js`). Its manual: "You are free to distribute and use exported cartridges and data as you please, provided that you have permission from the cartridge author and contributors." The headless switch is `-export`. So a PICO-8 guest is a web guest like the others (D380), and the PICO-8 program itself stays on the mini.
+- **What Geoff provides:** the **macOS** download from his Lexaloffle account, unzipped so that `~/game-studio-data/pico8/PICO-8.app` exists. The exporter runs on the mini, so the Raspberry Pi build isn't needed. The folder is outside the repo; a test checks no PICO-8 program file is tracked.
+- **Switches on by itself:** `build.mjs` with `"player": { "name": "pico8" }` looks for that app (or `PICO8`). Without it, it stops and says what to put where.
+- **Keys (D82):** PICO-8 already reads Z and C as O and X and V as X, so A and X are O, B and Y are X. START (Enter) opens PICO-8's own pause menu. Other keys are dropped.
+- **Carts:** a cart's licence is its author's. The BBS marks carts whose authors chose CC BY-NC-SA 4.0; that one is non-commercial, so it's for Geoff to accept for home use, per cart. A cart with no licence isn't redistributable.
+- **Open, for the director and Geoff:** whether an exported `game.js` (the cart plus PICO-8's web player) may be committed to this repo like other guests, as Lexaloffle's terms allow, or must stay in the mini's data and reach a cabinet's `<data>/guests/` another way. Committing is the simple route and is what the tool does now.
+- **Not run:** the export command, and `scripts/guests/pico8/index.html`, which was written from PICO-8's export template from memory. The first real export has to be checked in a browser before any PICO-8 guest ships.
+
+**D387. What's tested, and what isn't.** *(Claude.)*
+- `cabinet/service/test/players.browser.test.js`, real service and headless Chromium: a TIC-80 cart is on the shelf, draws, each of the stick's directions and Z X C V lights its own button, A, S, F1, Enter and backquote do nothing, Escape goes back and the play is logged. A homebrew ROM in RetroArch draws, ignores F1 and P, takes START, and Escape goes back with the play logged.
+- `scripts/guests/test/guests.test.mjs`: the lock, the key maps, every candidate's licence fields and file hashes, the rebuild, a wrong file refused, PICO-8's message.
+- **Not tested:** any game played through; sound; saves; two-player carts (all candidates are one player).

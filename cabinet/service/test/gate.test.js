@@ -377,6 +377,38 @@ test("real Chromium: a downloaded game is on the shelf once its smoke check pass
   }
 });
 
+test("real Chromium: a guest played by a player must draw: a real TIC-80 cart passes, a flat screen doesn't (D381)", { skip: noChromium, timeout: 120000 }, async () => {
+  const root = tmp();
+  // A shortlisted TIC-80 guest as it is: its player needs WebGL, which the gate's Chromium draws in software.
+  fs.cpSync(path.resolve(import.meta.dirname, "../../../guest-shortlist/grow-quickly"), path.join(root, "grow-quickly"), { recursive: true });
+  // A player that never starts: nothing thrown, nothing drawn.
+  fs.mkdirSync(path.join(root, "flat", "play"), { recursive: true });
+  fs.writeFileSync(path.join(root, "flat", "guest.json"), JSON.stringify({ id: "flat", title: "flat", version: "1", kind: "web", entry: "index.html", player: { name: "tic80" } }));
+  fs.writeFileSync(path.join(root, "flat", "play", "index.html"), "<!doctype html><title>flat</title><style>html,body{margin:0;height:100%;background:#000}</style><canvas></canvas>");
+  // The same flat page with no player: a plain web game isn't asked to draw (D312 as it was).
+  fs.mkdirSync(path.join(root, "plain", "play"), { recursive: true });
+  fs.writeFileSync(path.join(root, "plain", "guest.json"), JSON.stringify({ id: "plain", title: "plain", version: "1", kind: "web", entry: "index.html" }));
+  fs.copyFileSync(path.join(root, "flat", "play", "index.html"), path.join(root, "plain", "play", "index.html"));
+  const logs = tmp();
+  const gate = createGate({ settings: { ...realSettings(), watchMs: 4000 }, playing: () => false, logsDir: logs });
+  /** @type {any} */
+  let guests;
+  const checks = guestGate({ file: path.join(tmp(), "gate.json"), gate, urlOf: (id, meta) => `http://127.0.0.1:${guests.port}/${id}/${meta.entry}` });
+  guests = createGuests({ dirs: [root], logsDir: logs, admit: (id, meta) => checks.admitted(id, meta) });
+  const server = await startGuestServer(guests, { port: 0 });
+  guests.port = server.port;
+  try {
+    guests.list("");
+    while (checks.pending()) await sleep(100);
+    assert.deepEqual(guests.list("").map((/** @type {any} */ g) => g.id), ["grow-quickly", "plain"]);
+    const flat = checks.result("flat", { version: "1" });
+    assert.equal(flat?.failing[0].id, "draws");
+    assert.match(flat?.failing[0].reason ?? "", /one flat colour/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("no gate (development): every guest is on the shelf", () => {
   const checks = guestGate({ file: path.join(tmp(), "g.json"), gate: null, urlOf: () => null });
   assert.equal(checks.admitted("teti", { version: "1" }), true);

@@ -14,6 +14,7 @@ const { values: v } = parseArgs({
   options: {
     cart: { type: "string" },
     guest: { type: "string" },
+    draws: { type: "boolean" }, // with --guest: the page must also draw something (a guest played by a player, D381)
     chromium: { type: "string" },
     "budget-ms": { type: "string" },
     "watch-ms": { type: "string" },
@@ -57,7 +58,7 @@ try {
     }
     done({ kind: "cart", driver: report.driver, fallback, seconds: seconds(), report });
   } else if (v.guest) {
-    done({ kind: "guest", ...(await smoke(v.guest, v.chromium || null, Number(v["watch-ms"] ?? 5000))), seconds: seconds() });
+    done({ kind: "guest", ...(await smoke(v.guest, v.chromium || null, Number(v["watch-ms"] ?? 5000), Boolean(v.draws))), seconds: seconds() });
   } else {
     done({ error: "gate-run.js --cart DIR or --guest URL" }, 2);
   }
@@ -68,9 +69,11 @@ try {
 /**
  * A downloaded game's smoke check (D310): it loads, it throws nothing, and it asks
  * for nothing beyond its own origin.
- * @param {string} url @param {string | null} executable @param {number} watchMs
+ * A guest played by a player (TIC-80, RetroArch: D381) must also draw: a player that can't
+ * start shows one flat colour and throws nothing.
+ * @param {string} url @param {string | null} executable @param {number} watchMs @param {boolean} [draws]
  */
-async function smoke(url, executable, watchMs) {
+async function smoke(url, executable, watchMs, draws = false) {
   const origin = new URL(url).origin;
   const chrome = await launchChromium({ executable });
   /** @type {string[]} */
@@ -98,15 +101,44 @@ async function smoke(url, executable, watchMs) {
     }
     // A game's first seconds: most fail at once, or fetch what they need as they start.
     if (!loadFailed) await new Promise((r) => setTimeout(r, watchMs));
+    /** How many colours are on the screen; null if that wasn't asked or couldn't be seen. @type {number | null} */
+    let colours = null;
+    if (draws && !loadFailed) colours = await coloursOnScreen(page).catch(() => null);
     await page.close();
     /** @type {{ id: string, passed: boolean, reason: string | null }[]} */
     const checks = [
       { id: "loads", passed: !loadFailed, reason: loadFailed },
       { id: "no-errors", passed: errors.length === 0, reason: errors.length ? `${errors.length} error${errors.length === 1 ? "" : "s"}; the first: ${errors[0]}` : null },
       { id: "no-network", passed: outside.length === 0, reason: outside.length ? `it asked for ${outside.length} thing${outside.length === 1 ? "" : "s"} off the cabinet; the first: ${outside[0]}` : null },
+      ...(draws && !loadFailed ? [{ id: "draws", passed: colours !== 1, reason: colours === 1 ? `the screen was one flat colour after ${watchMs / 1000} s: its player didn't start` : null }] : []),
     ];
     return { ok: checks.every((c) => c.passed), checks, browser: chrome.product };
   } finally {
     await chrome.close();
   }
+}
+
+/**
+ * The colours in the page's picture, sampled 64 by 48. The page decodes its own screenshot,
+ * so nothing here needs a PNG reader.
+ * @param {{ screenshot: () => Promise<string>, evaluate: (e: string) => Promise<any> }} page
+ * @returns {Promise<number>}
+ */
+async function coloursOnScreen(page) {
+  const png = await page.screenshot();
+  return page.evaluate(`(async () => {
+    const i = new Image();
+    i.src = "data:image/png;base64,${png}";
+    await i.decode();
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 48;
+    const x = c.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    x.drawImage(i, 0, 0, 64, 48);
+    const d = x.getImageData(0, 0, 64, 48).data;
+    const seen = new Set();
+    for (let k = 0; k < d.length; k += 4) seen.add((d[k] << 16) | (d[k + 1] << 8) | d[k + 2]);
+    return seen.size;
+  })()`);
 }

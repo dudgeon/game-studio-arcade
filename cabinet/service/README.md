@@ -131,6 +131,8 @@ Downloaded web games sit on the shelf after the carts. Each is a folder in the r
 
 A version of a guest is its own folder whose `guest.json` names its `maker`, `parent` and `family`; the shelf indents it under the original (D234). `guests/teti-geoff` is Geoff's teti that keeps score. A guest reports a round's score by posting `{gsa: "score", n}` to the launcher; the play log keeps it, and G6 shows the score and the best (D235). A grown-up maker is added only by `node scripts/maker.mjs add-grown-up NAME` on the mini (token-gated, like coin.mjs); the service never writes `makers.json` itself, and the kids' who's-making list leaves grown-ups out (D236).
 
+**Guests that need a player (D380–D387):** a TIC-80 cart or a homebrew ROM is a guest folder too. Its `play/` holds TIC-80's web player or RetroArch's web build with one core, the game's file, and a page that starts it with the cabinet's keys. `guest.json`'s `player` says which. `node scripts/guests/build.mjs GUEST_DIR` builds the folder from pinned downloads (`scripts/guests/players.lock.json`). Candidates wait in `guest-shortlist/` until Geoff picks; see [docs/guest-players.md](../../docs/guest-players.md). The smoke check also requires such a guest to draw something (D383). Tests: `test/players.browser.test.js`, `scripts/guests/test/guests.test.mjs`.
+
 ## The publish gate (D310-D313)
 
 Before a made game goes on the shelf, the cabinet re-tests it itself (`src/gate.js`, `bin/gate-run.js`). It runs the spec's auto rules and the generic checks in the cabinet's own Chromium, through the playtest harness's pipe driver (no Playwright). Each run is its own process under `nice -n 19`, one at a time. A test waits while a game is being played (the launcher's `/api/arcade/playing` heartbeat), and one already running when a play starts is stopped and run again afterwards.
@@ -169,7 +171,7 @@ A grown-up takes a game, with every version of it, off the kids' shelf, or a mak
 
 - **Speech:** a stub fed text or a WAV with a transcript beside it (`src/speech.js`, D184). Real speech is Phase 3. New names are typed. The Picade has no keyboard, so speech must land before kids use it there.
 - **Never run against the real API.** The API path is the CLI's `sdkApi`, unchanged, with the key from the config. It's tested on replays only, including archiving a session (D188) and re-attaching to one after a restart (D191), written from the docs and SDK types.
-- **Not built:** launcher sound, gamepads in the launcher's menus, native guest players (RetroArch, PICO-8), `studio fork` on the desktop CLI.
+- **Not built:** launcher sound, gamepads in the launcher's menus, a PICO-8 guest (designed, waiting for Geoff's PICO-8: D386), `studio fork` on the desktop CLI.
 - **Score and best on G4:** not shown. A game's saves live inside its own sandboxed frame, and nothing reads them out yet.
 - **The workspace limit's refusal (L5)** is recognised by a guessed error wording; no limit has been hit to check it against.
 

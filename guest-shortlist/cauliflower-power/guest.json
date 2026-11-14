@@ -1,0 +1,33 @@
+{
+  "id": "cauliflower-power",
+  "title": "Cauliflower Power",
+  "by": "Librorumque",
+  "version": "2018-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "tic80",
+    "script": "lua"
+  },
+  "upstream": {
+    "source": "https://tic80.com/dev/lrq64/cauliflower_power",
+    "licence": "MIT",
+    "licence_source": "the cart's own code starts with the full MIT licence text: \"MIT LICENSE / Copyright © 2018 Librorumque\". A solo Ludum Dare 41 compo entry.",
+    "licence_note": "The whole licence text is inside the cart.",
+    "file": {
+      "name": "cauliflower_power.tic",
+      "url": "https://tic80.com/cart/74d69f265855b2a8c38ad45116bf48d7/cauliflower_power.tic",
+      "sha256": "6aac1e7ce627cf6c239f653d69e5f49edb04c39f8acd2ab12b72f9c0cb0fb52b"
+    }
+  },
+  "howToPlay": {
+    "goal": "Push the buckets onto the marked spots. Don't let the guards see you.",
+    "controls": [
+      "Stick: move and push",
+      "A: show where the guards can see",
+      "B: start the level again",
+      "X: next message"
+    ]
+  }
+}

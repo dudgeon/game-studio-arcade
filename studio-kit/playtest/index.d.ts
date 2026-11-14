@@ -115,6 +115,8 @@ export interface ChromiumPage {
   evaluate(expression: string): Promise<any>;
   goto(url: string, timeoutMs?: number): Promise<void>;
   waitFor(expression: string, timeoutMs?: number): Promise<void>;
+  /** The page as it looks now: a PNG, base64 (D383). */
+  screenshot(): Promise<string>;
   close(): Promise<void>;
 }
 /** A system Chromium: GSA_CHROMIUM, then the usual places, or null (D310). */

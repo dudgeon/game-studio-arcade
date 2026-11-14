@@ -41,6 +41,12 @@ const FLAGS = [
   "--metrics-recording-only",
   "--password-store=basic",
   "--use-mock-keychain",
+  // WebGL drawn in software, so a page that needs it (TIC-80's and RetroArch's web players, D381)
+  // is checked the same way on a cabinet with a GPU and on one without.
+  "--enable-unsafe-swiftshader",
+  // Sound may start without a button press, as in the kiosk (arcade-session). Without it a
+  // player keeps asking to start its sound, and the ask left hanging at close is a page error.
+  "--autoplay-policy=no-user-gesture-required",
 ];
 
 /**
@@ -218,6 +224,10 @@ export async function openPage(chrome, o = {}) {
         if (Date.now() > end) throw new HarnessError(`waited ${timeoutMs / 1000} s for ${expression}`);
         await new Promise((r) => setTimeout(r, 50));
       }
+    },
+    /** The page as it looks now: a PNG, base64. */
+    async screenshot() {
+      return String((await chrome.send("Page.captureScreenshot", { format: "png" }, sessionId)).data);
     },
     async close() {
       off();

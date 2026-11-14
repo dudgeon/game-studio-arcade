@@ -1,0 +1,33 @@
+{
+  "id": "8-bit-panda",
+  "title": "8 Bit Panda",
+  "by": "Bruno Oliveira",
+  "version": "2017-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "tic80",
+    "script": "lua"
+  },
+  "upstream": {
+    "source": "https://github.com/btco/panda",
+    "licence": "Apache-2.0",
+    "licence_source": "https://github.com/btco/panda/blob/master/README.md: \"This software is distributed under the Apache License, version 2.0.\" The art and music are the author's own, made in TIC-80 (same README).",
+    "licence_note": "Copyright (c) 2017 Bruno Oliveira. The licence text is in `LICENSE.txt`.",
+    "file": {
+      "name": "8_bit_panda.tic",
+      "url": "https://tic80.com/cart/b88b74e7a6f923251de764d89d6f3507/8_bit_panda.tic",
+      "sha256": "e0d94db2984675ed3669267db2e57b9d602a0a56a9d24fc1e9d9d6009aaeef53"
+    }
+  },
+  "howToPlay": {
+    "goal": "Run and jump through the islands. Bop the baddies and find the exit.",
+    "controls": [
+      "Stick: run",
+      "A: jump",
+      "B: attack, when you have a power-up",
+      "A starts the game"
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "grow-quickly",
+  "title": "Grow Quickly",
+  "by": "Cong",
+  "version": "2019-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "tic80",
+    "script": "lua"
+  },
+  "upstream": {
+    "source": "https://github.com/cxong/GrowQuickly",
+    "licence": "MIT",
+    "licence_source": "https://github.com/cxong/GrowQuickly/blob/master/LICENSE: \"MIT License / Copyright (c) 2019 Cong\"; the cart's header says \"license: MIT License\". Made for Ludum Dare 45.",
+    "licence_note": "The licence text is in `LICENSE.txt`.",
+    "file": {
+      "name": "grow_quickly.tic",
+      "url": "https://tic80.com/cart/c0d516a377ccdb26ac4b787832da57cb/grow_quickly.tic",
+      "sha256": "00f2a9c00c6894a12beac88da0857b33b5229acd6b2f385467e42497f9ddea74"
+    }
+  },
+  "howToPlay": {
+    "goal": "Water the plants, pick the fruit, shoo the crows.",
+    "controls": [
+      "Stick: move",
+      "A: water, pick or shoo",
+      "A starts the game"
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "dunkman",
+  "title": "Dunkman",
+  "by": "Cong",
+  "version": "2020-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "tic80",
+    "script": "moon"
+  },
+  "upstream": {
+    "source": "https://github.com/cxong/Dunkman",
+    "licence": "MIT",
+    "licence_source": "https://github.com/cxong/Dunkman/blob/master/LICENSE: \"MIT License / Copyright (c) 2020 Cong\"; the cart's header says \"license: MIT License\". A Ludum Dare 46 compo entry.",
+    "licence_note": "The licence text is in `LICENSE.txt`.",
+    "file": {
+      "name": "dunkman.tic",
+      "url": "https://tic80.com/cart/f92628f40b881fe353b2f4aab258ab9b/dunkman.tic",
+      "sha256": "11d3104f8cad190759179d50d15134cb1933c7bbbd66941728745b7918038229"
+    }
+  },
+  "howToPlay": {
+    "goal": "Get past the defenders and slam dunk.",
+    "controls": [
+      "Stick: move",
+      "A: jump and dunk",
+      "B: also jump"
+    ]
+  }
+}
