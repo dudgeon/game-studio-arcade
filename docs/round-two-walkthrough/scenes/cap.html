@@ -1,0 +1,29 @@
+<style>
+#talk { left: 24px; top: 64px; }
+#talk .mic { top: 44px; transition: background-color .4s, box-shadow .4s; }
+#talk #msg { left: 0; right: 0; top: 108px; text-align: center; color: #ffcd75; }
+#talk #tbar { top: 150px; }
+#talk #tnum { right: 8px; top: 164px; color: #94b0c2; }
+#talk #stopmsg { left: 8px; right: 8px; top: 186px; text-align: center; color: #ef7d57; }
+[data-state~="run"] #tbar u { width: 100%; }
+[data-state~="end"] #tbar u { background: #ef7d57; }
+[data-state~="end"] #talk .mic { background: #566c86; box-shadow: 0 0 0 4px #333c57; }
+#cap-h { left: 24px; top: 20px; }
+#now { left: 376px; top: 70px; width: 240px; }
+#c60 { left: 376px; top: 170px; } #c120 { left: 376px; top: 214px; } #c300 { left: 376px; top: 258px; }
+#cost { left: 376px; top: 318px; }
+</style>
+<div class="h" id="cap-h">How long can a kid talk?</div>
+<div class="cab" id="talk" data-f>
+  <div class="hd">Tell me your game idea</div>
+  <div class="mic"></div>
+  <div id="msg">Listening... let go when you're done</div>
+  <div class="bar" id="tbar" data-in="fade"><u></u></div>
+  <div id="tnum" data-in="fade">2:00</div>
+  <div id="stopmsg" data-in="fade">That's as long as I can listen.</div>
+</div>
+<div class="card" id="now" data-in="left" data-f><div class="lab">Today</div><div class="t">30 seconds, then it stops, with no sign</div></div>
+<div class="chip" id="c60" data-in="left" data-f>1 minute</div>
+<div class="chip" id="c120" data-in="left" data-f>2 minutes</div>
+<div class="chip" id="c300" data-in="left" data-f>5 minutes</div>
+<div class="s" id="cost" data-in="up">A full 2 minutes costs 0.13 cents to transcribe.</div>

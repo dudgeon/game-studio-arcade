@@ -1,0 +1,38 @@
+<style>
+#mo-h { left: 24px; top: 20px; }
+#mo-s { left: 24px; top: 52px; }
+.bl { left: 24px; width: 196px; text-align: right; font-size: 14px; line-height: 18px; color: #1f2328; white-space: nowrap; }
+.bb { left: 230px; height: 16px; border-radius: 3px; background: #1f2328; }
+.bv { font: 13px/16px ui-monospace, "SF Mono", Menlo, monospace; color: #5b636d; white-space: nowrap; }
+#budget { left: 590px; top: 82px; width: 0; height: 190px; border-left: 2px dashed #c2410c; }
+#budlab { left: 396px; top: 276px; color: #c2410c; font-weight: 600; font-size: 13px; white-space: nowrap; }
+#today { left: 24px; top: 306px; } #why2 { left: 24px; top: 348px; }
+#oA { left: 24px; top: 306px; } #oB { left: 24px; top: 348px; } #oC { left: 190px; top: 348px; }
+#m1 { left: 24px; top: 84px; } #m2 { left: 24px; top: 124px; } #m3 { left: 24px; top: 164px; } #m4 { left: 24px; top: 204px; } #m5 { left: 24px; top: 244px; }
+#demo { left: 404px; top: 84px; width: 176px; height: 132px; border-width: 4px; }
+#demo #sky { left: 0; top: 0; right: 0; height: 52px; background: #41a6f6; }
+#demo #floor { left: -90px; right: -90px; top: 52px; bottom: -40px; background: repeating-linear-gradient(90deg, #38b764 0 22px, #257179 22px 44px); transform: perspective(120px) rotateX(58deg); transform-origin: 50% 0; animation: road 1.2s linear infinite; }
+@keyframes road { from { background-position-x: 0; } to { background-position-x: 44px; } }
+#demo #car { left: 76px; top: 92px; width: 24px; height: 16px; background: #b13e53; border-radius: 2px; box-shadow: 0 4px 0 #1a1c2c; animation: sway 1.6s ease-in-out infinite alternate; }
+@keyframes sway { from { transform: translateX(-26px) rotate(-6deg); } to { transform: translateX(26px) rotate(6deg); } }
+</style>
+<div class="h" id="mo-h">What the Pi 5 can draw</div>
+<div class="s" id="mo-s" data-in="fade">Measured on the Picade. Time to draw one frame (95th percentile).</div>
+<div class="chip" id="m1" data-in="right" data-f>Easing: nothing starts or stops instantly</div>
+<div class="chip" id="m2" data-in="right" data-f>Gravity, bounce, friction</div>
+<div class="chip" id="m3" data-in="right" data-f>A camera that follows, and shakes on a hit</div>
+<div class="chip" id="m4" data-in="right" data-f>Parallax layers and particles</div>
+<div class="chip" id="m5" data-in="right" data-f>Depth: floor, maze, stacked sprites</div>
+<div class="bl" data-in="fade" style="top:90px">A game on the shelf today</div><div class="bb" id="b0" style="top:90px;width:130px;background:#8b939c" data-in="grow" data-f></div><div class="bv" style="left:368px;top:90px" id="v0" data-in="fade">6 ms</div>
+<div class="bl" data-in="fade" style="top:122px">1,000 sprites</div><div class="bb" id="b1" style="top:122px;width:13px" data-in="grow" data-f></div><div class="bv" style="left:250px;top:122px" id="v1" data-in="fade">0.6 ms</div>
+<div class="bl" data-in="fade" style="top:154px">A perspective floor</div><div class="bb" id="b2" style="top:154px;width:11px" data-in="grow" data-f></div><div class="bv" style="left:248px;top:154px" id="v2" data-in="fade">0.5 ms</div>
+<div class="bl" data-in="fade" style="top:186px">A first-person maze</div><div class="bb" id="b3" style="top:186px;width:32px" data-in="grow" data-f></div><div class="bv" style="left:270px;top:186px" id="v3" data-in="fade">1.5 ms</div>
+<div class="bl" data-in="fade" style="top:218px">40 stacked 3D objects</div><div class="bb" id="b4" style="top:218px;width:86px" data-in="grow" data-f></div><div class="bv" style="left:324px;top:218px" id="v4" data-in="fade">4.0 ms</div>
+<div class="bl" data-in="fade" style="top:250px">1,500 triangles</div><div class="bb" id="b5" style="top:250px;width:121px" data-in="grow" data-f></div><div class="bv" style="left:358px;top:250px" id="v5" data-in="fade">5.6 ms</div>
+<div id="budget" data-in="fade"></div><div id="budlab" data-in="fade">16.7 ms: one frame at 60 a second</div>
+<div class="cab" id="demo" data-in="scale" data-f><div id="sky"></div><div id="floor"></div><div id="car"></div></div>
+<div class="chip bad" id="today" data-in="up" data-f>Today: things move a fixed step a frame</div>
+<div class="chip" id="why2" data-in="up" data-f>The library has nothing for movement</div>
+<div class="chip good" id="oA" data-in="up" data-f>Motion kit + 2.5D, in software</div>
+<div class="chip" id="oB" data-in="up" data-f>+ sub-pixel glide</div>
+<div class="chip" id="oC" data-in="up" data-f>+ WebGL 3D</div>

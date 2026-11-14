@@ -1,0 +1,18 @@
+<style>
+#or-h { left: 24px; top: 20px; }
+.step { left: 24px; width: 592px; height: 38px; display: flex; align-items: center; gap: 12px; padding: 0 12px; transition: top .8s cubic-bezier(.45,0,.2,1), opacity .45s, box-shadow .45s; }
+.step .n { font: 600 15px/20px ui-monospace, "SF Mono", Menlo, monospace; width: 18px; }
+.step .w { flex: 1; font-size: 15px; white-space: nowrap; }
+.step .z { font-size: 13px; color: #5b636d; white-space: nowrap; }
+#s1 { top: 66px; } #s2 { top: 110px; } #s3 { top: 154px; } #s4 { top: 198px; } #s5 { top: 242px; } #s6 { top: 286px; } #s7 { top: 330px; }
+[data-state~="aifirst"] #s7 { top: 198px; } [data-state~="aifirst"] #s4 { top: 242px; } [data-state~="aifirst"] #s5 { top: 286px; } [data-state~="aifirst"] #s6 { top: 330px; }
+[data-state~="motionfirst"] #s4 { top: 66px; } [data-state~="motionfirst"] #s6 { top: 110px; } [data-state~="motionfirst"] #s1 { top: 154px; } [data-state~="motionfirst"] #s2 { top: 198px; } [data-state~="motionfirst"] #s3 { top: 242px; } [data-state~="motionfirst"] #s5 { top: 286px; }
+</style>
+<div class="h" id="or-h">The order of work</div>
+<div class="card step" id="s1" data-in="up" data-f><span class="w">Speech: 2 minutes, the timer, "I stopped listening"</span><span class="z">1 session</span></div>
+<div class="card step" id="s2" data-in="up" data-f><span class="w">Pages on the review</span><span class="z">1 session</span></div>
+<div class="card step" id="s3" data-in="up" data-f><span class="w">Version names</span><span class="z">1 to 2 sessions</span></div>
+<div class="card step" id="s4" data-in="up" data-f><span class="w">Motion kit and a scrolling template</span><span class="z">2 to 3 sessions</span></div>
+<div class="card step" id="s5" data-in="up" data-f><span class="w">Live words while talking</span><span class="z">2 sessions</span></div>
+<div class="card step" id="s6" data-in="up" data-f><span class="w">2.5D: floor, maze, stacking</span><span class="z">2 to 3 sessions</span></div>
+<div class="card step" id="s7" data-in="up" data-f><span class="w">AI in games</span><span class="z">3 to 4 sessions</span></div>
