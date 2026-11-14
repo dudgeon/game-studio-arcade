@@ -167,6 +167,34 @@ test("drive screenshot keeps the Picade's real grab: 1152x864 with a note, 1024x
   assert.equal(shot(text, "words.png").status, 1);
 });
 
+test("the Picade's kiosk asks for the panel's own 1024x768, on whichever screen is plugged in; the virtual cabinet's is unchanged (D419)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "arcade-session-"));
+  const log = path.join(dir, "calls");
+  // Stand-ins: wlr-randr lists the Picade's screen as the real one does, and records what it's asked; chromium just ends.
+  fs.writeFileSync(
+    path.join(dir, "wlr-randr"),
+    `#!/bin/bash\nif [ $# = 0 ]; then printf 'HDMI-A-1 "Pico Technology Inc. 0x0001 (HDMI-A-1)"\\n  Make: Pico Technology Inc.\\n  Modes:\\n    1152x864 px, 75.000000 Hz (current)\\n    1024x768 px, 60.004002 Hz\\n'; exit 0; fi\necho "$*" >> "${log}"\n[ -z "\${RANDR_FAILS:-}" ]\n`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(path.join(dir, "chromium"), `#!/bin/bash\necho chromium >> "${log}"\n`, { mode: 0o755 });
+  const session = (/** @type {string} */ envText, extra = {}) => {
+    fs.rmSync(log, { force: true });
+    const env = Object.fromEntries(envText.split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/arcade-session")], { encoding: "utf8", env: { PATH: `${dir}:/usr/bin:/bin`, ...env, ...extra } });
+    return { ...r, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n") : [] };
+  };
+  const profile = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `log() { :; }; . "${path.join(REPO, "cabinet/provision/profiles", name)}"; kiosk_env`], { encoding: "utf8" });
+  const picade = session(profile("picade.sh"));
+  assert.deepEqual(picade.calls, ["--output HDMI-A-1 --mode 1024x768", "chromium"]);
+  assert.match(picade.stdout, /HDMI-A-1 at 1024x768/);
+  // A mode the screen refuses doesn't stop the kiosk.
+  const refused = session(profile("picade.sh"), { RANDR_FAILS: "1" });
+  assert.deepEqual(refused.calls, ["--output HDMI-A-1 --mode 1024x768", "chromium"]);
+  assert.match(refused.stderr, /could not set HDMI-A-1 to 1024x768/);
+  const virtual = session(profile("virtual.sh"));
+  assert.deepEqual(virtual.calls, ["--output HEADLESS-1 --custom-mode 1024x768", "chromium"]);
+});
+
 /** A function of wifi.sh's, run in bash. */
 const fn = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `. "${WIFI_SH}"; ${name}`], { encoding: "utf8" });
 
