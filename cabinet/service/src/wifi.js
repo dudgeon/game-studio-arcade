@@ -252,8 +252,10 @@ export function createWifi(o = {}) {
     const here = parseScan(list.stdout).find((n) => n.inUse);
     s.ssid = here?.ssid ?? null;
     s.signal = here?.signal ?? null;
-    const ip = await nm(["-g", "IP4.ADDRESS", "device", "show", d.name]);
-    s.address = ip.stdout.split(/[\n|]/)[0]?.trim().replace(/\/\d+$/, "") || null;
+    // The lease's own address first: just after a change of network the device can still list the old network's
+    // address beside the new one for a moment (seen in the rehearsal, D418).
+    const ip = await nm(["-g", "DHCP4.OPTION,IP4.ADDRESS", "device", "show", d.name]);
+    s.address = /\bip_address = (\d+(?:\.\d+){3})/.exec(ip.stdout)?.[1] ?? /(\d+(?:\.\d+){3})\/\d+/.exec(ip.stdout)?.[1] ?? null;
     return s;
   };
 
