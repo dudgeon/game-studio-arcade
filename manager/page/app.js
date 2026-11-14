@@ -145,6 +145,7 @@ async function loadActivity() {
       ? a.screened.map((s) => `<div class="make"><div class="top"><span class="who">${esc(s.who)}</span><span class="hint">${when(s.at)}</span><span class="tag">${esc(s.verdict ?? s.log)}</span></div><div class="said">“${esc(s.said)}”</div>${s.offered ? `<div class="hint">Offered instead: ${esc(s.offered)}</div>` : ""}</div>`).join("")
       : "<p class=hint>None. (Screening's log appears here when the cabinet has one.)</p>";
     $("#gameai").innerHTML = gameAi(a.ai);
+    $("#gametalk").innerHTML = gameTalk(a.talk ?? []);
     $("#plays").innerHTML = `<tr><th>When</th><th>Game</th><th>Made by</th><th class=n>Seconds</th><th class=n>Score</th><th>Ended</th></tr>` +
       a.plays.slice(0, 100).map((p) => `<tr><td>${when(p.at)}</td><td>${esc(p.game)} <span class=hint>v${esc(p.version)}${p.guest ? " · guest" : ""}</span></td><td>${esc(p.made_by ?? "")}</td><td class=n>${esc(p.seconds)}</td><td class=n>${esc(p.score ?? "")}</td><td>${esc(p.ended ?? "")}${p.errors ? ` <span class=bad>${esc(p.errors)} errors</span>` : ""}</td></tr>`).join("");
   } catch (e) {
@@ -159,6 +160,16 @@ function gameAi(ai) {
   const trips = ai.trips.length ? `<p class=bad>The loop guard stopped a game ${ai.trips.length} time${ai.trips.length === 1 ? "" : "s"}: ${ai.trips.slice(-5).map((t) => `${esc(t.game)} (${when(t.at)})`).join(", ")}</p>` : "";
   if (!ai.games.length) return `${head}<p class=hint>No game has asked yet.</p>`;
   return `${head}${trips}<table><tr><th>Game</th><th class=n>Calls this month</th><th class=n>Cost this month</th><th class=n>Calls ever</th><th class=n>Cost ever</th><th>Last</th><th></th></tr>${ai.games.map((g) => `<tr><td>${esc(g.game)}</td><td class=n>${esc(g.month_calls)}</td><td class=n>${usd(g.month_cost_usd)}</td><td class=n>${esc(g.calls)}</td><td class=n>${usd(g.cost_usd)}</td><td>${when(g.last)}</td><td>${g.errors ? `<span class=hint>${esc(g.errors)} failed</span> ` : ""}${g.dropped ? `<span class=hint>${esc(g.dropped)} lines dropped</span> ` : ""}${g.trips ? `<span class=bad>guard ×${esc(g.trips)}</span>` : ""}</td></tr>`).join("")}</table>`;
+}
+// What was said into the mic during games (D489): every voice action and chat turn, newest first.
+const TALK_OUTCOME = { heard: "", none: "no action fitted", steered: "off-limits words: nothing sent on", held: "the reply was held back", flagged: "flagged: worth a look" };
+function gameTalk(rows) {
+  if (!rows.length) return "<p class=hint>Nothing yet. Every voice action and chat turn in a game shows here.</p>";
+  return rows.slice(0, 200).map((t) => {
+    const how = t.outcome?.startsWith("by_word") ? "matched by word, no model" : (TALK_OUTCOME[t.outcome] ?? t.outcome ?? "");
+    const loud = t.outcome === "steered" || t.outcome === "held" || t.outcome === "flagged";
+    return `<div class="make"><div class="top"><span class="who">${esc(t.game)}</span><span class="hint">v${esc(t.version)} · ${when(t.at)}</span><span class="tag">${esc(t.kind)}${t.ask ? `: ${esc(t.ask)}` : ""}</span>${how ? `<span class="${loud ? "bad" : "hint"}">${esc(how)}</span>` : ""}</div><div class="said">“${esc(t.said)}”</div>${t.reply ? `<div class="hint">The character said: ${esc(t.reply)}</div>` : ""}${t.action ? `<div class="hint">The game did: ${esc(t.action)}</div>` : ""}</div>`;
+  }).join("");
 }
 function make(m) {
   const ok = m.outcome === "committed";

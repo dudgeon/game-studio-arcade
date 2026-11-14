@@ -232,6 +232,18 @@ test("activity joins sessions, charges, plays and screened requests (D283)", () 
   assert.deepEqual(a.plays.map((p) => [p.game, p.guest, p.made_by]), [["rock", false, "tester"], ["teti", true, null]]);
   assert.deepEqual([a.screened[0].said, a.screened[0].verdict, a.screened[0].offered], ["something rude", "redirected", "something kind"]);
   assert.equal(a.coins[0].kind, "topup");
+  assert.deepEqual(a.talk, []);
+});
+
+test("activity lists what was said to games, newest first, and it isn't mixed into screened requests (D489)", () => {
+  const a = activity({
+    game_talk: [
+      { type: "game_talk", at: "2026-11-14T10:00:00Z", cart_id: "wizard-bridge", cart_version: 2, play_id: "pl_1", name: "spell", kind: "voice", said: "burn it", action: "fire", outcome: "heard" },
+      { type: "game_talk", at: "2026-11-14T10:01:00Z", cart_id: "wizard-bridge", cart_version: 2, play_id: "pl_1", name: "spell", kind: "voice", said: "something rude", action: null, outcome: "steered" },
+    ],
+  });
+  assert.deepEqual(a.talk.map((t) => [t.game, t.version, t.kind, t.ask, t.said, t.action, t.outcome]), [["wizard-bridge", 2, "voice", "spell", "something rude", null, "steered"], ["wizard-bridge", 2, "voice", "spell", "burn it", "fire", "heard"]]);
+  assert.deepEqual(a.screened, []);
 });
 
 test("key names map to Linux codes; unknown keys are refused", () => {

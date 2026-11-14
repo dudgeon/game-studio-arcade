@@ -16,6 +16,8 @@ export const AI_MIN_FALLBACK = 3;
 const LOW_WATER = 3;
 /** After a call that failed, wait this many frames before asking again (10 s). */
 const RETRY_FRAMES = 600;
+/** Buttons a game can make its talk button. Not the stick, and not start. */
+export const VOICE_BUTTONS = ["a", "b", "x", "y"];
 const NAME = /^[a-z][a-z0-9_]{0,23}$/;
 const PLAIN = /^[\x20-\x7e]+$/;
 
@@ -51,7 +53,7 @@ export function createAi(o) {
   };
   const get = (/** @type {string} */ fn, /** @type {unknown} */ name, /** @type {string} */ kind) => {
     const a = asks.get(/** @type {string} */ (name));
-    if (!a || a.kind !== kind) throw new Error(`g.ai.${fn}("${String(name)}") isn't declared: call g.ai.${kind === "lines" ? "lines" : "choice"}("${String(name)}", ...) in init first`);
+    if (!a || a.kind !== kind) throw new Error(`g.ai.${fn}("${String(name)}") isn't declared: call g.ai.${kind}("${String(name)}", ...) in init first`);
     return a;
   };
   /** One call in the air per ask, and a pause after one that failed. @param {any} a @param {Partial<AiAsk>} [extra] */
@@ -120,11 +122,37 @@ export function createAi(o) {
       send(a, { facts: clean });
       return out;
     },
+    // Voice actions (D489): the player holds this ask's button and talks; the cabinet hears, and hands
+    // back one of the game's own actions. The cart never gets the mic, the audio or the words.
+    voice(name, opts) {
+      declare("voice", name);
+      const ask = askText("voice", name, opts?.ask);
+      const actions = opts?.actions;
+      if (!Array.isArray(actions) || actions.length < 2 || actions.length > 8 || new Set(actions).size !== actions.length) throw new Error(`g.ai.voice("${name}") needs actions: 2 to 8 different words`);
+      for (const w of actions) if (!plainLine(w, 24) || w === "none") throw new Error(`g.ai.voice("${name}") actions are plain words of at most 24 characters, and not "none": ${JSON.stringify(w)}`);
+      const hold = opts?.hold;
+      if (!VOICE_BUTTONS.includes(hold)) throw new Error(`g.ai.voice("${name}") needs hold: the button to hold while talking (${VOICE_BUTTONS.join(", ")})`);
+      if ([...asks.values()].some((a) => a.kind === "voice" && a.hold === hold)) throw new Error(`g.ai.voice("${name}"): another voice ask already uses the ${hold} button`);
+      asks.set(name, { kind: "voice", name, ask, actions: [...actions], hold, heard: /** @type {string | null} */ (null) });
+    },
+    heard(name) {
+      const a = get("heard", name, "voice");
+      const out = a.heard;
+      a.heard = null;
+      return out;
+    },
   };
   Object.freeze(api);
 
   return {
     api,
+    /** The voice asks this cart declared, for a host that has a microphone (D489). */
+    voices: () => [...asks.values()].filter((a) => a.kind === "voice").map((a) => ({ name: a.name, ask: a.ask, actions: [...a.actions], hold: a.hold })),
+    /** What the cabinet heard for a voice ask: one of its actions, or nothing. @param {{ name?: unknown, action?: unknown }} v */
+    hear(v) {
+      const a = asks.get(/** @type {string} */ (v?.name));
+      if (a?.kind === "voice" && typeof v.action === "string" && a.actions.includes(v.action)) a.heard = v.action;
+    },
     /** Asks since the last call, for a host that can answer them. */
     drain() {
       const out = outbox;
@@ -134,7 +162,7 @@ export function createAi(o) {
     /** A host's answer. Anything that isn't what was asked for is dropped. @param {AiReply} r */
     deliver(r) {
       if (!r || typeof r !== "object") return;
-      const a = [...asks.values()].find((x) => x.waiting && x.waiting === r.id);
+      const a = [...asks.values()].find((x) => x.kind !== "voice" && x.waiting && x.waiting === r.id);
       if (!a) return;
       a.waiting = 0;
       if (a.kind === "lines") {

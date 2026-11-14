@@ -248,6 +248,10 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
     drainAi: () => ai.drain(),
     /** A host's answer to a g.ai ask. @param {import("./ai.js").AiReply} r */
     aiDeliver: (r) => ai.deliver(r),
+    /** The voice asks the cart declared (D489), and what the cabinet heard for one. */
+    aiVoices: () => ai.voices(),
+    /** @param {{ name?: unknown, action?: unknown }} v */
+    aiHear: (v) => ai.hear(v),
     /** Scores reported since the last call (D215). */
     drainScores() {
       const out = scoresOut;

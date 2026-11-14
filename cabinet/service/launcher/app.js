@@ -5,7 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
-import { gameAiFor } from "./game-ai.js";
+import { gameAiFor, voiceFor } from "./game-ai.js";
 import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows, guestsChecking } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
@@ -431,6 +431,7 @@ function startPlay(cart) {
     cartUrl: cart.url,
     players: config.players,
     ai: gameAiFor(cart.id, playId), // D480: g.ai asks go to the service; guests have none
+    voice: voiceFor(cart.id, playId, stage), // D489: the mic, while a game's talk button is held
     onStar: () => endPlay("star"),
     onError: () => {
       if (playing) playing.errors++;

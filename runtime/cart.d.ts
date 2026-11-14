@@ -124,6 +124,15 @@ declare namespace Arcade {
      * options (at most 8); the answer to them is used at the next `pick`.
      */
     pick(name: string, facts?: Record<string, number | boolean | string>): string;
+    /**
+     * Declare a voice ask, in `init` (D489): while the player holds `hold` (a, b, x or y) the cabinet
+     * listens, and it hands back the one of `actions` (2..8 of the game's own words) the player meant.
+     * The game never gets the microphone or the words. Give every action a button too: with no
+     * microphone, and in a playtest, nothing is ever heard.
+     */
+    voice(name: string, opts: { ask: string; actions: readonly string[]; hold: "a" | "b" | "x" | "y" }): void;
+    /** The action the cabinet heard for a voice ask since the last call, or null. Each is given once. */
+    heard(name: string): string | null;
   }
 
   /** The console handle passed to every cart function. */
