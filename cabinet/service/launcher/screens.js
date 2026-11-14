@@ -15,7 +15,7 @@ export const BODY_Y = HEADER_H + 4;
 export const HINT_Y = H - GLYPH_H - 2;
 export const TILE_GAP = 2;
 export const TILE_PAD = 3;
-const BADGE_W = 12;
+export const BADGE_W = 12;
 const BIG_ROWS = 3;
 
 const CHOOSE = "Stick to choose, any button to pick";

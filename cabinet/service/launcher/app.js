@@ -20,6 +20,7 @@ import {
   historyLines,
   howtoView,
   leaveView,
+  stopConfirmView,
   notYours,
   offlineMake,
   unconnectedMake,
@@ -777,10 +778,23 @@ function onBoard(v, action) {
     case "redirect-back":
       return v.onBack();
     case "stop":
+      // Are you sure? Keep going is lit, and it goes back to the question (E13, D315).
+      return showBoard(stopConfirmView({ usedCents: studio.used_cents ?? 0 }), ["stop-yes", "stop-keep"], { back: v.back, pendingId: v.pendingId });
+    case "stop-keep":
+      view = v.back;
+      armed = false;
+      return;
+    case "stop-yes":
       following = false;
       post("/api/studio/stop").catch(() => {});
       studio = { ...studio, phase: "idle", pending: null };
       return showShelf();
+    case "new-idea":
+      if (v.noticeId) {
+        post("/api/studio/notice-seen", { id: v.noticeId }).catch(() => {});
+        studio = { ...studio, notice: undefined };
+      }
+      return showWho();
   }
 }
 
@@ -827,7 +841,7 @@ function onBack() {
       showShelf(); // D187: the make carries on, and the shelf offers a way back.
       break;
     case "board":
-      if (v.board === "E8") {
+      if (v.board === "E8" || v.board === "E13") {
         view = v.back;
         break;
       }
@@ -838,6 +852,7 @@ function onBack() {
       }
       if (v.board === "B2" || v.board === "B3" || v.board === "B4") return void onBoard(v, v.actions?.[0]);
       if (v.board === "E10") return void v.onBack();
+      if (v.board === "E14") return void showShelf(); // the idea stays saved on Make until a try again or a new idea (D315)
       onBoard(v, v.noticeId ? "notice-shelf" : "shelf");
       break;
     case "check":
@@ -963,7 +978,8 @@ function frame() {
   tick++;
   if (view.screen === "play") return;
   view.tick = tick;
-  const waiting = studio.pending?.warn && (view.pendingId === studio.pending.id);
+  // On its question, and on the shelf after "Come back later", so a kid there is warned too (D315).
+  const waiting = studio.pending?.warn && (view.pendingId === studio.pending.id || view.screen === "shelf");
   view.warn = !!waiting;
   // E7: the last minute counts down on the hint line (D188).
   view.warnLeft = waiting && studio.pending.warn_until ? Math.max(0, Math.ceil((studio.pending.warn_until - Date.now()) / 1000)) : null;
