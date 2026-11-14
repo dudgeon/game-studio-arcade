@@ -123,7 +123,7 @@ test("the mic is on only while the game's talk button is held, and the action he
   run(50);
   await settle();
   assert.deepEqual(m.calls, ["start spell", "stop spell"]);
-  assert.deepEqual(posted.filter((p) => p.type === "heard"), [{ type: "heard", name: "spell", action: "fire" }]);
+  assert.deepEqual(posted.filter((p) => p.type === "heard"), [{ type: "heard", name: "spell", action: "fire", reply: undefined, fallback: false }]);
   host.destroy();
 });
 

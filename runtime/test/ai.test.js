@@ -129,7 +129,7 @@ test("voice asks (D489): declared with a talk button, an action is heard once, a
     probe: (/** @type {any} */ _g, /** @type {any} */ s) => s,
   };
   const m = createMachine({ cart, seed: 1 });
-  assert.deepEqual(m.aiVoices(), [{ name: "spell", ask: "Which spell does the wizard cast?", actions: ["fire", "ice", "heal"], hold: "y" }]);
+  assert.deepEqual(m.aiVoices(), [{ kind: "voice", name: "spell", ask: "Which spell does the wizard cast?", actions: ["fire", "ice", "heal"], hold: "y" }]);
   assert.deepEqual(m.drainAi(), [], "a voice ask asks nothing on its own");
   m.update();
   m.aiHear({ name: "spell", action: "ice" });

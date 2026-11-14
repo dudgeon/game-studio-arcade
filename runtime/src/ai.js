@@ -12,6 +12,8 @@ export const AI_MAX_ASKS = 8;
 export const AI_LINE_MAX = 120;
 export const AI_ASK_MAX = 300;
 export const AI_MIN_FALLBACK = 3;
+/** The longest line a character can say in a chat. */
+export const AI_REPLY_MAX = 160;
 /** Ask for more lines when this few fresh ones are left. */
 const LOW_WATER = 3;
 /** After a call that failed, wait this many frames before asking again (10 s). */
@@ -81,16 +83,7 @@ export function createAi(o) {
       const a = get("next", name, "lines");
       if (a.fresh.length <= LOW_WATER) send(a);
       if (a.fresh.length) return (a.last = /** @type {string} */ (a.fresh.shift()));
-      // Fallbacks go round in a shuffled bag: every one is used before any repeats.
-      if (!a.bag.length) {
-        a.bag = [...a.fallback];
-        for (let i = a.bag.length - 1; i > 0; i--) {
-          const j = Math.floor(rand() * (i + 1));
-          [a.bag[i], a.bag[j]] = [a.bag[j], a.bag[i]];
-        }
-        if (a.bag.length > 1 && a.bag[a.bag.length - 1] === a.last) a.bag.unshift(/** @type {string} */ (a.bag.pop()));
-      }
-      return (a.last = /** @type {string} */ (a.bag.pop()));
+      return fromBag(a);
     },
     choice(name, opts) {
       declare("choice", name);
@@ -132,7 +125,7 @@ export function createAi(o) {
       for (const w of actions) if (!plainLine(w, 24) || w === "none") throw new Error(`g.ai.voice("${name}") actions are plain words of at most 24 characters, and not "none": ${JSON.stringify(w)}`);
       const hold = opts?.hold;
       if (!VOICE_BUTTONS.includes(hold)) throw new Error(`g.ai.voice("${name}") needs hold: the button to hold while talking (${VOICE_BUTTONS.join(", ")})`);
-      if ([...asks.values()].some((a) => a.kind === "voice" && a.hold === hold)) throw new Error(`g.ai.voice("${name}"): another voice ask already uses the ${hold} button`);
+      if ([...asks.values()].some((a) => a.hold === hold)) throw new Error(`g.ai.voice("${name}"): another ask already uses the ${hold} button`);
       asks.set(name, { kind: "voice", name, ask, actions: [...actions], hold, heard: /** @type {string | null} */ (null) });
     },
     heard(name) {
@@ -141,17 +134,60 @@ export function createAi(o) {
       a.heard = null;
       return out;
     },
+    // Open chat (D489): the player holds this character's button and talks; the character's answer
+    // comes back as a line to show. The cart never gets the mic, the audio or the player's words.
+    chat(name, opts) {
+      declare("chat", name);
+      const who = opts?.who;
+      if (typeof who !== "string" || !who.trim() || who.length > AI_ASK_MAX || !PLAIN.test(who)) throw new Error(`g.ai.chat("${name}") needs who: a plain sentence about the character, at most ${AI_ASK_MAX} characters`);
+      const max = opts?.max ?? 120;
+      if (!Number.isInteger(max) || max < 40 || max > AI_REPLY_MAX) throw new Error(`g.ai.chat("${name}") max is the longest line the game can show: 40 to ${AI_REPLY_MAX}`);
+      const fallback = opts?.fallback;
+      if (!Array.isArray(fallback) || fallback.length < AI_MIN_FALLBACK) throw new Error(`g.ai.chat("${name}") needs fallback: at least ${AI_MIN_FALLBACK} lines the character says when it can't answer`);
+      for (const f of fallback) if (!plainLine(f, max)) throw new Error(`g.ai.chat("${name}") fallback lines are plain text of at most ${max} characters: ${JSON.stringify(f)}`);
+      const hold = opts?.hold;
+      if (!VOICE_BUTTONS.includes(hold)) throw new Error(`g.ai.chat("${name}") needs hold: the button to hold while talking (${VOICE_BUTTONS.join(", ")})`);
+      if ([...asks.values()].some((a) => a.hold === hold)) throw new Error(`g.ai.chat("${name}"): another ask already uses the ${hold} button`);
+      asks.set(name, { kind: "chat", name, who: who.trim(), max, fallback: [...fallback], bag: /** @type {string[]} */ ([]), last: "", hold, heard: /** @type {string | null} */ (null) });
+    },
+    reply(name) {
+      const a = get("reply", name, "chat");
+      const out = a.heard;
+      a.heard = null;
+      return out;
+    },
+  };
+  /** The next of an ask's own fallback lines: a shuffled bag, every one before any repeats. @param {any} a */
+  const fromBag = (a) => {
+    if (!a.bag.length) {
+      a.bag = [...a.fallback];
+      for (let i = a.bag.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [a.bag[i], a.bag[j]] = [a.bag[j], a.bag[i]];
+      }
+      if (a.bag.length > 1 && a.bag[a.bag.length - 1] === a.last) a.bag.unshift(/** @type {string} */ (a.bag.pop()));
+    }
+    return (a.last = /** @type {string} */ (a.bag.pop()));
   };
   Object.freeze(api);
 
   return {
     api,
     /** The voice asks this cart declared, for a host that has a microphone (D489). */
-    voices: () => [...asks.values()].filter((a) => a.kind === "voice").map((a) => ({ name: a.name, ask: a.ask, actions: [...a.actions], hold: a.hold })),
-    /** What the cabinet heard for a voice ask: one of its actions, or nothing. @param {{ name?: unknown, action?: unknown }} v */
+    voices: () =>
+      [...asks.values()]
+        .filter((a) => a.kind === "voice" || a.kind === "chat")
+        .map((a) => (a.kind === "voice" ? { kind: "voice", name: a.name, ask: a.ask, actions: [...a.actions], hold: a.hold } : { kind: "chat", name: a.name, who: a.who, max: a.max, hold: a.hold })),
+    /**
+     * What came of a hold: for a voice ask, one of its actions; for a chat, the character's line, or
+     * `fallback` when the cabinet has no line to give (offline, or one it held back), which uses one of the cart's own.
+     * @param {{ name?: unknown, action?: unknown, reply?: unknown, fallback?: unknown }} v
+     */
     hear(v) {
       const a = asks.get(/** @type {string} */ (v?.name));
       if (a?.kind === "voice" && typeof v.action === "string" && a.actions.includes(v.action)) a.heard = v.action;
+      else if (a?.kind === "chat" && plainLine(v.reply, a.max)) a.heard = /** @type {string} */ (v.reply);
+      else if (a?.kind === "chat" && (v.fallback === true || v.reply !== undefined)) a.heard = fromBag(a);
     },
     /** Asks since the last call, for a host that can answer them. */
     drain() {
@@ -162,7 +198,7 @@ export function createAi(o) {
     /** A host's answer. Anything that isn't what was asked for is dropped. @param {AiReply} r */
     deliver(r) {
       if (!r || typeof r !== "object") return;
-      const a = [...asks.values()].find((x) => x.kind !== "voice" && x.waiting && x.waiting === r.id);
+      const a = [...asks.values()].find((x) => (x.kind === "lines" || x.kind === "choice") && x.waiting && x.waiting === r.id);
       if (!a) return;
       a.waiting = 0;
       if (a.kind === "lines") {

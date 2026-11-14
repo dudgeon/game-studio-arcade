@@ -25,7 +25,7 @@ export const VOICE_MIN_MS = 300;
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
  *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
- *   voice?: { start: (v: { name: string, ask: string, actions: string[], hold: string }) => void, stop: (v: { name: string, ask: string, actions: string[], hold: string }) => Promise<{ action?: string | null }>, cancel: () => void },
+ *   voice?: { start: (v: any) => void, stop: (v: any) => Promise<{ action?: string | null, reply?: string | null, fallback?: boolean }>, cancel: () => void },
  * }} HostOptions
  *   test: paused clock and no live input; frames only advance through `test.step()`.
  *   persist: keep g.save() data in localStorage (default: true unless test).
@@ -116,7 +116,7 @@ export function createHost(opts) {
       Promise.resolve()
         .then(() => opts.voice?.stop(v))
         .then(
-          (r) => !stopped && r?.action && send({ type: "heard", name: v.name, action: r.action }),
+          (r) => !stopped && (r?.action || r?.reply || r?.fallback) && send({ type: "heard", name: v.name, action: r.action ?? undefined, reply: r.reply ?? undefined, fallback: r.fallback === true }),
           () => {},
         );
     } else if (!talking) {
