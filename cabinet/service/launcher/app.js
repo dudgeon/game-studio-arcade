@@ -55,6 +55,8 @@ let studio = { phase: "idle" };
 let config = { console: "Arcade", players: 1, speech: "stub" };
 /** @type {any[]} */
 let makers = [];
+/** Every maker's name, those not offered in "Who's making?" too (grown-ups, hidden names, D363). @type {Record<string, string>} */
+let names = {};
 /** @type {any[]} */
 let carts = [];
 /** Downloaded games (D230), after the carts on the shelf. @type {any[]} */
@@ -96,7 +98,7 @@ async function post(url, body = {}) {
 const get = (url) => fetch(url).then((r) => r.json());
 
 const pot = () => studio.pot ?? null;
-const nameOf = (/** @type {string} */ id) => makers.find((m) => m.id === id)?.name ?? id;
+const nameOf = (/** @type {string} */ id) => makers.find((m) => m.id === id)?.name ?? names[id] ?? id;
 /** The pot with names on its makers. */
 const namedPot = () => {
   const p = pot();
@@ -108,7 +110,7 @@ const usual = () => pot()?.usual ?? { new: 6, change: 3 };
 
 async function refresh() {
   carts = (await get("/api/carts")).carts;
-  makers = (await get("/api/makers")).makers;
+  ({ makers, names = {} } = await get("/api/makers"));
   guests = await fetchGuests();
 }
 

@@ -9,7 +9,7 @@ A **cart** is one game: a folder with `spec.md` (the source of truth), `cart.jso
 
 Two tool sets:
 - **studio** (on the mini): `read_kit`, `new_cart`, `validate_cart`, `playtest`, `play`, `import_asset`.
-- **arcade** (on the cabinet, through the Cabinet Manager's connection): `list_carts`, `get_cart`, `publish_cart`, `launch_on_cabinet`, `get_activity`, `cabinet_status`.
+- **arcade** (on the cabinet, through the Cabinet Manager's connection): `list_carts`, `get_cart`, `publish_cart`, `launch_on_cabinet`, `get_activity`, `cabinet_status`, `remove_from_shelf` and `restore_to_shelf` (a grown-up's "off the shelf", kept in the records, D360).
 
 ## The loop
 

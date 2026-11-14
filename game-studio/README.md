@@ -2,7 +2,7 @@
 
 The Claude Code plugin for making cabinet games on the Mac mini with a kid (HANDOFF §8.3; D340-D349). Claude Code gets two MCP servers and a skill:
 
-- **`arcade`** is the cabinet. Its tools run on the cabinet itself, in the cabinet service (`cabinet/service/src/arcade-mcp.js`): `list_carts`, `get_cart`, `publish_cart` (through the publish gate), `launch_on_cabinet`, `get_activity`, `cabinet_status`. On the mini, `src/arcade-bridge.js` reaches them through the Cabinet Manager's SSH connection and pairing token (D341). It adds `get_cart` `into` a folder, and `publish_cart` from a `dir`.
+- **`arcade`** is the cabinet. Its tools run on the cabinet itself, in the cabinet service (`cabinet/service/src/arcade-mcp.js`): `list_carts`, `get_cart`, `publish_cart` (through the publish gate), `launch_on_cabinet`, `get_activity`, `cabinet_status`, `remove_from_shelf` and `restore_to_shelf` (a grown-up's "off the shelf", kept in the records, D360). On the mini, `src/arcade-bridge.js` reaches them through the Cabinet Manager's SSH connection and pairing token (D341). It adds `get_cart` `into` a folder, and `publish_cart` from a `dir`.
 - **`studio`** runs on the mini, against cart folders: `new_cart`, `validate_cart`, `playtest`, `play` (a browser, keyboard as joystick), `import_asset`, `read_kit`.
 - **`build-cart`**, the skill: work spec-first with a kid, then check, play, publish and launch.
 

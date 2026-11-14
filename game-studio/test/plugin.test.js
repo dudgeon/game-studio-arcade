@@ -272,7 +272,7 @@ test("end to end over stdio: Claude Code's way in, through plugin/bin/run.mjs ar
     assert.equal(init.result.serverInfo.name, "arcade");
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
     const list = /** @type {any} */ (await rpc("tools/list"));
-    assert.equal(list.result.tools.length, 6);
+    assert.equal(list.result.tools.length, 8);
     assert.ok(list.result.tools.find((/** @type {any} */ t) => t.name === "publish_cart").inputSchema.properties.dir);
     const carts = /** @type {any} */ (await rpc("tools/call", { name: "list_carts", arguments: {} }));
     assert.equal(carts.result.structuredContent.carts[0].id, "penguin-catch");

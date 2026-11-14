@@ -17,7 +17,7 @@ const secs = (ms) => (ms < 10000 ? `${(ms / 1000).toFixed(1)} s` : ms < 120000 ?
 async function api(method, path, body) {
   const r = await fetch(`/api/c/${cabinet}${path}`, { method, headers: { "Content-Type": "application/json", "X-Manager": "1" }, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), j);
+  if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), j, { status: r.status });
   return j;
 }
 
@@ -264,6 +264,58 @@ $("#update").addEventListener("submit", async (e) => {
   loadSoftware();
 });
 
+// ---- Games and makers: off the shelf, kept in the records (D360-D364) ----
+let confirmRemove = null;
+async function loadGames() {
+  $("#gamesnote").textContent = "Reading the cabinet's library…";
+  try {
+    const [g, m] = await Promise.all([api("GET", "/games"), api("GET", "/makers")]);
+    const on = g.games.filter((x) => x.on_shelf).length;
+    $("#gamesnote").textContent = `${g.games.length} games: ${on} on the shelf, ${g.games.length - on} off.`;
+    $("#gamelist").innerHTML = `<tr><th>Game</th><th>Made by</th><th class=n>Versions</th><th>Last played</th><th>On the shelf</th><th></th></tr>` +
+      g.games.map((x) => {
+        const from = x.from ? `<div class=hint>a version of ${esc(x.from)}${x.from_off ? " (that one's off the shelf, so this shows as its own game)" : ""}</div>` : "";
+        const state = x.on_shelf ? `<span class="tag ok">on</span>` : `<span class="tag no">off</span> <span class=hint>${when(x.off.at)}${x.off.by ? ` by ${esc(x.off.by)}` : ""}${x.off.via && x.off.via !== "manager" ? ` (${esc(x.off.via)})` : ""}${x.off.reason ? `: ${esc(x.off.reason)}` : ""}</span>`;
+        const action = x.on_shelf
+          ? confirmRemove === x.id
+            ? `<button class="danger" data-act="remove" data-id="${esc(x.id)}">Remove ${x.versions > 1 ? `all ${x.versions} versions` : "it"}</button> <button data-act="cancel">Keep</button>`
+            : `<button data-act="ask" data-id="${esc(x.id)}">Remove from shelf</button>`
+          : `<button data-act="restore" data-id="${esc(x.id)}">Put back</button>`;
+        return `<tr><td><b>${esc(x.title)}</b> <span class=hint>${esc(x.id)}</span>${from}</td><td>${esc(x.maker_name ?? "starter")}</td><td class=n>${esc(x.versions)}</td><td>${x.last_played ? `${when(x.last_played)} <span class=hint>(${esc(x.plays)}×)</span>` : "<span class=hint>never</span>"}</td><td>${state}</td><td>${action}</td></tr>`;
+      }).join("");
+    $("#makerlist").innerHTML = `<tr><th>Name</th><th>On the list</th><th></th></tr>` +
+      m.makers.map((x) => {
+        const why = x.grown_up ? "grown-up (never on the kids' list)" : x.hidden ? "hidden in makers.json" : "";
+        const state = x.off ? `<span class="tag no">hidden</span> <span class=hint>${when(x.off.at)}${x.off.reason ? `: ${esc(x.off.reason)}` : ""}</span>` : why ? `<span class=hint>${esc(why)}</span>` : `<span class="tag ok">on</span>`;
+        const action = x.grown_up || x.hidden ? "" : x.off ? `<button data-act="show" data-id="${esc(x.id)}">Put back</button>` : `<button data-act="hide" data-id="${esc(x.id)}">Hide name</button>`;
+        return `<tr><td>${esc(x.name)} <span class=hint>${esc(x.id)}</span></td><td>${state}</td><td>${action}</td></tr>`;
+      }).join("");
+    $("#shelfhistory").innerHTML = g.history.length
+      ? `<tr><th>When</th><th>What</th><th>Who</th><th>Why</th></tr>` + g.history.map((h) => `<tr><td>${when(h.at)}</td><td>${esc(h.kind === "game" ? (h.action === "remove" ? "game off the shelf" : "game put back") : h.action === "remove" ? "name hidden" : "name put back")}: ${esc(h.target)}</td><td>${esc(h.by ?? "")}${h.via ? ` <span class=hint>${esc(h.via)}</span>` : ""}</td><td>${esc(h.reason ?? "")}</td></tr>`).join("")
+      : `<tr><td class=hint>Nothing has been taken off yet.</td></tr>`;
+  } catch (e) {
+    $("#gamesnote").innerHTML = `<span class=bad>${esc(e.status === 501 ? "This cabinet's software is older than the Games page: update it from the Software tab." : e.message)}</span>`;
+  }
+}
+$("#games").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const { act, id } = b.dataset;
+  if (act === "ask") { confirmRemove = id; return loadGames(); }
+  if (act === "cancel") { confirmRemove = null; return loadGames(); }
+  const path = { remove: "/games/remove", restore: "/games/restore", hide: "/makers/hide", show: "/makers/show" }[act];
+  if (!path) return;
+  b.disabled = true;
+  try {
+    await api("POST", path, { id });
+  } catch (err) {
+    $("#gamesnote").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
+  }
+  confirmRemove = null;
+  loadGames();
+});
+$("#gamesreload").addEventListener("click", loadGames);
+
 // ---- Views and the cabinet picker (D286) ----
 function show(v) {
   view = v;
@@ -272,6 +324,7 @@ function show(v) {
   if (v === "activity") loadActivity();
   if (v === "coins") loadPot();
   if (v === "software") loadSoftware();
+  if (v === "games") loadGames();
   try { localStorage.setItem("gsa-view", v); } catch {}
 }
 for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => show(b.dataset.view));

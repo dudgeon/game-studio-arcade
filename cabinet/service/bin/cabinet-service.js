@@ -17,6 +17,7 @@ import { startService } from "../src/server.js";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
 import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
+import { shelfMarks } from "../src/shelf-marks.js";
 import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate, stopGateRuns } from "../src/gate.js";
 
 const { values } = parseArgs({
@@ -88,6 +89,8 @@ function tokenFile(file) {
 }
 
 const makers = makersStore({ file: path.join(paths.root, "makers.json") });
+// Off the shelf, kept in the records (D360): a grown-up's marks, appended beside the other logs.
+const marks = shelfMarks({ logsDir: paths.logs });
 // The family coin pot (D202-D205): its numbers are settings, config.pot overrides them.
 const pot = potStore({ logsDir: paths.logs, settings: config.pot ?? {} });
 const cabinet = cabinetState({ root: paths.root });
@@ -204,6 +207,7 @@ const release = (() => {
 const mcp = createArcadeMcp({
   paths,
   makers,
+  marks,
   checker: gatedOrNot(),
   roots,
   studio,
@@ -223,6 +227,7 @@ const s = await startService({
   gateBusy: () => gate?.busy() ?? false,
   studio,
   makers,
+  marks,
   speech,
   libraryDir: paths.carts,
   logsDir: paths.logs,

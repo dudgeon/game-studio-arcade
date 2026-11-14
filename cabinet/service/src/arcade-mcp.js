@@ -9,6 +9,8 @@
 //   launch_on_cabinet  open a game's how-to-play screen on the cabinet, only from the shelf (D344)
 //   get_activity       the cabinet's logs, newest first (§9.5)
 //   cabinet_status     online, release, what's running, the gate's settings
+//   remove_from_shelf  take a game (every version of it) off the kids' shelf; kept in the records (D360-D362)
+//   restore_to_shelf   put it back
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -163,7 +165,7 @@ export function launchRelay(o = {}) {
 }
 
 /** Which log a record type lives in (§9.5), and what get_activity keeps of a studio_session. */
-const ACTIVITY_TYPES = ["studio_session", "cart_version", "play", "you_check", "publish_gate", "guest_play", "coin_ledger", "screening"];
+const ACTIVITY_TYPES = ["studio_session", "cart_version", "play", "you_check", "publish_gate", "guest_play", "coin_ledger", "screening", "shelf_mark"];
 /** @param {any} r */
 const slim = (r) => {
   if (r.type !== "studio_session") return r;
@@ -199,6 +201,7 @@ export function withoutWords(r) {
  * @param {{
  *   paths: { root: string, carts: string, logs: string, sessions: string },
  *   makers: ReturnType<typeof import("./makers.js").makersStore>,
+ *   marks?: ReturnType<typeof import("./shelf-marks.js").shelfMarks> | null,
  *   checker: import("@game-studio-arcade/studio-cli/src/checks.js").Checker,
  *   roots?: { root: string, source: "library" | "example" }[],
  *   studio?: { state: () => any },
@@ -221,6 +224,26 @@ export function createArcadeMcp(o) {
     if (!c) throw new ToolError(`no cart "${id}" on this cabinet (list_carts lists them)`);
     return c;
   };
+  /** remove_from_shelf and restore_to_shelf (D360-D362). @param {any} a @param {"remove" | "restore"} action */
+  function shelfMark(a, action) {
+    if (!o.marks) throw new ToolError("this cabinet keeps no shelf marks");
+    const c = find(a.id);
+    const line = c.branch ?? c.id;
+    const r = o.marks.mark({ kind: "game", target: line, action, by: typeof a.by === "string" ? a.by : "desktop", via: "mcp", reason: typeof a.reason === "string" ? a.reason : "" });
+    const versions = all().filter((x) => (x.branch ?? x.id) === line).map((x) => x.id);
+    const kids = all().filter((x) => x.parent && versions.includes(String(x.parent).replace(/@\d+$/, "")) && (x.branch ?? x.id) !== line).map((x) => x.branch ?? x.id);
+    return {
+      ok: true,
+      changed: r.changed,
+      game: line,
+      title: c.title,
+      versions,
+      on_shelf: action === "restore",
+      ...(kids.length ? { other_versions_stay: [...new Set(kids)] } : {}),
+      note: r.changed ? (action === "remove" ? "Off the shelf; kept in the records. restore_to_shelf puts it back." : "Back on the shelf.") : action === "remove" ? "It was already off the shelf." : "It was already on the shelf.",
+    };
+  }
+
   /** One publish at a time: each goes through the gate's queue anyway, and the library commit is ordered. */
   let publishing = Promise.resolve();
 
@@ -229,16 +252,20 @@ export function createArcadeMcp(o) {
     {
       name: "list_carts",
       description:
-        "List the games in the cabinet's library. Every version is its own cart; on_shelf marks the latest version of each line (what the kids see). Fields: id, title, version, maker, with, parent (cart@version), family, branch, origin (cabinet, desktop or starter), created, players, pitch, rule counts, commit.",
+        "List the games in the cabinet's library. Every version is its own cart; on_shelf marks the latest version of each line (what the kids see), unless a grown-up took the game off the shelf: then off_shelf says when, by whom and why (remove_from_shelf, restore_to_shelf). Fields: id, title, version, maker, with, parent (cart@version), family, branch, line, origin (cabinet, desktop or starter), created, players, pitch, rule counts, commit.",
       inputSchema: { type: "object", properties: { maker: { type: "string", description: "only this maker's carts (a maker id)" }, family: { type: "string", description: "only this game family (the first cart's id)" } }, additionalProperties: false },
       annotations: { readOnlyHint: true },
       async call(a) {
         let carts = all().map(cartSummary);
         const shelf = latestPerLine(carts);
-        carts = carts.map((c) => ({ ...c, on_shelf: shelf.has(c.id) }));
+        const off = o.marks?.off("game") ?? new Map();
+        carts = carts.map((c) => {
+          const mark = off.get(c.branch ?? c.id);
+          return { ...c, line: c.branch ?? c.id, on_shelf: shelf.has(c.id) && !mark, ...(mark ? { off_shelf: { at: mark.at, by: mark.by, via: mark.via, reason: mark.reason } } : {}) };
+        });
         if (a.maker) carts = carts.filter((c) => c.maker === a.maker);
         if (a.family) carts = carts.filter((c) => c.family === a.family);
-        return { carts, makers: o.makers.read().filter((m) => !m.hidden).map((m) => ({ id: m.id, name: m.name, ...(m.grown_up ? { grown_up: true } : {}) })) };
+        return { carts, makers: o.makers.read().filter((m) => !m.hidden).map((m) => ({ id: m.id, name: m.name, ...(m.grown_up ? { grown_up: true } : {}), ...(o.marks?.makerOff(m.id) ? { off_list: true } : {}) })) };
       },
     },
     {
@@ -339,6 +366,23 @@ export function createArcadeMcp(o) {
         const records = rows.slice(0, limit).map(slim);
         const words = a.include_words === true;
         return { count: rows.length, words: words ? "included" : "left out", records: words ? records : records.map(withoutWords) };
+      },
+    },
+    {
+      name: "remove_from_shelf",
+      description:
+        "Take a game off the cabinet's shelf: the kids no longer see it, play it or change it, with every version of it. Nothing is erased: its files, library history, plays and makes stay in the records and the backup, and restore_to_shelf puts it back. Give any cart id of the game; the whole line (the cart's branch) goes. A kid's own version of the game is its own line and stays unless removed too; on the shelf it then shows as its own game. Grown-ups only: use it when a grown-up asks.",
+      inputSchema: { type: "object", properties: { id: { type: "string", description: "a cart id (list_carts lists them)" }, reason: { type: "string", description: "why, for the records" }, by: { type: "string", description: "the grown-up who asked" } }, required: ["id"], additionalProperties: false },
+      async call(a) {
+        return shelfMark(a, "remove");
+      },
+    },
+    {
+      name: "restore_to_shelf",
+      description: "Put a game a grown-up took off the shelf back on it, with every version of it, as it was. Give any cart id of the game.",
+      inputSchema: { type: "object", properties: { id: { type: "string", description: "a cart id (list_carts lists them)" }, reason: { type: "string" }, by: { type: "string" } }, required: ["id"], additionalProperties: false },
+      async call(a) {
+        return shelfMark(a, "restore");
       },
     },
     {

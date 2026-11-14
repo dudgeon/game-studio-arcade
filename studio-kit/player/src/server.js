@@ -43,8 +43,11 @@ const TYPES = {
  *   origin?: "desktop" | "cabinet",
  *   checkerFromBody?: boolean,
  *   checksForMadeOnly?: boolean,
+ *   hideCart?: (cart: { id: string, branch?: string | null }) => boolean,
  *   now?: () => Date,
  * }} PlayerOptions
+ *   hideCart: leaves a cart out of /api/carts, the list the page shows (the cabinet's "off the shelf", D361).
+ *     Its plays still log, and its files are still served.
  *   origin: logged on play records (default "desktop"). The cabinet service passes "cabinet".
  *   checkerFromBody: the page says who answered you-check, since a cabinet has
  *     many players; otherwise it's always `checker`.
@@ -125,7 +128,7 @@ export function createPlayerHandler(opts = {}) {
       const line = lineOf.get(p.cart_id) ?? p.cart_id;
       bestOf.set(line, Math.max(bestOf.get(line) ?? 0, p.score));
     }
-    return all.map(({ dir, ...c }) => {
+    return all.filter((c) => !opts.hideCart?.(c)).map(({ dir, ...c }) => {
       const mine = checks.filter((r) => r.cart_id === c.id && r.cart_version === c.version);
       const last = mine[mine.length - 1];
       return {

@@ -1794,3 +1794,28 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **The kids' games keep their makers and lineage.** `cart.json` (maker, parent, family, branch, session) and the library's history come back byte for byte, and so does `makers.json`.
 - **Not carried, by design (D292):** `cabinet-state.json`, so the welcome screens show once more and a "resting" month is forgotten until the workspace limit refuses again. Also the Manager pairing (re-pair) and `kit-uploads.json` (re-uploaded on the first make).
 - **The loss window is the time since the last backup:** an hour normally, longer if the mini slept or the Picade was off the Wi-Fi. A card that still boots should get one more `run.mjs` first.
+
+**D360. "Remove a game" is off the shelf, kept in the records: an append-only mark beside the logs.** *(Geoff, 2026-11-13: "we need a way to delete games in case I want to get rid of the test games"; he chose "Off the shelf, kept in the records". Mechanics by Claude.)*
+- The game disappears from the cabinet for the kids, with every version of it. Nothing is erased (D5): its folders, library commits, makes, plays, coin entries and checks all stay, and the twin and the backup keep it. The Manager can put it back, as it was. Grown-ups only: the Manager, or the MCP tools, both behind the Manager's token.
+- **On disk:** `/var/lib/arcade/logs/shelf_marks.jsonl`, one JSON object per line, appended, never rewritten: `{"type":"shelf_mark","id":"sm_<base36 time><random>","at":"<ISO UTC>","kind":"game"|"maker","target":"<id>","action":"remove"|"restore","by":"<who>","via":"manager"|"mcp"|…,"reason":"<text>"}`. The last line for a (kind, target) wins. No file means nothing is off, so a new card needs none. The reader accepts any `via`; the day-one card writes `"day-one"` (D356-D358).
+- **Why a log and not a field in `cart.json` or `makers.json`:** a cart's files and its git history stay exactly as made, and a log under `logs/` is what the twin sync grows and never replaces (D291), the backup copies (D351) and the data check holds to only growing (D196). So the twin and the backup follow a removal, and a removal can never lose anything.
+- `cabinet/service/src/shelf-marks.js`.
+
+**D361. What leaves out a game that's off the shelf, and what keeps it.** *(Claude.)*
+- **Left out:** `/api/carts`, the list the launcher reads, so the shelf, "change this game" and each game's best score (`hideCart` in the player, which still logs plays and serves files). A change whose parent is off is refused (409), should an old screen ask.
+- **Kept:** the files and library history; every log; the Manager's Activity; `list_carts` and `get_activity` on the MCP server (`on_shelf: false` and `off_shelf` say why); the twin and the backup.
+- **A game is a line** (a cart's branch, or the cart itself: the shelf's rule, HANDOFF §2), so one mark covers v1, v2 and on. A version published later to a line that's off stays off.
+
+**D362. A removed game's other versions: a kid's version stays unless removed itself.** *(Claude; answers the director's question 4.)*
+- A version another maker made (D206) is its own line, with `parent` pointing at the game it came from. Removing the game doesn't remove it.
+- **On the shelf:** it's no longer indented under the game it came from, because that row is gone. The launcher's `families()` already takes the oldest line left in a family as its main row, so the kid's version shows as its own game, with nothing new in the launcher. Putting the game back indents it again.
+- **In the Manager:** the Games page says "a version of rock-rain (that one's off the shelf, so this shows as its own game)". `remove_from_shelf` names the versions that stay (`other_versions_stay`).
+
+**D363. Hiding a maker's name from "Who's making?", the same way.** *(Claude; carries out the director's item 2.)*
+- A `kind: "maker"` mark, target a `makers.json` id. `/api/makers` leaves the name out of the list "Who's making?" offers. The maker's games stay on the shelf. `makers.json` is never changed (its own `hidden` field stays as it was, for what set it before).
+- `/api/makers` now also returns `names`, every maker's name, so a hidden maker's games still read "by Tester2" on the shelf. The launcher's `nameOf` uses it, which also names a grown-up maker's games (D236) properly. That's the launcher's only change.
+
+**D364. The Manager's Games page, and the MCP tools.** *(Claude.)*
+- **Games page:** every game line, on or off the shelf, with who made it, how many versions, when it was last played (and how often), and, if off, when, by whom, how (day-one, mcp) and why. **Remove from shelf** asks once in place ("Remove all 2 versions" / "Keep"); **Put back** doesn't ask. Below: the makers, with **Hide name** and **Put back** (grown-ups and names hidden in `makers.json` have no button), and the history of every mark, newest first.
+- The Manager asks the cabinet (`/api/manager/games`, `/games/remove|restore`, `/makers/hide|show`, with the Manager's token); the cabinet keeps the marks. A cabinet whose software is older says so and points at the Software tab.
+- **MCP:** `remove_from_shelf {id, reason?, by?}` and `restore_to_shelf`, with any cart id of the game; behind the same token as every arcade tool (D341). `shelf_mark` is one of `get_activity`'s types.

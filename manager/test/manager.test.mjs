@@ -352,3 +352,33 @@ test("the Update button needs the Manager's page, like every POST (D285)", async
     assert.equal(f.runs.length, 0);
   }, { updates: updater({ run: f.run, checkout: () => "x" }) });
 });
+
+test("Games: the list, Remove from shelf and Put back, hiding a maker, all asked of the cabinet with its token (D364)", async () => {
+  const cab = fakeCabinet();
+  const calls = [];
+  cab.service = async (method, p, body) => {
+    calls.push({ method, p, body });
+    if (p === "/api/manager/games") return { status: 200, body: { games: [{ id: "rock-rain", on_shelf: true }], history: [] } };
+    if (p === "/api/manager/makers") return { status: 200, body: { makers: [{ id: "owen", on_list: true }] } };
+    if (p === "/api/manager/games/remove" && body.id === "nope") return { status: 404, body: { ok: false, error: 'no game "nope" on this cabinet' } };
+    return { status: 200, body: { ok: true, changed: true } };
+  };
+  await withManager({ virtual: cab }, async (base) => {
+    const cookie = await login(base);
+    const games = await (await fetch(`${base}/api/c/virtual/games`, { headers: { Cookie: cookie } })).json();
+    assert.equal(games.games[0].id, "rock-rain");
+    assert.equal((await post(base, cookie, "/api/c/virtual/games/remove", { id: "rock-rain", reason: "test game" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/games/restore", { id: "rock-rain" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/makers/hide", { id: "owen" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/makers/show", { id: "owen" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/games/remove", { id: "../x" })).status, 400);
+    const missing = await post(base, cookie, "/api/c/virtual/games/remove", { id: "nope" });
+    assert.equal(missing.status, 404);
+    // Without the Manager's own header, nothing is asked of the cabinet.
+    assert.equal((await fetch(`${base}/api/c/virtual/games/remove`, { method: "POST", headers: { Cookie: cookie }, body: JSON.stringify({ id: "rock-rain" }) })).status, 403);
+    const posts = calls.filter((c) => c.method === "POST");
+    assert.deepEqual(posts.map((c) => [c.p, c.body.id]), [["/api/manager/games/remove", "rock-rain"], ["/api/manager/games/restore", "rock-rain"], ["/api/manager/makers/hide", "owen"], ["/api/manager/makers/show", "owen"], ["/api/manager/games/remove", "nope"]]);
+    assert.equal(posts[0].body.reason, "test game");
+    assert.match(posts[0].body.by, /in the Manager$/);
+  });
+});
