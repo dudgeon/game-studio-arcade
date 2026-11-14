@@ -40,6 +40,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/twin-data.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/update-guard.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/power-button.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then

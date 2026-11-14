@@ -2,6 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { appendLineDurable as appendLine } from "./durable.js";
+
 /**
  * @param {string} logsDir
  * @param {"studio_session"|"studio_session_correction"|"cart_version"|"publish_gate"} type
@@ -9,17 +11,22 @@ import path from "node:path";
  */
 export function appendLog(logsDir, type, record) {
   fs.mkdirSync(logsDir, { recursive: true });
-  fs.appendFileSync(path.join(logsDir, `${type}.jsonl`), JSON.stringify({ type, ...record }) + "\n");
+  appendLine(path.join(logsDir, `${type}.jsonl`), JSON.stringify({ type, ...record }));
 }
 
 /** @param {string} file */
 export function readLog(file) {
   if (!fs.existsSync(file)) return [];
-  return fs
-    .readFileSync(file, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
+  const out = [];
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    if (!line) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      // A torn line from a power cut: skipped, never rewritten (D5, D371).
+    }
+  }
+  return out;
 }
 
 /** Spec diff for a brand-new cart: every line added. Forks will diff against the parent. */

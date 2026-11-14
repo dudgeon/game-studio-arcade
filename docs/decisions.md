@@ -1819,3 +1819,37 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **Games page:** every game line, on or off the shelf, with who made it, how many versions, when it was last played (and how often), and, if off, when, by whom, how (day-one, mcp) and why. **Remove from shelf** asks once in place ("Remove all 2 versions" / "Keep"); **Put back** doesn't ask. Below: the makers, with **Hide name** and **Put back** (grown-ups and names hidden in `makers.json` have no button), and the history of every mark, newest first.
 - The Manager asks the cabinet (`/api/manager/games`, `/games/remove|restore`, `/makers/hide|show`, with the Manager's token); the cabinet keeps the marks. A cabinet whose software is older says so and points at the Software tab.
 - **MCP:** `remove_from_shelf {id, reason?, by?}` and `restore_to_shelf`, with any cart id of the game; behind the same token as every arcade tool (D341). `shelf_mark` is one of `get_activity`'s types.
+
+## 2026-11-14 — Everyday power cuts, and the power button (D371-D374)
+
+The kids will switch the cabinet off at the wall, and Geoff accepted that the card has no fallback (D339). So everything the cabinet writes must survive the plug being pulled at any moment. Director's brief, 2026-11-13. Proved in a QEMU rehearsal of the card (D374).
+
+**D371. Every write the family's data depends on survives a power cut whole.** *(Claude; the rehearsal found each of these.)*
+- **The cart library's git** runs with `core.fsync=added` and `core.fsyncMethod=fsync`, through the environment, so the family's `.git/config` is never touched. Covered: objects, refs and the index.
+  - Before: a cut mid-make left an empty object file, and `git fsck` failed on the whole library.
+- **Creating the library:** `git init`'s own files aren't covered by core.fsync, so the library flushes once after it's made. If a cut ever left `.git/HEAD` empty, git sees no repository; the next make puts HEAD back to `main`, touching nothing else.
+- **Whole-file writes are fsync-then-rename** (`studio-kit/cli/src/durable.js`): makers, studio state, results, the run journal, gate results, cabinet state, session records, `cart.json`, the kit cache.
+  - Before: a session's `playtest.json`, `local-checks.json` and `cart/cart.json` came back empty.
+- **Folders another tool writes are flushed before use** (`syncTree`): the cart a session unpacks with `tar`, and the cart copied into the library, including the desktop publish path.
+- **Appends flush,** and never glue a new line onto a torn one: the coin ledger, the play, studio, screening, speech and guest logs. A torn last line stays torn and readers skip it. The kit's `readLog` now skips one instead of throwing.
+
+**D372. The power button: a tap does nothing; holding it about 2 s switches the cabinet off cleanly.** *(Geoff, 2026-11-14, through the director: "Tap ignored, hold to switch off"; Claude.)*
+- **What the hardware does** (platform notes): the overlay reports the button as `KEY_POWER`. With stock logind a tap powers off. Switching on is the X HAT's own, and it has its own hard cut after about a 3 s hold.
+- **logind can't do it:** its long press is fixed at 5 s (`LONG_PRESS_DURATION`, systemd 257), past the HAT's cut.
+- **So:** logind ignores the key (`/etc/systemd/logind.conf.d/arcade-power.conf`). `arcade-powerkey` (Picade profile only) watches every device with KEY_POWER and runs `systemctl poweroff` the moment the button has been held 2 s, without waiting for it to be let go. `/etc/arcade/power-button` (`hold=`, 0.5–2.8 s) changes the time.
+- **The race** (🔧, bring-up C6): if the HAT cuts at 3 s and a child holds on, the shutdown may not finish. D371 makes a hard cut safe for the data. If the hard cut comes first on the real cabinet, drop the hold to 1–1.5 s.
+- No feedback on the screen yet: "let go when the screen goes dark".
+
+**D373. The browser's disk cache lives in RAM.** *(Claude.)* `--disk-cache-dir=/dev/shm/arcade-chromium-cache`, sparing the card writes for files served from 127.0.0.1. The profile stays on the card: it holds the games' saves (the runtime's `g.save()` is localStorage). Those saves aren't in the data check, the twin or the backup. That's a gap worth closing separately.
+
+**D374. Proven: 20 power cuts at random moments, and the button, on a QEMU copy of the card.** *(Director's brief; Claude.)*
+- **The power cuts:** `scripts/cabinet-card/test/power-rehearsal.sh DIR [ROUNDS]` switches the rehearsal cabinet to replay with a throwaway Manager token, so makes run with no API and no spend.
+  - Each round runs `power-workload.mjs`: makes through to the shelf, coin top-ups, new makers, plays. It pulls the plug 4–53 s in (QEMU quits, nothing flushed), then boots.
+  - `power-check.mjs` then needs: the shelf back; every JSON file parsing and none empty; no broken line except a torn last one; the library passing `git fsck --full` with a clean tree; every cart whole and committed; and everything the service ever acknowledged still there (each made cart with its commit and its charge, each top-up, maker and play).
+- **Before the fixes:** round 2 broke the library (an empty git object). After the first fix, round 1 found the empty `.git/HEAD`, then a session's empty `cart.json`.
+- **After the fixes (2026-11-14): 20/20 pass.** The shelf was back 6–7 s after each boot, and 193 acknowledgements held: 44 carts, 108 ledger entries, 28 makers. Most cuts landed mid-make, because makes take most of the workload's time.
+- **The button:** `scripts/cabinet-card/test/button-rehearsal.sh DIR`, 7/7. Through a virtual KEY_POWER device:
+  - a 0.3 s tap was logged and ignored;
+  - QEMU's own power button (the kernel's power key) was ignored;
+  - a 2.5 s hold powered the guest off cleanly, with no ext4 journal replay at the next boot.
+- 🔧 **Only the Picade can show** the HAT's 3 s cut against the shutdown (C6).

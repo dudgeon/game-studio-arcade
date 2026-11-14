@@ -11,11 +11,12 @@
 // Every check is logged with its outcome (D273).
 import fs from "node:fs";
 import path from "node:path";
+import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 /** One line in logs/screening.jsonl. @param {string} dir @param {object} record */
 const appendLog = (dir, record) => {
   fs.mkdirSync(dir, { recursive: true });
-  fs.appendFileSync(path.join(dir, "screening.jsonl"), JSON.stringify({ type: "screening", ...record }) + "\n");
+  appendLineDurable(path.join(dir, "screening.jsonl"), JSON.stringify({ type: "screening", ...record }));
 };
 
 export const SCREEN_MODEL = "claude-haiku-5-5";

@@ -19,6 +19,7 @@ hw_late() {
   step_input_rule
   step_sound
   step_driver_keyboard
+  step_power_button
 }
 
 # The Pi has no battery clock. Until NTP answers, the clock says the image's date, and apt refuses

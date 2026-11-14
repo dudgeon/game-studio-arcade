@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { syncTree, writeFileDurable } from "./durable.js";
 
 export const EXPECTED = ["report.json", "cart.tgz"];
 export const MARKER = "DONE.json";
@@ -56,7 +57,7 @@ export async function downloadOutputs(o) {
   for (const f of ordered) {
     const name = safeName(f.filename);
     const dest = newest.get(f.filename) === f.id ? path.join(o.dir, name) : path.join(o.dir, `${name}.${f.id}`);
-    fs.writeFileSync(dest, await o.api.download(f.id));
+    writeFileDurable(dest, await o.api.download(f.id));
     files.push(path.basename(dest));
   }
   if (!manifest) missing = [...new Set([MARKER, ...EXPECTED.filter((n) => !files.includes(n))])];
@@ -98,6 +99,7 @@ export function extractCart(tarball, dest) {
   }
   fs.mkdirSync(dest, { recursive: true });
   execFileSync("tar", ["-xzf", tarball, "-C", dest]);
+  syncTree(dest); // a session's cart is kept whole (D5); tar doesn't flush (D371)
   return dest;
 }
 

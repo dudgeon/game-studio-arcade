@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { monthOf } from "./pot.js";
+import { writeJsonDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 /** @typedef {{ intro_seen_at?: string, month_seen?: string, resting_month?: string, resting_since?: string }} CabinetState */
 
@@ -23,9 +24,7 @@ export function cabinetState(o) {
   };
   /** @param {CabinetState} s */
   const write = (s) => {
-    fs.mkdirSync(o.root, { recursive: true });
-    fs.writeFileSync(`${file}.tmp`, JSON.stringify(s, null, 2) + "\n");
-    fs.renameSync(`${file}.tmp`, file);
+    writeJsonDurable(file, s);
   };
   return {
     file,

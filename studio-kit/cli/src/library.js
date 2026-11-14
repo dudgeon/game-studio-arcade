@@ -4,12 +4,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { syncTree, writeFileDurable } from "./durable.js";
 
 const GIT_ENV = {
   GIT_AUTHOR_NAME: "Studio",
   GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid",
   GIT_COMMITTER_NAME: "Studio",
   GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid",
+  // Objects, refs and the index on disk before a commit returns: a power cut must not leave the library with an
+  // empty object file, which breaks the whole repository (D371). Through the environment, so .git/config, which
+  // is the family's data, is never touched.
+  GIT_CONFIG_COUNT: "2",
+  GIT_CONFIG_KEY_0: "core.fsync",
+  GIT_CONFIG_VALUE_0: "added",
+  GIT_CONFIG_KEY_1: "core.fsyncMethod",
+  GIT_CONFIG_VALUE_1: "fsync",
 };
 
 function git(cwd, args) {
@@ -19,11 +28,20 @@ function git(cwd, args) {
 /** @param {string} root */
 export function ensureLibrary(root) {
   fs.mkdirSync(root, { recursive: true });
+  const head = path.join(root, ".git", "HEAD");
   if (!fs.existsSync(path.join(root, ".git"))) {
     git(root, ["init", "-q", "-b", "main"]);
-    fs.writeFileSync(path.join(root, "README.md"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n");
+    writeFileDurable(path.join(root, "README.md"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n");
     git(root, ["add", "README.md"]);
     git(root, ["commit", "-q", "-m", "Start the dev cart library"]);
+    // core.fsync covers objects, refs and the index, not the files `git init` writes. A power cut seconds after the
+    // first make left .git/HEAD empty, and git no longer saw a repository (the QEMU power rehearsal, D371). Once, here.
+    try {
+      execFileSync("sync");
+    } catch {}
+  } else if (!fs.existsSync(head) || fs.statSync(head).size === 0) {
+    // A library whose creation was cut off like that: HEAD back to its only branch. Nothing else is touched (D5).
+    writeFileDurable(head, "ref: refs/heads/main\n");
   }
   return root;
 }
@@ -67,7 +85,8 @@ export function commitNewCart(o) {
   const dest = path.join(o.root, id);
   // Key frames are regenerable (D62): the library keeps playtest.json, never the PNGs.
   fs.cpSync(o.cartDir, dest, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
-  fs.writeFileSync(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
+  writeFileDurable(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
+  syncTree(dest); // the shelf reads these files, not git's copies (D371)
   git(o.root, ["add", "--", id]);
   git(o.root, ["commit", "-q", "-m", o.message.replace("{id}", id)]);
   return { id, dir: dest, commit: git(o.root, ["rev-parse", "HEAD"]) };

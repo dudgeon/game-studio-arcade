@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { changeTarget, specChange } from "@game-studio-arcade/studio-cli/src/make.js";
 import { appendLog, readLog, newSpecDiff } from "@game-studio-arcade/studio-cli/src/log.js";
+import { syncTree } from "@game-studio-arcade/studio-cli/src/durable.js";
 import { ensureLibrary, slugify, freeId, specTitle } from "@game-studio-arcade/studio-cli/src/library.js";
 import { readCart, listCarts } from "@game-studio-arcade/player/src/library.js";
 import { mcpServer, ToolError } from "./mcp-rpc.js";
@@ -33,7 +34,8 @@ const TEXT_EXT = new Set([".md", ".js", ".json", ".txt", ".ts", ".csv", ".svg"])
 /** How long launch_on_cabinet waits for the launcher to say yes or no. */
 export const LAUNCH_WAIT_MS = 8000;
 
-const GIT_ENV = { GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid" };
+// core.fsync: a commit is on disk before it returns, as in the Studio's library (D371).
+const GIT_ENV = { GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid", GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsync", GIT_CONFIG_VALUE_0: "added", GIT_CONFIG_KEY_1: "core.fsyncMethod", GIT_CONFIG_VALUE_1: "fsync" };
 const git = (/** @type {string} */ cwd, /** @type {string[]} */ args, /** @type {any} */ o = {}) => execFileSync("git", args, { cwd, env: { ...process.env, ...GIT_ENV }, maxBuffer: 2 ** 26, ...o });
 
 /** A bundle path is safe and belongs in a cart folder. @param {string} p */
@@ -479,6 +481,7 @@ export function createArcadeMcp(o) {
       const dest = path.join(o.paths.carts, id);
       fs.cpSync(cartDir, dest, { recursive: true });
       fs.writeFileSync(path.join(dest, "cart.json"), JSON.stringify({ ...cartJson, id }, null, 2) + "\n");
+      syncTree(dest); // on disk before it's committed and on the shelf (D371)
       git(o.paths.carts, ["add", "--", id]);
       git(o.paths.carts, ["commit", "-q", "-m", `desktop ${parentRef ? `change ${parentRef} -> ` : ""}${id} v${version} (${sessionId})`]);
       committed = { id, commit: git(o.paths.carts, ["rev-parse", "HEAD"], { encoding: "utf8" }).trim() };

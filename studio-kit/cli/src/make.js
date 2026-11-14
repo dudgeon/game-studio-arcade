@@ -11,6 +11,7 @@ import { analyzeFreeze, isPlaytestRun, SNAPSHOT_NAMES } from "./freeze.js";
 import { addYouCheckRules, questionsFor } from "./untested.js";
 import { checkAppliedBrief, staleMessage } from "./brief.js";
 import { readAgentDef } from "./config.js";
+import { writeFileDurable } from "./durable.js";
 
 /**
  * @typedef {object} MakeOptions
@@ -191,9 +192,9 @@ export async function makeCart(o) {
   writeJson(path.join(sessionDir, "session.json"), rest);
   for (const [name, body] of Object.entries(captured)) {
     fs.mkdirSync(path.join(sessionDir, "frozen"), { recursive: true });
-    fs.writeFileSync(path.join(sessionDir, "frozen", name), body);
+    writeFileDurable(path.join(sessionDir, "frozen", name), body);
   }
-  fs.writeFileSync(path.join(sessionDir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
+  writeFileDurable(path.join(sessionDir, "events.jsonl"), events.map((e) => JSON.stringify(e)).join("\n") + (events.length ? "\n" : ""));
 
   ui.progress("Bringing your game home");
   const dl = await downloadOutputs({ api: o.api, sessionId: result.sessionId, dir: path.join(sessionDir, "outputs"), ...o.outputs });
@@ -229,7 +230,7 @@ export async function makeCart(o) {
     youCheckAdded = amended.added;
     if (youCheckAdded.length) {
       spec = amended.text;
-      fs.writeFileSync(path.join(cartDir, "spec.md"), spec);
+      writeFileDurable(path.join(cartDir, "spec.md"), spec);
     }
   }
   for (const line of buildSummary(freeze.checks_changed_after_playtest, youCheckAdded)) ui.info(line);
@@ -384,7 +385,7 @@ function readTextIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
 }
 
+// A session's record survives a power cut whole, or not at all (D371).
 function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  writeFileDurable(file, JSON.stringify(data, null, 2) + "\n");
 }

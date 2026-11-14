@@ -6,6 +6,7 @@
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 export const RATE = 16000;
 /** A kid holding the button down forever doesn't fill the memory: 30 s is plenty for an idea. */
@@ -331,7 +332,7 @@ export function liveSpeech(o) {
     if (!o.logFile) return;
     try {
       fs.mkdirSync(path.dirname(o.logFile), { recursive: true });
-      fs.appendFileSync(o.logFile, `${JSON.stringify({ ts: new Date(now()).toISOString(), ...entry })}\n`);
+      appendLineDurable(o.logFile, JSON.stringify({ ts: new Date(now()).toISOString(), ...entry }));
     } catch {}
   };
 

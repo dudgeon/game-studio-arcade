@@ -6,6 +6,7 @@
 // its own: it's the last entry's pot_after_cents, so the ledger is the only truth.
 import fs from "node:fs";
 import path from "node:path";
+import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 /** The numbers in the handoff's §2. Settings, not constants (D203): the config's `pot` overrides them. */
 export const POT_DEFAULTS = {
@@ -124,8 +125,8 @@ export function potStore(o) {
       pot_before_cents: before,
       pot_after_cents: before + delta,
     };
-    fs.mkdirSync(o.logsDir, { recursive: true });
-    fs.appendFileSync(file, JSON.stringify(entry) + "\n");
+    // Flushed before the top-up or charge is reported, and never glued to a torn line (D371).
+    appendLineDurable(file, JSON.stringify(entry));
     return entry;
   };
 

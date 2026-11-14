@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendLog } from "@game-studio-arcade/studio-cli/src/log.js";
+import { writeJsonDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
 const RUN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../bin/gate-run.js");
 
@@ -346,9 +347,7 @@ export function guestGate(o) {
   const unchecked = new Set();
   const keyOf = (/** @type {string} */ id, /** @type {any} */ meta) => `${id}@${meta?.version ?? "unversioned"}`;
   const save = () => {
-    fs.mkdirSync(path.dirname(o.file), { recursive: true });
-    fs.writeFileSync(`${o.file}.tmp`, `${JSON.stringify(known, null, 1)}\n`);
-    fs.renameSync(`${o.file}.tmp`, o.file);
+    writeJsonDurable(o.file, known, 1);
   };
   return {
     /**
