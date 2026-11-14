@@ -15,6 +15,7 @@
     <button data-view="screen" class="on">Screen</button>
     <button data-view="activity">Activity</button>
     <button data-view="coins">Coins</button>
+    <button data-view="software">Software</button>
   </nav>
 </header>
 
@@ -83,6 +84,18 @@
     <p id="coinmsg" class="hint"></p>
     <h2>Coin history</h2>
     <table id="ledger"></table>
+  </section>
+
+  <section id="software" class="view">
+    <div id="versions" class="card"></div>
+    <form id="update" class="card">
+      <h2>Update this cabinet</h2>
+      <p class="hint">Sends the mini's checkout to the cabinet over the network. Carts, logs and the key stay as they are. The cabinet waits if a game or a make is on, and goes back to what it had if it isn't healthy after, or if the power goes partway. The shelf restarts once.</p>
+      <label class="check"><input type="checkbox" name="os"> OS packages too (not the kernel or boot firmware; takes longer)</label>
+      <button id="updatebtn">Update</button>
+    </form>
+    <p id="updatemsg" class="hint"></p>
+    <pre id="updatelog" hidden></pre>
   </section>
 </main>
 </body>

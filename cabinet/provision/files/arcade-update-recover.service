@@ -1,0 +1,12 @@
+[Unit]
+Description=Put the cabinet back after an update that was cut off (D334); check the network after OS packages changed (D333)
+After=local-fs.target NetworkManager.service
+ConditionPathExistsGlob=/var/lib/arcade-update/*
+
+[Service]
+Type=exec
+ExecStart=/bin/bash /usr/local/lib/arcade-update/arcade-update-recover --boot
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

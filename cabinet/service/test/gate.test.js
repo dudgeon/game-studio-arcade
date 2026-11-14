@@ -314,8 +314,11 @@ test("the launcher's play heartbeat reaches the tracker", async () => {
     assert.equal((await post({ playing: true, what: "teti" })).status, 200);
     assert.equal(plays.playing(), true);
     assert.equal(plays.what(), "teti");
+    // What an update asks before it starts (D332).
+    assert.deepEqual(await (await fetch(`${s.url}/api/arcade/playing`)).json(), { playing: true, what: "teti", gate_busy: false });
     await post({ playing: false });
     assert.equal(plays.playing(), false);
+    assert.equal((await (await fetch(`${s.url}/api/arcade/playing`)).json()).playing, false);
   } finally {
     await s.close();
   }

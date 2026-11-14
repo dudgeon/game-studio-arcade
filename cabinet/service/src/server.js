@@ -16,6 +16,7 @@
 //   POST /api/studio/result-seen {id}: someone has seen how a make ended (D192)
 //   POST /api/studio/still-here  a key was pressed: the walk-away clock starts again (D188)
 //   POST /api/arcade/playing     {playing, what?}: a game started, is still going, or ended; the publish gate waits (D310)
+//   GET  /api/arcade/playing     {playing, what, gate_busy}: whether a game or a gate check is on now; an update waits (D332)
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
@@ -89,6 +90,7 @@ function readJson(req) {
  *   managerToken?: string | null | (() => string | null),
  *   screen?: ReturnType<typeof import("./screening.js").createScreener> | null,
  *   plays?: ReturnType<typeof import("./gate.js").playTracker>,
+ *   gateBusy?: () => boolean,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -279,6 +281,7 @@ export function createServiceHandler(o) {
       if (pathname === "/api/pot") return json(res, 200, potView(60));
       if (pathname === "/api/boot") return json(res, 200, o.cabinet?.boot() ?? { intro: false, new_month: false });
       if (pathname === "/api/studio") return json(res, 200, o.studio.state());
+      if (pathname === "/api/arcade/playing") return json(res, 200, { playing: o.plays?.playing() ?? false, what: o.plays?.what() ?? null, gate_busy: o.gateBusy?.() ?? false });
       if (pathname === "/api/studio/events") return events(res);
       return json(res, 405, { ok: false, error: "method not allowed" });
     }

@@ -1,0 +1,139 @@
+#!/bin/bash
+# The Picade's boot update, through tryboot (D336). A deliberate step, never part of an ordinary update.
+#
+#   arcade-boot status                what boots now, and any try in progress
+#   arcade-boot try                   copy what boots now into its own slot and try booting from it (the first time)
+#   arcade-boot try --packages        update the boot packages (kernel, boot firmware), put them in a new slot, try it
+#   arcade-boot confirm               at boot (arcade-boot-confirm.service): keep a try that came up well, or go back
+#
+# How it stays safe. Each slot is a folder on the boot partition (arcade-ID/) holding its own kernel, initramfs,
+# device trees, overlays and cmdline.txt; config.txt picks one with os_prefix. A try writes only a new folder and
+# tryboot.txt, then restarts with `reboot "0 tryboot"`: the Pi reads tryboot.txt for that one boot only. If the
+# try hangs (the hardware watchdog restarts it), crashes, loses power, or comes up without its network or the
+# service, the next boot reads config.txt and the last slot. Only a try that came up well is kept, by
+# rewriting config.txt's slot block, the one write to the boot partition that matters (D336).
+# The firmware ignores an os_prefix whose kernel or device tree is missing (config_txt docs, checked 2026-11-13).
+# Writes nothing but under the boot partition and /var/lib/arcade-update. Not under the data folder.
+set -u
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../update-lib.sh
+. "$HERE/update-lib.sh" 2>/dev/null || . /usr/local/lib/arcade-update/update-lib.sh
+BOOT_DIR="${ARCADE_BOOT_DIR:-/boot/firmware}"
+CMDLINE="${ARCADE_CMDLINE:-/proc/cmdline}"
+TRY="$STATE/boot-try"
+RESULT="$STATE/boot-result.json"
+REBOOT_TRY="${ARCADE_REBOOT_TRY:-systemctl reboot 0 tryboot}"
+REBOOT="${ARCADE_REBOOT:-systemctl reboot}"
+CONFIRM_TRIES="${ARCADE_CONFIRM_TRIES:-150}"
+BEGIN='# BEGIN arcade boot slot (D336)'
+END='# END arcade boot slot'
+say() { echo "[arcade-boot] $*"; }
+stop() { echo "[arcade-boot] Stopped: $*" >&2; exit 1; }
+
+committed() { sed -n "/^$BEGIN\$/,/^$END\$/s/^os_prefix=\(.*\)\/\$/\1/p" "$BOOT_DIR/config.txt" | tail -1; }
+
+# config.txt with our block set to SLOT: the rest of the file exactly as it is.
+config_with() { # SLOT
+  sed "/^$BEGIN\$/,/^$END\$/d" "$BOOT_DIR/config.txt"
+  printf '%s\n[all]\nos_prefix=%s/\nkernel_watchdog_timeout=15\n%s\n' "$BEGIN" "$1" "$END"
+}
+
+result() { # OK REASON
+  node -e 'const [ok, reason, slot] = process.argv.slice(1); process.stdout.write(JSON.stringify({ ok: ok === "true", reason, slot, at: new Date().toISOString() }, null, 1) + "\n")' "$1" "$2" "$(state_get "$TRY" slot)" > "$RESULT.new" 2>/dev/null \
+    || printf '{"ok": %s, "reason": "%s"}\n' "$1" "$2" > "$RESULT.new"
+  mv "$RESULT.new" "$RESULT"
+  say "$2"
+}
+
+# The files a slot needs, from where the Pi OS packages put them: the top of the boot partition.
+fill_slot() { # DIR
+  local d="$1" f
+  rm -rf "$d.tmp"; install -d "$d.tmp/overlays"
+  for f in kernel_2712.img kernel8.img initramfs_2712 initramfs8 cmdline.txt; do [ ! -f "$BOOT_DIR/$f" ] || cp "$BOOT_DIR/$f" "$d.tmp/$f"; done
+  cp "$BOOT_DIR"/bcm27*.dtb "$d.tmp/" 2>/dev/null || true
+  cp -R "$BOOT_DIR/overlays/." "$d.tmp/overlays/"
+  # With a README there, the firmware loads overlays from this slot, not the shared folder (config_txt docs).
+  [ -f "$d.tmp/overlays/README" ] || echo "Overlays for this boot slot (D336)." > "$d.tmp/overlays/README"
+  { [ -f "$d.tmp/kernel_2712.img" ] || [ -f "$d.tmp/kernel8.img" ]; } && ls "$d.tmp"/bcm27*.dtb >/dev/null 2>&1 || { rm -rf "$d.tmp"; return 1; }
+  sync
+  mv "$d.tmp" "$d"
+}
+
+cmd_status() {
+  echo "boots: ${BOOT_DIR}/$(committed)/ (empty: the top of the boot partition)"
+  echo "kernel running: $(uname -r)"
+  [ -e "$TRY" ] && echo "trying: $(state_get "$TRY" slot), since $(state_get "$TRY" at)"
+  [ -e "$RESULT" ] && echo "last result: $(tr -d '\n' < "$RESULT")"
+  echo "free on the boot partition: $(df -m --output=avail "$BOOT_DIR" | tail -1) MB"
+  return 0
+}
+
+cmd_try() {
+  local packages=no saved="" slot id busy
+  [ "${1:-}" = --packages ] && packages=yes
+  [ "$(id -u)" = 0 ] || stop "run as root"
+  [ ! -e "$TRY" ] || stop "a try is already waiting for its restart ($(state_get "$TRY" slot)). Restart the cabinet, or remove $TRY."
+  [ ! -e "$STATE/pending" ] || stop "an update is in progress."
+  busy="$(busy_reason)"; [ -z "$busy" ] || stop "$busy. Try again when the cabinet is free."
+  [ "$(df -m --output=avail "$BOOT_DIR" | tail -1)" -ge 120 ] || stop "under 120 MB free on the boot partition."
+  if [ "$packages" = yes ]; then
+    [ -n "$(committed)" ] || stop "this cabinet still boots from the top of the boot partition, which the packages overwrite. Run 'arcade-boot try' once first."
+    id="$(date -u +%Y%m%d%H%M%S)"
+    saved="$STATE/boot-$id"
+    local names plan
+    names="$(dpkg-query -W -f='${db:Status-Status} ${Package}\n' $BOOT_PACKAGES 2>/dev/null | sed -n 's/^installed //p' | grep -v '^rpi-eeprom$' | sort -u)"
+    apt-get update -q || stop "couldn't reach the package servers."
+    apt-mark unhold $names >/dev/null
+    plan="$(apt-get -s -q install --only-upgrade $names 2>/dev/null | awk '/^Inst /{ v=$3; gsub(/[\[\]]/, "", v); print $2 "=" v }')"
+    if [ -z "$plan" ]; then hold_boot; say "the boot packages are up to date: nothing to try"; return 0; fi
+    say "updating: $(echo $plan | tr ' ' ',')"
+    # shellcheck disable=SC2086
+    apt_save "$saved" $plan || { hold_boot; stop "couldn't keep a copy of the boot packages first."; }
+    DEBIAN_FRONTEND=noninteractive apt-get -y -q -o Dpkg::Options::=--force-confold install --only-upgrade $names || { apt_back "$saved"; hold_boot; stop "the packages didn't install; put back."; }
+    hold_boot
+  fi
+  id="${id:-$(date -u +%Y%m%d%H%M%S)}"
+  slot="arcade-$id"
+  fill_slot "$BOOT_DIR/$slot" || stop "the new slot is missing a kernel or a device tree."
+  sed -i "1s/\$/ arcade.slot=$id/" "$BOOT_DIR/$slot/cmdline.txt"
+  config_with "$slot" > "$BOOT_DIR/tryboot.txt.new" && sync && mv "$BOOT_DIR/tryboot.txt.new" "$BOOT_DIR/tryboot.txt"
+  state_write "$TRY" "slot=$slot" "id=$id" "previous=$(committed)" "saved=$saved" "at=$(date -u +%FT%TZ)" "kernel_before=$(uname -r)"
+  sync
+  say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to $(committed || true)."
+  $REBOOT_TRY
+}
+
+cmd_confirm() {
+  [ -e "$TRY" ] || return 0
+  local slot id
+  slot="$(state_get "$TRY" slot)"; id="$(state_get "$TRY" id)"
+  if ! grep -qw "arcade.slot=$id" "$CMDLINE"; then
+    # The try never came up, or the Pi was restarted before it was kept: this is the last good boot.
+    [ -z "$(state_get "$TRY" saved)" ] || apt_back "$(state_get "$TRY" saved)"
+    hold_boot
+    result false "the try of $slot didn't come up (a hang, a crash or a restart): the cabinet went back to $(committed)"
+    rm -f "$TRY"
+    return 0
+  fi
+  say "this is the try of $slot: checking the network and the service"
+  if net_ok "$CONFIRM_TRIES" && service_up 60 && systemctl is-active --quiet arcade-kiosk; then
+    config_with "$slot" > "$BOOT_DIR/config.txt.new" && sync && mv "$BOOT_DIR/config.txt.new" "$BOOT_DIR/config.txt" && sync
+    [ "$(committed)" = "$slot" ] || { result false "couldn't write config.txt to keep $slot"; rm -f "$TRY"; $REBOOT; return 0; }
+    result true "kept $slot: kernel $(uname -r)"
+    rm -f "$TRY"
+    return 0
+  fi
+  [ -z "$(state_get "$TRY" saved)" ] || apt_back "$(state_get "$TRY" saved)"
+  hold_boot
+  result false "the try of $slot came up without its network or the service: restarting into $(committed)"
+  rm -f "$TRY"
+  sync
+  $REBOOT
+}
+
+case "${1:-}" in
+  status) cmd_status ;;
+  try) shift; cmd_try "$@" ;;
+  confirm) cmd_confirm ;;
+  *) sed -n '2,8p' "$0" >&2; exit 2 ;;
+esac

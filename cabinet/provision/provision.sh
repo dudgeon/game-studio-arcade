@@ -38,6 +38,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/cabinet-config.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/twin-data.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/update-guard.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
@@ -195,6 +197,7 @@ hw_late
 step_boot_wait
 stage "Starting the arcade"
 step_services
+step_update_guard
 stage "Finishing"
 install -d /etc/arcade
 echo "$RELEASE_NAME" > /etc/arcade/provisioned-version
