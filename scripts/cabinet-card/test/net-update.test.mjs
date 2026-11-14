@@ -104,8 +104,8 @@ test("arcade-boot: a try writes tryboot.txt and a new folder only; keeping it re
   const tryFn = s.slice(s.indexOf("cmd_try() {"), s.indexOf("cmd_confirm() {"));
   assert.doesNotMatch(tryFn, /config\.txt\.new|> "\$BOOT_DIR\/config\.txt"/, "a try never writes config.txt");
   assert.match(tryFn, /tryboot\.txt\.new.*mv/);
-  assert.ok(tryFn.indexOf("state_write \"$TRY\"") < tryFn.indexOf('systemctl reboot "0 tryboot"'));
-  assert.doesNotMatch(s, /systemctl reboot 0 tryboot/, "one argument, as Raspberry Pi's reboot '0 tryboot'");
+  assert.ok(tryFn.indexOf("state_write \"$TRY\"") < tryFn.indexOf('--reboot-argument="0 tryboot"'));
+  assert.doesNotMatch(s, /systemctl reboot "?0 tryboot/, "systemd 257 refuses a positional reboot argument");
   assert.match(tryFn, /grep -v '\^rpi-eeprom\$'/, "the bootloader is never part of a boot try");
   const confirm = s.slice(s.indexOf("cmd_confirm() {"));
   assert.ok(confirm.indexOf("net_ok") < confirm.indexOf("config.txt.new"), "kept only after the network and the service");

@@ -136,8 +136,9 @@ cmd_try() {
   state_write "$TRY" "slot=$slot" "id=$id" "previous=$(committed)" "saved=$saved" "at=$(date -u +%FT%TZ)" "kernel_before=$(uname -r)"
   sync
   say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to ${BOOT_DIR}/$(committed)/."
-  # One argument, "0 tryboot", as in Raspberry Pi's `reboot '0 tryboot'` (the rehearsal caught it split in two).
-  if ! { if [ -n "${ARCADE_REBOOT_TRY:-}" ]; then $ARCADE_REBOOT_TRY; else systemctl reboot "0 tryboot"; fi; }; then
+  # "0 tryboot" as reboot(2)'s argument, as Raspberry Pi's `reboot '0 tryboot'`. systemd 257 refuses `systemctl reboot ARG`
+  # ("Too many arguments", found in the rehearsal); --reboot-argument is its way.
+  if ! { if [ -n "${ARCADE_REBOOT_TRY:-}" ]; then $ARCADE_REBOOT_TRY; else systemctl reboot --reboot-argument="0 tryboot"; fi; }; then
     rm -f "$TRY" "$BOOT_DIR/tryboot.txt"
     [ -z "$saved" ] || apt_back "$saved"
     hold_boot
