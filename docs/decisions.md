@@ -1794,3 +1794,39 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **The kids' games keep their makers and lineage.** `cart.json` (maker, parent, family, branch, session) and the library's history come back byte for byte, and so does `makers.json`.
 - **Not carried, by design (D292):** `cabinet-state.json`, so the welcome screens show once more and a "resting" month is forgotten until the workspace limit refuses again. Also the Manager pairing (re-pair) and `kit-uploads.json` (re-uploaded on the first make).
 - **The loss window is the time since the last backup:** an hour normally, longer if the mini slept or the Picade was off the Wi-Fi. A card that still boots should get one more `run.mjs` first.
+
+## 2026-11-14 — The day-one card (SD-card worker)
+
+Geoff chose a clean start for the kids' first switch-on (through the director, 2026-11-13): a full pot, a short shelf, and no Tester names. The "off the shelf" mark is the Manager worker's (D360). Its format was relayed by the director and confirmed with the Manager worker directly: its reader takes any `via`, and `"by": "geoff"` is right.
+
+**D356. `flash.mjs --day-one FILE`, applied to the card's copy only.** *(Claude.)*
+- The file is JSON: `{"pot": "full", "hide_makers": ["tester", "tester2"], "shelf": ["teti", "teti-geoff", ...]}`.
+- The flash applies it to its snapshot of the twin's data (D324), after `seed()` and before packing. The twin, the backup and the mini keep everything as it was. `twin.mjs sync` later sets the twin's own versions aside (D294), never deleting them.
+- The flash stops before touching the card if the file names a game or maker the data doesn't have, so a typo can't silently drop a game.
+- **Never with `--from-backup`:** a rebuilt card comes back as it was (D354), so the two together are refused.
+
+**D357. A full pot: the twin's test ledger isn't carried.** *(Claude.)* `logs/coin_ledger.jsonl` is left out of the card's copy. The pot is worked out from that ledger alone (D355), so the Picade starts the month with the service's own refill: 100 coins. The twin keeps its ledger in its records on the mini.
+
+**D358. The shelf and the makers, as D360 marks.** *(Claude.)*
+- The card's copy gets `"remove"` lines in `logs/shelf_marks.jsonl`, in the Manager's format:
+  - `kind: "maker"` for each hidden maker (`makers.json` itself is never touched);
+  - `kind: "game"` for every shelf line not chosen.
+- Every mark has `by: "geoff"`, `via: "day-one"`, Geoff's reason, and a trailing newline.
+- **Lines, not carts:** a game mark targets a line (a cart's `branch`, or its own id). So one mark hides a game with all its versions, and a kid's own version is a line of its own. A day-one file may name any cart in a line to keep the whole line.
+- Everything stays on the card (D5). A grown-up brings a game or maker back from the Manager with a `"restore"` mark.
+- **Starters:** the starter games are lines like any other (the twin carries its own copies of them). A shelf list that leaves them out marks them off too.
+- **Until the Manager's reader is on main,** the marks are on the card but nothing reads them, so every game and maker still shows.
+
+**D359. Speech's install files leave the card after first boot.** *(Claude, from the update worker's finding.)* Once first boot has succeeded and `/opt/arcade/speech/speech.json` exists, `firstboot.sh` removes `seed/speech` (wheels and model, about 291 MB) from the boot partition. That leaves about 397 MB free there instead of about 115.
+- **Safe for a re-run:** a failed first boot keeps the files for its retry. A successful one never runs again (`provisioned-version`). Provisioning run again by an update doesn't use the card's copy: `speech.sh` skips what's installed, and fetches from the internet otherwise.
+
+**Rehearsed on 2026-11-14** (throwaway twin: three games, one with a version on its line, a Tester2 game, Tester and Tester2, and a ledger written by the service's own pot code down to 66 coins):
+- **Run 11, day-one** (shelf: teti, teti-geoff, rehearsal-dodge):
+  - The pot was 100 coins, with one ledger line (the month's refill).
+  - Three marks, owned by `arcade`, all via `day-one` by `geoff`: the makers tester and tester2, and the game line tester2-catch. rehearsal-dodge-v2 stays with its line.
+  - `makers.json` was unchanged, and all the games' files were carried.
+  - Speech's files were removed (291 MB), leaving 397 MB free on the boot partition. First boot exited 0.
+- **Run 12, `--from-backup` from the same folder:**
+  - Everything as it was: 66 coins, all four ledger lines, no marks.
+  - `--day-one` together with `--from-backup` stopped before writing anything.
+- Neither run showed the marks taking effect, since the Manager's reader isn't on main yet.

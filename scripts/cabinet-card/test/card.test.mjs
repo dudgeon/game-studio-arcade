@@ -594,3 +594,81 @@ test("picade-key.sh refuses arguments and a missing terminal, and --check says t
   assert.match(check.stderr, /no Picade identity at .* yet: run scripts\/cabinet-card\/picade-key\.sh first/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---- The day-one card (D356-D359) ----
+
+test("day-one: a full pot, Tester off \"Who's making?\", and marks for every shelf line not chosen, in D360's format", async () => {
+  const { applyDayOne, parseDayOne, MARKS, VIA } = await import("../day-one.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "day-one-"));
+  const cart = (id, extra = {}) => {
+    fs.mkdirSync(path.join(dir, "carts", id), { recursive: true });
+    fs.writeFileSync(path.join(dir, "carts", id, "cart.json"), JSON.stringify({ id, title: id, ...extra }));
+  };
+  cart("rock-rain");
+  cart("candy-cat-drop");
+  cart("candy-cat-drop-v2", { branch: "candy-cat-drop" });
+  cart("fruit-cat-drop", { parent: "candy-cat-drop@1" });
+  cart("apple-catch");
+  fs.mkdirSync(path.join(dir, "logs"));
+  fs.writeFileSync(path.join(dir, "logs/coin_ledger.jsonl"), '{"kind":"charge"}\n');
+  const makers = [{ id: "tester", name: "Tester" }, { id: "tester2", name: "Tester2" }, { id: "geoff", name: "Geoff", grown_up: true }];
+  fs.writeFileSync(path.join(dir, "makers.json"), JSON.stringify(makers));
+  const before = fs.readFileSync(path.join(dir, "makers.json"), "utf8");
+  const spec = parseDayOne(JSON.stringify({ pot: "full", hide_makers: ["tester", "tester2"], shelf: ["teti", "teti-geoff", "rock-rain", "candy-cat-drop-v2"] }));
+  const now = new Date("2026-11-14T09:00:00Z");
+  const d = applyDayOne(dir, spec, { guestIds: ["teti", "teti-geoff"], now });
+  assert.equal(d.ledgerLeftOff, true);
+  assert.ok(!fs.existsSync(path.join(dir, "logs/coin_ledger.jsonl")), "the copy's ledger is left off: the pot starts full");
+  assert.equal(fs.readFileSync(path.join(dir, "makers.json"), "utf8"), before, "makers.json is never touched (D360)");
+  assert.deepEqual(d.shelf, ["candy-cat-drop", "rock-rain", "teti", "teti-geoff"], "naming a version keeps its whole line");
+  assert.deepEqual(d.offShelf, ["apple-catch", "fruit-cat-drop"], "a kid's own version is its own line");
+  const text = fs.readFileSync(path.join(dir, MARKS), "utf8");
+  assert.ok(text.endsWith("\n"));
+  const lines = text.trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((m) => `${m.kind}:${m.target}`), ["maker:tester", "maker:tester2", "game:apple-catch", "game:fruit-cat-drop"]);
+  for (const m of lines) {
+    assert.equal(m.type, "shelf_mark");
+    assert.equal(m.action, "remove");
+    assert.equal(m.by, "geoff");
+    assert.equal(m.via, VIA);
+    assert.equal(m.at, "2026-11-14T09:00:00.000Z");
+    assert.match(m.id, /^sm_[0-9a-z]+$/);
+    assert.equal(typeof m.reason, "string");
+  }
+  assert.equal(new Set(lines.map((m) => m.id)).size, lines.length, "every mark has its own id");
+  // Unknown ids are reported (the flash stops on them), not guessed.
+  const d2 = applyDayOne(dir, parseDayOne(JSON.stringify({ hide_makers: ["nobody"], shelf: ["no-such-game"] })), { guestIds: [] });
+  assert.deepEqual(d2.unknownMakers, ["nobody"]);
+  assert.deepEqual(d2.unknownGames, ["no-such-game"]);
+  for (const bad of ["{", '{"pot":"empty"}', '{"shelf":"teti"}', '{"hide":["x"]}', '{"shelf":["Bad Id"]}']) assert.throws(() => parseDayOne(bad));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("--day-one is never applied to a restore from the backup (D354, D356)", () => {
+  const src = fs.readFileSync(FLASH, "utf8");
+  assert.match(src, /if \(flag\("--from-backup"\)\) stop\("--day-one is a clean start; --from-backup brings a card back as it was/);
+});
+
+test("first boot removes speech's install files from the card after a full success, and keeps them for a retry (D359)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "card-speech-"));
+  const run = (exitCode, installed) => {
+    const seed = path.join(root, `seed-${exitCode}-${installed}`);
+    const src = path.join(root, "src");
+    fs.mkdirSync(path.join(seed, "speech/models"), { recursive: true });
+    fs.writeFileSync(path.join(seed, "speech/models/encoder.ort"), "x".repeat(1000));
+    fs.writeFileSync(path.join(seed, "profile"), "picade\n");
+    fs.mkdirSync(src, { recursive: true });
+    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] == 1/1 Finishing"\nexit ${exitCode}\n`);
+    execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
+    const speechJson = path.join(root, installed ? "speech.json" : "not-there.json");
+    if (installed) fs.writeFileSync(speechJson, "{}");
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, `work-${exitCode}`), ARCADE_SCREEN: path.join(root, "tty"), ARCADE_SPEECH_JSON: speechJson, ARCADE_TICK_S: "30" } });
+    return { log: r.stdout, kept: fs.existsSync(path.join(seed, "speech")) };
+  };
+  const ok = run(0, true);
+  assert.ok(!ok.kept, ok.log);
+  assert.match(ok.log, /removed speech's install files from the card, \d+ MB freed/);
+  assert.ok(run(3, true).kept, "a failed first boot keeps them for the retry");
+  assert.ok(run(0, false).kept, "not installed: kept");
+  fs.rmSync(root, { recursive: true, force: true });
+});

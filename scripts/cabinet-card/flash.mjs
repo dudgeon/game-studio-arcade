@@ -18,7 +18,8 @@
 // (or "psk"), mode 0600, owned by you (D327).
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
-// --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
+// --day-one FILE gives the card Geoff's clean start (D356-D358: a full pot, chosen shelf, hidden makers; never with
+// --from-backup). --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
 // --from-backup takes it from the mini's hourly backup of the Picade instead of the twin: the card died (D354);
 // The identity comes from scripts/cabinet-card/picade-key.sh, run once before (D329); --prepare-identity asks for the
 // key here instead (repair). --no-identity writes a card that starts offline; --no-groq leaves Groq off (Moonshine only);
@@ -47,6 +48,7 @@ import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/l
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { backupDir, cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
 import { IDENTITY_FILE, lockWorkspace, readIdentity } from "./picade-key.mjs";
+import { applyDayOne, parseDayOne } from "./day-one.mjs";
 import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, wifiFromFile, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
@@ -272,6 +274,18 @@ function twinSnapshot(work) {
     r = twinSeed(folderEnd(dir), twin, new Date());
   } catch (e) {
     stop(`couldn't take the twin's data for the card: ${/** @type {Error} */ (e).message}. Or flash with --no-seed.`);
+  }
+  // D356-D358: Geoff's clean start, on this copy only. Never on a restore: a rebuilt card comes back as it was (D354).
+  const dayOne = opt("--day-one");
+  if (dayOne) {
+    if (flag("--from-backup")) stop("--day-one is a clean start; --from-backup brings a card back as it was. Use one or the other.");
+    const spec = parseDayOne(readFileSync(resolve(dayOne), "utf8"));
+    const guestIds = existsSync(join(REPO, "guests")) ? readdirSync(join(REPO, "guests")).filter((g) => existsSync(join(REPO, "guests", g, "guest.json"))) : [];
+    const d = applyDayOne(dir, spec, { guestIds });
+    if (d.unknownGames.length || d.unknownMakers.length) {
+      stop(`the day-one file names ${[...d.unknownGames.map((g) => `game "${g}"`), ...d.unknownMakers.map((m) => `maker "${m}"`)].join(", ")}, which the twin's data doesn't have. Check the ids; nothing was written.`);
+    }
+    say(`day-one: pot ${spec.pot === "full" ? "full (the twin's test ledger left off)" : "as it is"}; ${d.hidden.length} makers off "Who's making?" (${d.hidden.join(", ") || "none"}); ${d.shelf ? `${d.shelf.length} games on the shelf (${d.shelf.join(", ")}), ${d.offShelf.length} carried off it` : "shelf as it is"}`);
   }
   const tgz = join(work, "twin-data.tar.gz");
   run("tar", ["-czf", tgz, "--no-xattrs", "--no-mac-metadata", "-C", dir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });

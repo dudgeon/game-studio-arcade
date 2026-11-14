@@ -67,6 +67,13 @@ fi
 stop_ticker
 show "Done." "Restarting..."
 echo "=== firstboot ok $(date -u) ==="
+# D359: speech's wheels and model (about 324 MB) are installed in /opt/arcade/speech now, so the card's copy only
+# fills the boot partition. A re-run of provisioning doesn't need it (speech.sh skips what's installed), and first
+# boot never runs again once it has succeeded. Only after a full success; a failed first boot keeps it for the retry.
+if [ -d "$SEED/speech" ] && [ -f "${ARCADE_SPEECH_JSON:-/opt/arcade/speech/speech.json}" ]; then
+  freed="$(du -sm "$SEED/speech" 2>/dev/null | cut -f1)"
+  rm -rf "$SEED/speech" && sync && echo "=== firstboot: removed speech's install files from the card, ${freed:-?} MB freed ==="
+fi
 touch "$SEED/provision.ok"
 # The picade profile asks for one restart when it changed config.txt (D250): its overlay and screen power
 # only start at boot. The virtual profile never asks.
