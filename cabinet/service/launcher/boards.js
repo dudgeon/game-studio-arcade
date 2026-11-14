@@ -211,7 +211,7 @@ const TAG_BG = { new: C.yellow, check: C.aqua, starter: C.gray, version: C.navy 
 /** @param {Painter} p @param {any} v */
 function shelf(p, v) {
   if (v.unconnected) header(p, v.console ?? "Arcade", "Not connected");
-  else if (v.offline) header(p, v.console ?? "Arcade", "No Wi-Fi");
+  else if (v.offline) header(p, v.console ?? "Arcade", v.offlineWord ?? "No Wi-Fi");
   else header(p, v.console ?? "Arcade", v.pot != null ? `Pot ${num(v.pot)}` : "", v.pot != null);
   /** @type {any[]} */
   const items = v.items;

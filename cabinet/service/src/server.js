@@ -43,6 +43,7 @@
 //   everything else              createPlayerHandler (/api/carts, /api/plays, /api/you-check, /runtime/…, /carts/…)
 import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlayerHandler } from "@game-studio-arcade/player";
@@ -106,6 +107,7 @@ function readJson(req) {
  *   mcp?: ReturnType<typeof import("./arcade-mcp.js").createArcadeMcp> | null,
  *   launches?: ReturnType<typeof import("./arcade-mcp.js").launchRelay> | null,
  *   marks?: ReturnType<typeof import("./shelf-marks.js").shelfMarks> | null,
+ *   wifi?: import("./wifi-client.js").WifiPort | null,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -227,6 +229,16 @@ export function createServiceHandler(o) {
       o.speech.feed({ text: body.text, wav: body.wav });
       return json(res, 200, { ok: true });
     }
+    // D414: the launcher's Wi-Fi screens. Loopback only, like everything here; the password goes to the helper
+    // and nowhere else: not a log, not the Studio's records.
+    if (pathname === "/api/wifi/scan" || pathname === "/api/wifi/join") {
+      if (!o.wifi) throw new HttpError(404, "no Wi-Fi settings on this cabinet");
+      if (pathname === "/api/wifi/scan") return json(res, 200, { ...(await o.wifi.scan()), ok: true });
+      if (typeof body.ssid !== "string" || (body.password != null && typeof body.password !== "string")) throw new HttpError(400, "ssid and password are text");
+      const r = await o.wifi.join({ ssid: body.ssid, password: body.password ?? null, security: typeof body.security === "string" ? body.security : undefined });
+      // A result is the answer either way: "joined" says whether it worked.
+      return json(res, 200, { ...r, joined: !!r.ok, host: os.hostname(), ok: true });
+    }
     throw new HttpError(404, "no such endpoint");
   };
 
@@ -308,7 +320,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer"]);
+  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
@@ -342,6 +354,13 @@ export function createServiceHandler(o) {
       if (pathname === "/api/pot") return json(res, 200, potView(60));
       if (pathname === "/api/boot") return json(res, 200, o.cabinet?.boot() ?? { intro: false, new_month: false });
       if (pathname === "/api/studio") return json(res, 200, o.studio.state());
+      if (pathname === "/api/wifi") {
+        if (!o.wifi) return json(res, 200, { available: false });
+        return void o.wifi.status().then(
+          (st) => json(res, 200, { ...st, available: true }),
+          () => json(res, 200, { available: true, ok: false }),
+        );
+      }
       if (pathname === "/api/arcade/playing") return json(res, 200, { playing: o.plays?.playing() ?? false, what: o.plays?.what() ?? null, gate_busy: o.gateBusy?.() ?? false });
       if (pathname === "/api/studio/events") return events(res);
       if (pathname === "/api/arcade/launch") {
