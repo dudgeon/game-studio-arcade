@@ -373,13 +373,22 @@ async function writeBoot(mount, seedDir, cloud) {
     want.set(path, createHash("sha256").update(text).digest("hex"));
   }
   // macOS leaves AppleDouble files beside anything with extended attributes on FAT.
-  const sweep = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
+  // Only the card's top level and our seed: macOS makes its own locked folders on a mounted card (.Spotlight-V100,
+  // .fseventsd), which aren't ours to read. The first real flash stopped on one (2026-11-14).
+  const sweep = (dir, deep) => {
+    let entries = [];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
       if (e.name.startsWith("._")) rmSync(join(dir, e.name), { force: true });
-      else if (e.isDirectory()) sweep(join(dir, e.name));
+      else if (deep && e.isDirectory()) sweep(join(dir, e.name), true);
     }
   };
-  sweep(mount);
+  sweep(mount, false);
+  sweep(seed, true);
   run("sync", []);
   for (const [path, sha] of want) if ((await sha256File(path)) !== sha) stop(`${path} didn't read back as written`);
   say(`seed and cloud-init files written and read back (${want.size} files)`);
@@ -489,8 +498,15 @@ async function main() {
     console.log(describe(info, partitionsOf(diskId)).join("\n"));
     const phrase = confirmPhrase(info);
     console.log(`\nIt becomes the cabinet's card: Raspberry Pi OS Lite ${lock.image.name}, hostname ${hostname}, profile ${PROFILE}.`);
-    const typed = ask(`Type "${phrase}" to erase it, or anything else to stop: `);
-    if (typed.trim() !== phrase) stop("nothing written.");
+    // D394: a wrapper that already names this exact card (disk and size) can pass the phrase; any other card stops.
+    const given = opt("--erase-confirmed");
+    if (given !== undefined) {
+      if (given !== phrase) stop(`--erase-confirmed says "${given}", but this card is "${phrase}". Nothing written.`);
+      say(`erasing ${diskId} (${phrase.split(" ").pop()}), as confirmed`);
+    } else {
+      const typed = ask(`Type "${phrase}" to erase it, or anything else to stop: `);
+      if (typed.trim() !== phrase) stop("nothing written.");
+    }
     confirmed = info;
     target = `/dev/r${diskId}`;
   } else {

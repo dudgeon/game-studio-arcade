@@ -1952,3 +1952,11 @@ Geoff chose a clean start for the kids' first switch-on (through the director, 2
 7. the kids' first make.
 
 Each step says what Geoff does, what he'll see, and what Claude does from the mini meanwhile, using the current scripts.
+
+**D393. A cable to the router works too: the card asks for wired Ethernet alongside the Wi-Fi.** *(Director's ask, 2026-11-14, before the first flash.)*
+- **The change:** the card's `network-config` now has `ethernets: eth0: {dhcp4: true, optional: true}` beside `wifis`. If the Wi-Fi details are wrong or the basement signal is weak, a cable from the router into the Pi's Ethernet port gets first boot online, and the mini finds the cabinet on `arcade.local`.
+  - `optional`: no boot waits for a cable.
+  - While a cable is plugged in, NetworkManager prefers it (its default route metrics). The Wi-Fi stays the everyday path.
+- **What already worked:** every QEMU rehearsal ran wired-only, through NetworkManager's automatic "Wired connection 1" (rehearsal 1 listed it). So a card written before this change, such as Geoff's first, gets the cable fallback the same way. This makes it the card's own request, not a default.
+- **Proven:** the unit test checks the block. The wired-only rehearsal of a card with the block was stopped while Geoff's flash ran, so it hasn't run yet; it's the next rehearsal. mDNS from the mini can't be shown in QEMU's user-mode network, only on the home network.
+- **flash-day.md** gains "If it doesn't show up on the network", and its adopt line now says what D336 does: one restart of about a minute, with the slot kept only if Wi-Fi and the shelf come back (bring-up F2).

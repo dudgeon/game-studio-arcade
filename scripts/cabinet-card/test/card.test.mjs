@@ -52,6 +52,7 @@ test("network-config holds the WPA key, never the password, and quotes any netwo
   assert.ok(!text.includes("correct horse battery"));
   assert.match(text, /^network:$/m);
   assert.match(text, /renderer: NetworkManager/);
+  assert.match(text, /\n  ethernets:\n    eth0:\n      dhcp4: true\n      optional: true\n  wifis:\n/, "a cable works too, and no boot waits for one (D393)");
   assert.match(text, /regulatory-domain: "US"/);
   const nameLine = text.split("\n").find((l) => l.endsWith(":") && l.trim().startsWith('"'));
   assert.equal(JSON.parse(nameLine.trim().slice(0, -1)), ssid, "the name survives quoting");
@@ -749,4 +750,10 @@ test("commit-starters.sh commits the twin's untracked starters the first-boot wa
   assert.equal(busy.status, 4);
   assert.match(busy.stdout, /a make is running/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("--erase-confirmed must name this exact card, or the flash stops before writing (D394)", () => {
+  const src = fs.readFileSync(FLASH, "utf8");
+  assert.match(src, /const given = opt\("--erase-confirmed"\);\n\s+if \(given !== undefined\) \{\n\s+if \(given !== phrase\) stop\(/);
+  assert.ok(src.indexOf('opt("--erase-confirmed")') < src.indexOf("confirmed = info;"), "checked before the card is marked confirmed");
 });
