@@ -280,15 +280,26 @@ function say(p, v) {
   const cy = Math.max(y + 34, 92);
   const listening = v.phase === "listening";
   const hearing = v.phase === "hearing";
-  const pulse = listening ? 3 + Math.floor(((v.tick ?? 0) % 30) / 6) : 0;
-  if (listening) p.fb.circ(W / 2, cy, 18 + pulse, C.coral);
-  p.fb.circfill(W / 2, cy, 16, listening ? C.red : hearing ? C.gray : C.blue);
+  // D492: the mic gone quiet for good while the button is still down says so, not a pulsing mic.
+  const lost = listening && v.live?.stopped === true;
+  const pulse = listening && !lost ? 3 + Math.floor(((v.tick ?? 0) % 30) / 6) : 0;
+  if (listening && !lost) p.fb.circ(W / 2, cy, 18 + pulse, C.coral);
+  p.fb.circfill(W / 2, cy, 16, lost ? C.gray : listening ? C.red : hearing ? C.gray : C.blue);
   p.fb.rectfill(W / 2 - 3, cy - 10, 7, 13, C.white);
   p.fb.rectfill(W / 2 - 6, cy + 1, 13, 2, C.white);
   p.fb.rectfill(W / 2 - 1, cy + 3, 3, 5, C.white);
   p.fb.rectfill(W / 2 - 5, cy + 8, 11, 2, C.white);
-  const msg = listening ? "Listening... let go when you're done" : hearing ? "Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : v.purpose === "name" ? "Hold any button and say your name" : "Hold any button and talk";
-  p.box({ id: "say-message", text: msg, x: M, y: cy + 25, w: INNER, h: heightOf(2), color: listening ? C.pink : v.phase === "silence" ? C.yellow : C.white, align: "center", onCut: "never" });
+  const held = v.live?.seconds ?? 0;
+  const clock = `${Math.floor(held / 60)}:${String(held % 60).padStart(2, "0")}`;
+  const msg = lost ? "The mic stopped hearing you. Let go and try again." : listening ? `Listening ${clock}. Let go when you're done.` : hearing ? "Stopped listening. Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : v.purpose === "name" ? "Hold any button and say your name" : "Hold any button and talk";
+  p.box({ id: "say-message", text: msg, x: M, y: cy + 25, w: INNER, h: heightOf(2), color: lost ? C.yellow : listening ? C.pink : v.phase === "silence" ? C.yellow : C.white, align: "center", onCut: "never" });
+  // D492: the last lines of what Moonshine hears so far, dimmer than final words: "what I'm hearing", not the record.
+  if (listening && !lost && v.live?.words) {
+    const wy = cy + 25 + 2 * LINE_H + 3;
+    const rows = Math.min(3, rowsFor(HINT_Y - wy - 2));
+    const shown = wrap(clean(v.live.words), colsFor(INNER)).slice(-rows).join("\n");
+    if (rows > 0) p.box({ id: "say-live", text: shown, x: M, y: wy, w: INNER, h: heightOf(rows), color: C.silver, align: "center", keepLines: true });
+  }
   if (!listening && !hearing && v.phase !== "silence") p.box({ id: "say-sub", text: "Let go to send it", x: M, y: cy + 25 + 2 * LINE_H, w: INNER, h: GLYPH_H, color: C.silver, align: "center" });
   // The key that types is F1 on a keyboard and the ENT button on the Picade (D82, D431).
   const ent = v.typeKey ?? "F1";

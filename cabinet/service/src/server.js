@@ -21,7 +21,9 @@
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/game-ai            {cart_id, play_id, kind, name, ask, …}: a game's g.ai ask (D480, src/game-ai.js)
 //   POST /api/game-ai/voice      {cart_id, play_id, name, ask, actions}: ends a hold-to-talk in a game; one action back (D489)
-//   POST /api/speech/start, stop hold-to-talk (D87, D184)
+//   POST /api/speech/start, stop hold-to-talk (D87, D184); start {live: true} for words while talking (D492)
+//   POST /api/speech/cancel      drop a hold, nothing transcribed (D491)
+//   GET  /api/speech/live        the words so far while a button is down (D492)
 //   POST /api/speech/feed        {text} or {wav}: the stub only
 //   GET  /api/guests, POST /api/guest-plays  guest games (D230-D232, src/guests.js)
 //   GET  /api/pot                the family coin pot and its ledger, newest first (D202, A1, A2)
@@ -252,7 +254,7 @@ export function createServiceHandler(o) {
       return json(res, 200, { ok: true });
     }
     if (pathname === "/api/speech/start") {
-      o.speech.start();
+      o.speech.start(body.live === true ? { live: true } : {}); // D492: words while talking, for the talk screens
       return json(res, 200, { ok: true });
     }
     if (pathname === "/api/speech/cancel") {
@@ -363,7 +365,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume", "/api/game-ai", "/api/speech/cancel", "/api/game-ai/voice"]);
+  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/live", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume", "/api/game-ai", "/api/speech/cancel", "/api/game-ai/voice"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
@@ -391,6 +393,8 @@ export function createServiceHandler(o) {
     if (o.guests?.api(req, res, pathname)) return;
     if (!OURS.has(pathname)) return player(req, res);
     if (req.method === "GET") {
+      // D492: the words heard so far, the seconds held, and whether the mic stopped, while a button is down.
+      if (pathname === "/api/speech/live") return json(res, 200, o.speech.live?.() ?? { listening: false, seconds: 0, words: null, stopped: false });
       if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind, keyboard: o.keyboard ?? true });
       // The list "Who's making?" offers, and every maker's name for the shelf's "by …", hidden ones too (D363).
       if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list().filter((m) => !o.marks?.makerOff(m.id)), names: Object.fromEntries(o.makers.read().map((m) => [m.id, m.name])) });

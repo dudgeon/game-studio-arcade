@@ -36,6 +36,8 @@ export const SPEECH_FILE = "/opt/arcade/speech/speech.json";
  * @typedef {object} Recorder
  * @property {() => void} start
  * @property {() => Promise<Buffer>} stop    the PCM captured since start, 16-bit little-endian, mono, 16 kHz
+ * @property {(fn: ((pcm: Buffer) => void) | null) => void} [onData]  each piece of audio as it arrives (D492)
+ * @property {() => boolean} [alive]  still capturing: false once the mic has gone while the button is still down
  * @property {() => void} [close]
  */
 /**
@@ -43,8 +45,29 @@ export const SPEECH_FILE = "/opt/arcade/speech/speech.json";
  * @property {string} name
  * @property {(pcm: Buffer) => Promise<string>} transcribe
  * @property {() => void} [warm]   get ready for a clip soon: called when a button goes down
+ * @property {LiveWords} [live]   words while the kid talks (D492): Moonshine only
  * @property {() => void} [close]
  */
+/**
+ * @typedef {object} LiveWords
+ * @property {() => Promise<void>} begin
+ * @property {(pcm: Buffer) => Promise<string>} add   the words so far
+ * @property {() => Promise<string>} end              the final words
+ */
+/** Live words get audio in steps of a quarter second (D492). */
+const LIVE_STEP_BYTES = RATE / 2;
+/** The end of the live words is what's shown: three lines need far fewer than this. */
+const LIVE_TAIL = 400;
+/**
+ * @typedef {{ listening: boolean, seconds: number, words: string | null, stopped: boolean }} LiveView
+ *   words: null when live words aren't on (none asked, no Moonshine, or it fell behind and stopped);
+ *   stopped: the mic went quiet for good while the button is still down
+ */
+/** The helper's requests that aren't a clip (moonshine_helper.py). */
+const WARM_OP = 0xffffffff;
+const LIVE_BEGIN = 0xfffffffe;
+const LIVE_AUDIO = 0xfffffffd;
+const LIVE_END = 0xfffffffc;
 /** Idle longer than this and Moonshine is warmed again when a hold starts. */
 export const WARM_AFTER_MS = 30_000;
 
@@ -72,6 +95,9 @@ export function alsaRecorder(o = {}) {
   let size = 0;
   /** @type {Promise<void> | null} */
   let ended = null;
+  /** @type {((pcm: Buffer) => void) | null} */
+  let listener = null;
+  let capturing = false;
   const findDevice = () => {
     if (o.device) return o.device;
     try {
@@ -95,9 +121,11 @@ export function alsaRecorder(o = {}) {
       child = c;
       let err = "";
       c.stderr?.on("data", (d) => (err = (err + d).slice(-400)));
+      capturing = true;
       c.stdout?.on("data", (/** @type {Buffer} */ d) => {
         chunks.push(d);
         size += d.length;
+        listener?.(d);
       });
       ended = new Promise((resolve) => {
         c.on("error", (e) => {
@@ -106,6 +134,7 @@ export function alsaRecorder(o = {}) {
         });
         c.on("close", (code, signal) => {
           if (code && signal !== "SIGINT" && signal !== "SIGTERM") o.log?.(`speech: arecord exited ${code}: ${err.trim()}`);
+          capturing = false;
           resolve();
         });
       });
@@ -120,12 +149,18 @@ export function alsaRecorder(o = {}) {
         await ended;
         clearTimeout(t);
       }
+      listener = null;
+      capturing = false;
       const pcm = Buffer.concat(chunks, size);
       for (const c of chunks) c.fill(0);
       chunks = [];
       size = 0;
       return pcm;
     },
+    onData(fn) {
+      listener = fn;
+    },
+    alive: () => capturing,
     close() {
       child?.kill("SIGKILL");
       child = null;
@@ -248,21 +283,51 @@ export function moonshineEngine(o) {
   launch();
 
   let lastUsed = 0;
+  /**
+   * One request to the helper, and its answer. @param {number} op  a clip's length, or one of the codes below
+   * @param {Buffer | null} [body]  sent after a second length, for LIVE_AUDIO
+   */
+  const ask = async (op, body = null) => {
+    if (!child && !closed) launch();
+    if (!(await ready)) throw new Error("Moonshine isn't running");
+    const c = /** @type {import("node:child_process").ChildProcess} */ (child);
+    const answer = new Promise((resolve) => waiting.push(resolve));
+    const head = Buffer.alloc(body ? 8 : 4);
+    head.writeUInt32LE(op);
+    if (body) head.writeUInt32LE(body.length, 4);
+    c.stdin?.write(head);
+    if (body?.length) c.stdin?.write(body);
+    lastUsed = Date.now();
+    /** @type {any} */
+    const msg = await answer;
+    if (msg.error) throw new Error(`Moonshine: ${msg.error}`);
+    return msg;
+  };
   /** @param {Buffer | null} pcm  null: warm up */
   const once = async (pcm) => {
+    if (!pcm) return String((await ask(WARM_OP)).text ?? "");
     if (!child && !closed) launch();
     if (!(await ready)) throw new Error("Moonshine isn't running");
     const c = /** @type {import("node:child_process").ChildProcess} */ (child);
     const answer = new Promise((resolve) => waiting.push(resolve));
     const head = Buffer.alloc(4);
-    head.writeUInt32LE(pcm ? pcm.length : 0xffffffff);
+    head.writeUInt32LE(pcm.length);
     c.stdin?.write(head);
-    if (pcm?.length) c.stdin?.write(pcm);
+    if (pcm.length) c.stdin?.write(pcm);
     lastUsed = Date.now();
     /** @type {any} */
     const msg = await answer;
     if (msg.error) throw new Error(`Moonshine: ${msg.error}`);
     return String(msg.text ?? "");
+  };
+  /** In the queue, after whatever is ahead of it. @template T @param {() => Promise<T>} fn @returns {Promise<T>} */
+  const inTurn = (fn) => {
+    const r = queue.then(fn);
+    queue = r.then(
+      () => {},
+      () => {},
+    );
+    return r;
   };
 
   return {
@@ -272,12 +337,12 @@ export function moonshineEngine(o) {
     },
     transcribe(pcm) {
       // One clip at a time, in order: the helper answers in the order it's asked. A long one goes in 30 s pieces (D470).
-      const r = queue.then(() => eachPiece(splitPcm(pcm, MOONSHINE_CHUNK_SECONDS), 1, once));
-      queue = r.then(
-        () => {},
-        () => {},
-      );
-      return r;
+      return inTurn(() => eachPiece(splitPcm(pcm, MOONSHINE_CHUNK_SECONDS), 1, once));
+    },
+    live: {
+      begin: () => inTurn(async () => void (await ask(LIVE_BEGIN))),
+      add: (pcm) => inTurn(async () => String((await ask(LIVE_AUDIO, pcm)).live ?? "")),
+      end: () => inTurn(async () => String((await ask(LIVE_END)).live ?? "")),
     },
     warm() {
       // Idle a while: the model may have gone cold. Warm it while the kid is still talking.
@@ -379,7 +444,7 @@ export function groqEngine(o) {
  * Real speech: a recorder and engines tried in order (Groq, then Moonshine). Logs which engine
  * answered and how long it took, never what was said or the audio.
  * @param {{ recorder: Recorder, engines: Engine[], online?: () => boolean, logFile?: string, log?: (m: string) => void, now?: () => number }} o
- * @returns {import("./speech.js").Speech & { close: () => void }}
+ * @returns {import("./speech.js").Speech & { close: () => void, live: () => LiveView }}
  */
 export function liveSpeech(o) {
   const now = o.now ?? Date.now;
@@ -390,6 +455,15 @@ export function liveSpeech(o) {
   const fedText = [];
   let startedAt = 0;
   const kind = o.engines.map((e) => e.name).join("+") || "none";
+  /** The engine whose live words show while the kid talks (D492): Moonshine on the cabinet. */
+  const liveEngine = o.engines.find((e) => e.live);
+
+  /**
+   * The live words of the hold under way, if it asked for them (D492).
+   * @type {null | { words: string, sent: number, busy: Promise<void>, pending: Buffer[], pendingBytes: number,
+   *   failed: boolean, feeder: NodeJS.Timeout | null, clip: Buffer | null }}
+   */
+  let live = null;
 
   /** @param {any} entry */
   const record = (entry) => {
@@ -400,14 +474,96 @@ export function liveSpeech(o) {
     } catch {}
   };
 
+  /** Send what's waiting to the stream, one request at a time, so a slow Pi batches rather than queues. */
+  const pump = () => {
+    const L = live;
+    if (!L || L.failed || !liveEngine?.live) return;
+    if (L.pendingBytes < LIVE_STEP_BYTES) return;
+    const piece = Buffer.concat(L.pending, L.pendingBytes);
+    L.pending = [];
+    L.pendingBytes = 0;
+    L.busy = L.busy.then(async () => {
+      try {
+        L.words = await /** @type {LiveWords} */ (liveEngine.live).add(piece);
+        L.sent += piece.length;
+      } catch (/** @type {any} */ e) {
+        L.failed = true;
+        o.log?.(`speech: live words stopped: ${e.message}`);
+      } finally {
+        piece.fill(0);
+      }
+    });
+    L.busy.then(pump);
+  };
+  /** @param {Buffer} d */
+  const take = (d) => {
+    if (!live) return;
+    const copy = Buffer.from(d); // the recorder wipes its own copy when the hold ends
+    live.pending.push(copy);
+    live.pendingBytes += copy.length;
+    pump();
+  };
+
+  /**
+   * End the hold's live words: send what hasn't gone, then the stream's final words. Null if there were none.
+   * @param {Buffer | null} pcm  the whole hold, to send what the stream hasn't had
+   */
+  const endLive = async (pcm) => {
+    const L = live;
+    live = null;
+    if (!L || !liveEngine?.live) return null;
+    if (L.feeder) clearInterval(L.feeder);
+    o.recorder.onData?.(null);
+    await L.busy;
+    for (const b of L.pending) b.fill(0);
+    if (L.failed) {
+      liveEngine.live.end().catch(() => {});
+      return null;
+    }
+    const rest = pcm ? Buffer.from(pcm.subarray(L.sent)) : null;
+    try {
+      if (rest?.length) await liveEngine.live.add(rest);
+      return (await liveEngine.live.end()).trim();
+    } catch {
+      return null;
+    } finally {
+      rest?.fill(0);
+    }
+  };
+
   return {
     kind,
-    start() {
+    /** @param {{ live?: boolean }} [opts]  live: words while the kid talks, for the talk screens (D492) */
+    start(opts = {}) {
       if (open) return;
       open = true;
       startedAt = now();
       if (!fedText.length) for (const e of o.engines) e.warm?.();
       if (!fed.length && !fedText.length) o.recorder.start();
+      if (opts.live && liveEngine?.live && !fedText.length) {
+        live = { words: "", sent: 0, busy: Promise.resolve(), pending: [], pendingBytes: 0, failed: false, feeder: null, clip: null };
+        const L = live;
+        L.busy = liveEngine.live.begin().catch((/** @type {any} */ e) => {
+          L.failed = true;
+          o.log?.(`speech: live words couldn't start: ${e.message}`);
+        });
+        if (fed.length) {
+          // A fed clip stands in for the mic: it reaches the stream half a second at a time, as speech would.
+          const clip = fed[0];
+          let at = 0;
+          L.feeder = setInterval(() => {
+            if (at >= clip.length) return;
+            take(clip.subarray(at, at + LIVE_STEP_BYTES * 2));
+            at += LIVE_STEP_BYTES * 2;
+          }, 100);
+        } else o.recorder.onData?.(take);
+      }
+    },
+    /** What the kid sees while holding the button (D492). */
+    live() {
+      const L = live;
+      const stopped = open && !fed.length && o.recorder.alive ? !o.recorder.alive() : false;
+      return { listening: open, seconds: open ? Math.floor((now() - startedAt) / 1000) : 0, words: L && !L.failed ? L.words.slice(-LIVE_TAIL) : null, stopped };
     },
     async stop(opts = {}) {
       if (!open) return { text: "" };
@@ -416,10 +572,14 @@ export function liveSpeech(o) {
       // D491: a game's voice action wants speed: Moonshine first, Groq only if it fails.
       const engines = opts.fast ? [...o.engines].sort((a, b) => (a.name === "moonshine" ? -1 : b.name === "moonshine" ? 1 : 0)) : o.engines;
       let pcm = fed.length ? /** @type {Buffer} */ (fed.shift()) : await o.recorder.stop();
+      // The stream's final words are Moonshine's answer for this hold: it has heard it all already (D492).
+      const liveFinal = live ? endLive(pcm) : null;
       const heldMs = now() - startedAt;
       const audioMs = Math.round((pcm.length / 2 / RATE) * 1000);
       if (pcm.length < RATE * 2 * 0.2) {
         record({ engine: null, held_ms: heldMs, audio_ms: audioMs, ms: 0, result: "too short" });
+        await liveFinal;
+        pcm.fill(0);
         return { text: "" };
       }
       /** @type {string[]} */
@@ -432,8 +592,9 @@ export function liveSpeech(o) {
           }
           const t = now();
           try {
-            const text = (await engine.transcribe(pcm)).trim();
-            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(opts.fast ? { fast: true } : {}), ...(pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
+            const streamed = engine === liveEngine && liveFinal ? await liveFinal : null;
+            const text = streamed ?? (await engine.transcribe(pcm)).trim();
+            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(opts.fast ? { fast: true } : {}), ...(liveFinal ? { live: true } : {}), ...(streamed == null && pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
             return { text };
           } catch (/** @type {any} */ e) {
             skipped.push(`${engine.name}: ${e.name === "TimeoutError" ? "timed out" : e.message}`);
@@ -443,6 +604,7 @@ export function liveSpeech(o) {
         o.log?.(`speech: no engine answered (${skipped.join("; ")})`);
         return { text: "" };
       } finally {
+        await liveFinal; // the stream has finished with the audio before it's wiped
         pcm.fill(0); // drop it: the audio is gone once the words are back
         pcm = Buffer.alloc(0);
       }
@@ -455,8 +617,10 @@ export function liveSpeech(o) {
         fedText.shift();
         return;
       }
+      const ending = live ? endLive(null) : null;
       const from = fed.length ? Promise.resolve(/** @type {Buffer} */ (fed.shift())) : o.recorder.stop();
-      from.then((pcm) => {
+      from.then(async (pcm) => {
+        await ending;
         pcm.fill(0);
         record({ engine: null, held_ms: now() - startedAt, audio_ms: Math.round((pcm.length / 2 / RATE) * 1000), ms: 0, result: "cancelled" });
       }, () => {});
