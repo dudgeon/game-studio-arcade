@@ -38,6 +38,7 @@ import { holdOverlay } from "./wifi.js";
 import { WIFI_HINT, asEnt, createWifiFlow } from "./wifi-flow.js";
 import { openKeys, sayKey } from "./say-keys.js";
 import { listenForVolume } from "./volume.js";
+import { seenAll, turnPage } from "./pages.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -593,6 +594,7 @@ function onStick(dir) {
       break;
     case "question":
       if (ud) moveSel(v, ud, 4);
+      else if (turnPage(v, dir, painter.boxes)) break; // D453: long words in pages
       else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "Claude asks", flowed: questionText(v), top: 0, back: v, pendingId: v.pendingId });
       break;
     case "reader":
@@ -608,6 +610,7 @@ function onStick(dir) {
     case "say":
       if (v.phase === "confirm") {
         if (ud) moveSel(v, ud, confirmTiles(v).length);
+        else if (turnPage(v, dir, painter.boxes)) break; // D453
         else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "I heard", flowed: flow(v.transcript), top: 0, back: v, pendingId: v.pendingId });
       }
       break;
@@ -621,6 +624,7 @@ function onStick(dir) {
       break;
     case "check":
       if (ud) moveSel(v, ud, CHECK_TILES.length);
+      else if (turnPage(v, dir, painter.boxes)) break; // D453
       else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "You check", flowed: flow(v.rule), top: 0, back: v });
       break;
   }
@@ -722,7 +726,8 @@ function onButton() {
       break;
     case "say":
       if (v.phase === "confirm") {
-        if (v.sel === 0) v.done(v.added ? `${v.added} ${v.transcript}` : v.transcript);
+        if (v.sel === 0 && !seenAll(v, painter.boxes)) turnPage(v, "right", painter.boxes); // D453: nothing approved unseen
+        else if (v.sel === 0) v.done(v.added ? `${v.added} ${v.transcript}` : v.transcript);
         else if (v.sel === 1 && (v.purpose !== "name" || canHear())) show({ ...v, phase: "idle", transcript: "", typed: "", added: "", sel: 0 });
         else if (v.purpose === "name") show({ ...typeIt(v), startedTyping: canHear() }); // "Type it": ESC from there is back to the mic
         else show({ ...v, phase: "idle", added: [v.added, v.transcript].filter(Boolean).join(" "), transcript: "", sel: 0 }); // Add more: the next words join these
@@ -922,7 +927,7 @@ async function endTalk(v) {
 async function cancelTalk(v) {
   v.phase = "idle";
   await v.talking;
-  post("/api/speech/stop").catch(() => {});
+  post("/api/speech/cancel").catch(() => {}); // D491: thrown away, not transcribed
 }
 
 const anyButtonHeld = () => [...held].some((c) => BUTTONS.has(c));

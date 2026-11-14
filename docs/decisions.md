@@ -2186,3 +2186,20 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 - **Open chat's twelve safety rules** (game-ai.md) are approved, with Geoff's changes: **every chat turn's text is kept on the cabinet** for him to read and shown in the Manager ("Everything"), in the cabinet's logs only; **no turn limit**; the Studio offers chat **only when it's a strong fit** and doesn't push it; **on straight away** on both cabinets.
 - **Voice actions are added,** in Geoff's words: "Games should also be able to use push to talk/moonshine model to interact with games during gameplay, and game can call haiku to interpret and decide action based on transcription". A game opens hold-to-talk mid-play (the cabinet owns the mic), the cabinet hears with Moonshine for speed and offline, and the model picks one action from a set the game declares. The same screening and safety rules apply. The mic and Moonshine are the speech worker's; this is built with them.
 - Order: lines and choices (D480 to D488, built), then voice actions, then open chat.
+
+## 2026-11-14 — Long words in pages (speech worker; D490–D494 are pages and live words)
+
+**D490. Long words on the review screens read in pages, in place, turned with the stick left and right. Nothing is cut with "..." (D453, Geoff 2026-11-14).** *(Geoff's choice; Claude's build.)*
+- **Where:** "Is this right? I heard:" (M6, ideas, answers and changes), Claude's question (M7), and a rule to check (G2). On each, when the words don't fit, the box shows one page, and its last row says "1 of 3 >" in yellow ("< 2 of 3 >" in the middle). The hint says "Left/right: pages. Up/down: choose."
+- **The page belongs to its words.** A new hold, a "Say it again" or the next question opens on page 1 without anything resetting it. Stick left at page 1 and right at the last page do what they did before. So on a question whose options are also cut, right on the last page still opens the reader for them.
+- **Nothing approved unseen.** On M6, "Yes! That's it" reads "Read it all first" (grey) until the last page has been on screen, and pressing it turns the page. Question tiles and rule checks don't wait: a choice there isn't approving the words.
+- **D455 goes with it.** After "Add more", the pages hold the earlier words and the new ones together, so the reader's bug of showing only the newest part can't happen on M6.
+- **Unchanged:** option tiles (A, B) still end in "..." with the reader one stick-right away. The plan (M9) keeps its rule list and reader.
+- **Code:** `launcher/pages.js` (the page state, pure), `Painter.box({ page })` and `paginate()` in `text.js`, and one line on each of the three stick cases and on M6's Yes in `app.js`.
+- **Tests:** a 400-word transcript read page by page (every word once, in order, nothing faulted, Yes waiting for the last page), Add more's pages, a long rule, and the stress flow in a real browser turning every page.
+
+**D491. The Speech interface gains a fast hold and a cancelled hold, for a game's voice actions (D489) and the talk screens.** *(Claude, agreed with the AI-in-games worker.)*
+- **`stop({ fast: true })`** asks Moonshine on the cabinet first, and Groq only if Moonshine fails. That's Geoff's choice for voice actions: speed and offline over the last word. A plain `stop()` keeps Groq first (D263). `speech.jsonl` marks a fast hold.
+- **`cancel()`**, and `POST /api/speech/cancel` from the page, drop a hold: the recorder stops, the audio is wiped, and nothing is transcribed or sent anywhere. It's logged as `result: "cancelled"`. Before this, a cancelled talk screen called stop and paid for a Groq request (10 s minimum) whose words nobody read. The launcher's cancel now uses it.
+- **Live words (D454) will be opt-in** with `start({ live: true })` from the talk screens. A game's `start()` streams nothing, so many short holds a minute are fine; a test runs 20 in a row.
+

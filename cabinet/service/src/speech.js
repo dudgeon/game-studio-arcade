@@ -7,7 +7,9 @@ import fs from "node:fs";
  * @typedef {object} Speech
  * @property {string} kind
  * @property {() => void} start
- * @property {() => Promise<{ text: string }>} stop
+ * @property {(o?: { fast?: boolean }) => Promise<{ text: string }>} stop  fast: Moonshine first, for a game's
+ *   voice actions, where speed matters more than the last word (D491); Groq only if Moonshine fails
+ * @property {() => void} [cancel]  drop the hold: nothing transcribed, nothing sent, the audio gone (D491)
  * @property {(u: { text?: string, wav?: string }) => void} [feed]  stub only
  */
 
@@ -41,6 +43,11 @@ export function stubSpeech() {
       if (!open) return { text: "" };
       open = false;
       return { text: queue.shift() ?? "" };
+    },
+    cancel() {
+      if (!open) return;
+      open = false;
+      queue.shift(); // what this hold would have heard goes with it
     },
     feed({ text, wav }) {
       if (typeof text === "string") {

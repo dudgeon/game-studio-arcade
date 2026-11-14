@@ -19,14 +19,27 @@ say Make me a game about a penguin that slides across the whole of Antarctica co
 hold a 200
 wait say confirm
 shot heard-very-long
+# D453: the words read in pages; Yes waits for the last one.
 press right
-wait reader
-shot heard-reader
-press a
-wait say confirm
+press right
+press right
+press right
+press right
+press right
+press right
+press right
+shot heard-last-page
 press a
 wait question
 shot q1-everything-long
+# D453: the question's pages, then right once more opens the reader for the cut options.
+press right
+press right
+press right
+press right
+press right
+press right
+press right
 press right
 wait reader
 shot q1-reader
@@ -45,6 +58,13 @@ shot q2-emoji-and-quotes
 press a
 wait question
 shot q3-one-long-word
+press right
+press right
+press right
+press right
+press right
+press right
+press right
 press right
 wait reader
 shot q3-reader
@@ -105,10 +125,14 @@ press esc
 wait check
 shot check-long-rule
 press right
-wait reader
-shot check-reader
-press a
-wait check
+press right
+press right
+press right
+press right
+press right
+press right
+press right
+shot check-last-page
 press down
 press down
 press down
