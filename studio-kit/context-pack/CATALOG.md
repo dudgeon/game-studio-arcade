@@ -12,6 +12,8 @@ Copy one into the cart folder, then change it in small edits; don't rewrite what
 - `maze/`: tile-by-tile walking, walls from a text map, pickups, a timed round.
 - `paddle/`: a ball off the walls, a paddle, serves.
 - `scroller/`: run and jump through a world wider than the screen: a map, a camera, parallax hills, stars, spikes, a flag.
+- `racer/`: drive laps round a ring road on a ground in perspective, against the clock.
+- `maze3d/`: walk a maze seen from inside and find the gems, against the clock.
 - `blank/`: title, play, game over, best score, a dot. Use it when the idea fits none of the others.
 
 Choose only after you've finished asking: the one the player's idea fits, otherwise `blank`. Its rules and numbers are defaults that the player's answers override. Read only its files.

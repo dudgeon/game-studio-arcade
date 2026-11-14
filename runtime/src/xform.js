@@ -125,6 +125,9 @@ export function texRow(buf, tex, x, y, n, u, v, du, dv, shade) {
   const i0 = Math.max(0, Math.ceil((buf.clipX0 - A - k + 1) / k));
   const i1 = Math.min(Math.floor(n) - 1, Math.floor((buf.clipX1 - 1 - A) / k));
   if (!(i0 <= i1)) return;
+  // `| 0` below keeps the sampling in whole-number arithmetic, which is several times faster; it
+  // would turn a NaN into texel 0, so a row with no real place in the picture is left undrawn here.
+  if (!Number.isFinite(u + v + du + dv)) return;
   const w = tex.w;
   const h = tex.h;
   const data = tex.data;
@@ -134,8 +137,8 @@ export function texRow(buf, tex, x, y, n, u, v, du, dv, shade) {
   if (k === 1) {
     const o = y0 * stride + A;
     for (let i = i0; i <= i1; i++) {
-      let tu = Math.floor(u + i * du) % w;
-      let tv = Math.floor(v + i * dv) % h;
+      let tu = (Math.floor(u + i * du) | 0) % w;
+      let tv = (Math.floor(v + i * dv) | 0) % h;
       if (tu < 0) tu += w;
       if (tv < 0) tv += h;
       const c = data[tv * w + tu];
@@ -148,8 +151,8 @@ export function texRow(buf, tex, x, y, n, u, v, du, dv, shade) {
   const o0 = y0 * stride;
   let holes = false;
   for (let i = i0; i <= i1; i++) {
-    let tu = Math.floor(u + i * du) % w;
-    let tv = Math.floor(v + i * dv) % h;
+    let tu = (Math.floor(u + i * du) | 0) % w;
+    let tv = (Math.floor(v + i * dv) | 0) % h;
     if (tu < 0) tu += w;
     if (tv < 0) tv += h;
     const c = data[tv * w + tu];
@@ -160,14 +163,15 @@ export function texRow(buf, tex, x, y, n, u, v, du, dv, shade) {
     const col = table[c];
     const xs = Math.max(A + i * k, buf.clipX0);
     const xe = Math.min(A + i * k + k, buf.clipX1);
-    for (let xx = xs; xx < xe; xx++) p[o0 + xx] = col;
+    if (xe - xs === 4) p[o0 + xs] = p[o0 + xs + 1] = p[o0 + xs + 2] = p[o0 + xs + 3] = col;
+    else for (let xx = xs; xx < xe; xx++) p[o0 + xx] = col;
     if (holes) for (let yy = y0 + 1; yy < y1; yy++) for (let xx = xs; xx < xe; xx++) p[yy * stride + xx] = col;
   }
   if (holes) {
     // Blocks before the first hole have only their first row: finish them.
     for (let i = i0; i <= i1; i++) {
-      let tu = Math.floor(u + i * du) % w;
-      let tv = Math.floor(v + i * dv) % h;
+      let tu = (Math.floor(u + i * du) | 0) % w;
+      let tv = (Math.floor(v + i * dv) | 0) % h;
       if (tu < 0) tu += w;
       if (tv < 0) tv += h;
       const c = data[tv * w + tu];
@@ -206,15 +210,15 @@ export function texCol(buf, tex, x, y, n, u, v, dv, shade) {
   if (!(j0 <= j1)) return;
   const w = tex.w;
   const h = tex.h;
-  let tu = Math.floor(u) % w;
+  if (!Number.isFinite(u + v + dv)) return;
+  let tu = (Math.floor(u) | 0) % w;
   if (tu < 0) tu += w;
-  if (!(tu >= 0)) return;
   const data = tex.data;
   const table = shadeTable(shade);
   const p = buf.pixels;
   const stride = buf.w;
   for (let j = j0; j <= j1; j++) {
-    let tv = Math.floor(v + j * dv) % h;
+    let tv = (Math.floor(v + j * dv) | 0) % h;
     if (tv < 0) tv += h;
     const c = data[tv * w + tu];
     if (!(c >= 0)) continue;

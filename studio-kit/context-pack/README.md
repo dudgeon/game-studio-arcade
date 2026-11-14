@@ -4,7 +4,7 @@ What a Studio session can read to build a cart, arranged so it reads little (D16
 
 - `CATALOG.md`: always read. One line per module and template, plus the house rules. Budget 2,000 tokens.
 - `modules/`: guides read on demand (`cart-api`, `checks`, `sprites`, `spec`, `movement`). Library modules are beside their code, in `runtime/lib/ref/`.
-- `templates/`: `catch`, `dodge`, `maze`, `paddle`, `scroller`, and `blank`. Complete passing carts. `scroller` is the one that moves the way the `movement` guide says (D478); budget 5,000 tokens each. None is a falling-blocks game (D12).
+- `templates/`: `catch`, `dodge`, `maze`, `paddle`, `scroller`, `racer`, `maze3d`, and `blank`. Complete passing carts. `scroller`, `racer` and `maze3d` move the way the `movement` guide says and glide (D478); budget 5,000 tokens each. None is a falling-blocks game (D12).
 - `bin/pack-size.js`: what each file costs, with the ratio measured from real reads (D164). `npm run size -w @game-studio-arcade/context-pack`.
 
 **To add a library module:** see `runtime/lib/REFERENCE.md`. **To add a template:** a folder here with `spec.md`, `cart.json`, `game.js`, `checks.js`, one line in the catalog, and a name in `test/pack.test.js`.

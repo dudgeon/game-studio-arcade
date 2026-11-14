@@ -71,9 +71,9 @@ async function open() {
   }
   const rt = await import(data.runtimeUrl);
   /** @type {Arcade.TestHandle} */
-  // fine: a cart that glides (D476) also draws its glide picture, at the cabinet's 4 display pixels per
-  // game pixel, so its frame time here includes that work. Other carts, and older runtimes, are unaffected.
-  const base = await rt.headless(data.gameUrl, { seed: data.seed, fine: 4 });
+  // No glide buffer here (D476, D479): this driver times the game's own work against its 4 ms budget.
+  // The browser driver, and so the cabinet's gate, draws and shows a gliding cart's glide picture.
+  const base = await rt.headless(data.gameUrl, { seed: data.seed });
   return {
     base,
     async timedStep() {

@@ -17,8 +17,8 @@ Games that move in steps (tile mazes, falling blocks, board games) keep their st
 ## Depth: pick one
 
 - **Side or top view, more to it:** `parallax` layers and a `camera`. Start from the `scroller` template.
-- **Into the screen** (racing, flying): `floor`. The ground stretches to a horizon and turns under you; things stand on it and grow as they come near.
-- **From inside** (mazes, dungeons, haunted houses): `raycast`. Walls from a text map, things standing in it.
+- **Into the screen** (racing, flying): `floor`. The ground stretches to a horizon and turns under you; things stand on it and grow as they come near. Start from the `racer` template.
+- **From inside** (mazes, dungeons, haunted houses): `raycast`. Walls from a text map, things standing in it. Start from the `maze3d` template.
 - **Chunky objects that turn** (cars, boats, tanks seen from above): `stack`. Or one sprite with `rot` for something flat.
 
 One of `floor` or `raycast` fills the screen, so use one per scene. All of them are drawn in whole pixels and the 32 colors.
