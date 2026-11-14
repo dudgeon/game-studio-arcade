@@ -1,0 +1,76 @@
+# cx-audit: a new maker's name and the typing screen, with only the Picade's keys.
+#seed family.json
+wait S1
+shot shelf-day-one
+press a
+wait M1
+press down
+press down
+shot M1-someone-new-lit
+press a
+wait say typing
+shot M2-name-typing-empty
+# The stick does nothing here.
+press up
+press left
+# The six player buttons type their keyboard letters: z x c v q e.
+press a
+press b
+press x
+press y
+press q
+press e
+shot M2-name-typed-with-buttons
+# START (1UP) is Enter: done.
+press start
+wait say confirm
+shot M2-name-confirm
+press a
+wait M3
+shot M3-after-button-name
+press esc
+wait M1
+shot M1-with-zxcvqe
+press esc
+wait S1
+# The talk screen: ENT (F1) opens typing.
+press a
+wait M1
+press a
+wait M3
+# Any button but COIN does nothing on the coin check.
+press a
+press start
+shot M3-button-does-nothing
+press coin
+wait M4
+press f1
+wait say typing
+shot M4-ENT-opens-typing
+press a
+press a
+press b
+shot M4-typing-with-buttons
+press start
+wait say confirm
+shot M6-confirm-button-gibberish
+# Say it again goes back to the mic.
+press down
+press a
+wait say idle
+# ENT again, then ESC: back to the mic, not out.
+press f1
+wait say typing
+press esc
+wait say idle
+# Nothing said: E9.
+hold a 400
+wait say silence
+shot E9-silence
+press esc
+wait M3
+press esc
+wait M1
+press esc
+wait S1
+shot shelf-end

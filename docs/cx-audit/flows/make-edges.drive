@@ -1,0 +1,84 @@
+# cx-audit: the plan screen's stick, leaving, stopping, and what the shelf says after.
+#seed family.json
+wait S1
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say I want a game where a penguin catches fish that fall from the sky
+hold a 300
+wait M6
+# Add more.
+press down
+press down
+shot M6-add-more-lit
+press a
+wait say idle
+shot M4-add-more-mic
+say and a boot falls sometimes
+hold y 300
+wait M6
+shot M6-added
+press a
+wait M7
+# ESC on a question asks; ESC again goes back to the question.
+press esc
+wait E8
+press esc
+wait M7
+shot M7-esc-on-E8-goes-back
+press right
+press left
+press a
+wait question
+press a
+wait question
+press a
+wait M9
+shot M9-plan
+# The two tiles sit side by side. Right is the reader, not "Change it".
+press right
+wait reader
+shot M9-right-opens-reader
+press left
+wait M9
+press down
+shot M9-down-lights-change
+press left
+shot M9-left-lights-build
+press down
+press a
+wait say idle
+shot M9-change-it-mic
+press esc
+wait M9
+# Stop.
+press esc
+wait E8
+press down
+press down
+press a
+wait E13
+shot E13-are-you-sure
+press esc
+wait M9
+press esc
+wait E8
+press down
+press down
+press a
+wait E13
+press up
+press a
+wait S1
+shot S1-after-stop
+sleep 1500
+shot S1-after-stop-later
+press a
+sleep 800
+shot make-after-stop
+press esc
+sleep 500
+shot after-esc

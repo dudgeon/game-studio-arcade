@@ -1,0 +1,43 @@
+# cx-audit: E10 "How about this?" from the word list, every way out of it, and the keys while the service is down.
+#seed family.json
+wait S1
+press a
+wait M1
+press a
+wait M3
+press coin
+wait M4
+say a game about a penguin who says shit a lot
+hold a 300
+wait M6
+press a
+wait E10
+shot E10-how-about-this
+# Say it a new way: back at the mic.
+press down
+press a
+wait say idle
+shot E10-say-it-a-new-way
+press esc
+wait M3
+shot E10-esc-from-mic-is-coin-check
+press coin
+wait M4
+say a game about a penguin who says shit a lot
+hold a 300
+wait M6
+press a
+wait E10
+press esc
+wait S1
+shot E10-esc-is-shelf
+# The service goes away for 8 s: every key, then it comes back.
+restart 8000
+shot E4-during
+press a
+press esc
+press coin
+press start
+shot E4-after-keys
+wait S1
+shot S1-back

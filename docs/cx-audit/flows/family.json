@@ -1,0 +1,11 @@
+{
+  "makers": ["Owen", "Alina"],
+  "state": "seen",
+  "ledger": [
+    { "kind": "refill" },
+    { "kind": "charge", "who": "owen", "cost_cents": 162, "what": "new game" },
+    { "kind": "charge", "who": "alina", "cost_cents": 56, "what": "new game" },
+    { "kind": "charge", "who": "owen", "cost_cents": 31, "what": "change", "outcome": "didn't finish" },
+    { "kind": "topup", "cents": 100, "reason": "Owen helped clean the basement" }
+  ]
+}
