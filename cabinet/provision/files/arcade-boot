@@ -23,7 +23,6 @@ BOOT_DIR="${ARCADE_BOOT_DIR:-/boot/firmware}"
 CMDLINE="${ARCADE_CMDLINE:-/proc/cmdline}"
 TRY="$STATE/boot-try"
 RESULT="$STATE/boot-result.json"
-REBOOT_TRY="${ARCADE_REBOOT_TRY:-systemctl reboot 0 tryboot}"
 REBOOT="${ARCADE_REBOOT:-systemctl reboot}"
 CONFIRM_TRIES="${ARCADE_CONFIRM_TRIES:-150}"
 BEGIN='# BEGIN arcade boot slot (D336)'
@@ -136,8 +135,14 @@ cmd_try() {
   config_with "$slot" > "$BOOT_DIR/tryboot.txt.new" && sync && mv "$BOOT_DIR/tryboot.txt.new" "$BOOT_DIR/tryboot.txt"
   state_write "$TRY" "slot=$slot" "id=$id" "previous=$(committed)" "saved=$saved" "at=$(date -u +%FT%TZ)" "kernel_before=$(uname -r)"
   sync
-  say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to $(committed || true)."
-  $REBOOT_TRY
+  say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to ${BOOT_DIR}/$(committed)/."
+  # One argument, "0 tryboot", as in Raspberry Pi's `reboot '0 tryboot'` (the rehearsal caught it split in two).
+  if ! { if [ -n "${ARCADE_REBOOT_TRY:-}" ]; then $ARCADE_REBOOT_TRY; else systemctl reboot "0 tryboot"; fi; }; then
+    rm -f "$TRY" "$BOOT_DIR/tryboot.txt"
+    [ -z "$saved" ] || apt_back "$saved"
+    hold_boot
+    stop "couldn't restart into the try: nothing changed, $slot is left unused."
+  fi
 }
 
 cmd_confirm() {
