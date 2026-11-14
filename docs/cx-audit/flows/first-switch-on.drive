@@ -1,0 +1,52 @@
+# cx-audit: the first switch-on with no Wi-Fi: welcome screens, the shelf's hint, the hold, Make, the pot.
+#! --offline --wifi-demo
+#seed first-boot.json
+wait B2
+shot B2-welcome
+# ESC, COIN, ENT and the Wi-Fi hold on the welcome screen.
+press coin
+press f1
+shot B2-after-COIN-ENT
+down f1
+down f2
+sleep 3400
+up f1
+up f2
+shot B2-after-wifi-hold
+press esc
+wait B3
+shot B3-esc-went-on
+press esc
+wait E1
+shot E1-shelf-offline
+press a
+wait E2
+shot E2-make-offline
+press esc
+wait E1
+press coin
+wait A1
+shot A1-pot-offline
+press a
+wait A2
+shot A2-history-empty
+press a
+press start
+press esc
+wait A1
+press esc
+wait E1
+# A game's card, then change it while offline.
+press down
+press right
+wait S3
+shot S3-card
+press down
+press down
+press down
+press a
+sleep 600
+shot change-offline
+press esc
+sleep 500
+shot after-change-offline-esc
