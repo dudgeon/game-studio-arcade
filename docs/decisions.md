@@ -345,7 +345,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   | utility ESC | escape | Escape (1) | ★, provisionally (D84) |
   | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
   | power button | (KEY_POWER) | | safe shutdown |
-- Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then.
+- Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then. *(Set 2026-11-14 before assembly, in [hardware/picade-wiring.png](hardware/picade-wiring.png): A B on the near row, blue then yellow; X Y on the far row; pink 5 and 6 spare; 1UP front left, COIN front right, ESC left side, ENT right side. Replaces the plan in ca35d25.)*
 - P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet; implemented by D110–D112, so P2 gets input only when it is 2 or more.)*
 
 **D83. Pi 5 setup facts the provisioning script must handle.** *(Claude, from Pimoroni's setup guide and the picade-hat repo, 2026-11-07.)*

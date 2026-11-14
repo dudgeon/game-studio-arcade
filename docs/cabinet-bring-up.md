@@ -58,16 +58,9 @@ Allow 2–3 hours. Tools: a cross-head screwdriver and a flat one 2.5 mm or smal
 - **Screen power (micro-USB → USB-A):** plug the USB-A end into one of the Pi's **black USB 2 ports**. See A4.
 - **Power button:** one wire pair from LED 1/2 to the HAT's **LED** header, the other from **C/NO** to the HAT's **ON** header. Check no spade connectors on the back of the button touch each other.
 - **Joystick:** the white plug only fits one way on the stick. At the HAT, wire **1 (GND)** goes to the GND-marked pin of **JOYSTICK**.
-- **Buttons:** Pimoroni's guide says any socket works, because the keys are set in software. That's true, and ours are already set (D82), so wiring to this plan means nothing needs changing later. Looking down at the console, joystick on the left:
-
-  ```
-            blue    yellow   pink
-  far row  [ 3=X ]  [ 4=Y ]  [ 6 ]
-  near row [ 1=A ]  [ 2=B ]  [ 5 ]
-  ```
-
-  The number is the HAT socket (marked 1 to 6). 5 and 6 are spares. Each button's two-pin plug fits either way round.
-- **Black buttons:** front left → **ESC** (back to the shelf, D88); front right → **1UP** (START); right side → **COIN** (spend coins); left side → **ENT** (type instead of talking; rarely used).
+- **Buttons and black buttons: wire them as in the printable diagram, [hardware/picade-wiring.png](hardware/picade-wiring.png)** (SVG beside it). Pimoroni's guide says any socket works "as we'll be remapping the inputs in software later on". That's true, and ours are already set (D82), so wiring to the diagram means nothing needs changing later.
+  - Coloured buttons, looking down with the joystick on the left: near row blue = **1 (A)**, yellow = **2 (B)**; far row blue = **3 (X)**, yellow = **4 (Y)**; pink far = 5, pink near = 6 (spares). The number is the HAT socket marked 1 to 6. Each two-pin plug fits either way round.
+  - Black buttons: front left = **1UP** (START), front right = **COIN** (spend coins), left side = **ESC** (back to the shelf; on a side so it isn't hit mid-game), right side = **ENT** (type instead of talking; rarely used).
 - If a button ends up in a different socket, don't rewire: tell Claude which button does what, and the map changes in software.
 - **Last:** check every spade connector, and that no bare metal touches other metal.
 
