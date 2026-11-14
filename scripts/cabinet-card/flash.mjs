@@ -12,13 +12,15 @@
 //
 //   node scripts/cabinet-card/flash.mjs --list          the disks it could write, and why the others are refused
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
-//   node scripts/cabinet-card/flash.mjs --check         what the flash gathers, checked against the virtual cabinet; writes nothing
+//   node scripts/cabinet-card/flash.mjs --check [--day-one FILE]   what the flash gathers, checked against the virtual
+//                                                       cabinet (and a day-one file's ids); writes nothing
 //
 // The Wi-Fi is asked for, unless ~/.config/game-studio-arcade/wifi.json exists: {"ssid": "...", "password": "..."}
 // (or "psk"), mode 0600, owned by you (D327).
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
-// --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
+// --day-one FILE gives the card Geoff's clean start (D356-D358: a full pot, chosen shelf, hidden makers; never with
+// --from-backup). --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
 // --from-backup takes it from the mini's hourly backup of the Picade instead of the twin: the card died (D354);
 // The identity comes from scripts/cabinet-card/picade-key.sh, run once before (D329); --prepare-identity asks for the
 // key here instead (repair). --no-identity writes a card that starts offline; --no-groq leaves Groq off (Moonshine only);
@@ -47,6 +49,7 @@ import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/l
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { backupDir, cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
 import { IDENTITY_FILE, lockWorkspace, readIdentity } from "./picade-key.mjs";
+import { applyDayOne, parseDayOne, planDayOne } from "./day-one.mjs";
 import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, wifiFromFile, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
@@ -273,6 +276,18 @@ function twinSnapshot(work) {
   } catch (e) {
     stop(`couldn't take the twin's data for the card: ${/** @type {Error} */ (e).message}. Or flash with --no-seed.`);
   }
+  // D356-D358: Geoff's clean start, on this copy only. Never on a restore: a rebuilt card comes back as it was (D354).
+  const dayOne = opt("--day-one");
+  if (dayOne) {
+    if (flag("--from-backup")) stop("--day-one is a clean start; --from-backup brings a card back as it was. Use one or the other.");
+    const spec = parseDayOne(readFileSync(resolve(dayOne), "utf8"));
+    const guestIds = existsSync(join(REPO, "guests")) ? readdirSync(join(REPO, "guests")).filter((g) => existsSync(join(REPO, "guests", g, "guest.json"))) : [];
+    const d = applyDayOne(dir, spec, { guestIds });
+    if (d.unknownGames.length || d.unknownMakers.length) {
+      stop(`the day-one file names ${[...d.unknownGames.map((g) => `game "${g}"`), ...d.unknownMakers.map((m) => `maker "${m}"`)].join(", ")}, which the twin's data doesn't have. Check the ids; nothing was written.`);
+    }
+    say(`day-one: pot ${spec.pot === "full" ? "full (the twin's test ledger left off)" : "as it is"}; ${d.hidden.length} makers off "Who's making?" (${d.hidden.join(", ") || "none"}); ${d.shelf ? `${d.shelf.length} games on the shelf (${d.shelf.join(", ")}), ${d.offShelf.length} carried off it` : "shelf as it is"}`);
+  }
   const tgz = join(work, "twin-data.tar.gz");
   run("tar", ["-czf", tgz, "--no-xattrs", "--no-mac-metadata", "-C", dir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
   rmSync(dir, { recursive: true, force: true });
@@ -407,6 +422,31 @@ async function check() {
     line(!ti.replay.length, ti.replay.length ? `twin data: replay data (${ti.replay.join(", ")}) can't go to a live cabinet` : "twin data: no replay data");
     line(!ti.makeInFlight, ti.makeInFlight ? "twin data: a make is running or still to be collected on the virtual cabinet; flash once it's done" : "twin data: no make running");
     line(files.length > 0, `twin data: ${files.length} files to copy, ${carts.size} games, release ${ti.release}`);
+    // D356: a day-one file, checked against the live twin's games and makers with the same planner the flash uses.
+    const dayOne = opt("--day-one");
+    if (dayOne) {
+      const spec = parseDayOne(readFileSync(resolve(dayOne), "utf8"));
+      const rels = [...carts].map((id) => `carts/${id}/cart.json`);
+      const got = twin.call("read", { files: [...rels, "makers.json"].filter((r) => tm.files[r]).map((rel) => ({ rel })) });
+      const json = (/** @type {string} */ rel) => {
+        try {
+          return JSON.parse(Buffer.from(got[rel].b64, "base64").toString("utf8"));
+        } catch {
+          return null;
+        }
+      };
+      const guestIds = existsSync(join(REPO, "guests")) ? readdirSync(join(REPO, "guests")).filter((g) => existsSync(join(REPO, "guests", g, "guest.json"))) : [];
+      const plan = planDayOne(spec, {
+        carts: [...carts].map((id) => ({ id, branch: json(`carts/${id}/cart.json`)?.branch })),
+        makerIds: (json("makers.json") ?? []).map((/** @type {any} */ m) => m.id),
+        guestIds,
+      });
+      line(!plan.unknownGames.length, plan.unknownGames.length ? `day-one: no such game on the twin: ${plan.unknownGames.join(", ")}` : `day-one: on the shelf, ${plan.shelf?.length ?? "all"} lines: ${plan.shelf?.join(", ") ?? "(no shelf list)"}`);
+      if (plan.shelf) console.log(`         off the shelf (carried, marked), ${plan.offShelf.length} lines: ${plan.offShelf.join(", ") || "none"}`);
+      line(!plan.unknownMakers.length, plan.unknownMakers.length ? `day-one: no such maker on the twin: ${plan.unknownMakers.join(", ")}` : `day-one: off "Who's making?": ${plan.hidden.join(", ") || "nobody"}`);
+      const ledger = tm.files["logs/coin_ledger.jsonl"];
+      line(true, `day-one: pot ${spec.pot === "full" ? `full (the twin's ledger${ledger ? `, ${ledger.size} bytes,` : ""} stays on the mini)` : "as it is"}`);
+    }
   } catch (e) {
     line(false, `twin data: ${/** @type {Error} */ (e).message}`);
   }

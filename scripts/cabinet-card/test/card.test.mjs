@@ -396,7 +396,7 @@ test("first boot installs the card's cabinet config, then wipes it from the card
   assert.ok(!fs.existsSync(file));
   // No file on the card: nothing happens.
   assert.equal(execFileSync("/bin/bash", ["-c", script("step_cabinet_config")], { encoding: "utf8" }), "");
-  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8"), /step_carts\nstep_cabinet_config\n/, "after the carts (service-config.mjs takes arcade's uid from them), before the services start");
+  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8"), /step_carts\nstep_library\nstep_cabinet_config\n/, "after the carts (service-config.mjs takes arcade's uid from them), before the services start");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -504,7 +504,7 @@ test("first boot unpacks the twin's data into an empty data folder, before the s
   assert.match(out, /already has data: keeping its own/);
   assert.equal(fs.readFileSync(path.join(data, "makers.json"), "utf8"), '[{"id":"owen"}]');
   const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
-  assert.match(prov, /step_twin_data\nstep_carts\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
+  assert.match(prov, /step_twin_data\nstep_carts\nstep_library\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -592,5 +592,161 @@ test("picade-key.sh refuses arguments and a missing terminal, and --check says t
   const check = spawnSync(SCRIPT, ["--check"], { encoding: "utf8", env });
   assert.equal(check.status, 1);
   assert.match(check.stderr, /no Picade identity at .* yet: run scripts\/cabinet-card\/picade-key\.sh first/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---- The day-one card (D356-D359) ----
+
+test("day-one: a full pot, Tester off \"Who's making?\", and marks for every shelf line not chosen, in D360's format", async () => {
+  const { applyDayOne, parseDayOne, MARKS, VIA } = await import("../day-one.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "day-one-"));
+  const cart = (id, extra = {}) => {
+    fs.mkdirSync(path.join(dir, "carts", id), { recursive: true });
+    fs.writeFileSync(path.join(dir, "carts", id, "cart.json"), JSON.stringify({ id, title: id, ...extra }));
+  };
+  cart("rock-rain");
+  cart("candy-cat-drop");
+  cart("candy-cat-drop-v2", { branch: "candy-cat-drop" });
+  cart("fruit-cat-drop", { parent: "candy-cat-drop@1" });
+  cart("apple-catch");
+  fs.mkdirSync(path.join(dir, "logs"));
+  fs.writeFileSync(path.join(dir, "logs/coin_ledger.jsonl"), '{"kind":"charge"}\n');
+  const makers = [{ id: "tester", name: "Tester" }, { id: "tester2", name: "Tester2" }, { id: "geoff", name: "Geoff", grown_up: true }];
+  fs.writeFileSync(path.join(dir, "makers.json"), JSON.stringify(makers));
+  const before = fs.readFileSync(path.join(dir, "makers.json"), "utf8");
+  const spec = parseDayOne(JSON.stringify({ pot: "full", hide_makers: ["tester", "tester2"], shelf: ["teti", "teti-geoff", "rock-rain", "candy-cat-drop-v2"] }));
+  const now = new Date("2026-11-14T09:00:00Z");
+  const d = applyDayOne(dir, spec, { guestIds: ["teti", "teti-geoff"], now });
+  assert.equal(d.ledgerLeftOff, true);
+  assert.ok(!fs.existsSync(path.join(dir, "logs/coin_ledger.jsonl")), "the copy's ledger is left off: the pot starts full");
+  assert.equal(fs.readFileSync(path.join(dir, "makers.json"), "utf8"), before, "makers.json is never touched (D360)");
+  assert.deepEqual(d.shelf, ["candy-cat-drop", "rock-rain", "teti", "teti-geoff"], "naming a version keeps its whole line");
+  assert.deepEqual(d.offShelf, ["apple-catch", "fruit-cat-drop"], "a kid's own version is its own line");
+  const text = fs.readFileSync(path.join(dir, MARKS), "utf8");
+  assert.ok(text.endsWith("\n"));
+  const lines = text.trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((m) => `${m.kind}:${m.target}`), ["maker:tester", "maker:tester2", "game:apple-catch", "game:fruit-cat-drop"]);
+  for (const m of lines) {
+    assert.equal(m.type, "shelf_mark");
+    assert.equal(m.action, "remove");
+    assert.equal(m.by, "geoff");
+    assert.equal(m.via, VIA);
+    assert.equal(m.at, "2026-11-14T09:00:00.000Z");
+    assert.match(m.id, /^sm_[0-9a-z]+$/);
+    assert.equal(typeof m.reason, "string");
+  }
+  assert.equal(new Set(lines.map((m) => m.id)).size, lines.length, "every mark has its own id");
+  // Unknown ids are reported (the flash stops on them), not guessed.
+  const d2 = applyDayOne(dir, parseDayOne(JSON.stringify({ hide_makers: ["nobody"], shelf: ["no-such-game"] })), { guestIds: [] });
+  assert.deepEqual(d2.unknownMakers, ["nobody"]);
+  assert.deepEqual(d2.unknownGames, ["no-such-game"]);
+  for (const bad of ["{", '{"pot":"empty"}', '{"shelf":"teti"}', '{"hide":["x"]}', '{"shelf":["Bad Id"]}']) assert.throws(() => parseDayOne(bad));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("--day-one is never applied to a restore from the backup (D354, D356)", () => {
+  const src = fs.readFileSync(FLASH, "utf8");
+  assert.match(src, /if \(flag\("--from-backup"\)\) stop\("--day-one is a clean start; --from-backup brings a card back as it was/);
+});
+
+test("first boot removes speech's install files from the card after a full success, and keeps them for a retry (D359)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "card-speech-"));
+  const run = (exitCode, installed) => {
+    const seed = path.join(root, `seed-${exitCode}-${installed}`);
+    const src = path.join(root, "src");
+    fs.mkdirSync(path.join(seed, "speech/models"), { recursive: true });
+    fs.writeFileSync(path.join(seed, "speech/models/encoder.ort"), "x".repeat(1000));
+    fs.writeFileSync(path.join(seed, "profile"), "picade\n");
+    fs.mkdirSync(src, { recursive: true });
+    fs.writeFileSync(path.join(src, "provision.sh"), `echo "[provision 10:00:00] == 1/1 Finishing"\nexit ${exitCode}\n`);
+    execFileSync("tar", ["-czf", path.join(seed, "provision.tar.gz"), "-C", src, "."]);
+    const speechJson = path.join(root, installed ? "speech.json" : "not-there.json");
+    if (installed) fs.writeFileSync(speechJson, "{}");
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/firstboot.sh")], { encoding: "utf8", env: { ...process.env, ARCADE_SEED: seed, ARCADE_WORK: path.join(root, `work-${exitCode}`), ARCADE_SCREEN: path.join(root, "tty"), ARCADE_SPEECH_JSON: speechJson, ARCADE_TICK_S: "30" } });
+    return { log: r.stdout, kept: fs.existsSync(path.join(seed, "speech")) };
+  };
+  const ok = run(0, true);
+  assert.ok(!ok.kept, ok.log);
+  assert.match(ok.log, /removed speech's install files from the card, \d+ MB freed/);
+  assert.ok(run(3, true).kept, "a failed first boot keeps them for the retry");
+  assert.ok(run(0, false).kept, "not installed: kept");
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("docs/day-one.json is a valid day-one file: full pot, Tester hidden, the agreed shelf (D356)", async () => {
+  const { parseDayOne } = await import("../day-one.mjs");
+  const spec = parseDayOne(fs.readFileSync(path.join(REPO, "docs/day-one.json"), "utf8"));
+  assert.equal(spec.pot, "full");
+  assert.deepEqual(spec.hide_makers, ["tester", "tester2"]);
+  for (const id of ["teti", "teti-geoff", "apple-catch", "comet-dodge", "wall-ball"]) assert.ok(spec.shelf.includes(id), id);
+});
+
+test("a card with no twin data starts the cart library the service's way, starters committed; a seeded one is untouched (D390)", async () => {
+  const { ensureLibrary } = await import("../../../studio-kit/cli/src/library.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-library-"));
+  const git = (cwd, ...a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
+  const step = (data) =>
+    execFileSync("/bin/bash", ["-c", `log() { echo "[provision] $*"; }; DATA=${JSON.stringify(data)}; . ${JSON.stringify(path.join(REPO, "cabinet/provision/library.sh"))}; STARTER_IDS=" apple-catch comet-dodge wall-ball"; step_library`], { encoding: "utf8", env: { ...process.env, GIT_AS: " ", DATA_OWNER_FILE: "true" } });
+  // New: three starters copied in, no library yet.
+  const fresh = path.join(dir, "fresh");
+  for (const [name, id] of [["catch", "apple-catch"], ["dodge", "comet-dodge"], ["paddle", "wall-ball"]]) fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates", name), path.join(fresh, "carts", id), { recursive: true });
+  const out = step(fresh);
+  assert.match(out, /started the cart library: 3 starters committed/);
+  const lib = path.join(fresh, "carts");
+  assert.equal(git(lib, "status", "--porcelain"), "", "nothing left untracked");
+  assert.deepEqual(git(lib, "log", "--format=%s", "--reverse").split("\n"), ["Start the dev cart library", "starter apple-catch v1 (D161)", "starter comet-dodge v1 (D161)", "starter wall-ball v1 (D161)"]);
+  assert.equal(git(lib, "log", "-1", "--format=%an <%ae>"), "Studio <studio@game-studio-arcade.invalid>", "the service's author");
+  // The service's own ensureLibrary finds it ready and changes nothing.
+  const head = git(lib, "rev-parse", "HEAD");
+  ensureLibrary(lib);
+  assert.equal(git(lib, "rev-parse", "HEAD"), head);
+  assert.equal(fs.readFileSync(path.join(lib, "README.md"), "utf8"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n", "the same README as ensureLibrary writes");
+  // Seeded (the twin's library, starters untracked as on the virtual cabinet): left exactly as it is.
+  const seeded = path.join(dir, "seeded");
+  fs.cpSync(fresh, seeded, { recursive: true });
+  fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates/catch"), path.join(seeded, "carts", "loose-starter"), { recursive: true });
+  const before = git(path.join(seeded, "carts"), "rev-parse", "HEAD");
+  assert.match(step(seeded), /already there: leaving it as it is/);
+  assert.equal(git(path.join(seeded, "carts"), "rev-parse", "HEAD"), before);
+  assert.match(git(path.join(seeded, "carts"), "status", "--porcelain"), /\?\? loose-starter\//, "an untracked folder stays untracked");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("commit-starters.sh commits the twin's untracked starters the first-boot way, once, and only adds (D391)", () => {
+  const SCRIPT = path.join(REPO, "scripts/virtual-cabinet/commit-starters.sh");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "starters-"));
+  const lib = path.join(dir, "carts");
+  const git = (...a) => execFileSync("git", a, { cwd: lib, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid" } }).trim();
+  // Like the twin today: a library with made games, the three starters untracked.
+  fs.mkdirSync(lib, { recursive: true });
+  git("init", "-q", "-b", "main");
+  fs.writeFileSync(path.join(lib, "README.md"), "# Dev cart library\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "Start the dev cart library");
+  fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates/dodge"), path.join(lib, "log-hopper"), { recursive: true });
+  git("add", "log-hopper");
+  git("commit", "-q", "-m", "make log-hopper v1 (sesn_X)");
+  for (const [name, id] of [["catch", "apple-catch"], ["dodge", "comet-dodge"], ["paddle", "wall-ball"]]) fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates", name), path.join(lib, id), { recursive: true });
+  const run = (...args) => spawnSync(SCRIPT, args, { encoding: "utf8", env: { ...process.env, COMMIT_STARTERS_LOCAL: dir } });
+  const before = git("rev-parse", "HEAD");
+  const dry = run("--dry-run");
+  assert.equal(dry.status, 0, dry.stdout + dry.stderr);
+  assert.match(dry.stdout, /would commit 3 starters/);
+  assert.equal(git("rev-parse", "HEAD"), before, "a dry run changes nothing");
+  const r = run();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /committed 3 starters; untracked now: 0/);
+  assert.deepEqual(git("log", "--format=%s", "-3", "--reverse").split("\n"), ["starter apple-catch v1 (D161)", "starter comet-dodge v1 (D161)", "starter wall-ball v1 (D161)"]);
+  assert.equal(git("rev-list", "--count", "HEAD"), "5", "only commits added; the made game's history is as it was");
+  assert.equal(git("log", "-1", "--format=%an <%ae>"), "Studio <studio@game-studio-arcade.invalid>");
+  const head = git("rev-parse", "HEAD");
+  const again = run();
+  assert.match(again.stdout, /already in the library[\s\S]*committed 0 starters/);
+  assert.equal(git("rev-parse", "HEAD"), head, "running it again does nothing");
+  // Never while a make runs: the service commits to the same library.
+  fs.writeFileSync(path.join(dir, "studio-run.json"), "{}");
+  const busy = run();
+  assert.equal(busy.status, 4);
+  assert.match(busy.stdout, /a make is running/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

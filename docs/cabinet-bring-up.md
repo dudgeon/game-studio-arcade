@@ -9,6 +9,8 @@ Sources, checked live 2026-11-11: Pimoroni's [Assembling your Picade](https://le
 
 ---
 
+**On the day itself:** [flash-day.md](flash-day.md) walks through it in order, from the card reader arriving to the kids' first game.
+
 ## The first end-to-end run, short
 
 For when the cabinet is built (Part A). The card carries everything, so the Picade is ready the moment it's switched on: the shelf with the virtual cabinet's games, speech on Groq (Moonshine as the fallback), and Make (D320-D326). Nothing is typed into the cabinet or run against it afterwards. Details are in the parts below.
@@ -17,7 +19,7 @@ For when the cabinet is built (Part A). The card carries everything, so the Pica
    - In the Claude Console: the `cabinet-picade` workspace and its spend limit, then a key scoped to it. Copy the key. (D1)
    - In a Terminal window on the mini, from the repo on `main`: `scripts/cabinet-card/picade-key.sh`. Paste the key when it asks (nothing shows). It checks the key's workspace, sets the Studio up there, stores the identity privately on the mini, and proves it with one session that sends no message. Look for `ok   workspace ..., agent version N`. (D329)
 2. **Flash, at the mini.** The virtual cabinet must be running (the card copies its Groq key and its games). Put the card in the mini's reader. In a Terminal window, in the repo on `main`:
-   `node scripts/cabinet-card/flash.mjs --check` first: it says whether everything the card needs is there, and writes nothing. Then `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
+   `node scripts/cabinet-card/flash.mjs --check` first: it says whether everything the card needs is there, and writes nothing. Then `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN --day-one docs/day-one.json` with the disk it names (`--day-one`: Geoff's clean start, a full pot, the chosen shelf and the Tester makers hidden; D356-D358. Claude writes that file with the list Geoff confirms).
    It asks, in this order:
    - the `erase diskN NNGB` phrase it shows;
    - the Wi-Fi name and password (nothing shows), unless `~/.config/game-studio-arcade/wifi.json` holds them (D327);

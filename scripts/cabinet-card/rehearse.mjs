@@ -133,7 +133,10 @@ function prepare(out) {
     const config = process.env.REHEARSE_CONFIG ? ["--cabinet-config-from", process.env.REHEARSE_CONFIG] : ["--no-identity"];
     // REHEARSE_TWIN_DIR: a folder of throwaway twin data for the card (D324), or none.
     if (process.env.REHEARSE_TWIN_DIR) config.push("--twin-dir", process.env.REHEARSE_TWIN_DIR);
-    else config.push("--no-seed");
+    else if (!process.env.REHEARSE_FROM_BACKUP) config.push("--no-seed");
+    // REHEARSE_FROM_BACKUP: the dead-card restore (D354), from GSA_TWIN_DIR's backup folder. REHEARSE_DAY_ONE: a day-one file (D356).
+    if (process.env.REHEARSE_FROM_BACKUP) config.push("--from-backup");
+    if (process.env.REHEARSE_DAY_ONE) config.push("--day-one", process.env.REHEARSE_DAY_ONE);
     const r = spawnSync(NODE, [join(HERE, "flash.mjs"), "--image-file", img, "--allow-dirty", ...config], {
       input: "Rehearsal network\nrehearsal-password-123\n",
       stdio: ["pipe", "inherit", "inherit"],

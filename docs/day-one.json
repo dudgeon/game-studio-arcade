@@ -1,0 +1,6 @@
+{
+  "note": "Geoff's clean start for the kids' first switch-on (2026-11-14): a full pot, the guest games, the starters and three example games; every other test game is carried off the shelf, and the Tester makers are hidden. Change it from the Manager's Games page.",
+  "pot": "full",
+  "hide_makers": ["tester", "tester2"],
+  "shelf": ["teti", "teti-geoff", "apple-catch", "comet-dodge", "wall-ball", "candy-cat-drop", "cloud-popper", "log-hopper"]
+}

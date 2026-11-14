@@ -1795,6 +1795,43 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **Not carried, by design (D292):** `cabinet-state.json`, so the welcome screens show once more and a "resting" month is forgotten until the workspace limit refuses again. Also the Manager pairing (re-pair) and `kit-uploads.json` (re-uploaded on the first make).
 - **The loss window is the time since the last backup:** an hour normally, longer if the mini slept or the Picade was off the Wi-Fi. A card that still boots should get one more `run.mjs` first.
 
+**D356. `flash.mjs --day-one FILE`, applied to the card's copy only.** *(Claude.)*
+- The file is JSON: `{"pot": "full", "hide_makers": ["tester", "tester2"], "shelf": ["teti", "teti-geoff", ...]}`.
+- The flash applies it to its snapshot of the twin's data (D324), after `seed()` and before packing. The twin, the backup and the mini keep everything as it was. `twin.mjs sync` later sets the twin's own versions aside (D294), never deleting them.
+- The flash stops before touching the card if the file names a game or maker the data doesn't have, so a typo can't silently drop a game.
+- **Never with `--from-backup`:** a rebuilt card comes back as it was (D354), so the two together are refused.
+
+**D357. A full pot: the twin's test ledger isn't carried.** *(Claude.)* `logs/coin_ledger.jsonl` is left out of the card's copy. The pot is worked out from that ledger alone (D355), so the Picade starts the month with the service's own refill: 100 coins. The twin keeps its ledger in its records on the mini.
+
+**D358. The shelf and the makers, as D360 marks.** *(Claude.)*
+- The card's copy gets `"remove"` lines in `logs/shelf_marks.jsonl`, in the Manager's format:
+  - `kind: "maker"` for each hidden maker (`makers.json` itself is never touched);
+  - `kind: "game"` for every shelf line not chosen.
+- Every mark has `by: "geoff"`, `via: "day-one"`, Geoff's reason, and a trailing newline.
+- **Lines, not carts:** a game mark targets a line (a cart's `branch`, or its own id). So one mark hides a game with all its versions, and a kid's own version is a line of its own. A day-one file may name any cart in a line to keep the whole line.
+- Everything stays on the card (D5). A grown-up brings a game or maker back from the Manager with a `"restore"` mark.
+- **Starters:** the starter games are lines like any other (the twin carries its own copies of them). A shelf list that leaves them out marks them off too.
+- **Until the Manager's reader is on main,** the marks are on the card but nothing reads them, so every game and maker still shows.
+
+**D359. Speech's install files leave the card after first boot.** *(Claude, from the update worker's finding.)* Once first boot has succeeded and `/opt/arcade/speech/speech.json` exists, `firstboot.sh` removes `seed/speech` (wheels and model, about 291 MB) from the boot partition. That leaves about 397 MB free there instead of about 115.
+- **Safe for a re-run:** a failed first boot keeps the files for its retry. A successful one never runs again (`provisioned-version`). Provisioning run again by an update doesn't use the card's copy: `speech.sh` skips what's installed, and fetches from the internet otherwise.
+
+**Rehearsed on 2026-11-14** (throwaway twin: three games, one with a version on its line, a Tester2 game, Tester and Tester2, and a ledger written by the service's own pot code down to 66 coins):
+- **Run 11, day-one** (shelf: teti, teti-geoff, rehearsal-dodge):
+  - The pot was 100 coins, with one ledger line (the month's refill).
+  - Three marks, owned by `arcade`, all via `day-one` by `geoff`: the makers tester and tester2, and the game line tester2-catch. rehearsal-dodge-v2 stays with its line.
+  - `makers.json` was unchanged, and all the games' files were carried.
+  - Speech's files were removed (291 MB), leaving 397 MB free on the boot partition. First boot exited 0.
+- **Run 12, `--from-backup` from the same folder:**
+  - Everything as it was: 66 coins, all four ledger lines, no marks.
+  - `--day-one` together with `--from-backup` stopped before writing anything.
+- Neither run showed the marks taking effect, since the Manager's reader isn't on main yet.
+- **The day-one list** (2026-11-14, the director's recommendation, which Geoff accepted; he can change it from the Manager's Games page) is `docs/day-one.json`:
+  - Shelf: teti, teti-geoff, the three starters, and three example lines (candy-cat-drop, cloud-popper, log-hopper).
+  - Hidden makers: tester and tester2. Pot: full.
+  - `flash.mjs --check --day-one docs/day-one.json` checks a file's ids against the live virtual cabinet with the same planner the flash uses, reading only (the twin helper's `manifest` and `read`).
+  - Its run on 2026-11-14 found every id. It gave 8 lines on the shelf and 9 off it (bee-buzz, fly-catcher, frog-flicker, fruit-cat-drop, penguin-slide, pepper-bone-catch, rock-rain, shark-chomp, snowball-drop). The twin's 8342-byte ledger stays on the mini.
+
 **D360. "Remove a game" is off the shelf, kept in the records: an append-only mark beside the logs.** *(Geoff, 2026-11-13: "we need a way to delete games in case I want to get rid of the test games"; he chose "Off the shelf, kept in the records". Mechanics by Claude.)*
 - The game disappears from the cabinet for the kids, with every version of it. Nothing is erased (D5): its folders, library commits, makes, plays, coin entries and checks all stay, and the twin and the backup keep it. The Manager can put it back, as it was. Grown-ups only: the Manager, or the MCP tools, both behind the Manager's token.
 - **On disk:** `/var/lib/arcade/logs/shelf_marks.jsonl`, one JSON object per line, appended, never rewritten: `{"type":"shelf_mark","id":"sm_<base36 time><random>","at":"<ISO UTC>","kind":"game"|"maker","target":"<id>","action":"remove"|"restore","by":"<who>","via":"manager"|"mcp"|…,"reason":"<text>"}`. The last line for a (kind, target) wins. No file means nothing is off, so a new card needs none. The reader accepts any `via`; the day-one card writes `"day-one"` (D356-D358).
@@ -1853,3 +1890,38 @@ The kids will switch the cabinet off at the wall, and Geoff accepted that the ca
   - QEMU's own power button (the kernel's power key) was ignored;
   - a 2.5 s hold powered the guest off cleanly, with no ext4 journal replay at the next boot.
 - 🔧 **Only the Picade can show** the HAT's 3 s cut against the shutdown (C6).
+
+## 2026-11-14 — The day-one card (SD-card worker)
+
+Geoff chose a clean start for the kids' first switch-on (through the director, 2026-11-13): a full pot, a short shelf, and no Tester names. The "off the shelf" mark is the Manager worker's (D360). Its format was relayed by the director and confirmed with the Manager worker directly: its reader takes any `via`, and `"by": "geoff"` is right.
+
+**D390. A card with no twin data starts the cart library at first boot, with the starters committed.** *(Claude, from the update worker's finding, 2026-11-14. D390-D399 are this worker's block: D356-D359 are used, D360-D369 are the Manager's, and D370-D379 the update worker's.)*
+- **The finding:** provisioning copies the three starters into `/var/lib/arcade/carts`, but the library's git repo only appeared with the first make. The service's `ensureLibrary` commits only its README, and a make commits only its own folder, so the starters stayed untracked for good.
+- **Wider than unseeded cards:** the virtual cabinet has the same gap today. Its library holds every made game, but apple-catch, comet-dodge and wall-ball are untracked (read-only look, 2026-11-14).
+- **The fix (`cabinet/provision/library.sh`, after `step_carts`):** on a cabinet with no library yet, first boot starts it the service's own way, as `arcade`: the same README, the same "Studio" author, and the same first commit ("Start the dev cart library"). Then it commits each starter as `starter <id> v1 (D161)`. The service's `ensureLibrary` then finds the library ready and changes nothing.
+- **A library that's already there is left as it is:** a seeded card (the twin's library), the twin itself, or a re-run.
+- **Tested:**
+  - the commits and their author;
+  - `ensureLibrary` changes nothing afterwards;
+  - the same README;
+  - a seeded library untouched, with its untracked folder still untracked.
+- **Rehearsal 13** (a card with no twin data): the log said "3 starters committed". The library had the four commits by Studio, nothing untracked, and `.git` and README owned by `arcade`. First boot exited 0.
+- **Not done, offered:** committing the untracked starters in the twin's library, and so on a seeded card too. That's a small change, but it adds commits to the twin's history, which then reach the Picade by seed and come back by sync. Done once on the twin before the flash, both would match. It's the director's call whether to do it.
+
+**D391. The twin's own starters are committed too: `scripts/virtual-cabinet/commit-starters.sh`.** *(The director's yes, 2026-11-14; Claude.)*
+- The virtual cabinet's apple-catch, comet-dodge and wall-ball are untracked in its library (D390). This script commits each one the way first boot now does: `starter <id> v1 (D161)`, by "Studio", as `arcade`, over the twin's admin SSH. Then a card seeded from the twin carries their history too.
+- **It only adds commits.** A starter already tracked is left alone, so running it again does nothing. `--dry-run` says what it would do and changes nothing. It refuses while a make is running or still to be collected, because the service commits to the same library.
+- **Run it before the flash.** After the Picade exists, a commit on the twin is the twin's own and sync sets it aside (D294).
+- **Tested** on a stand-in library: the dry run, three commits after the made game's history, a re-run that does nothing, and the refusal during a make.
+- **Live dry run, 2026-11-14:** "would commit 3 starters; untracked now: 3". The real run waits for the director to sequence it.
+
+**D392. The flash day, as a walkthrough: [flash-day.md](flash-day.md).** *(Director's ask, 2026-11-14.)* Linked from the checklist, it covers:
+1. picade-key.sh;
+2. `flash.mjs --check --day-one docs/day-one.json`, then the flash;
+3. card in, mic in, power on, first boot;
+4. Manager pairing;
+5. the hourly backup's install;
+6. the first update and `boot-update.mjs adopt`;
+7. the kids' first make.
+
+Each step says what Geoff does, what he'll see, and what Claude does from the mini meanwhile, using the current scripts.
