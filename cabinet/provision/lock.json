@@ -26,6 +26,7 @@
   },
   "picade": {
     "picade_hat_repo": "https://github.com/pimoroni/picade-hat",
-    "picade_hat_commit": "f97c2ac7211c8d9ff866b22a82c3b2ae6d01e0df"
+    "picade_hat_commit": "f97c2ac7211c8d9ff866b22a82c3b2ae6d01e0df",
+    "tailscale_version": "1.104.7"
   }
 }

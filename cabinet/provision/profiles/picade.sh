@@ -13,6 +13,9 @@ hw_early() {
   wait_for_clock
 }
 
+# shellcheck source=/dev/null
+. "$SELF_DIR/harden.sh"
+
 hw_late() {
   step_overlay
   step_config_txt
@@ -20,6 +23,7 @@ hw_late() {
   step_sound
   step_driver_keyboard
   step_power_button
+  step_harden
 }
 
 # The Pi has no battery clock. Until NTP answers, the clock says the image's date, and apt refuses
@@ -71,6 +75,8 @@ dtparam=start=28
 dtparam=escape=1
 dtparam=enter=59
 dtparam=coin=60
+# D396: the USB-C port as a network port for the mini (rpi-usb-gadget; harden.sh)
+dtoverlay=dwc2,dr_mode=peripheral
 # END arcade provision
 CONF
 }

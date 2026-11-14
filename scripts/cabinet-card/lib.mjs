@@ -64,6 +64,12 @@ export function networkConfig({ ssid, psk, country }) {
     "    eth0:",
     "      dhcp4: true",
     "      optional: true",
+    // D398: on the cable, DHCP never gives up (NetworkManager stops after 45 s by default, which cut the mini off on
+    // a direct cable) and IPv6 is link-local, so a mini on the end of the cable always reaches fe80::…%en0.
+    "      networkmanager:",
+    "        passthrough:",
+    `          ipv4.dhcp-timeout: ${q("2147483647")}`,
+    `          ipv6.method: ${q("link-local")}`,
     "  wifis:",
     "    wlan0:",
     "      dhcp4: true",
@@ -116,7 +122,8 @@ export function userData({ hostname, timezone, locale, authorizedKey, country })
     `      - ${q(authorizedKey.trim())}`,
     "bootcmd:",
     // Pi OS keeps Wi-Fi blocked until a country is set; network-config's regulatory-domain should do it.
-    `  - [sh, -c, ${q(`raspi-config nonint do_wifi_country ${country} || true; rfkill unblock wifi || true`)}]`,
+    // D398: once per card (it rewrites cmdline.txt on FAT); cloud-init is off after first boot anyway (D395).
+    `  - [sh, -c, ${q(`cloud-init-per once arcade-wifi-country sh -c 'raspi-config nonint do_wifi_country ${country} || true; rfkill unblock wifi || true'`)}]`,
     // D244's networkd wait, masked now: provision.sh masks it too, but only after cloud-config, which it holds 2 minutes.
     `  - [sh, -c, ${q("systemctl mask systemd-networkd-wait-online.service; systemctl stop --no-block systemd-networkd-wait-online.service || true")}]`,
     "runcmd:",

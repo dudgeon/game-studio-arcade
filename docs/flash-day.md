@@ -114,7 +114,22 @@ node scripts/cabinet-card/boot-update.mjs adopt
 
 **Claude, meanwhile:** reads both reports. If either goes back, it says why before anything else is tried.
 
-## 7. The kids make a game
+## 7. Remote access: sign Tailscale in, once
+
+So the mini can reach the cabinet from anywhere, even when `arcade.local` doesn't answer (D397). First boot has already installed Tailscale and left it waiting for a sign-in. The sign-in is yours to do: no script signs in to anything.
+
+**Claude:** runs `sudo tailscale up --hostname=arcade --ssh=false --accept-dns=false` on the Picade and gives you the link it prints.
+
+**You:**
+1. Open the link, sign in with the Tailscale account the mini uses, and approve the machine `arcade`.
+2. If the mini isn't on Tailscale yet, install the Tailscale app on it and sign in to the same account.
+3. In the Tailscale admin console, turn off key expiry for `arcade`, so the cabinet never drops off the tailnet by itself.
+
+**You'll see:** `arcade` in the Tailscale app's list of machines.
+
+**Claude, meanwhile:** reaches the cabinet as `arcade` (or at its 100.x address) with the Picade's own SSH key. Tailscale SSH stays off (`--ssh=false`), and so does MagicDNS on the cabinet, so playing never depends on Tailscale.
+
+## 8. The kids make a game
 
 **You, with Owen or Alina:**
 1. From the shelf: stick and **A** on **Make a new game**.
@@ -142,6 +157,8 @@ If first boot can't join the Wi-Fi (a wrong name or password, or a weak signal i
 **Claude, meanwhile:** finds it on `arcade.local` over its own key, then tells you whether the Wi-Fi joined too.
 - If the Wi-Fi didn't join, the fix is to re-write the card with the right Wi-Fi details.
 - Or keep the cable: while a cable is plugged in, the cabinet prefers it over the Wi-Fi.
+
+**No router cable nearby?** Run a cable straight from the mini's Ethernet port to the Pi's. Cards from D398 on never stop asking for an address on that cable and always keep a link-local address, so Claude reaches the Pi at `fe80::…%en0` with no router in between. The Pi's USB-C port is a network port as well (D396), but **only through a VBUS (power) blocker**: the X HAT already powers the Pi, and the mini mustn't power it too.
 
 **If anything goes wrong on the day:** stop, and tell Claude what the screen says.
 - The repair tools are `connect-picade.sh` (the Picade's key or agent) and `groq-picade.sh` (the Groq key).
