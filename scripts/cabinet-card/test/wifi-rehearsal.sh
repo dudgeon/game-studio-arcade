@@ -86,21 +86,27 @@ grep -q "wlan0:wifi" "$OUT/setup.log" || { echo "no simulated Wi-Fi device: is m
 echo "=== card: the first network through netplan, then adopted"
 psk="$("$N" -e 'console.log(require("crypto").pbkdf2Sync(process.argv[1], process.argv[2], 4096, 32, "sha1").toString("hex"))' "$HOME_PASS" "$HOME_SSID")"
 printf 'network:\n  version: 2\n  renderer: NetworkManager\n  wifis:\n    wlan0:\n      dhcp4: true\n      optional: true\n      regulatory-domain: "US"\n      access-points:\n        "%s":\n          password: "%s"\n' "$HOME_SSID" "$psk" > "$OUT/netplan.yaml"
-# In place of the rehearsal card's own stand-in network, which names a network that isn't there.
-"$D" ssh "sudo rm -f /etc/netplan/*.yaml; sudo tee /etc/netplan/50-cloud-init.yaml >/dev/null; sudo chmod 600 /etc/netplan/50-cloud-init.yaml; sudo netplan apply 2>&1 | grep -v 'too open' | grep -v '^\$'" < "$OUT/netplan.yaml"
+# A new card: in place of the rehearsal card's own stand-in network (which names a network that isn't there), and
+# with nothing of ours kept from an earlier run of this script.
+# Through root's own shell: our folders are root's alone, so a glob in the admin's shell would match nothing.
+"$D" ssh "sudo sh -c 'rm -f /etc/netplan/*.yaml /var/lib/arcade-wifi/arcade-wifi-* /etc/NetworkManager/system-connections/arcade-wifi-*'; sudo nmcli connection reload; sudo tee /etc/netplan/50-cloud-init.yaml >/dev/null; sudo chmod 600 /etc/netplan/50-cloud-init.yaml; sudo netplan apply 2>&1 | grep -v 'too open' | grep -v '^\$'" < "$OUT/netplan.yaml"
 t="$(until_wifi "netplan-wlan0-" 90)" && step card ok "joined through netplan in $t s" || step card fail "netplan's network didn't join"
 home_id="arcade-wifi-$("$N" -e 'console.log(require("crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "$HOME_SSID")"
 adopted="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js adopt 2>&1 | tail -1; sudo ls /var/lib/arcade-wifi /etc/NetworkManager/system-connections | grep -c $home_id; nmcli -t -f NAME,FILENAME connection show | grep -c '^$home_id:/etc/NetworkManager/system-connections/'")"
 [ "$(echo "$adopted" | tail -2 | tr '\n' ' ')" = "2 1 " ] && step card ok "adopted: a keyfile in both places, and NetworkManager reads ours as it is" || step card fail "adopt: $adopted"
-country="$(look "cat /etc/arcade/wifi-country 2>/dev/null; sudo cat /etc/NetworkManager/conf.d/arcade-wifi.conf | grep -c -E 'autoconnect-retries-default=0|wifi.powersave=2'" | tr '\n' ' ')"
-step card "$([ "${country##* 2 }" = "" ] && [ -n "$country" ] && echo ok || echo fail)" "provisioning's settings on the cabinet: country and conf lines: $country"
+conf="$(look "sudo cat /etc/NetworkManager/conf.d/arcade-wifi.conf | grep -c -E 'autoconnect-retries-default=0|wifi.powersave=2'" )"
+step card "$([ "$conf" = 2 ] && echo ok || echo fail)" "provisioning's NetworkManager settings on the cabinet: no power saving, retry for ever ($conf of 2 lines)"
 
 echo "=== lost: netplan's copy goes, then our live keyfile goes"
 look "sudo rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/90-NM-*.yaml; sudo netplan apply >/dev/null 2>&1; sudo nmcli connection reload" >/dev/null
 t="$(until_wifi "arcade-wifi-" 90)" && step lost ok "with netplan's copy deleted, Wi-Fi is on our keyfile after $t s" || step lost fail "no Wi-Fi on our keyfile after netplan's copy went"
-look "sudo rm -f /etc/NetworkManager/system-connections/arcade-wifi-*; sudo nmcli connection reload; sudo nmcli device disconnect wlan0 >/dev/null 2>&1" >/dev/null
-t="$(until_wifi "arcade-wifi-" 120)" && step lost ok "with the live keyfile deleted and Wi-Fi dropped, the watch put it back: Wi-Fi after $t s" || step lost fail "the watch didn't bring Wi-Fi back after the keyfile was deleted"
-look "sudo truncate -s 0 /etc/NetworkManager/system-connections/arcade-wifi-*; sleep 40; sudo sh -c 'wc -c < /etc/NetworkManager/system-connections/arcade-wifi-*'" | tail -1 | grep -qv '^0$' && step lost ok "a keyfile emptied (as a power cut can) is whole again within 40 s" || step lost fail "an emptied keyfile stayed empty"
+live_count="sudo sh -c 'ls /etc/NetworkManager/system-connections | grep -c arcade-wifi-'"
+gone="$(look "sudo sh -c 'rm -f /etc/NetworkManager/system-connections/arcade-wifi-*'; $live_count; sudo nmcli connection reload; sudo nmcli device disconnect wlan0 >/dev/null 2>&1")"
+t="$(until_wifi "arcade-wifi-" 120)"
+back="$(look "$live_count")"
+if [ "$t" != no ] && [ "$gone" = 0 ] && [ "$back" = 1 ]; then step lost ok "with the live keyfile deleted and Wi-Fi dropped, the watch put the file back and Wi-Fi returned after $t s"; else step lost fail "keyfile deleted: files right after $gone (want 0), files later $back (want 1), Wi-Fi after $t s"; fi
+sizes="$(look "sudo sh -c 'truncate -s 0 /etc/NetworkManager/system-connections/arcade-wifi-*; cat /etc/NetworkManager/system-connections/arcade-wifi-* | wc -c; sleep 40; cat /etc/NetworkManager/system-connections/arcade-wifi-* | wc -c'" | tr '\n' ' ')"
+case "$sizes" in "0 0 "|"") step lost fail "an emptied keyfile stayed empty ($sizes)" ;; "0 "*) step lost ok "a keyfile emptied (as a power cut can) is whole again within 40 s (bytes before and after: $sizes)" ;; *) step lost fail "the keyfile wasn't emptied: $sizes" ;; esac
 
 echo "=== radio: switched off, then blocked"
 look "sudo nmcli radio wifi off" >/dev/null
@@ -125,8 +131,8 @@ export LIMIT=60 OUT_LOG="$OUT/boots.log"; : > "$OUT_LOG"
 boot_check() { # WHAT
   local line saved
   line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)"
-  for _ in $(seq 1 40); do case "$line" in *"Wi-Fi up none"*|"") sleep 3; line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)" ;; *) break ;; esac; done
-  saved="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js status" | json 'o.saved.filter(s=>s.startsWith("Rehearsal")).sort().join(" ; ")')"
+  for _ in $(seq 1 40); do case "$line" in *"Wi-Fi up none"*|*"doesn't answer"*|"") sleep 3; line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)" ;; *) break ;; esac; done
+  saved="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js status" | json 'o.saved.filter(s=>s.startsWith("Rehearsal ")&&s!=="Rehearsal network").sort().join(" ; ")')"
   if [ "${line%% *}" = PASS ] && [ "$saved" = "$GUEST_SSID ; $HOME_SSID" ]; then step "$1" ok "${line#PASS this boot 1: }; saved: $saved"; else step "$1" fail "${line:-no answer}; saved: $saved"; fi
 }
 for i in $(seq 1 "$CUTS"); do

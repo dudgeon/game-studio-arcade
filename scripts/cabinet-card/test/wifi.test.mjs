@@ -75,6 +75,23 @@ test("when the name is quiet it tries the router's name, then the last address, 
   l.close();
 });
 
+test("off the home Wi-Fi: Tailscale's address, then the addresses the card worker recorded for the cable and the USB port", { skip: !mac }, async () => {
+  const l = await listener();
+  const ts = setup({});
+  const tailscale = path.join(ts.dir, "tailscale");
+  fs.writeFileSync(tailscale, '#!/bin/bash\n[ "$1 $2 $3" = "ip -4 arcade" ] && echo 127.0.0.1\n', { mode: 0o755 });
+  const viaTailscale = await connect({ ...ts.env, PICADE_TAILSCALE: tailscale }, l.port);
+  assert.equal(viaTailscale.out, "SSH-2.0-test\n");
+  assert.match(viaTailscale.err, /\(tailscale\)/);
+
+  const usb = setup({});
+  fs.writeFileSync(path.join(usb.dir, "last-known-address.json"), '{\n  "eth0": { "mac": "02:00:00:00:00:01", "link_local": "fe80::ff:fe00:1" },\n  "usb_gadget": { "ipv4": "127.0.0.1" }\n}\n');
+  const viaUsb = await connect({ ...usb.env, PICADE_TAILSCALE: "", PICADE_CABLE_IF: "lo0" }, l.port);
+  assert.equal(viaUsb.out, "SSH-2.0-test\n");
+  assert.match(viaUsb.err, /\(usb-port\)/);
+  l.close();
+});
+
 test("with nothing answering it fails, saying what it tried; a damaged last-address file is never used", { skip: !mac }, async () => {
   const none = setup({});
   const r = spawnSync("/bin/bash", [CONNECT, "arcade.local", "1"], { env: none.env, encoding: "utf8" });
@@ -90,6 +107,32 @@ test("SSH to the Picade goes through the finder: the driver and the Manager", ()
   assert.match(drive, /ProxyCommand=\$REPO\/scripts\/cabinet-card\/picade-connect\.sh %h %p/);
   assert.match(fs.readFileSync(path.join(REPO, "manager/cabinet.mjs"), "utf8"), /ProxyCommand=\$\{PICADE_CONNECT\} %h %p/);
   assert.ok(fs.statSync(CONNECT).mode & 0o100, "picade-connect.sh is executable");
+});
+
+test("the driver reaches the Picade with the Picade's own key and known_hosts, never the virtual cabinet's", () => {
+  // A stand-in ssh that prints what it was given.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drive-ssh-"));
+  fs.writeFileSync(path.join(dir, "ssh"), '#!/bin/bash\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
+  const picade = path.join(dir, "picade");
+  const vm = path.join(dir, "vm");
+  const drive = (/** @type {Record<string, string>} */ env) =>
+    execFileSync("/bin/bash", [path.join(REPO, "cabinet/vm/drive"), "ssh", "true"], { encoding: "utf8", env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, GSA_CABINET_DIR: picade, GSA_VM_DIR: vm, ARCADE_RIDE_S: "1", ...env } });
+  for (const env of [{ CABINET: "real" }, { ARCADE_CABINET: "real" }, { ARCADE_HOST: "arcade.local" }]) {
+    const args = drive(env);
+    assert.match(args, new RegExp(`^${picade}/ssh/arcade_ed25519$`, "m"), JSON.stringify(env));
+    assert.match(args, new RegExp(`^UserKnownHostsFile=${picade}/ssh/known_hosts$`, "m"));
+    assert.match(args, /^cabinet@arcade\.local$/m);
+    assert.match(args, /^ProxyCommand=.*picade-connect\.sh %h %p$/m);
+    assert.doesNotMatch(args, new RegExp(vm));
+  }
+  const virtual = drive({});
+  assert.match(virtual, new RegExp(`^${vm}/ssh/arcade-virtual_ed25519$`, "m"));
+  assert.match(virtual, /^cabinet@arcade-virtual\.local$/m);
+  assert.doesNotMatch(virtual, /ProxyCommand/);
+  // A rehearsal on a forwarded port keeps the key it was given.
+  const rehearsal = drive({ ARCADE_HOST: "127.0.0.1", ARCADE_SSH_PORT: "2299", ARCADE_SSH_DIR: path.join(dir, "r"), ARCADE_SSH_KEY_NAME: "arcade_ed25519" });
+  assert.match(rehearsal, new RegExp(`^${dir}/r/arcade_ed25519$`, "m"));
+  assert.doesNotMatch(rehearsal, /ProxyCommand/);
 });
 
 /** A function of wifi.sh's, run in bash. */

@@ -5,6 +5,8 @@
 #   1. arcade.local    the cabinet's own name, by mDNS (avahi on the cabinet)
 #   2. arcade.lan, arcade   the name the router's DHCP gives it, when mDNS is quiet
 #   3. the last address that worked, kept in the Picade's folder on the mini
+#   4. off the home Wi-Fi altogether: Tailscale's address for it, a cable straight to its Ethernet port (its
+#      link-local address), its USB-C service port; the last two from last-known-address.json in that folder
 #
 # SSH still checks the host key under the name arcade.local, whichever way it connected: another machine that
 # has taken an old address is refused, not trusted.
@@ -26,6 +28,9 @@ resolve() {
   dscacheutil -q host -a name "$1" 2>/dev/null | awk '/^ip_address:/ { print $2; exit }'
 }
 answers() { [ -n "$1" ] && "$NC" -z -G 3 "$1" "$2" >/dev/null 2>&1; }
+ipv4() { case "$1" in ""|*[!0-9.]*) return 1 ;; esac; }
+# What the card worker recorded of the Picade's other ways in: eth0's link-local address, the USB port's address.
+KNOWN="$PICADE_DIR/last-known-address.json"
 remember() {
   [ "$(cat "$LAST" 2>/dev/null)" = "$1" ] && return 0
   mkdir -p "$PICADE_DIR" && printf '%s\n' "$1" > "$LAST.new" && mv "$LAST.new" "$LAST"
@@ -44,9 +49,23 @@ find_picade() {
     fi
   done
   ip="$(cat "$LAST" 2>/dev/null)"
-  case "$ip" in *[!0-9.]*|"") return 1 ;; esac
-  answers "$ip" "$port" || return 1
-  echo "$ip last-address"
+  if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip last-address"; return 0; fi
+  # Off the home Wi-Fi altogether (D395-D397, the card worker's service paths): Tailscale, once a person has signed
+  # the cabinet in; then a cable straight to the Pi's Ethernet port; then its USB-C service port.
+  local ts=""
+  for ts in "$(command -v tailscale 2>/dev/null)" /Applications/Tailscale.app/Contents/MacOS/Tailscale; do [ -x "$ts" ] && break; ts=""; done
+  if [ -n "${PICADE_TAILSCALE-$ts}" ]; then
+    ip="$("${PICADE_TAILSCALE-$ts}" ip -4 "$base" 2>/dev/null | head -1)"
+    if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip tailscale"; return 0; fi
+  fi
+  # Its Tailscale address as recorded, for a mini that's on the tailnet but has no tailscale command to ask.
+  ip="$(sed -n 's/.*"tailscale": *{.*"ipv4": *"\(100\.[0-9.]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"
+  if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip tailscale"; return 0; fi
+  ip="$(sed -n 's/.*"link_local": *"\(fe80:[0-9a-f:]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"
+  if [ -n "$ip" ] && answers "$ip%${PICADE_CABLE_IF:-en0}" "$port"; then echo "$ip%${PICADE_CABLE_IF:-en0} direct-cable"; return 0; fi
+  ip="$(sed -n 's/.*"usb_gadget": *{ *"ipv4": *"\([0-9.]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"
+  if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip usb-port"; return 0; fi
+  return 1
 }
 
 if [ "${1:-}" = "--where" ]; then

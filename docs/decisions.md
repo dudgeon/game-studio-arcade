@@ -2007,7 +2007,7 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - puts back any of our networks missing from NetworkManager's folder, or different there (an empty file after a power cut), and reloads them;
 - switches the radio on and unblocks it (rfkill) if it's off, with the country;
 - with a saved network and no Wi-Fi: after 30 s, looks for networks and connects, every minute; after 3 min, restarts wpa_supplicant and NetworkManager; after 5 min, reloads the Wi-Fi chip's driver (`brcmfmac`); then one of those two every 10 min, for ever;
-- never restarts NetworkManager while a cable carries the cabinet, which would cut a grown-up's session;
+- never restarts NetworkManager while a cable carries the cabinet's default route, which would cut a grown-up's session. Only that counts as a cable: the Picade's eth0 and its USB service port both say "connected" with nothing plugged in (the card worker's finding);
 - says each change in the journal, and leaves `/run/arcade-wifi/status.json` (connected, name, signal, address) for the service.
 - Games play on through all of it: nothing here is in the play path.
 
@@ -2030,7 +2030,8 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - `scripts/cabinet-card/picade-connect.sh` is SSH's ProxyCommand for the Picade. It tries `arcade.local` (mDNS, avahi on the cabinet), then `arcade.lan` and `arcade` (the router's DHCP name), then the address in `~/game-studio-data/cabinets/arcade/last-address`, which it rewrites whenever a name answers.
 - SSH still checks the host key under the name `arcade.local` however it connected, so a different machine on an old address is refused.
 - `cabinet/vm/drive` and the Cabinet Manager use it whenever the host is the Picade's, so the update, connect, driver-keyboard and twin scripts all get it. `picade-connect.sh --where` prints the address and how it was found.
-- Not done: sweeping the network for the Pi when all three fail. The cabinet's own Wi-Fi screen shows its address (D414).
+- **Off the home Wi-Fi altogether,** it then tries the card worker's service paths (D395-D397), in this order: Tailscale's address for `arcade` (once a person has signed the cabinet in, and if the mini has Tailscale), a cable straight to the Pi's Ethernet port (eth0's link-local address, on the mini's `en0`), and the USB-C service port. The last two addresses come from `last-known-address.json` in the Picade's folder on the mini, which the card worker keeps; nothing about the hardware is in the repo.
+- Not done: sweeping the network for the Pi when every way fails. The cabinet's own Wi-Fi screen shows its address (D414).
 
 **D417. Why the Picade lost its Wi-Fi on flash day: not proven. What was ruled out, and what the evidence fits.** *(The card worker's capture over a direct cable, 2026-11-14 09:32; the Wi-Fi worker's reading.)*
 - **What happened:** first boot and its one restart were on Wi-Fi (`Dudginsen`, 192.168.86.123, `arcade.local` resolving). After Geoff power-cycled it to fix the joystick plug, the shelf said "No Wi-Fi" at every start, a clean restart included, and the mini's pings failed.
@@ -2051,6 +2052,29 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **`up` and `down` are for the cabinet's own controls (D421):** steps of 10, down to 0, up to a cap of 60. A level above the cap (set from the Manager) only comes down. The cap is a first guess, to tune by ear on the Picade.
 - The Manager's `control.sh` is unchanged and still works on a cabinet without the tool.
 - **Tested** with stand-ins for `amixer`, `aplay` and `alsactl` (`scripts/cabinet-card/test/volume.test.mjs`). **Not yet proven on the Picade:** that the boot run sets 30% on a new card, and that `alsa-restore` brings a softvol level back after a restart (D366 left that for the hardware too).
+
+**D421. Open, for Geoff: how the volume is changed at the cabinet.** *(Claude proposes; the choice is Geoff's.)* Three options, mocked up for him 2026-11-14. Each shows a small bar for a second and stops at D420's cap.
+1. **The two pink buttons (5 and 6) are quieter and louder, anywhere.** Claude's pick: nothing to remember, works mid-game, and house games never see those buttons (D82). It uses up the spare buttons, and they stop counting as "any button picks" (D182).
+2. **Hold COIN and push the stick up or down, anywhere.** Keeps the pink buttons spare. A hidden combination, the stick still moves the player mid-game, and COIN on the shelf would open the pot on letting go.
+3. **A Sound tile on the shelf.** Visible and labelled, but only from the shelf, and the largest change to the launcher.
+
+**D418. Proven against a real NetworkManager on a QEMU copy of the card; the Picade's own proof is `wifi-proof.sh`.** *(Director's brief; Claude.)*
+- **The rehearsal:** `scripts/cabinet-card/test/wifi-rehearsal.sh DIR [CUTS] [RESTARTS]`, on a card image booted in QEMU (`rehearse.mjs`). The VM has no Wi-Fi chip, so the kernel's simulated radios (`mac80211_hwsim`) stand in: `wlan0` is the cabinet's, and two more are access points (hostapd, with dnsmasq for addresses) that start at every boot. NetworkManager, wpa_supplicant, netplan and our helper are the real ones.
+- **Provisioning's own step ran on that card's first boot** and kept the card's network as a keyfile of ours.
+- **Result, 2026-11-14, the last full run: 27 of 28 steps.** The one failure was a wrong address on the result of a join (fixed, below). Every step that tests the Wi-Fi coming back passed:
+  - the first network joined through netplan as the card's does, and `adopt` kept it in both places; NetworkManager reads our keyfile as it is;
+  - with netplan's copy deleted, Wi-Fi was on our keyfile 26 s later; with our live keyfile deleted too and the Wi-Fi dropped, the watch put the file back and Wi-Fi returned in 21 s; a keyfile emptied as a power cut can leave one (0 bytes) was whole again (530 bytes) within 40 s;
+  - the radio switched off, then blocked with rfkill: back on Wi-Fi in 17 and 15 s;
+  - over the socket as the kiosk's user: the scan listed both networks; a wrong password failed with "The password didn't work.", kept nothing, and the cabinet was back on the first network; a network named `Rehearsal Guest; 2` with a password holding two spaces, a backslash, a semicolon, a quote and a hash joined and was kept;
+  - **10 power cuts** (QEMU quits, nothing flushed), the first right after that join and the rest at random moments in a boot's first 45 s, then **5 clean restarts**: Wi-Fi up 17-30 s after power-on every time, with both networks still saved. An earlier full run gave 17-25 s.
+- **What the rehearsal found and fixed in the Wi-Fi code:**
+  - a password with a semicolon was written with an escape NetworkManager refuses, so it could never have been joined;
+  - NetworkManager's rewrite of the netplan YAML can drop the country, so provisioning now also reads it from the kernel command line;
+  - just after a change of network the device can still list the old network's address, so the result screen would have shown the wrong one. The address now comes from the new lease. Checked by hand on the rehearsal cabinet after the run; not re-run as a step.
+- **What it found in itself:** in the first full run, the steps that delete and empty our keyfile didn't act (a glob in a root-only folder, expanded by the admin's shell), and passed anyway. They now run in root's shell and check the file went; the figures above are from the run after that fix.
+- **What it can't show:** the Pi's own chip and driver (`brcmfmac`), a mesh that steers clients, and a weak basement signal. Those are the Picade's.
+- **On the Picade** (the card worker, after the first Wi-Fi commit was delivered by update): `wlan0` came back by itself on two restarts, 12.8 and 12.9 s after power-on, on our `arcade-wifi-*` profile, checked separately from the cable.
+- **The Picade's proof:** `scripts/cabinet-card/wifi-proof.sh restarts 5` restarts the cabinet itself; `wifi-proof.sh cycles 10` counts ten power cycles a person does, and says when. Each boot's line is the seconds from power-on until NetworkManager had `wlan0` activated, read from the cabinet's own journal, so a cable being in doesn't mask it. A pass is 60 s or less. Results are kept in the Picade's folder on the mini.
 
 **D421. The volume at the cabinet: hold ENT and press a pink button.** *(Geoff, 2026-11-14: "enter plus pink buttons", from three mocked-up options: the pinks alone, COIN plus the stick, a Sound tile on the shelf. Claude built it.)*
 - **What it does:** while ENT (F1) is held, pink 5 (Q) is quieter and pink 6 (E) is louder. One press is one step of 10, from 0 up to the cabinet's cap of 60% (D420). The Manager's slider still goes to 100, and a level above 60 only comes down at the cabinet. Which pink sits nearer the player is checked on the Picade; swapping them is two constants.

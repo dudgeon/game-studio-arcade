@@ -93,8 +93,13 @@ export function parseScan(text) {
 /** The keyfile's name for a network: stable for a name, and safe as a file name whatever the name holds. @param {string} ssid */
 export const idFor = (ssid) => `${PREFIX}${createHash("sha256").update(ssid, "utf8").digest("hex").slice(0, 12)}`;
 
-/** A keyfile string value: GKeyFile's escapes, with every space written out so none is trimmed. @param {string} s */
-const keyfileValue = (s) => s.replace(/\\/g, "\\\\").replace(/ /g, "\\s").replace(/\t/g, "\\t").replace(/;/g, "\\;");
+/**
+ * A keyfile string value, with every space written out so none is trimmed. Only the escapes GLib's key files
+ * know for a plain value: backslash-s, backslash-t and a doubled backslash. A semicolon is itself; escaping it
+ * makes NetworkManager refuse the file (found against a real NetworkManager in the rehearsal, D418).
+ * @param {string} s
+ */
+const keyfileValue = (s) => s.replace(/\\/g, "\\\\").replace(/ /g, "\\s").replace(/\t/g, "\\t");
 
 /**
  * The NetworkManager keyfile for one network. It asks, itself, for what D411 wants of every network: join by
@@ -228,7 +233,11 @@ export function createWifi(o = {}) {
     const r = await nm(["-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device", "status"]);
     const rows = r.stdout.split("\n").filter(Boolean).map(splitTerse);
     const wifi = rows.find((f) => f[1] === "wifi");
-    const wired = rows.some((f) => f[1] === "ethernet" && /^connected/.test(f[2] ?? ""));
+    // A cable counts only when it carries the cabinet's traffic: the default route. The Picade's eth0 and its USB
+    // service port both say "connected" with nothing plugged in (the card worker's finding, 2026-11-14).
+    const route = await run("ip", ["-4", "route", "show", "default"]);
+    const via = /\bdev (\S+)/.exec(route.stdout.split("\n")[0] ?? "")?.[1] ?? null;
+    const wired = rows.some((f) => f[1] === "ethernet" && f[0] === via && /^connected/.test(f[2] ?? ""));
     return { ok: r.code === 0, name: wifi?.[0] ?? null, state: wifi?.[2] ?? null, connection: wifi && /^connected/.test(wifi[2] ?? "") ? wifi[3] || null : null, wired };
   };
 
@@ -243,8 +252,10 @@ export function createWifi(o = {}) {
     const here = parseScan(list.stdout).find((n) => n.inUse);
     s.ssid = here?.ssid ?? null;
     s.signal = here?.signal ?? null;
-    const ip = await nm(["-g", "IP4.ADDRESS", "device", "show", d.name]);
-    s.address = ip.stdout.split(/[\n|]/)[0]?.trim().replace(/\/\d+$/, "") || null;
+    // The lease's own address first: just after a change of network the device can still list the old network's
+    // address beside the new one for a moment (seen in the rehearsal, D418).
+    const ip = await nm(["-g", "DHCP4.OPTION,IP4.ADDRESS", "device", "show", d.name]);
+    s.address = /\bip_address = (\d+(?:\.\d+){3})/.exec(ip.stdout)?.[1] ?? /(\d+(?:\.\d+){3})\/\d+/.exec(ip.stdout)?.[1] ?? null;
     return s;
   };
 
@@ -282,7 +293,9 @@ export function createWifi(o = {}) {
     }
     const livePath = path.join(live, file);
     writeDurable(livePath, /** @type {string} */ (text), 0o600);
-    await nm(["connection", "load", livePath]);
+    const loaded = await nm(["connection", "load", livePath]);
+    // A file NetworkManager won't read is our mistake, not the password's: say so in the journal, and fail as a join does.
+    if (loaded.code !== 0 || /fail|error/i.test(`${loaded.stdout}${loaded.stderr}`)) log(`NetworkManager wouldn't load ${file}: ${`${loaded.stderr}${loaded.stdout}`.trim().split("\n")[0]}`);
     const up = await nm(["-w", "45", "connection", "up", "id", idFor(q.ssid), "ifname", d.name], 60_000);
     if (up.code === 0) {
       writeDurable(path.join(store, file), /** @type {string} */ (text), 0o600);

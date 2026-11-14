@@ -77,7 +77,8 @@ UNIT
 wifi_country() {
   local c
   c="$(sed -n 's/.*regulatory-domain: *"\{0,1\}\([A-Z][A-Z]\)"\{0,1\}.*/\1/p' /etc/netplan/*.yaml 2>/dev/null | head -1)"
-  [ -n "$c" ] || c="$(sed -n 's/.*cfg80211\.ieee80211_regdom=\([A-Z][A-Z]\).*/\1/p' /proc/cmdline | head -1)"
+  # NetworkManager's rewrite of the YAML can drop the country (seen in the rehearsal): the command line has it too.
+  [ -n "$c" ] || c="$(sed -n 's/.*cfg80211\.ieee80211_regdom=\([A-Z][A-Z]\).*/\1/p' /proc/cmdline /boot/firmware/cmdline.txt 2>/dev/null | head -1)"
   echo "$c"
 }
 

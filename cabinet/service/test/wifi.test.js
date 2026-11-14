@@ -47,8 +47,8 @@ test("a keyfile asks for what D411 wants and survives any name or password", () 
   assert.match(text, /^powersave=2$/m);
   assert.match(text, /^autoconnect-priority=12$/m);
   assert.match(text, /^key-mgmt=wpa-psk$/m);
-  // Every space written out, so GKeyFile trims none; the backslash and the semicolon escaped.
-  assert.match(text, /^psk=\\stwo\\s\\sspaces\\\\and\\;semi\\s$/m);
+  // Every space written out, so GKeyFile trims none; the backslash doubled; a semicolon left as it is.
+  assert.match(text, /^psk=\\stwo\\s\\sspaces\\\\and;semi\\s$/m);
   assert.deepEqual(readKeyfile(text), { ssid: "Café; #1 = home", priority: 12, uuid: UUID });
   assert.match(keyfile({ ssid: "x", password: "longenough", kind: "sae", priority: 1, uuid: UUID }), /^key-mgmt=sae$/m);
   assert.doesNotMatch(keyfile({ ssid: "x", kind: "open", priority: 1, uuid: UUID }), /wifi-security/);
@@ -66,7 +66,7 @@ test("why a join failed, in a grown-up's words", () => {
 });
 
 /** A pretend nmcli: one Wi-Fi device, and a list of what was asked. */
-function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, device?: boolean, radio?: boolean, others?: string, secrets?: string }} */ f = {}) {
+function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, device?: boolean, status?: string, route?: string, radio?: boolean, others?: string, secrets?: string }} */ f = {}) {
   /** @type {string[][]} */
   const calls = [];
   const state = { connected: f.connected ?? null, ...f };
@@ -75,7 +75,9 @@ function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, devic
     calls.push([cmd, ...args]);
     const a = args.join(" ");
     const ok = (/** @type {string} */ stdout = "") => ({ code: 0, stdout, stderr: "" });
+    if (cmd === "ip") return ok(f.route ?? "");
     if (cmd !== "nmcli") return ok(cmd === "rfkill" && args[0] === "list" ? "0: phy0: Wireless LAN\n\tSoft blocked: no\n" : "");
+    if (a.includes("device status") && f.status) return ok(f.status);
     if (a.includes("device status")) return ok(f.device === false ? "lo:loopback:connected (externally):lo\n" : `wlan0:wifi:${state.connected ? "connected" : "disconnected"}:${state.connected ?? ""}\nlo:loopback:connected (externally):lo\n`);
     if (a.includes("device wifi list")) return ok(`${state.connected ? "*" : " "}:Home:80:WPA2\n :Guest:60:WPA2\n`);
     if (a.includes("IP4.ADDRESS")) return ok("192.168.86.123/24\n");
@@ -200,6 +202,16 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 min
   assert.deepEqual(watchStep({ downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, radioOn: false, now: 1 }).actions, ["unblock"]);
   // The Wi-Fi chip gone from the bus: the driver side is tried after a minute.
   assert.deepEqual(watchStep({ downSince: 0, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, device: false, now: 60 }).actions, ["restart"]);
+});
+
+test("a cable counts only when it carries the default route: the Picade's eth0 and USB port say connected with nothing plugged in", async () => {
+  const status = "wlan0:wifi:disconnected:\neth0:ethernet:connected:netplan-eth0\nusb0:ethernet:connected:USB Gadget (shared)\nlo:loopback:connected (externally):lo\n";
+  const idle = createWifi({ run: fakeNm({ status, route: "" }).run, ...dirs() });
+  assert.equal((await idle.device()).wired, false);
+  const onWifi = createWifi({ run: fakeNm({ status, route: "default via 192.168.86.1 dev wlan0 proto dhcp src 192.168.86.123 metric 600\n" }).run, ...dirs() });
+  assert.equal((await onWifi.device()).wired, false);
+  const onCable = createWifi({ run: fakeNm({ status, route: "default via 192.168.86.1 dev eth0 proto dhcp src 192.168.86.40 metric 100\ndefault via 192.168.86.1 dev wlan0 metric 600\n" }).run, ...dirs() });
+  assert.equal((await onCable.device()).wired, true);
 });
 
 test("a watch round unblocks the radio with the country, and leaves the status for the service", async () => {
