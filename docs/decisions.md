@@ -2061,3 +2061,27 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **In the launcher** (`app.js`, a few lines): a pink pressed while ENT is held isn't a button. On the talk screen ENT now opens typing when it's let go, and not if a pink was pressed meanwhile; a tap works as before (D184).
 - **No clash with the Wi-Fi screen's ENT and COIN hold** (checked with the Wi-Fi worker, 2026-11-14): theirs needs both held for 3 s and any other key cancels it; here a pink does nothing while COIN is held.
 - **Tested:** the watcher against recorded key events, the stream in the service's test, and the chord and the bar in headless Chromium. **Not yet proven on the Picade:** the real buttons, the bar over a game, and whether 60% is the right cap by ear.
+
+## 2026-11-14 — Nothing at the cabinet needs a keyboard (D430-D439, name-entry worker)
+
+Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabinet OFFERS NO AFFORDANCES to enter a name." The Picade has no keyboard, and "Someone new" opened a typing screen (D184).
+
+**D430. A new name is said, like everything else; typing is the fallback.** *(D87, as Geoff set it; D184's flag flipped. Claude.)*
+- "Someone new" opens the mic: "Hold any button and say your name". The name heard is shown, "Is this your name?", with **Yes, that's me**, **Say it again** and **Type it**.
+- This is so wherever the cabinet can hear: the Picade and the virtual cabinet (Groq and Moonshine, D260). Where it can't (the speech stub on the mini and in tests, or no speech engine set up), a new name starts in typing as before.
+- The service tells the launcher whether the cabinet has a keyboard: `keyboard` in `/api/config`, false for the `picade` profile and true elsewhere. With a keyboard, typing is the keyboard's screen as it was (F1, D184), so the virtual cabinet keeps F1 typing. With none, typing is the stick's keyboard (D431), and the hint names the button: "ENT: type instead" (ENT sends F1, D82).
+
+**D431. One on-screen keyboard: the Wi-Fi screens' grid (D414), on every talk screen.** *(Geoff chose the grid for Wi-Fi; the director's brief: reuse it, don't build a second. Claude.)*
+- ENT on a talk screen ("Tell me your game idea", "Something else", "What should change?", a new name, and "I didn't hear anything") opens the grid keyboard. The stick moves, A types, B deletes, X changes page, 1UP is DONE, ESC goes back to the mic.
+- **A name:** letters only, on one page of three rows, with delete and DONE. The first letter is a capital and the rest small. The limit is the 16 the service already keeps (D87's `NAME_MAX`); the header counts down what's left.
+- **An idea or an answer:** the Wi-Fi keyboard's three pages (abc, ABC, symbols), with space, delete and DONE, up to 300 characters. The line over the field is the question being answered.
+- DONE goes to the same "Is this right?" step as spoken or typed words (D201), so it can't start a build.
+- The button that opened the keyboard types nothing until it's let go (D182).
+- With a keyboard (the virtual cabinet, the mini), F1 on the typing screen swaps to the stick's keyboard and back, keeping the words, so the grid can be tried there too.
+- **How it's built:** `wifi.js` now exports the field and the grid (`fieldTop`, `keyGrid`) and `wifi-flow.js` the keys' logic (`moveKey`, `pressKey`, `keyboardKey`), each taking a keyboard's pages and action row; the Wi-Fi password screen is one user and `say-keys.js` the other. The Wi-Fi screens draw and behave as they did.
+
+**D432. What else needed a keyboard at the cabinet: the list.** *(Claude's sweep of the launcher, the runtime and the cabinet's docs, 2026-11-14.)*
+- **Fixed here:** the new maker's name (D430); F1 "type instead" on the idea, "Something else" and "what should change" screens; "Type it" after the cabinet didn't hear (E9). All are ENT and the stick now (D431).
+- **Already had a way:** the Wi-Fi password (D414), the volume (D421), back to the shelf (ESC, D88), starting a make (COIN, D205), shutting down (the power button, D372).
+- **Never at the cabinet, by design:** the API key, the Groq key, pairing, coins and hiding a maker are the Manager's and the mini's scripts.
+- **Left as it is:** a second player's keys (W A S D) exist only on a keyboard; the Picade has one player's controls and the controller count defaults to 1 (D85). Guest players read the same keys the Picade sends (D82) and their own menus aren't opened from the cabinet.

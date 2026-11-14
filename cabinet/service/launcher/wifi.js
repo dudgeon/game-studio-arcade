@@ -103,37 +103,38 @@ const KEY_H = 15;
 const KEY_GAP = 2;
 const GRID_X = M + Math.floor((INNER - (KEY_COLS * KEY_W + (KEY_COLS - 1) * KEY_GAP)) / 2);
 
-/** The password as the field shows it: its tail, so the last characters typed are always in view. */
-function fieldText(/** @type {string} */ text, /** @type {boolean} */ shown, /** @type {number} */ cols) {
-  const t = shown ? text : "*".repeat(text.length);
-  return t.length > cols ? t.slice(t.length - cols) : t;
-}
-
-/** The title and the field every password screen starts with. Returns the next free y. */
-function passwordTop(/** @type {Painter} */ p, /** @type {any} */ v) {
-  p.header("Wi-Fi password", v.text.length < PASS_MIN ? `${PASS_MIN - v.text.length} more` : `${v.text.length} letters`);
-  p.box({ id: "wifi-for", text: `For ${clean(v.ssid)}`, x: M, y: BODY_Y, w: INNER, h: GLYPH_H, color: C.silver, onCut: "ok" });
+/**
+ * The title, a line saying what it's for, and the field every keyboard screen starts with. The field shows the
+ * text's tail, so the last characters typed are always in view. Returns the next free y.
+ * @param {Painter} p @param {{ id: string, title: string, right?: string, label: string, text: string, tick?: number }} o
+ */
+export function fieldTop(p, o) {
+  p.header(o.title, o.right);
+  p.box({ id: `${o.id}-for`, text: o.label, x: M, y: BODY_Y, w: INNER, h: GLYPH_H, color: C.silver, onCut: "ok" });
   const fy = BODY_Y + LINE_H + 2;
   const fh = GLYPH_H + 8;
   p.fb.rectfill(M, fy, INNER, fh, C.black);
   p.fb.rect(M, fy, INNER, fh, C.sky);
   const cols = colsFor(INNER - 10) - 1;
-  const shownText = fieldText(v.text, v.show !== false, cols);
+  const shownText = o.text.length > cols ? o.text.slice(o.text.length - cols) : o.text;
   // Drawn straight from the framebuffer: a password may hold two spaces in a row, which a text box would fold.
   p.fb.text(shownText, M + 5, fy + 4, C.white, {});
-  if ((v.tick ?? 0) % 60 < 40) p.fb.rectfill(M + 5 + shownText.length * ADVANCE, fy + 4, ADVANCE - 1, GLYPH_H, C.yellow);
-  p.boxes.push({ id: "wifi-field", text: shownText, x: M + 5, y: fy + 4, w: INNER - 10, h: GLYPH_H, lines: [], cut: false, onCut: "ok", readable: false });
+  if ((o.tick ?? 0) % 60 < 40) p.fb.rectfill(M + 5 + shownText.length * ADVANCE, fy + 4, ADVANCE - 1, GLYPH_H, C.yellow);
+  p.boxes.push({ id: `${o.id}-field`, text: shownText, x: M + 5, y: fy + 4, w: INNER - 10, h: GLYPH_H, lines: [], cut: false, onCut: "ok", readable: false });
   return fy + fh + 4;
 }
 
 /**
- * The grid keyboard. `row` 0-3 and `col` 0-9 are a key; `row` 4 is the action row, `col` 0-4.
+ * The grid keyboard (D414), for any screen that types with the stick (D431): rows of ten keys, then the action
+ * row. `row` past the last row of keys is the action row, and `col` which action. The last action takes the width left.
  * @param {Painter} p
- * @param {{ ssid: string, text: string, page: number, row: number, col: number, show?: boolean, tick?: number }} v
+ * @param {{ page: number, row: number, col: number }} v
+ * @param {number} y0
+ * @param {{ id: string, pages: readonly { name: string, keys: string }[], acts: { id: string, text: string, w?: number, hue: number, dim?: boolean }[], hint: string }} o
  */
-function keys(p, v) {
-  const y0 = passwordTop(p, v);
-  const page = PAGES[v.page] ?? PAGES[0];
+export function keyGrid(p, v, y0, o) {
+  const page = o.pages[v.page] ?? o.pages[0];
+  const KEY_ROWS = page.keys.length / KEY_COLS;
   for (let r = 0; r < KEY_ROWS; r++) {
     for (let c = 0; c < KEY_COLS; c++) {
       const ch = page.keys[r * KEY_COLS + c];
@@ -148,27 +149,46 @@ function keys(p, v) {
     }
   }
   const ay = y0 + KEY_ROWS * (KEY_H + KEY_GAP) + 2;
-  const next = PAGES[(v.page + 1) % PAGES.length].name;
-  const ready = v.text.length >= PASS_MIN;
-  const acts = [
-    { id: "page", text: next, w: 34, hue: C.purple },
-    { id: "space", text: "space", w: 62, hue: C.blue },
-    { id: "delete", text: "delete", w: 48, hue: C.red },
-    { id: "show", text: v.show === false ? "show" : "hide", w: 38, hue: C.teal },
-    { id: "join", text: "JOIN", w: 0, hue: C.green },
-  ];
   const total = KEY_COLS * KEY_W + (KEY_COLS - 1) * KEY_GAP;
-  acts[4].w = total - acts.slice(0, 4).reduce((s, a) => s + a.w + KEY_GAP, 0);
+  const fixed = o.acts.slice(0, -1).reduce((s, a) => s + (a.w ?? 0) + KEY_GAP, 0);
   let x = GRID_X;
-  acts.forEach((a, i) => {
+  o.acts.forEach((a, i) => {
+    const w = i === o.acts.length - 1 ? total - fixed : (a.w ?? 0);
     const lit = v.row === KEY_ROWS && v.col === i;
-    const dim = a.id === "join" && !ready;
-    p.fb.rectfill(x, ay, a.w, KEY_H, lit ? a.hue : dim ? C.night : C.slate);
-    p.fb.rect(x, ay, a.w, KEY_H, lit ? C.white : dim ? C.slate : a.hue);
-    p.box({ id: `wifi-act-${a.id}`, text: a.text, x, y: ay + Math.floor((KEY_H - GLYPH_H) / 2) + 1, w: a.w, h: GLYPH_H, color: dim ? C.gray : C.white, align: "center", onCut: "never" });
-    x += a.w + KEY_GAP;
+    p.fb.rectfill(x, ay, w, KEY_H, lit ? a.hue : a.dim ? C.night : C.slate);
+    p.fb.rect(x, ay, w, KEY_H, lit ? C.white : a.dim ? C.slate : a.hue);
+    p.box({ id: `${o.id}-act-${a.id}`, text: a.text, x, y: ay + Math.floor((KEY_H - GLYPH_H) / 2) + 1, w, h: GLYPH_H, color: a.dim ? C.gray : C.white, align: "center", onCut: "never" });
+    x += w + KEY_GAP;
   });
-  p.hint("A: type  B: delete  X: abc/ABC/#  1UP: join");
+  p.hint(o.hint);
+}
+
+/**
+ * W2. `row` 0-3 and `col` 0-9 are a key; `row` 4 is the action row, `col` 0-4.
+ * @param {Painter} p
+ * @param {{ ssid: string, text: string, page: number, row: number, col: number, show?: boolean, tick?: number }} v
+ */
+function keys(p, v) {
+  const y0 = fieldTop(p, {
+    id: "wifi",
+    title: "Wi-Fi password",
+    right: v.text.length < PASS_MIN ? `${PASS_MIN - v.text.length} more` : `${v.text.length} letters`,
+    label: `For ${clean(v.ssid)}`,
+    text: v.show !== false ? v.text : "*".repeat(v.text.length),
+    tick: v.tick,
+  });
+  keyGrid(p, v, y0, {
+    id: "wifi",
+    pages: PAGES,
+    acts: [
+      { id: "page", text: PAGES[(v.page + 1) % PAGES.length].name, w: 34, hue: C.purple },
+      { id: "space", text: "space", w: 62, hue: C.blue },
+      { id: "delete", text: "delete", w: 48, hue: C.red },
+      { id: "show", text: v.show === false ? "show" : "hide", w: 38, hue: C.teal },
+      { id: "join", text: "JOIN", hue: C.green, dim: v.text.length < PASS_MIN },
+    ],
+    hint: "A: type  B: delete  X: abc/ABC/#  1UP: join",
+  });
 }
 
 // ---------- W3, W4: joining, and how it went ----------

@@ -97,6 +97,7 @@ function readJson(req) {
  *   speech: import("./speech.js").Speech,
  *   libraryDir: string, logsDir: string,
  *   players?: number, consoleName?: string, examples?: boolean,
+ *   keyboard?: boolean, // false on the Picade, which has no keyboard: typing there is the stick's (D430)
  *   guests?: ReturnType<typeof import("./guests.js").createGuests>,
  *   pot?: ReturnType<typeof import("./pot.js").potStore>,
  *   cabinet?: ReturnType<typeof import("./cabinet-state.js").cabinetState>,
@@ -351,7 +352,7 @@ export function createServiceHandler(o) {
     if (o.guests?.api(req, res, pathname)) return;
     if (!OURS.has(pathname)) return player(req, res);
     if (req.method === "GET") {
-      if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind });
+      if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind, keyboard: o.keyboard ?? true });
       // The list "Who's making?" offers, and every maker's name for the shelf's "by …", hidden ones too (D363).
       if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list().filter((m) => !o.marks?.makerOff(m.id)), names: Object.fromEntries(o.makers.read().map((m) => [m.id, m.name])) });
       if (pathname === "/api/pot") return json(res, 200, potView(60));

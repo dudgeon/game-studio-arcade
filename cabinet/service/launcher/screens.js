@@ -199,7 +199,7 @@ function who(p, v) {
   p.hint(CHOOSE);
 }
 
-const SAY_TITLE = {
+export const SAY_TITLE = {
   request: "Tell me your game idea",
   answer: "Something else",
   change: "What should change?",
@@ -209,6 +209,7 @@ const SAY_TITLE = {
 
 /** @param {Painter} p @param {any} v */
 function say(p, v) {
+  if (v.phase === "keys") return /** @type {any} */ (SCREENS)["say-keys"](p, v); // the stick's keyboard (D431, say-keys.js)
   p.header(SAY_TITLE[v.purpose] ?? "Tell me");
   let y = BODY_Y;
   if (v.prompt) {
@@ -225,7 +226,7 @@ function say(p, v) {
     const r = p.box({ id: "say-transcript", text: v.added ? `${v.added} ${v.transcript}` : v.transcript, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.transcript), tilesY - y - 2), onCut: "reader", readable: true });
     let ty = tilesY;
     tiles.forEach((t, i) => {
-      ty = p.tile({ id: ["say-yes", "say-again", "say-more"][i], text: t, y: ty, rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : C.blue }).y;
+      ty = p.tile({ id: ["say-yes", "say-again", v.purpose === "name" ? "say-type" : "say-more"][i], text: t, y: ty, rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : C.blue }).y;
     });
     p.hint(r.cut ? READ_MORE : CHOOSE);
     return;
@@ -242,7 +243,7 @@ function say(p, v) {
     const b = p.box({ id: "say-typed", text: shown, x: M, y, w: INNER, h: heightOf(rows), keepLines: true });
     const lastLine = lines.slice(-1)[0] ?? "";
     if ((v.tick ?? 0) % 40 < 24) p.fb.rectfill(Math.min(M + lastLine.length * ADVANCE, M + INNER - 4), y + (Math.max(b.rows, 1) - 1) * LINE_H, 4, GLYPH_H - 1, C.yellow);
-    p.hint("Enter: done. ESC: back.");
+    p.hint("Enter: done. F1: stick keys. ESC: back.");
     return;
   }
   // idle, listening, hearing, silence
@@ -256,10 +257,12 @@ function say(p, v) {
   p.fb.rectfill(W / 2 - 6, cy + 1, 13, 2, C.white);
   p.fb.rectfill(W / 2 - 1, cy + 3, 3, 5, C.white);
   p.fb.rectfill(W / 2 - 5, cy + 8, 11, 2, C.white);
-  const msg = listening ? "Listening... let go when you're done" : hearing ? "Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : "Hold any button and talk";
+  const msg = listening ? "Listening... let go when you're done" : hearing ? "Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : v.purpose === "name" ? "Hold any button and say your name" : "Hold any button and talk";
   p.box({ id: "say-message", text: msg, x: M, y: cy + 25, w: INNER, h: heightOf(2), color: listening ? C.pink : v.phase === "silence" ? C.yellow : C.white, align: "center", onCut: "never" });
   if (!listening && !hearing && v.phase !== "silence") p.box({ id: "say-sub", text: "Let go to send it", x: M, y: cy + 25 + 2 * LINE_H, w: INNER, h: GLYPH_H, color: C.silver, align: "center" });
-  p.hint(listening || hearing ? "" : v.phase === "silence" ? "Hold a button to try. F1: type it." : "F1: type instead. ESC: back.");
+  // The key that types is F1 on a keyboard and the ENT button on the Picade (D82, D431).
+  const ent = v.typeKey ?? "F1";
+  p.hint(listening || hearing ? "" : v.phase === "silence" ? `Hold a button to try. ${ent}: type it.` : `${ent}: type instead. ESC: back.`);
 }
 
 /** @param {Painter} p @param {any} v */

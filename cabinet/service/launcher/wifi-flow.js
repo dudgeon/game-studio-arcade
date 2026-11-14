@@ -2,7 +2,7 @@
 // The Wi-Fi screens' keys and steps (D413, D414): the hold that opens them, the list, the keyboard, joining,
 // and the result. app.js hands it keys while a Wi-Fi screen is up; drawing is wifi.js. Pure but for the three
 // things it's given: how to show a view, how to ask the service, and how to go back to the shelf.
-import { ACTIONS, KEY_COLS, KEY_ROWS, PAGES, PASS_MAX, PASS_MIN } from "./wifi.js";
+import { ACTIONS, KEY_COLS, PAGES, PASS_MAX, PASS_MIN } from "./wifi.js";
 
 /** The two utility buttons a grown-up holds together (D413): ENT is F1, COIN is F2 (D82). */
 export const HOLD_KEYS = Object.freeze(["F1", "F2"]);
@@ -14,38 +14,85 @@ export const WIFI_HINT = "No Wi-Fi. Grown-up: hold ENT and COIN";
 /** Where the hold works: the shelf, and what COIN or Make may have put over it. */
 const HOLD_SCREENS = new Set(["shelf", "pot", "history"]);
 
-/** Which action key is under each grid column, and the column above each action key. */
-const ACTION_UNDER = [0, 0, 1, 1, 1, 2, 2, 3, 3, 4];
-const COL_OVER = [0, 3, 5, 7, 9];
+/**
+ * A keyboard's keys (D431): its pages (each rows of ten), its action row, which action is under each grid column,
+ * the column over each action, and the most it holds. `put` joins a typed key to the text, where that isn't plain.
+ * @typedef {{ pages: readonly { name: string, keys: string }[], actions: readonly string[], actionUnder: readonly number[], colOver: readonly number[], max: number, put?: (text: string, ch: string) => string }} Keys
+ */
+/** The Wi-Fi password's keyboard. @type {Keys} */
+export const WIFI_KEYS = Object.freeze({ pages: PAGES, actions: ACTIONS, actionUnder: [0, 0, 1, 1, 1, 2, 2, 3, 3, 4], colOver: [0, 3, 5, 7, 9], max: PASS_MAX });
 
-/** The last column of a row that holds a key (the symbols page ends early). @param {number} page @param {number} row */
-const lastCol = (page, row) => {
-  const keys = PAGES[page].keys.slice(row * KEY_COLS, (row + 1) * KEY_COLS);
+/** How many rows of keys a keyboard has. @param {Keys} L */
+export const keyRows = (L) => L.pages[0].keys.length / KEY_COLS;
+
+/** The last column of a row that holds a key (a page may end early). @param {Keys} L @param {number} page @param {number} row */
+const lastCol = (L, page, row) => {
+  const keys = L.pages[page].keys.slice(row * KEY_COLS, (row + 1) * KEY_COLS);
   return Math.max(0, keys.trimEnd().length - 1);
 };
 
 /**
- * Move on the keyboard. Rows 0-3 are keys, row 4 the action row. Left and right wrap; up and down stop.
- * @param {{ page: number, row: number, col: number }} v @param {"up" | "down" | "left" | "right"} dir
+ * Move on the keyboard. The rows of keys, then the action row. Left and right wrap; up and down stop.
+ * @param {{ page: number, row: number, col: number }} v @param {"up" | "down" | "left" | "right"} dir @param {Keys} [L]
  */
-export function moveKey(v, dir) {
+export function moveKey(v, dir, L = WIFI_KEYS) {
+  const rows = keyRows(L);
   let { row, col } = v;
-  if (row === KEY_ROWS) {
-    if (dir === "left") col = (col + ACTIONS.length - 1) % ACTIONS.length;
-    else if (dir === "right") col = (col + 1) % ACTIONS.length;
-    else if (dir === "up") (row = KEY_ROWS - 1), (col = Math.min(COL_OVER[col], lastCol(v.page, row)));
+  if (row === rows) {
+    const n = L.actions.length;
+    if (dir === "left") col = (col + n - 1) % n;
+    else if (dir === "right") col = (col + 1) % n;
+    else if (dir === "up") (row = rows - 1), (col = Math.min(L.colOver[col], lastCol(L, v.page, row)));
     return { row, col };
   }
-  const last = lastCol(v.page, row);
+  const last = lastCol(L, v.page, row);
   if (dir === "left") col = col === 0 ? last : col - 1;
   else if (dir === "right") col = col >= last ? 0 : col + 1;
   else if (dir === "up" && row > 0) row -= 1;
   else if (dir === "down") {
-    if (row === KEY_ROWS - 1) return { row: KEY_ROWS, col: ACTION_UNDER[col] };
+    if (row === rows - 1) return { row: rows, col: L.actionUnder[col] };
     row += 1;
-    col = Math.min(col, lastCol(v.page, row));
+    col = Math.min(col, lastCol(L, v.page, row));
   }
   return { row, col };
+}
+
+/**
+ * Do one thing on the keyboard: "type" presses what's lit; "delete", "space" and "page" are themselves. Those
+ * happen here; any other action (join, done, show) is handed back for the screen to do.
+ * @param {{ text: string, page: number, row: number, col: number }} v @param {string} what @param {Keys} [L]
+ * @returns {string | null}
+ */
+export function pressKey(v, what, L = WIFI_KEYS) {
+  const rows = keyRows(L);
+  if (what === "delete") v.text = v.text.slice(0, -1);
+  else if (what === "page") {
+    v.page = (v.page + 1) % L.pages.length;
+    if (v.row < rows) v.col = Math.min(v.col, lastCol(L, v.page, v.row));
+  } else if (what === "space") v.text.length < L.max && (v.text += " ");
+  else if (what !== "type") return what;
+  else if (v.row === rows) return pressKey(v, L.actions[v.col], L);
+  else {
+    const ch = L.pages[v.page].keys[v.row * KEY_COLS + v.col];
+    if (ch && ch !== " " && v.text.length < L.max) v.text = L.put ? L.put(v.text, ch) : v.text + ch;
+  }
+  return null;
+}
+
+/**
+ * A key went down while a keyboard is up: the stick moves, A types, B deletes, X changes page, and 1UP is the
+ * last action (join, done). Returns the action left for the screen, as pressKey does.
+ * @param {{ code: string, repeat: boolean }} e @param {{ text: string, page: number, row: number, col: number }} v @param {Keys} [L]
+ * @returns {string | null}
+ */
+export function keyboardKey(e, v, L = WIFI_KEYS) {
+  const dir = /** @type {Record<string, "up" | "down" | "left" | "right">} */ ({ ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" })[e.code];
+  if (dir) Object.assign(v, moveKey(v, dir, L));
+  else if (e.code === "KeyZ" || e.code === "KeyV" || e.code === "KeyQ" || e.code === "KeyE") return pressKey(v, "type", L); // A, and the spare buttons
+  else if (e.code === "KeyX" || e.code === "Backspace") pressKey(v, "delete", L); // B; held, it keeps deleting. Backspace: a keyboard plugged in
+  else if (e.code === "KeyC" && !e.repeat) pressKey(v, "page", L); // X
+  else if (e.code === "Enter" && !e.repeat) return /** @type {string} */ (L.actions.at(-1)); // 1UP
+  return null;
 }
 
 /**
@@ -120,27 +167,6 @@ export function createWifiFlow(o) {
     typePassword(net);
   }
 
-  /** @param {any} v @param {"type" | "delete" | "page" | "join"} what */
-  function keyboard(v, what) {
-    if (what === "delete") v.text = v.text.slice(0, -1);
-    else if (what === "page") {
-      v.page = (v.page + 1) % PAGES.length;
-      if (v.row < KEY_ROWS) v.col = Math.min(v.col, lastCol(v.page, v.row));
-    } else if (what === "join") {
-      if (v.text.length >= PASS_MIN) void join(v.net, v.text);
-    } else if (v.row === KEY_ROWS) {
-      const a = ACTIONS[v.col];
-      if (a === "page") keyboard(v, "page");
-      else if (a === "space") v.text.length < PASS_MAX && (v.text += " ");
-      else if (a === "delete") keyboard(v, "delete");
-      else if (a === "show") v.show = v.show === false;
-      else keyboard(v, "join");
-    } else {
-      const ch = PAGES[v.page].keys[v.row * KEY_COLS + v.col];
-      if (ch && ch !== " " && v.text.length < PASS_MAX) v.text += ch;
-    }
-  }
-
   function back() {
     const v = o.view();
     if (v.screen === "wifi-keys" || v.screen === "wifi-result") return list();
@@ -181,13 +207,9 @@ export function createWifiFlow(o) {
         else if (dir === "down") v.sel = Math.min(n - 1, v.sel + 1);
         else if (!dir && !e.repeat && isButton(e.code) && !v.scanning) v.sel < v.networks.length ? pick(v.networks[v.sel]) : void scan();
       } else if (v.screen === "wifi-keys") {
-        if (dir) Object.assign(v, moveKey(v, dir));
-        else if (e.code === "KeyZ" || e.code === "KeyV" || e.code === "KeyQ" || e.code === "KeyE") keyboard(v, "type"); // A, and the spare buttons
-        else if (e.code === "KeyX") keyboard(v, "delete"); // B; held, it keeps deleting
-        else if (e.code === "KeyC" && !e.repeat) keyboard(v, "page"); // X
-        else if (e.code === "Enter" && !e.repeat) keyboard(v, "join"); // 1UP
-        // A grown-up with a keyboard plugged in can just type.
-        else if (e.code === "Backspace") keyboard(v, "delete");
+        const a = keyboardKey(e, v);
+        if (a === "show") v.show = v.show === false;
+        else if (a === "join" && v.text.length >= PASS_MIN) void join(v.net, v.text);
       } else if (v.screen === "wifi-result") {
         const n = v.ok ? 1 : 3;
         if (dir === "up") v.sel = Math.max(0, v.sel - 1);

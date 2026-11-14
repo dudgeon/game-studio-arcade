@@ -10,7 +10,7 @@ How a kid's voice becomes the words on "Is this right? I heard:" (M6). Decisions
 4. The words go back to the launcher, which shows M6. An empty result shows E9 ("didn't hear that"). The clip is then zeroed and dropped. No audio is ever written anywhere.
 5. `speech.jsonl` in the cabinet's logs gets one line per hold. It records the engine, the hold and audio lengths, the latency, the word count, and any engines skipped and why. It never holds the words.
 
-F1 typing is unchanged: it's the keyboard's way to answer.
+F1 typing is unchanged where the cabinet has a keyboard. On the Picade, ENT opens the stick's on-screen keyboard instead (D430, D431).
 
 ## Engines
 
