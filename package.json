@@ -6,7 +6,8 @@
   "workspaces": [
     "runtime",
     "studio-kit/*",
-    "cabinet/service"
+    "cabinet/service",
+    "game-studio"
   ],
   "engines": {
     "node": ">=22 <23"

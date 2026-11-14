@@ -1,0 +1,12 @@
+{
+  "name": "game-studio-arcade",
+  "owner": { "name": "game-studio-arcade" },
+  "description": "The basement arcade's own plugins, for Claude Code on the Mac mini. Local only; not for public listing.",
+  "plugins": [
+    {
+      "name": "game-studio",
+      "source": "./game-studio/plugin",
+      "description": "Make and change cabinet games from Claude Code on the Mac mini, and publish them to the cabinet through its publish gate."
+    }
+  ]
+}

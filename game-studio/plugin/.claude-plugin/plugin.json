@@ -1,0 +1,6 @@
+{
+  "name": "game-studio",
+  "version": "0.1.0",
+  "description": "Make and change cabinet games from Claude Code on the Mac mini: pull a cart from the cabinet, work spec-first, playtest, play with the keyboard, and publish it back through the cabinet's publish gate.",
+  "author": { "name": "game-studio-arcade" }
+}

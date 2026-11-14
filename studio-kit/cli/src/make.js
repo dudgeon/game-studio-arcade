@@ -90,7 +90,7 @@ function packParent(parent, sessionsDir) {
 }
 
 /** The spec lines a change removed and added, for the record. @param {string|null} before @param {string|null} after */
-function specChange(before, after) {
+export function specChange(before, after) {
   if (after == null) return null;
   const a = String(before ?? "").replace(/\n$/, "").split("\n");
   const b = String(after).replace(/\n$/, "").split("\n");

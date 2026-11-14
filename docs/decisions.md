@@ -1684,6 +1684,69 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
 - **Changing the Wi-Fi network or password over the network:** not built. A wrong one would cut the cabinet off.
 - **config.txt changes in a software update** (picade.sh's block) are still written in place and take effect at the next restart, as before (D250). Moving them into a tried slot like D336 is a follow-up.
 
+## 2026-11-13 — The desktop flow: the cabinet's MCP server and the game-studio plugin (D340-D349)
+
+*(Worker, from the director's zoom-out review: HANDOFF §3.1, §8.3, §9.2 and §9.3 were locked, and none of it existed.)*
+
+**D340. The arcade MCP server is a route inside the cabinet service: `POST /mcp` on its loopback port.** *(Claude; carries out §3.1's "the MCP server lives on the cabinet, inside the cabinet service".)*
+- `cabinet/service/src/arcade-mcp.js` holds the six tools of §9.2: `list_carts`, `get_cart`, `publish_cart`, `launch_on_cabinet`, `get_activity`, `cabinet_status`. `src/mcp-rpc.js` is a small JSON-RPC core with no packages, shared with the plugin.
+- **Protocol, checked against the spec 2026-11-13.** It speaks both eras. Modern (2026-07-28): a version in each request's `_meta`, `server/discover`, `resultType: "complete"`, and error -32022 for an unsupported version. Legacy: `initialize`, `notifications/initialized`, `ping`. Claude Code asks stdio servers for the modern revision first and falls back to the legacy one.
+- Streamable HTTP with JSON answers only: no server-sent stream, because no tool needs to push anything.
+- It's not in the play path. It reads the library and logs, appends to them, or asks the launcher, and every request is answered on the service's own event loop.
+
+**D341. Who may connect: the mini alone, paired like the Manager.** *(Claude, within the director's brief: "keep it home-network only, paired like the Manager"; for Geoff to see.)*
+- **Nothing new listens on the network.** `/mcp` is on the service's `127.0.0.1:8330`, like the Manager's endpoints, reached through the mini's SSH to the cabinet: the Manager's held connection and port forward (`manager/cabinet.mjs`, D280, D286), with the cabinet's own admin key, which only the mini has.
+- **Then the Manager's pairing token** (`/etc/arcade/manager-token`, D208, D215), as `Authorization: Bearer`. A cabinet that isn't paired answers 404 there, as for the Manager.
+- **No browser can call it.** A request that carries an `Origin` header is refused, so a web page can't reach it through DNS rebinding.
+- One token for both the Manager and the desktop. It's the same grown-up on the same mini, and it means one fewer secret to pair. A separate desktop token is a small change if Geoff wants to revoke them separately.
+
+**D342. The plugin's `arcade` server is a bridge on the mini.** *(Claude.)*
+- Claude Code starts `game-studio/src/arcade-bridge.js` over stdio. It opens the SSH link at the first call, so Claude Code's start isn't held up, and passes each call to the cabinet unchanged.
+- Two conveniences live in the bridge, because only the mini has the folders:
+  - `get_cart`'s `into` writes the files to a new local folder, with `.arcade-pulled.json` (id, version, commit), instead of returning them.
+  - `publish_cart`'s `dir` packs a local folder as the bundle. Files a cart doesn't hold are listed as `not_sent`. The parent comes from the marker unless one is given, so a pulled game publishes as a change to it.
+- `ARCADE_CABINET` picks the cabinet: `virtual` (the default), `real`, or a name in the Manager's `cabinets.json`. `ARCADE_URL` with `ARCADE_TOKEN_FILE` reaches a service directly, for a local copy and the tests.
+
+**D343. publish_cart: a new version through the same checks as a make, never a replacement.** *(Claude; §3.1's never-delete, spec-first and publish gate, D310.)*
+- **The bundle:** `{files: [{path, text|base64}]}` holding `spec.md`, `cart.json`, `game.js`, `checks.js`, `NOTICE.md` and `assets/…` only. Paths use safe characters only, with no `..` and no dot-files, at most 300 files and 4 MB. A sent `playtest.json` is dropped: the cabinet writes its own.
+- **The cabinet writes the provenance:** maker, with, parent (`id@version`), family and branch, `session_id` (`desk_…`), `origin: "desktop"`, created. Makers must be in the cabinet's `makers.json`. Geoff is a grown-up maker (D236).
+- **Lineage works as for a cabinet change** (D206, make.js's ids). The parent's own maker gets the next version of the same line (`<line>-v<n>`). Anyone else gets their own version, a new line in the same family. The parent is never touched.
+- **Validate, then the publish gate** (D310: its queue, low priority, waiting while a game is played). Only a pass is copied into the library and committed. A failure is logged and kept in `sessions/<desk_…>/` (D5), and comes back as a tool error naming each failing check, so Claude can fix it and publish again.
+- **Logs** (§9.5): a `studio_session` with `origin: "desktop"`, `kind` new or change, `summary`, the spec diff and the gate's result; and a `cart_version` on a commit. The Manager's Activity reads them as it does a make.
+- One publish at a time.
+
+**D344. launch_on_cabinet opens a game's how-to-play board, and only from the shelf.** *(Claude, with the director's go for a small launcher hook; for Geoff to see, because it's what the kids see.)*
+- **What the kids see is an existing board.** The launcher shows G0 (how to play) for that game, the same board a kid gets by picking it on the shelf, and pressing a button plays it. No new screen.
+- **It never interrupts.** The service refuses while a make is running or a game is being played. The launcher refuses on any screen but the shelf, saying which. The tool reports the refusal with its reason.
+- **How it works:** the launcher listens on `/api/arcade/launch` (server-sent events) and answers on `/api/arcade/launch/answer`. With no launcher listening, or no answer in 8 s, the launch is refused. The hook is one self-contained block at the end of `launcher/app.js`.
+- **For Geoff:** a kid browsing the shelf would see it jump to the launched game's board. That's the flow §8.3 asked for. If it should wait until the shelf has sat untouched for a while, that's a small change.
+
+**D345. A desktop build costs the family's coin pot nothing.** *(Claude; follows §3.1: desktop builds run on Geoff's account with Geoff present.)* The pot reads only `coin_ledger`. A desktop session writes none, and its `list_cost` is null.
+
+**D346. The studio tools: §9.3's four, plus read_kit and play.** *(Claude.)*
+- Claude Code names a plugin server's tools `mcp__plugin_game-studio_studio__<tool>`, and the spec allows dots but Claude Code's own names don't. So they're `new_cart`, `validate_cart`, `playtest` and `import_asset` on the `studio` server, which reads as §9.3's `studio.*`.
+- `read_kit` gives the same lean context pack a make reads (D160), with the mini's paths.
+- `play` serves the folder with the runtime's dev server and opens the browser, keyboard as the joystick: the "local browser" of §3.1's desktop experience, which is quicker than the Manager's simulator for iterating.
+- `playtest` is the same harness the gate runs (node by default, `driver: browser` for Playwright's Chromium).
+- **`import_asset`:** carts import nothing (D21), so a picture becomes sprite rows to paste into `game.js`, fitted to `size` × `size` (at most 64), each pixel the nearest of the 32 house colours, and transparent below half alpha. It keeps the picture as `assets/<name>.png` and the rows as `assets/<name>.sprite.json`, and adds a NOTICE.md line from `source`. PNG is read directly; anything else goes through macOS's `sips` first.
+- The `build-cart` skill is the spec-first loop for Geoff and a kid, with the house rules: inspired-by only, the kids' words stay off the repo, never delete, publish only when Geoff says.
+
+**D347. The plugin's layout, and how it's installed.** *(Claude.)*
+- `game-studio/plugin/` is the plugin: `.claude-plugin/plugin.json`, `.mcp.json` (servers `arcade` and `studio`), `skills/build-cart/`, and `bin/run.mjs`.
+- The code is in `game-studio/src/`, with tests in `game-studio/test/` (an npm workspace).
+- Claude Code may run an installed plugin from its own copy. So `run.mjs` finds the checkout: `GSA_REPO`, else the checkout it sits in, else `~/claude-home/game-studio-arcade`. An installed plugin therefore runs the main checkout's code.
+- The servers run on Node 22 (`GSA_NODE` overrides it).
+- The repo root is a one-plugin marketplace (`.claude-plugin/marketplace.json`). `claude plugin validate` passes on both.
+- **Installing into Geoff's Claude Code is his call** (the director's brief). The command is in `game-studio/README.md`.
+
+**D348. get_activity carries the kids' words into a desktop session.** *(Claude; for Geoff to see.)*
+- §9.2's `get_activity` returns what the logs hold, including a kid's request and answers, so Claude can build on what they asked for at the cabinet. Heavy fields (usage, tokens, the spec diff) are left out.
+- That puts the kids' words into Geoff's Claude Code session, on his account. The Manager only shows them in his browser.
+- The tool's description and the skill both say never to copy them into the repo or a file.
+- If Geoff would rather a desktop session never saw them, `get_activity` can drop `request`, `turns` and `said`, and keep the rest.
+
+**D349. What's proven, and what isn't.** *(Claude, 2026-11-13.)* See the task note and `game-studio/README.md` for the runs.
+
 ## 2026-11-13 — The twin as the Picade's backup (D350–D359)
 
 Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): if the Picade's card dies, it's reflashed and reloaded from the mini. So the mini's copy is the only backup of the kids' games. Code: `scripts/twin-backup/`, `manager/backup.mjs`, `scripts/twin.mjs`.
