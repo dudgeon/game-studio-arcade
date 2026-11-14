@@ -1,0 +1,11 @@
+[Unit]
+Description=The speaker starts quiet: set and store the default volume once, never over a stored level (D420)
+After=sound.target alsa-restore.service
+Before=arcade-kiosk.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/arcade-volume default
+
+[Install]
+WantedBy=multi-user.target
