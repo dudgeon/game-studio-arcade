@@ -99,6 +99,18 @@ test("arcade-boot: a slot block is added, replaced and read back; the rest of co
   assert.ok(twice.startsWith(original));
 });
 
+test("arcade-boot: a new slot replaces the block where it is, so a block after it keeps its place (the Picade, 2026-11-14)", () => {
+  const { dir, run } = bootFns();
+  const begin = "# BEGIN arcade boot slot (D336)";
+  const end = "# END arcade boot slot";
+  const before = `# the image's\n${begin}\n[all]\nos_prefix=arcade-1/\nkernel_watchdog_timeout=15\n${end}\n# BEGIN arcade provision\n[all]\ndtoverlay=picade\n# END arcade provision\n`;
+  fs.writeFileSync(path.join(dir, "config.txt"), before);
+  const after = run("config_with arcade-2");
+  assert.equal(after, before.replace("arcade-1/", "arcade-2/"), "only the slot's name changed; the provision block is still last");
+  fs.writeFileSync(path.join(dir, "config.txt"), after);
+  assert.equal(run("config_with arcade-2"), after, "the same slot again changes nothing");
+});
+
 test("arcade-boot: a try writes tryboot.txt and a new folder only; keeping it rewrites config.txt last (D336)", () => {
   const s = code(read("files/arcade-boot"));
   const tryFn = s.slice(s.indexOf("cmd_try() {"), s.indexOf("cmd_confirm() {"));

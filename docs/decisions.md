@@ -1637,6 +1637,7 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
   - If all three come up, it keeps the slot by rewriting config.txt's slot block. That is the one write that matters.
   - If not, or if the try hangs, crashes or loses power, the next boot reads config.txt, which still names the last slot, and the boot packages are put back from their copies.
   - The confirm knows a try by `arcade.slot=<id>` in that slot's own cmdline.txt.
+  - **The block stays where it is** when a new slot is kept (2026-11-14). picade.sh re-appends its own block at the end, so a moving slot block made every later software update see config.txt as "changed" and rewrite it on the FAT partition, with a spurious "restart wanted". Seen on the Picade after F2.
 - **A hang must turn into a restart.** The slot block sets `kernel_watchdog_timeout=15`, and systemd kicks the watchdog (`RuntimeWatchdogSec=15s`).
   - 🔧 Not confirmed in the docs: that a watchdog reset clears the tryboot flag as "a reset" does. Prove it on the Picade with a deliberately broken try before relying on it.
 - **Commands:** `scripts/cabinet-card/boot-update.mjs`, from a Terminal on the mini, never from the Manager. It waits for the outcome and reports it.
@@ -1961,6 +1962,29 @@ Each step says what Geoff does, what he'll see, and what Claude does from the mi
 - **Proven:** the unit test checks the block. The wired-only rehearsal of a card with the block was stopped while Geoff's flash ran, so it hasn't run yet; it's the next rehearsal. mDNS from the mini can't be shown in QEMU's user-mode network, only on the home network.
 - **flash-day.md** gains "If it doesn't show up on the network", and its adopt line now says what D336 does: one restart of about a minute, with the slot kept only if Wi-Fi and the shelf come back (bring-up F2).
 
+**D395. The Picade keeps a persistent journal, capped at 50 MB, and cloud-init is off after first boot.** *(Claude, from the Picade's first lost Wi-Fi, 2026-11-14; the director's list, items 1 and 4.)*
+- **Why:** Pi OS keeps the journal in memory only (`40-rpi-volatile-storage.conf`), so the boots that lost the Wi-Fi left no evidence. A higher-numbered drop-in, `90-arcade-persistent.conf`, makes it persistent and caps it.
+- **cloud-init:** it only had first boot to do. `/etc/cloud/cloud-init.disabled` stops it from re-rendering the network later, and stops the card's bootcmd from rewriting `cmdline.txt` on FAT at every boot.
+- **Where:** `cabinet/provision/harden.sh` (`step_harden`, called at the end of the Picade profile's `hw_late`). Safe to run again. The Wi-Fi itself is `wifi.sh` (D410-D415).
+- **On the live Picade:** applied by hand on 2026-11-14 with the same settings; `journalctl --list-boots` now lists every boot.
+
+**D396. The Pi's USB-C port is a network port for the mini (Raspberry Pi's rpi-usb-gadget).** *(Geoff through the director, "Yes, set it up", 2026-11-14.)*
+- **What:** `rpi-usb-gadget on` (in the image): g_ether, dwc2 in peripheral mode, and NetworkManager's "USB Gadget (shared)" profile. The Pi is 10.12.194.1, and it serves the mini an address on 10.12.194.0/28.
+- **config.txt:** `dtoverlay=dwc2,dr_mode=peripheral` sits in our block. The copy the tool appends after the block is removed, and the stock `[cm5]` host-mode line stays.
+- **⚠ Power:** USB-C is also the Pi's power input, and the X HAT already powers it. A cable from the mini must go through a VBUS (power) blocker. Not proven over a cable yet: that waits on the adapter. On the live Picade, `usb0` and g_ether came up after a restart.
+
+**D397. Tailscale on the Picade, pinned, with the sign-in left to a person.** *(Geoff, "Allow it", and through the director, "fully manage provisioning on the cabinet", 2026-11-14.)*
+- **What:** Tailscale's own apt repository for trixie. Its key is accepted only with fingerprint `2596A99EAAB33821893C0A79458CA832957F5868`, the version is pinned in `lock.json` (`picade.tailscale_version`, 1.104.7), and `tailscaled` is enabled.
+- **The sign-in:** a human step in flash-day.md §7, `tailscale up --hostname=arcade --ssh=false --accept-dns=false`. No auth key is stored anywhere.
+- **SSH:** the Picade's own key over the tailnet, never Tailscale SSH. MagicDNS stays off on the cabinet, so its own lookups and play never depend on Tailscale.
+- **A failure:** a failed download or install is logged and provisioning goes on. Tailscale is for reaching the cabinet, never for playing (cabinet independence).
+
+**D398. On the cable, DHCP never gives up and IPv6 is link-local; the Wi-Fi country is set once per card.** *(Claude, from the 2026-11-14 recovery over a direct cable.)*
+- **The finding:** on a direct cable from the mini, NetworkManager stopped asking for an address after 45 s and dropped the link-local address with it, so the mini lost its way in.
+- **The card's network-config:** eth0 gets a NetworkManager passthrough, `ipv4.dhcp-timeout: "2147483647"` (forever) and `ipv6.method: "link-local"`. That's the same as the live Picade's `netplan-eth0` after `nmcli con modify`.
+- **The country:** the bootcmd's `do_wifi_country` now runs under `cloud-init-per once`, so it never rewrites `cmdline.txt` again, even if cloud-init is turned back on.
+- **Tested:** unit tests on network-config, the bootcmd, the hardening steps (in a scratch `/etc`), the overlay dedupe and the Tailscale pin and key check. No rehearsal with the new card yet.
+
 ## 2026-11-14 — The Picade's Wi-Fi: always comes back, always findable, fixable from the cabinet (D410-D419, Wi-Fi worker)
 
 Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-cycle on flash day: Wi-Fi must come back by itself, the mini must always find the cabinet, and a lost Wi-Fi must never need a cable or a reflash. The root cause of that drop is D417.
@@ -2051,3 +2075,13 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **What it can't show:** the Pi's own chip and driver (`brcmfmac`), a mesh that steers clients, and a weak basement signal. Those are the Picade's.
 - **On the Picade** (the card worker, after the first Wi-Fi commit was delivered by update): `wlan0` came back by itself on two restarts, 12.8 and 12.9 s after power-on, on our `arcade-wifi-*` profile, checked separately from the cable.
 - **The Picade's proof:** `scripts/cabinet-card/wifi-proof.sh restarts 5` restarts the cabinet itself; `wifi-proof.sh cycles 10` counts ten power cycles a person does, and says when. Each boot's line is the seconds from power-on until NetworkManager had `wlan0` activated, read from the cabinet's own journal, so a cable being in doesn't mask it. A pass is 60 s or less. Results are kept in the Picade's folder on the mini.
+
+**D421. The volume at the cabinet: hold ENT and press a pink button.** *(Geoff, 2026-11-14: "enter plus pink buttons", from three mocked-up options: the pinks alone, COIN plus the stick, a Sound tile on the shelf. Claude built it.)*
+- **What it does:** while ENT (F1) is held, pink 5 (Q) is quieter and pink 6 (E) is louder. One press is one step of 10, from 0 up to the cabinet's cap of 60% (D420). The Manager's slider still goes to 100, and a level above 60 only comes down at the cabinet. Which pink sits nearer the player is checked on the Picade; swapping them is two constants.
+- **The pinks alone stay spare** and still count for "any button picks" (D182). ENT held alone does nothing new.
+- **A small bar** shows for a second and a half after each press: one block per step up to the cap, and "VOL OFF" at 0.
+- **Where it lives:** `arcade-volkey`, a root watcher on the input devices like the power button's (D372), runs `arcade-volume up` or `down`. Not the launcher: a guest game holds the keyboard in its own frame, where the launcher sees no keys, and this way it works in every game.
+- **The bar's path:** the watcher writes the level to `/run/arcade-volume/level.json`; the service watches that file and streams it on `GET /api/arcade/volume`; `launcher/volume.js` draws the bar over whatever is on screen. Nothing new can be written to the service.
+- **In the launcher** (`app.js`, a few lines): a pink pressed while ENT is held isn't a button. On the talk screen ENT now opens typing when it's let go, and not if a pink was pressed meanwhile; a tap works as before (D184).
+- **No clash with the Wi-Fi screen's ENT and COIN hold** (checked with the Wi-Fi worker, 2026-11-14): theirs needs both held for 3 s and any other key cancels it; here a pink does nothing while COIN is held.
+- **Tested:** the watcher against recorded key events, the stream in the service's test, and the chord and the bar in headless Chromium. **Not yet proven on the Picade:** the real buttons, the bar over a game, and whether 60% is the right cap by ear.

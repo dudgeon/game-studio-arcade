@@ -30,12 +30,12 @@ ensure_control() {
 }
 
 # Is a level for this card's PCM control in the stored state? Only inside this card's own block: the mic is a
-# sound card too.
+# sound card too. alsactl writes the softvol control as plain "name PCM" (seen on the Picade, 2026-11-14).
 stored() {
   [ -f "$STATE" ] || return 1
   awk -v card="state.$CARD" '
     /^state\./ { mine = ($1 == card) }
-    mine && /name .PCM Playback Volume/ { found = 1 }
+    mine && $1 == "name" && ($2 == "PCM" || $2 == "\047PCM\047" || $0 ~ /name \047PCM Playback Volume\047/) { found = 1 }
     END { exit found ? 0 : 1 }' "$STATE"
 }
 

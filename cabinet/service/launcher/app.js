@@ -35,6 +35,7 @@ import { REDIRECT_ACTIONS, redirectBoard } from "./redirect.js";
 import { checksFor, familyOfCart, gameRows } from "./shelf.js";
 import { holdOverlay } from "./wifi.js";
 import { WIFI_HINT, createWifiFlow } from "./wifi-flow.js";
+import { listenForVolume } from "./volume.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -47,6 +48,9 @@ const painter = new Painter();
 const BUTTONS = new Set(["KeyZ", "KeyX", "KeyC", "KeyV", "KeyQ", "KeyE", "Enter"]);
 /** COIN is the X HAT's F2 (D82). It opens the pot on the shelf, and only it starts spending (D205). */
 const COIN = "F2";
+/** D421: while ENT (F1) is held, the pink buttons are the volume (arcade-volkey does it), not "any button". */
+const PINKS = new Set(["KeyQ", "KeyE"]);
+let volumeChord = false;
 const NAME_MAX = 16;
 const WORDS_MAX = 300;
 
@@ -929,6 +933,7 @@ addEventListener("keydown", (e) => {
   e.preventDefault();
   if (!e.repeat) held.add(e.code);
   if (wifiNow.available && wifi.keydown(e, held)) return;
+  if (PINKS.has(e.code) && held.has("F1") && !held.has(COIN)) return void (volumeChord = true);
   const v = view;
   if (v.screen === "say" && v.phase === "typing") return onTyping(e, v);
   if (e.code in STICK) return onStick(/** @type {any} */ (STICK)[e.code]);
@@ -938,11 +943,8 @@ addEventListener("keydown", (e) => {
     if (v.screen === "shelf") return void showPot();
     return;
   }
-  if (e.code === "F1" && !e.repeat && v.screen === "say" && ["idle", "silence"].includes(v.phase)) {
-    v.phase = "typing";
-    v.startedTyping = true;
-    return;
-  }
+  // F1 types on letting go, and only if no pink was pressed meanwhile: holding it is the volume's (D421).
+  if (e.code === "F1") return void (e.repeat || (volumeChord = false));
   if (!BUTTONS.has(e.code) || e.repeat) return;
   if (!armed) return;
   if (v.screen === "say" && ["idle", "silence"].includes(v.phase)) return void beginTalk(v);
@@ -952,6 +954,10 @@ addEventListener("keydown", (e) => {
 
 addEventListener("keyup", (e) => {
   held.delete(e.code);
+  if (e.code === "F1" && !volumeChord && view.screen === "say" && ["idle", "silence"].includes(view.phase)) {
+    view.phase = "typing";
+    view.startedTyping = true;
+  }
   if (!anyButtonHeld()) {
     armed = true;
     if (view.screen === "say" && view.phase === "listening") endTalk(view);
@@ -1072,6 +1078,8 @@ connect();
     if (launches.readyState === EventSource.CLOSED) setTimeout(listenForLaunches, 1000);
   };
 })();
+
+listenForVolume();
 
 setInterval(() => {
   if (offlineSince && Date.now() - offlineSince >= OFFLINE_NOTICE_MS && view.screen !== "play" && !view.restarting) offline();
