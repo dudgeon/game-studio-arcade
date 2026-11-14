@@ -10,7 +10,7 @@
 # A boot passes when Wi-Fi was up within LIMIT seconds of power-on (default 60) and the cabinet answers the mini.
 # It reaches the Picade as everything else does (cabinet/vm/drive, D416). ARCADE_HOST, ARCADE_SSH_PORT,
 # ARCADE_SSH_DIR and ARCADE_SSH_KEY_NAME point it at a rehearsal instead. Results go to OUT (default
-# ~/game-studio-data/cabinets/arcade/wifi-proof/<time>.log). It changes nothing on the cabinet but the restarts.
+# $PICADE_DIR/wifi-proof/<time>.log). It changes nothing on the cabinet but the restarts.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
