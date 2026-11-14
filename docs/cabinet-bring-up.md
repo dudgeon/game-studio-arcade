@@ -30,6 +30,20 @@ For when the cabinet is built (Part A). The card carries everything, so the Pica
 
 Afterwards, Claude commits `studio-kit/managed-agent/claude-lock.arcade.json` (no secrets in it), and from then on the twin follows the Picade: `node scripts/twin.mjs sync`. Updates reach the Picade over the network (its admin SSH is up from first boot); the card isn't touched again.
 
+### The Manager on the real cabinet, first run (D369)
+
+From any browser on the home network, once the shelf is up (step 4). Every page reaches the Picade over its own admin SSH, with the key the card script made (`~/game-studio-data/cabinets/arcade/ssh/`, as `scripts/cabinet-card/picade-ssh.sh` names it), at `arcade.local`.
+
+1. **Open the Manager.** It's always on if its launchd agent is installed (`scripts/manager-launchd/install.sh`, D368); otherwise `scripts/manager.sh start` on the mini. In a browser you haven't used it from before, open the link `scripts/manager.sh url` prints, once. Pick **Real cabinet (Picade)** at the top.
+2. **Screen.** The shelf should appear within a few seconds, with "Live: checked … ago" under it. "No SSH key" means the card wasn't written on this mini. "No answer from arcade.local" means the Picade isn't on the Wi-Fi yet (C2).
+3. **Coins: Pair.** The first time, the Coins page says it has no token and offers **Pair**. Press it: the Picade makes its Manager token (if it has none) and the mini keeps a copy (`~/.config/game-studio-arcade/manager-token-real`, 0600). This works before the cabinet has its API key too (the service reads `/etc/arcade/manager-token` whatever its config). Then the pot shows 100 coins, or what the twin's data brought.
+4. **Health.** Temperature, throttling, the Wi-Fi signal and band, disk, uptime, software version and the service's recent warnings. A red line means look now: over 80 °C, throttled (often the power supply), low disk, a weak signal, or a service down. C2 and C7 read from here.
+5. **Speaker.** Set the volume with the slider (C5). It's kept across restarts. Pimoroni warns 100% is a bit much: the page says so above 80%.
+6. **Games and Activity.** Games lists every game, with Remove from shelf and Put back (D360-D364). Activity shows each make as it's logged.
+7. **Restart and switch off** (Health page). Each asks once, and the cabinet refuses while someone is playing or making a game. After **Switch off**, only the cabinet's own power button brings it back.
+8. **Driving it from the Manager** (optional, for validation): `scripts/cabinet-card/driver-keyboard.sh on` on the mini, then the on-screen buttons and your keyboard work as on the virtual cabinet. `off` when you're done (D287).
+9. **Software.** Later updates go from the Software tab, over the Wi-Fi (Part F).
+
 ---
 
 ## Part A: build it (start now, no software needed)
@@ -118,7 +132,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 - If it never reaches the shelf after 30 minutes: tell Claude. The log is on the card's boot partition at `seed/provision.log` (readable on the mini), and on the cabinet over SSH.
 
 **C2. Wi-Fi in the basement** 🔧
-- On the mini: `ping arcade.local`. Claude checks it joined the home Wi-Fi, the signal level, and that it can reach the internet but not the mini (the cabinet never uses the mini, D7).
+- On the mini: `ping arcade.local`. The Manager's Health page shows the signal and band (Real cabinet). Claude checks it joined the home Wi-Fi, the signal level, and that it can reach the internet but not the mini (the cabinet never uses the mini, D7).
 - If it can't be found: the Wi-Fi name or password was wrong, or the basement is out of range. Re-writing the card is the fix for the first; a mesh point nearer the basement for the second.
 - If the network is **WPA3-only**, the precomputed key can't work: re-write the card with `--wpa3`, which puts the password itself on the card (still erased at first boot). Most mesh systems run WPA2/WPA3 mixed, which the default handles.
 
@@ -135,7 +149,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 
 **C5. Sound** 🔧
 - Look for: a game's sound from the speaker.
-- Pimoroni warns 100% is "a bit much". Claude sets the level with you over SSH (the `PCM` control); tell Claude what level the kids should get.
+- Pimoroni warns 100% is "a bit much". Set the level with the Manager's Speaker slider (Health page, Real cabinet; the `PCM` control, kept across restarts, D366). Pick the level the kids should get.
 - If silent: speaker wires (+/−, bare metal gripped), then Claude checks the X HAT's sound card shows up as `sndrpihifiberry`.
 
 **C6. Power button** 🔧
@@ -144,7 +158,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 - **Watch for:** if a quick tap while it's running shuts it down, a kid can switch it off by accident. Tell Claude; it can ignore short presses and shut down only on a long one.
 
 **C7. Temperature** 🔧
-- Claude reads the Pi's temperature after a few games and during a make. Under 80 °C is fine; the Pi slows itself at 85 °C.
+- The Manager's Health page shows the Pi's temperature and whether it has throttled. Check it after a few games and during a make. Under 80 °C is fine (over 80 the page warns); the Pi slows itself at 85 °C.
 
 ---
 

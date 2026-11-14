@@ -1819,3 +1819,30 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **Games page:** every game line, on or off the shelf, with who made it, how many versions, when it was last played (and how often), and, if off, when, by whom, how (day-one, mcp) and why. **Remove from shelf** asks once in place ("Remove all 2 versions" / "Keep"); **Put back** doesn't ask. Below: the makers, with **Hide name** and **Put back** (grown-ups and names hidden in `makers.json` have no button), and the history of every mark, newest first.
 - The Manager asks the cabinet (`/api/manager/games`, `/games/remove|restore`, `/makers/hide|show`, with the Manager's token); the cabinet keeps the marks. A cabinet whose software is older says so and points at the Software tab.
 - **MCP:** `remove_from_shelf {id, reason?, by?}` and `restore_to_shelf`, with any cart id of the game; behind the same token as every arcade tool (D341). `shelf_mark` is one of `get_activity`'s types.
+
+**D365. The Manager's Health page (HANDOFF §9.4).** *(Claude, at the director's ask, for Geoff's "are the mini's tools to manage the cabinet built out?")*
+- **What it shows:** the CPU temperature, throttling now and since it started (`vcgencmd get_throttled`, decoded: under-voltage, frequency capped, throttled, soft temperature limit), the Wi-Fi network, signal (0-100 and dBm) and band, free space on `/` and the boot partition, uptime, the software version and profile, whether the launcher and kiosk are running, and the last 12 warnings or errors from their journal.
+- **How:** `manager/remote/health.py` is sent over the cabinet's SSH each time and run as root (`sudo -n python3 -`). It only reads, so a cabinet needs nothing new installed. What a cabinet doesn't have (Wi-Fi and temperature on the virtual cabinet) is shown as such, never an error. The service's journal isn't the kids' words: those stay in the logs under `/var/lib/arcade`.
+- **Warnings** (`manager/health.mjs`), red when to act now: over 80 °C; throttled now (under-voltage says to look at the power supply); under 1 GB or 10% free on `/`; a service not running. Amber: throttled since it started, under 30 MB on the boot partition, a signal under 40% or -70 dBm. A note at 70 °C.
+
+**D366. The speaker's volume from the Manager, kept across restarts.** *(Claude.)*
+- A slider on the Health page sets the X HAT's `PCM` softvol control (D253) on card `sndrpihifiberry`, through `manager/remote/control.sh` (sent each time, run as root). The control appears only once something has played through it, so the script plays a second of silence first if it's missing.
+- **Kept across restarts** with `alsactl store`, which Pi OS's `alsa-restore` reads at boot. That's the usual Pi OS path; proving it on the Picade is part of C5.
+- Above 80% the page says Pimoroni warns 100% is a bit much. It doesn't cap it: the level is Geoff's.
+- The virtual cabinet has no sound card, and the page says so.
+
+**D367. Restart the shelf, restart the cabinet, switch off: one confirm each, refused while busy.** *(Claude; reuses D332.)*
+- On the Health page. Each asks once in place, and the request must say it was confirmed.
+- **Busy is the update's own check:** `control.sh` sources the cabinet's `/usr/local/lib/arcade-update/update-lib.sh` and calls `busy_reason`. So a make running or still to collect, a game being played, or a gate check all refuse with the same reason the update gives ("a game is being played (teti): nothing was changed"). A cabinet whose software predates that file refuses and says to update first.
+- **What each does:** restart the shelf is `systemctl restart arcade-launcher arcade-kiosk` (about 10 s). Restart and switch off run `systemctl reboot` or `poweroff` 2 seconds later, so the answer reaches the Manager first.
+- After switch off, the Picade comes back only with its power button, and the virtual cabinet only with `scripts/virtual-cabinet/up.sh`. The confirm says which.
+
+**D368. The Manager always on: a launchd agent, installed by a command, not by default.** *(Claude.)*
+- `scripts/manager-launchd/install.sh` installs `com.game-studio-arcade.manager`: Node 22 runs `manager/server.mjs --port 8335` from the checkout it's run from, at login, with no window. KeepAlive restarts it if it stops (at most every 10 s). The log is the same `~/game-studio-data/manager/manager.log`. It refuses to run from a worktree, like the backup's (D350). `uninstall.sh` removes it and keeps the key, the tokens and the log.
+- **With the agent in place,** `scripts/manager.sh` defers to launchd: `start` says it's on, `stop` points at `uninstall.sh` (KeepAlive would start it again), `restart` is `launchctl kickstart -k`, and `status` and `url` work as before. Installing stops a Manager that `manager.sh` started, so only one holds the port.
+
+**D369. The real cabinet through every Manager page, and a Picade with no config yet can still pair.** *(Claude.)*
+- The `real` cabinet takes its host and key from `scripts/cabinet-card/picade-ssh.sh` (D259), through `picade.mjs`: `arcade.local`, the key `flash.mjs` made, as user `cabinet`. Its token is `~/.config/game-studio-arcade/manager-token-real`.
+- **The gap this found:** the service read the Manager's token only beside its `--config` file. A new Picade plays offline with no config until `connect-picade.sh` (D252), so pairing would have made a token the service never read: no Coins, Games or MCP. Now, with no config, it reads `/etc/arcade/manager-token`, the file pairing writes.
+- **Tested with a stand-in:** `manager/test/fake-ssh.mjs` plays the Picade's SSH on this machine. It holds the connection, forwards the service port, and runs commands against a temp root. The test walks screen, Activity, pairing, Coins, Games, Health and keys (refused while the driver keyboard is off). It checks every call used the Picade's key and `cabinet@arcade.local`, and that a Picade that doesn't answer says why.
+- The first-run steps are in `docs/cabinet-bring-up.md`, "The Manager on the real cabinet, first run".
