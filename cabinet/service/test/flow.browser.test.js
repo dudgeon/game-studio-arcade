@@ -158,6 +158,50 @@ test("a button still held from the last screen doesn't open the mic; silence and
   });
 });
 
+test("ENT held with a pink is the volume's: it doesn't type, talk or pick; ENT tapped still types (D421)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, faults }) => {
+    await run(`
+      wait shelf
+      press a
+      wait who
+      press a
+      wait say typing
+      type owen
+      press enter
+      wait say confirm
+      press a
+      wait M3
+      press coin
+      wait say idle
+      down f1
+      press q
+      press e
+      sleep 100
+    `);
+    assert.equal(await page.evaluate(() => /** @type {any} */ (window).launcher.phase()), "idle", "the pinks didn't open the mic");
+    await run(`
+      up f1
+      sleep 100
+    `);
+    assert.equal(await page.evaluate(() => /** @type {any} */ (window).launcher.phase()), "idle", "letting ENT go after a volume press doesn't start typing");
+    await run(`
+      press f1
+      wait say typing
+    `);
+    assert.deepEqual(await faults(), []);
+    // The bar: a level from the service shows for a moment, over whatever screen is up, then goes.
+    await page.route("**/api/arcade/volume", (/** @type {any} */ route) => route.fulfill({ status: 200, contentType: "text/event-stream", body: 'data: {"percent":40,"cap":60}\n\n' }));
+    await page.reload();
+    const bar = page.locator("#volume");
+    await bar.waitFor({ state: "visible", timeout: 10_000 });
+    assert.equal(await bar.locator("span").count(), 6, "six steps to the cap of 60");
+    assert.equal(await bar.locator("span[data-lit]").count(), 4, "40% lights four");
+    assert.match((await bar.textContent()) ?? "", /^VOL$/);
+    await page.unroute("**/api/arcade/volume");
+    await bar.waitFor({ state: "hidden", timeout: 10_000 });
+  });
+});
+
 test("ESC mid-make goes to the shelf, and the tile goes back to the same question, after a reload too", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, url, run, faults }) => {
     await run(`

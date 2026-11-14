@@ -9,8 +9,12 @@ VOLUME_UNIT="${VOLUME_UNIT:-/etc/systemd/system/arcade-volume-default.service}"
 step_volume() {
   install -m 0755 "$SELF_DIR/files/arcade-volume" "$VOLUME_BIN"
   install -m 0644 "$SELF_DIR/files/arcade-volume-default.service" "$VOLUME_UNIT"
+  # D421: hold ENT and press a pink button, at the cabinet.
+  install -m 0755 "$SELF_DIR/files/arcade-volkey" /usr/local/bin/arcade-volkey
+  install -m 0644 "$SELF_DIR/files/arcade-volkey.service" /etc/systemd/system/arcade-volkey.service
   systemctl daemon-reload
-  systemctl enable arcade-volume-default >/dev/null 2>&1
+  systemctl enable arcade-volume-default arcade-volkey >/dev/null 2>&1
+  systemctl restart arcade-volkey
   # Never stops provisioning: a cabinet with no sound yet still gets its shelf.
   log "speaker volume: $("$VOLUME_BIN" default 2>&1 || true)"
 }

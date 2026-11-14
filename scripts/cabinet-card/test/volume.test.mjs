@@ -2,7 +2,7 @@
 // at the cap. arcade-volume runs here against stand-ins for amixer, aplay and alsactl.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -94,4 +94,68 @@ test("the picade profile runs the volume step after the sound is set up, and a u
   const unit = fs.readFileSync(path.join(REPO, "cabinet/provision/files/arcade-volume-default.service"), "utf8");
   assert.match(unit, /After=.*alsa-restore\.service/);
   assert.match(unit, /ExecStart=\/usr\/local\/bin\/arcade-volume default/);
+});
+
+// ---------- D421: hold ENT and press a pink button ----------
+const VOLKEY = path.join(REPO, "cabinet/provision/files/arcade-volkey");
+const KEY = { q: 16, e: 18, f1: 59, f2: 60, z: 44 };
+
+/** Linux input events (struct input_event, 64-bit): each step is [key, 1 down | 0 up | 2 repeat]. */
+function events(steps) {
+  const buf = Buffer.alloc(24 * steps.length);
+  steps.forEach(([key, value], i) => {
+    buf.writeUInt16LE(1, i * 24 + 16); // EV_KEY
+    buf.writeUInt16LE(KEY[key], i * 24 + 18);
+    buf.writeInt32LE(value, i * 24 + 20);
+  });
+  return buf;
+}
+
+/** Run the watcher over a recorded run of key events; returns the directions it asked for and the level it showed. */
+async function watch(steps, { percent = 40 } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "volkey-"));
+  const dev = path.join(root, "event0");
+  const calls = path.join(root, "calls");
+  const show = path.join(root, "run/level.json");
+  const tool = path.join(root, "arcade-volume");
+  fs.writeFileSync(dev, events(steps));
+  fs.writeFileSync(calls, "");
+  fs.writeFileSync(tool, `#!/bin/bash\necho "$1" >> "${calls}"\necho '{"speaker": true, "percent": ${percent}, "cap": 60}'\n`, { mode: 0o755 });
+  const child = spawn("python3", [VOLKEY], { env: { PATH: process.env.PATH, ARCADE_VOLUME_CMD: tool, ARCADE_VOLUME_SHOW: show, ARCADE_VOLKEY_DEVICES: dev }, stdio: ["ignore", "pipe", "inherit"] });
+  let out = "";
+  child.stdout.on("data", (d) => (out += d));
+  // It has read everything once it reports the file's end.
+  for (let i = 0; i < 100 && !out.includes("lost "); i++) await new Promise((r) => setTimeout(r, 50));
+  child.kill();
+  assert.match(out, /lost /, "the watcher read the events");
+  return { calls: fs.readFileSync(calls, "utf8").split("\n").filter(Boolean), shown: fs.existsSync(show) ? JSON.parse(fs.readFileSync(show, "utf8")) : null };
+}
+
+test("ENT held and a pink pressed: 5 is quieter, 6 is louder, one step a press, and the level is written for the bar", async () => {
+  const r = await watch([["f1", 1], ["q", 1], ["q", 0], ["e", 1], ["e", 2], ["e", 2], ["e", 0], ["e", 1], ["e", 0], ["f1", 0]]);
+  assert.deepEqual(r.calls, ["down", "up", "up"], "a held pink's repeats aren't more steps");
+  assert.equal(r.shown.percent, 40);
+  assert.equal(r.shown.cap, 60);
+});
+
+test("the pinks alone stay spare, ENT alone does nothing, and letting ENT go ends it", async () => {
+  const r = await watch([["q", 1], ["q", 0], ["e", 1], ["e", 0], ["f1", 1], ["f1", 0], ["q", 1], ["q", 0], ["f1", 1], ["z", 1], ["z", 0], ["f1", 0]]);
+  assert.deepEqual(r.calls, []);
+  assert.equal(r.shown, null);
+});
+
+test("ENT with COIN held is the Wi-Fi screen's: a pink does nothing then, whichever went down first", async () => {
+  const r = await watch([["f1", 1], ["f2", 1], ["q", 1], ["q", 0], ["e", 1], ["e", 0], ["f2", 0], ["f1", 0], ["f2", 1], ["f1", 1], ["e", 1], ["e", 0], ["f1", 0], ["f2", 0]]);
+  assert.deepEqual(r.calls, []);
+});
+
+test("a pink already down when ENT is pressed isn't a volume press", async () => {
+  const r = await watch([["q", 1], ["f1", 1], ["q", 0], ["f1", 0]]);
+  assert.deepEqual(r.calls, []);
+});
+
+test("provisioning installs the watcher with the volume step", () => {
+  const step = fs.readFileSync(path.join(REPO, "cabinet/provision/volume.sh"), "utf8");
+  assert.match(step, /files\/arcade-volkey" \/usr\/local\/bin\/arcade-volkey/);
+  assert.match(step, /enable arcade-volume-default arcade-volkey/);
 });

@@ -2028,7 +2028,12 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - The Manager's `control.sh` is unchanged and still works on a cabinet without the tool.
 - **Tested** with stand-ins for `amixer`, `aplay` and `alsactl` (`scripts/cabinet-card/test/volume.test.mjs`). **Not yet proven on the Picade:** that the boot run sets 30% on a new card, and that `alsa-restore` brings a softvol level back after a restart (D366 left that for the hardware too).
 
-**D421. Open, for Geoff: how the volume is changed at the cabinet.** *(Claude proposes; the choice is Geoff's.)* Three options, mocked up for him 2026-11-14. Each shows a small bar for a second and stops at D420's cap.
-1. **The two pink buttons (5 and 6) are quieter and louder, anywhere.** Claude's pick: nothing to remember, works mid-game, and house games never see those buttons (D82). It uses up the spare buttons, and they stop counting as "any button picks" (D182).
-2. **Hold COIN and push the stick up or down, anywhere.** Keeps the pink buttons spare. A hidden combination, the stick still moves the player mid-game, and COIN on the shelf would open the pot on letting go.
-3. **A Sound tile on the shelf.** Visible and labelled, but only from the shelf, and the largest change to the launcher.
+**D421. The volume at the cabinet: hold ENT and press a pink button.** *(Geoff, 2026-11-14: "enter plus pink buttons", from three mocked-up options: the pinks alone, COIN plus the stick, a Sound tile on the shelf. Claude built it.)*
+- **What it does:** while ENT (F1) is held, pink 5 (Q) is quieter and pink 6 (E) is louder. One press is one step of 10, from 0 up to the cabinet's cap of 60% (D420). The Manager's slider still goes to 100, and a level above 60 only comes down at the cabinet. Which pink sits nearer the player is checked on the Picade; swapping them is two constants.
+- **The pinks alone stay spare** and still count for "any button picks" (D182). ENT held alone does nothing new.
+- **A small bar** shows for a second and a half after each press: one block per step up to the cap, and "VOL OFF" at 0.
+- **Where it lives:** `arcade-volkey`, a root watcher on the input devices like the power button's (D372), runs `arcade-volume up` or `down`. Not the launcher: a guest game holds the keyboard in its own frame, where the launcher sees no keys, and this way it works in every game.
+- **The bar's path:** the watcher writes the level to `/run/arcade-volume/level.json`; the service watches that file and streams it on `GET /api/arcade/volume`; `launcher/volume.js` draws the bar over whatever is on screen. Nothing new can be written to the service.
+- **In the launcher** (`app.js`, a few lines): a pink pressed while ENT is held isn't a button. On the talk screen ENT now opens typing when it's let go, and not if a pink was pressed meanwhile; a tap works as before (D184).
+- **No clash with the Wi-Fi screen's ENT and COIN hold** (checked with the Wi-Fi worker, 2026-11-14): theirs needs both held for 3 s and any other key cancels it; here a pink does nothing while COIN is held.
+- **Tested:** the watcher against recorded key events, the stream in the service's test, and the chord and the bar in headless Chromium. **Not yet proven on the Picade:** the real buttons, the bar over a game, and whether 60% is the right cap by ear.
