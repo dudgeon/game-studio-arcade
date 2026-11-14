@@ -6,6 +6,10 @@
 //   node scripts/twin.mjs seed --yes    once, at bring-up: the Picade starts as a copy of the twin
 //     --set-aside-real                  ...after moving aside what bring-up checks left on it (D298)
 //
+//   The hourly backup (D350-D355) is scripts/twin-backup/: it syncs the Picade into a plain folder on the mini,
+//   ~/game-studio-data/twin/backup (the copy a dead card is rebuilt from), then into the twin.
+//   A seed, a sync and a backup never run at once: they share one lock in ~/game-studio-data/twin.
+//
 //   The real cabinet is the Picade: arcade.local, with the key the card script made in
 //   the folder scripts/cabinet-card/picade-ssh.sh names (GSA_CABINET_DIR moves it), as connect-picade.sh reaches it.
 //   --real HOST                another name for the Picade, if arcade.local doesn't resolve
@@ -19,6 +23,7 @@
 // Keys, the cabinet's config and its Manager token are never read or copied (D292).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -152,6 +157,54 @@ function fetchFrom(/** @type {End} */ source, /** @type {import("../cabinet/twin
 
 const stampNow = (/** @type {Date} */ now) => now.toISOString().replace(/[:.]/g, "-");
 
+/** The twin's bookkeeping on the mini (D350): the lock, the backup folder and its record. GSA_TWIN_DIR moves it (tests). */
+export const twinHome = () => process.env.GSA_TWIN_DIR ?? path.join(os.homedir(), "game-studio-data", "twin");
+/** The Picade's copy on the mini that a dead card is rebuilt from (D351). Only sync writes it. */
+export const backupDir = () => path.join(twinHome(), "backup");
+/** A lock older than this is from a run that died. */
+const LOCK_STALE_MS = 6 * 60 * 60 * 1000;
+
+export class Busy extends Error {}
+
+/**
+ * One seed, sync or backup at a time (D352). Re-entrant within this process.
+ * @template T @param {string} what @param {() => T} fn @returns {T}
+ */
+export function withLock(what, fn) {
+  const home = twinHome();
+  fs.mkdirSync(home, { recursive: true });
+  const lock = path.join(home, "lock");
+  const owner = path.join(lock, "owner.json");
+  let mine = false;
+  try {
+    fs.mkdirSync(lock);
+    mine = true;
+  } catch (/** @type {any} */ e) {
+    if (e.code !== "EEXIST") throw e;
+    let o = null;
+    try {
+      o = JSON.parse(fs.readFileSync(owner, "utf8"));
+    } catch {}
+    if (o?.pid === process.pid) return fn();
+    let alive = false;
+    try {
+      if (o?.pid) process.kill(o.pid, 0);
+      alive = Boolean(o?.pid);
+    } catch {}
+    if (alive && Date.now() - Date.parse(o.at) < LOCK_STALE_MS) throw new Busy(`${o.what} is running (pid ${o.pid}, since ${o.at}); try again when it's done`);
+    // A lock left by a run that died: ours to take. It's bookkeeping, not data.
+    fs.rmSync(lock, { recursive: true, force: true });
+    fs.mkdirSync(lock);
+    mine = true;
+  }
+  try {
+    fs.writeFileSync(owner, JSON.stringify({ pid: process.pid, what, at: new Date().toISOString() }));
+    return fn();
+  } finally {
+    if (mine) fs.rmSync(lock, { recursive: true, force: true });
+  }
+}
+
 /** What differs, read from both, nothing written. @param {End} real @param {End} twin */
 export function status(real, twin) {
   const [ri, ti] = [real.call("info"), twin.call("info")];
@@ -171,22 +224,30 @@ export function status(real, twin) {
   };
 }
 
-/** Real into twin. Append-only: new files copied, logs grown, the twin's own changes set aside first. @param {End} real @param {End} twin */
-export function sync(real, twin, now = new Date()) {
+/**
+ * Real into twin. Append-only: new files copied, logs grown, the twin's own changes set aside first.
+ * keepOld (the backup folder, D351): every file the real cabinet replaced is kept too, not only the twin's own.
+ * @param {End} real @param {End} twin @param {{ keepOld?: boolean }} [o]
+ */
+export function sync(real, twin, now = new Date(), o = {}) {
   const ti = twin.call("info");
   if (ti.makeInFlight) throw new Error("a make is running on the twin; sync once it's done");
   const ri = real.call("info");
   const [rm, tm] = [real.call("manifest"), twin.call("manifest")];
   const d = drift(rm.files, tm.files, ti.baseline);
   const got = fetchFrom(real, d, rm.files, tm.files, ti.baseline);
+  const older = new Set(o.keepOld ? d.changed.filter((c) => c.untouched).map((c) => c.rel) : []);
+  if (o.keepOld) for (const c of d.changed) c.untouched = false;
   const plan = applyInput(d, rm.files, tm.files, got);
+  for (const a of plan.setAside) if (older.has(a.rel)) a.reason = "an older copy, replaced by the real cabinet's newer one (D351)";
   const result = twin.call("apply", {
     stamp: stampNow(now),
     ...plan,
+    dirs: rm.emptyDirs ?? [],
     baseline: true,
     lastSync: { at: now.toISOString(), from: real.name, real_release: ri.release, copied: d.missing.length, grown: d.grown.length, replaced: d.changed.length, set_aside: plan.setAside.length },
   });
-  return { ...result, copied: d.missing.length, grown: d.grown.length, replaced: d.changed.length, realMakeInFlight: ri.makeInFlight };
+  return { ...result, copied: d.missing.length, grown: d.grown.length, replaced: d.changed.length, realMakeInFlight: ri.makeInFlight, files: Object.keys(rm.files).length, carts: shelfDrift(rm.files, {}).onlySource.length };
 }
 
 /**
@@ -197,6 +258,11 @@ export function sync(real, twin, now = new Date()) {
  * @param {End} real @param {End} twin @param {{ setAsideReal?: boolean }} [o]
  */
 export function seed(real, twin, now = new Date(), o = {}) {
+  return withLock("a seed", () => seedNow(real, twin, now, o));
+}
+
+/** @param {End} real @param {End} twin @param {Date} now @param {{ setAsideReal?: boolean }} o */
+function seedNow(real, twin, now, o) {
   const [ri, ti] = [real.call("info"), twin.call("info")];
   if (ti.replay.length) throw new Error(`the twin has replay data (${ti.replay.join(", ")}); it can't go to a live cabinet (D150, D155)`);
   if (ri.makeInFlight || ti.makeInFlight) throw new Error("a make is running; seed once it's done");
@@ -234,7 +300,7 @@ export function seed(real, twin, now = new Date(), o = {}) {
   const got = fetchFrom(twin, d, tm.files, rm.files, null);
   const plan = applyInput(d, tm.files, rm.files, got);
   for (const a of plan.setAside) a.reason = "on the real cabinet before the seed";
-  const result = real.call("apply", { stamp: stampNow(now), ...plan });
+  const result = real.call("apply", { stamp: stampNow(now), ...plan, dirs: tm.emptyDirs ?? [] });
   if (result.skipped.length) throw new Error(`${result.skipped.length} files changed on the real cabinet while seeding; run seed again`);
   // The twin's baseline: from here on, a difference on the twin is the twin's own (D294).
   twin.call("apply", { stamp: stampNow(now), setAside: [], write: [], append: [], baseline: true, lastSync: { at: now.toISOString(), from: real.name, seeded: true } });
@@ -285,7 +351,7 @@ async function main() {
     const s = status(real, twin);
     print(s, describe(s));
   } else if (cmd === "sync") {
-    const r = sync(real, twin);
+    const r = withLock("a sync", () => sync(real, twin));
     print(r, `Synced ${real.name} → ${twin.name}: ${r.copied} new, ${r.appended} logs grown, ${r.replaced} replaced, ${r.setAside} set aside on the twin${r.skipped.length ? `, ${r.skipped.length} skipped (changed while syncing; the next sync takes them)` : ""}.`);
     const s = status(real, twin);
     if (!values.json) console.log(describe(s));

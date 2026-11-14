@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { activity } from "./activity.mjs";
+import { backupHealth, readBackupRecord } from "./backup.mjs";
 import { Cabinet, CONFIG_DIR, loadCabinets } from "./cabinet.mjs";
 import { CONTROLS, toLinux } from "./keys.mjs";
 
@@ -99,8 +100,9 @@ export function houseTimeZone() {
 const dollars = (/** @type {number} */ c) => `${c < 0 ? "-" : ""}$${(Math.abs(c) / 100).toFixed(2)}`;
 
 /**
- * @param {{ key: string, cabinets: Map<string, any>, page?: string }} o
+ * @param {{ key: string, cabinets: Map<string, any>, page?: string, backupRecord?: string }} o
  *   cabinets: name -> a Cabinet (or a stand-in with the same methods, for tests)
+ *   backupRecord: the hourly backup's record, for the Picade's "last backup" (D353); default ~/game-studio-data/twin/backup.json
  */
 export function createManager(o) {
   const page = o.page ?? path.join(HERE, "page");
@@ -120,7 +122,10 @@ export function createManager(o) {
     const c = o.cabinets.get(name);
     const f = c.frame;
     const now = Date.now();
-    return { name, label: c.config.label, host: c.config.host, problem: c.problem || null, frame_age_ms: f ? now - f.at : null, changed_ago_ms: f ? now - f.changedAt : null, stale: !f || now - f.at > STALE_MS, can_drive: c.canDrive, watchers: watch.get(name)?.watchers.size ?? 0 };
+    const stale = !f || now - f.at > STALE_MS;
+    // The Picade's backup on the mini (D353); the virtual cabinet is a copy itself and has none.
+    const backup = name === "real" ? backupHealth(readBackupRecord(o.backupRecord), { now, live: !c.problem && !stale }) : null;
+    return { name, label: c.config.label, host: c.config.host, problem: c.problem || null, frame_age_ms: f ? now - f.at : null, changed_ago_ms: f ? now - f.changedAt : null, stale, can_drive: c.canDrive, watchers: watch.get(name)?.watchers.size ?? 0, backup };
   }
 
   /** @param {string} name */

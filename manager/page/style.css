@@ -30,6 +30,9 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .fresh { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
 .fresh.stale { color: var(--warn); font-weight: 600; }
 .fresh.down { color: var(--bad); font-weight: 600; }
+.backup { margin: 4px 0 0; }
+.backup.warn { color: var(--bad); font-weight: 600; }
+.backup.off, .backup.none { opacity: 0.8; }
 .hint { color: var(--muted); font-size: 13px; }
 .pad { flex: 0 1 300px; display: grid; gap: 16px; user-select: none; -webkit-user-select: none; touch-action: none; }
 .pad button { min-height: 52px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; }
