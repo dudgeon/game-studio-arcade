@@ -60,6 +60,22 @@ Or the Manager's **Software** tab, which runs the same command (D338). This is h
 
 To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`. Each update's folder, log and result are in `/var/lib/arcade-update/`.
 
+### Security updates to pinned packages (D375)
+
+`--os` takes Debian and Raspberry Pi security fixes for everything except two sets:
+- the boot packages, which go through `boot-update.mjs` (D336);
+- the packages pinned in `cabinet/provision/apt.lock` (Chromium, cage, openssh-server, git, xz-utils, …).
+
+Those stay at the version the virtual cabinet was tested with (D335). A fix to one of them arrives like any other change, through the repo:
+
+1. **See what's newer.** On the virtual cabinet, run `sudo apt-get update`, then `apt-cache policy NAME` for each name in apt.lock, comparing Installed with Candidate. On the Picade, `apt-get -s upgrade` lists one that's newer: it's waiting there because it's pinned.
+2. **Bump its line** in apt.lock on a branch. Note the date and why in the file's header.
+3. **Prove it on the virtual cabinet:** `node scripts/virtual-cabinet/update-cabinet.mjs` from that branch, committed.
+   - The software step installs the new version.
+   - It keeps a copy of the old one first, and puts it back if the cabinet isn't healthy afterwards.
+   - Look for "updated", the data check passing, and the new version in `dpkg-query -W NAME`.
+4. **Merge,** then a plain F1 on the Picade (`update-cabinet.mjs --picade`) when nobody's playing.
+
 ## Add coins or reset the pot
 
 Until the Cabinet Manager exists, a grown-up does it from the mini (D215). The reason is shown to the kids in the coin history (A2).
