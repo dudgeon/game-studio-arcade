@@ -22,7 +22,7 @@ function cabinet({ card = true, level = null, stored = null } = {}) {
   const sh = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
   sh("aplay", card ? `if [ "$1" = -l ]; then echo "card 0: sndrpihifiberry [snd_rpi_hifiberry_dac]"; exit 0; fi\n[ -f "${levelFile}" ] || echo 100 > "${levelFile}"` : `[ "$1" = -l ] && echo "card 1: Mic [USB Mic]"; exit 0`);
   sh("amixer", `[ -f "${levelFile}" ] || exit 1\ncase "$*" in\n  *sget*) echo "  Mono: Playback 77 [$(cat "${levelFile}")%]" ;;\n  *sset*) for a; do v="$a"; done; echo "\${v%\\%}" > "${levelFile}" ;;\nesac`);
-  sh("alsactl", `printf "state.Mic {\\n\\tcontrol.1 {\\n\\t\\tname 'PCM Playback Volume'\\n\\t}\\n}\\nstate.sndrpihifiberry {\\n\\tcontrol.1 {\\n\\t\\tname 'PCM Playback Volume'\\n\\t\\tvalue $(cat "${levelFile}")\\n\\t}\\n}\\n" > "${state}"`);
+  sh("alsactl", `printf "state.Mic {\\n\\tcontrol.1 {\\n\\t\\tname 'PCM Playback Volume'\\n\\t}\\n}\\nstate.sndrpihifiberry {\\n\\tcontrol.1 {\\n\\t\\tiface MIXER\\n\\t\\tname PCM\\n\\t\\tvalue $(cat "${levelFile}")\\n\\t}\\n}\\n" > "${state}"`);
   sh("timeout", `shift; exec "$@"`);
   if (level != null) fs.writeFileSync(levelFile, `${level}\n`);
   if (stored != null) fs.writeFileSync(state, stored);
