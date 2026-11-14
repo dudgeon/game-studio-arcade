@@ -30,7 +30,7 @@ Auth (D16, D17): the client comes from `@game-studio-arcade/auth`, which passes 
 1. Builds the studio kit; uploads it unless that exact kit is already uploaded.
 2. Creates a session from the agent and environment in `studio-kit/managed-agent/claude-lock.json`, with the kit mounted and a budget.
 3. Opens the event stream, **then** sends the request.
-4. Relays `ask_player` as A/B/C/D (C takes typed text), `show_plan` as build/change, and `tell_player` plus tool activity as one-line progress. After D, any further question is answered D automatically.
+4. Relays `ask_player` as A/B/C/D (C takes typed text), `show_plan` as build/change, `name_version` as A/B/C/D with D as "You pick" (a maker's own change only, D471), and `tell_player` plus tool activity as one-line progress. After D, any further question is answered D automatically.
 5. Reconnects if the stream drops, replaying missed events from the history without repeats. Answers any tool call the stream missed when the session reports `requires_action`.
 6. Polls the session's files until `DONE.json` is there and every size in it matches (D19), skipping the session's inputs. Then it downloads every output into `~/game-studio-data/sessions/<id>/` and extracts `cart.tgz`.
 7. Runs `validate_cart` and the local playtest. Commits the cart to `~/game-studio-data/carts/` only if both pass.

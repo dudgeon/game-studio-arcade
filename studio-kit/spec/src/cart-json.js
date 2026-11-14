@@ -6,6 +6,7 @@
 // comes from the runtime by relative path, not the package name: the kit tarball
 // has runtime/ beside studio-kit/ but no node_modules, so a bare import wouldn't resolve there.
 import { MAX_PLAYERS } from '../../../runtime/index.js';
+import { isVersionName, VERSION_NAME_MAX } from './version-name.js';
 
 export const CART_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PARENT = /^[a-z0-9]+(?:-[a-z0-9]+)*@[1-9][0-9]*$/;
@@ -19,6 +20,8 @@ const FIELDS = {
   title: [(v) => typeof v === 'string' && v.trim() !== '' && v.length <= 60, 'a non-empty string of at most 60 characters'],
   players: [(v) => Number.isInteger(v) && v >= 1 && v <= MAX_PLAYERS, `a whole number from 1 to ${MAX_PLAYERS}: how many people the game is for (more than the controllers present means taking turns)`],
   version: [(v) => Number.isInteger(v) && v >= 1, 'a whole number, 1 or more'],
+  // What this version is called (D472). Left out for a first version and any unnamed one.
+  version_name: [isVersionName, `this version's name: at most ${VERSION_NAME_MAX} characters of plain letters, digits and spaces, e.g. "Faster logs"`],
   maker: [nullableString, 'a string such as "O", or null'],
   with: [nullableString, 'a string such as "A", or null'],
   parent: [(v) => v === null || (typeof v === 'string' && PARENT.test(v)), '"cart-id@version" or null'],

@@ -12,6 +12,7 @@ import { addYouCheckRules, questionsFor } from "./untested.js";
 import { checkAppliedBrief, staleMessage } from "./brief.js";
 import { readAgentDef } from "./config.js";
 import { writeFileDurable } from "./durable.js";
+import { cleanVersionName, nameChangelogLine, versionNameTaken } from "@game-studio-arcade/spec";
 
 /**
  * @typedef {object} MakeOptions
@@ -22,7 +23,7 @@ import { writeFileDurable } from "./durable.js";
  * @property {string} [model]
  * @property {number} budgetCents
  * @property {import("./answers.js").Answerer} answerer
- * @property {{progress: (s: string, stage?: number | null) => void, info: (s: string) => void, debug?: (s: string) => void, usage?: (u: any) => void}} ui
+ * @property {{progress: (s: string, stage?: number | null) => void, info: (s: string) => void, debug?: (s: string) => void, usage?: (u: any) => void, named?: (name: string | null) => void}} ui
  * @property {import("./checks.js").Checker} checker
  * @property {ReturnType<typeof import("./config.js").dataPaths>} paths
  * @property {{agentId: string, agentVersion?: number, environmentId: string}} lock
@@ -44,8 +45,20 @@ import { writeFileDurable } from "./durable.js";
 /**
  * The game a change starts from (§8.2, D206). The maker's own change is the next
  * version of the same game; anyone else's is their own version, a new branch.
- * @typedef {{ id: string, dir: string, version: number, maker: string | null, family?: string | null, branch?: string | null, title: string, session_id?: string | null }} Parent
+ * `version_name` is what the parent version is called, and `names` every name its line has used (D471).
+ * @typedef {{ id: string, dir: string, version: number, maker: string | null, family?: string | null, branch?: string | null, title: string, session_id?: string | null, version_name?: string | null, names?: string[] }} Parent
  */
+
+/**
+ * The names a new version of this game can't take (D473): the game's title, and every name its line has used.
+ * Null when the version gets no name: a new game, or a maker's own version of someone else's (it takes its title).
+ * @param {Parent | null | undefined} parent @param {ReturnType<typeof changeTarget> | null} target
+ * @returns {{ taken: string[] } | null}
+ */
+export function namingFor(parent, target) {
+  if (!parent || !target?.ownVersion) return null;
+  return { taken: [parent.title, ...(parent.names ?? []), ...(parent.version_name ? [parent.version_name] : [])] };
+}
 
 /** Where the parent cart is mounted in the session (agents/studio.md, Forks). */
 export const PARENT_MOUNT = "/mnt/session/uploads/parent.tgz";
@@ -64,6 +77,7 @@ export function changeTarget(parent, maker) {
 
 /** The message that starts a change: the brief's Forks section reads it. @param {{request: string, maker: string, withPlayer?: string|null, parent: Parent, target: ReturnType<typeof changeTarget>}} o */
 export function changeMessage(o) {
+  const used = [...new Set([...(o.parent.names ?? []), ...(o.parent.version_name ? [o.parent.version_name] : [])])];
   const lines = [
     "Change request from the cabinet: this is a fork.",
     `Parent cart: ${o.parent.id}, version ${o.parent.version}, "${o.parent.title}"${o.parent.maker ? ` by ${o.parent.maker}` : " (a starter game)"}.`,
@@ -71,6 +85,9 @@ export function changeMessage(o) {
     o.target.ownVersion
       ? `This makes version ${o.target.version} of the same game, by the same maker. Add a Changelog line under v${o.target.version}.`
       : `This makes the maker's own version: a new game that starts from the parent's spec. Keep the parent's rules unless the change says otherwise. Add a Changelog line under v1 saying it started from ${o.parent.id} v${o.parent.version}.`,
+    ...(o.target.ownVersion
+      ? [`This version gets a name: call name_version once the player says build.${used.length ? ` Names this game has already used: ${used.map((n) => `"${n}"`).join(", ")}.` : ""}`]
+      : ["This version goes by the game's title: don't call name_version."]),
     `Maker: ${o.maker}${o.withPlayer ? ` (with ${o.withPlayer})` : ""}`,
     "What the player wants changed (speech-to-text transcript, their own words):",
     `"${o.request}"`,
@@ -122,6 +139,7 @@ export async function makeCart(o) {
   }
   const kit = o.resume ? { fileId: "", hash: o.resume.kitHash ?? null } : await o.kit();
   const target = o.parent ? changeTarget(o.parent, o.maker) : null;
+  const naming = namingFor(o.parent, target);
   /** @type {{fileId: string, mountPath: string}[]} */
   const extraFiles = [];
   if (o.parent && !o.resume) {
@@ -173,6 +191,7 @@ export async function makeCart(o) {
     now,
     onEvent: captureSnapshot,
     resume: o.resume,
+    naming,
   });
   // Nothing here says the session has ended, so there's nothing to collect yet: try again later.
   if (o.resume && result.stopReason === "stream_lost") throw new Error("the stream was lost while picking the session back up");
@@ -185,6 +204,7 @@ export async function makeCart(o) {
     maker: o.maker,
     questions: result.turns.filter((t) => !t.auto).map(recordedAnswer),
     plan: result.planTurns.map((p) => (p.choice === "change" ? { choice: "change", said: p.said } : { choice: "build" })),
+    ...(result.nameTurn ? { name: { choice: result.nameTurn.choice, ...(result.nameTurn.said ? { said: result.nameTurn.said } : {}) } } : {}),
   };
   writeJson(path.join(sessionDir, "answers.json"), answers);
   if (o.recordFile) writeJson(o.recordFile, answers);
@@ -210,6 +230,29 @@ export async function makeCart(o) {
     fs.rmSync(path.join(cartDir, "earlier-turns.json"), { force: true });
   } else if (dl.files.includes("spec.md")) {
     spec = fs.readFileSync(path.join(dl.dir, "spec.md"), "utf8");
+  }
+
+  // The version's name (D471-D473): the answer on the name question, or, when the player's own words needed
+  // shortening, what the agent wrote in cart.json. Cleaned here, so a bad name never fails a kid's game: the
+  // version just shows by its number. It goes in cart.json and on the spec's Changelog line.
+  const version = target?.version ?? 1;
+  /** @type {string | null} */
+  let versionName = null;
+  if (naming) {
+    const written = cleanVersionName(cartJson?.version_name, { cut: true });
+    versionName = result.nameTurn?.name ?? (written && !versionNameTaken(written, naming.taken) ? written : null);
+  }
+  if (cartDir && cartJson && (cartJson.version_name ?? null) !== versionName) {
+    const { version_name: _, ...rest } = cartJson;
+    cartJson = versionName ? { ...rest, version_name: versionName } : rest;
+    writeFileDurable(path.join(cartDir, "cart.json"), JSON.stringify(cartJson, null, 2) + "\n");
+  }
+  if (cartDir && spec != null && versionName) {
+    const named = nameChangelogLine(spec, version, versionName);
+    if (named !== spec) {
+      spec = named;
+      writeFileDurable(path.join(cartDir, "spec.md"), spec);
+    }
   }
 
   const freeze = analyzeFreeze(events, {
@@ -253,7 +296,6 @@ export async function makeCart(o) {
   /** @type {{id: string, dir: string, commit: string}|null} */
   let committed = null;
   const created = now().toISOString();
-  const version = target?.version ?? 1;
   const parentRef = o.parent ? `${o.parent.id}@${o.parent.version}` : null;
   if (commit && cartDir) {
     const title = cartJson?.title || specTitle(spec) || o.parent?.title || "cart";
@@ -267,6 +309,7 @@ export async function makeCart(o) {
         id: wantedId,
         title,
         version,
+        ...(versionName ? { version_name: versionName } : {}),
         maker: o.maker,
         with: o.withPlayer ?? null,
         parent: parentRef,
@@ -281,6 +324,8 @@ export async function makeCart(o) {
     appendLog(o.paths.logs, "cart_version", {
       cart_id: committed.id,
       version,
+      // The name and who picked it (D472): a tile, the maker's own words, or Claude on "You pick".
+      ...(versionName ? { version_name: versionName, named_by: o.maker, name_picked: result.nameTurn?.picked ?? "claude" } : {}),
       parent: parentRef,
       session_id: result.sessionId,
       commit: committed.commit,
@@ -300,6 +345,9 @@ export async function makeCart(o) {
     kit: kit.hash,
     turns: result.turns.map(({ question, option_a, option_b, choice, said }) => ({ question, option_a, option_b, choice, said })),
     plan_turns: result.planTurns,
+    // The name question as asked and answered, and the name the version got (D471).
+    version_name: versionName,
+    name_turn: result.nameTurn,
     questions: result.turns.filter((t) => !t.auto).length,
     ended_by: result.endedBy,
     kind: o.parent ? "change" : "new",

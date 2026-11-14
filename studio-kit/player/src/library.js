@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { parseSpec } from "@game-studio-arcade/spec";
+import { cleanVersionName, parseSpec } from "@game-studio-arcade/spec";
 
 /** Same data folder as the CLI (D14): `GSA_DATA_DIR` or ~/game-studio-data. */
 export function dataDir(env = process.env) {
@@ -20,6 +20,7 @@ export function dataDir(env = process.env) {
  *   source: "library" | "example",
  *   title: string,
  *   version: number,
+ *   version_name: string | null,
  *   maker: string | null,
  *   with: string | null,
  *   players: number | null,
@@ -86,6 +87,8 @@ export function readCart(root, id, source = "library") {
     source,
     title: String(meta.title || titleLine || id),
     version: Number.isInteger(v) && v > 0 ? v : 1,
+    // What this version is called (D472). Null for a first version and every one made before names.
+    version_name: cleanVersionName(meta.version_name, { cut: true }),
     maker: meta.maker ?? null,
     with: meta.with ?? null,
     players: Number.isInteger(meta.players) ? meta.players : null,

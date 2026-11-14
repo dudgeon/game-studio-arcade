@@ -1,7 +1,8 @@
 // Runs one Studio session: open the stream, send the request, relay the custom
 // tools (D41) until the session goes idle for good. Plays the cabinet's
 // Studio-side role (tile relay); the CLI and later the cabinet service share it.
-import { planResult, questionResult } from "./tiles.js";
+import { nameResult, planResult, questionResult } from "./tiles.js";
+import { cleanVersionName, versionNameTaken } from "@game-studio-arcade/spec";
 import { LINE_STAGE, progressFor, progressGate, tellStage } from "./progress.js";
 import { kidWords } from "./kidwords.js";
 
@@ -12,6 +13,7 @@ import { kidWords } from "./kidwords.js";
  *
  * @typedef {object} Ui
  * @property {(text: string, stage?: number | null) => void} progress   one kid-language line, with its D198 stage when known
+ * @property {(name: string | null) => void} [named]   the version's name, once the name question is answered (D471); null while Claude shortens the player's words
  * @property {(usage: any) => void} [usage]      the session's usage so far, as it streams (the cabinet's live coin count)
  * @property {(text: string) => void} [debug]
  *
@@ -23,10 +25,20 @@ import { kidWords } from "./kidwords.js";
  * @property {string|null} said
  * @property {boolean} [auto]                      answered D by the relay after make-it-now
  *
+ * @typedef {object} NameTurn                     the name question and its answer (D471)
+ * @property {string} option_a
+ * @property {string} option_b
+ * @property {"A"|"B"} pick                        Claude's choice, used on D "You pick"
+ * @property {"A"|"B"|"C"|"D"} choice
+ * @property {string|null} said                    the player's own words, on C
+ * @property {string|null} name                    the name this gave, or null when the agent has to make one from `said`
+ * @property {"tile"|"said"|"claude"} picked       who chose it
+ *
  * @typedef {object} SessionResult
  * @property {string} sessionId
  * @property {Turn[]} turns
  * @property {{summary: string, controls?: string, top_rules?: string[], rules: any[], changes?: any[], choice: string, said: string|null}[]} planTurns
+ * @property {NameTurn|null} nameTurn             the last name question, if this version got a name
  * @property {"answers"|"make_it_now"} endedBy
  * @property {string} stopReason   end_turn | budget_reached | retries_exhausted | refusal | terminated | stream_lost
  * @property {any} usage           session usage (list_cost, tokens, active_seconds)
@@ -82,6 +94,21 @@ export function planOf(input) {
   };
 }
 
+/**
+ * The name an answer to the name question gives (D471). A and B are Claude's names, D "You pick" is the one
+ * Claude would choose, C is the player's own, as long as it fits and is free. Claude's names are cut to fit;
+ * the player's never are: a long one goes back to Claude to shorten from their words.
+ * @param {{option_a: string, option_b: string, pick: string}} q @param {{choice: string, said?: string | null}} a @param {readonly string[]} taken
+ * @returns {{ name: string | null, picked: "tile"|"said"|"claude" }}
+ */
+export function nameFor(q, a, taken) {
+  const free = (/** @type {string | null} */ n) => (n && !versionNameTaken(n, taken) ? n : null);
+  const mine = (/** @type {string} */ letter) => free(cleanVersionName(letter === "B" ? q.option_b : q.option_a, { cut: true }));
+  if (a.choice === "C") return { name: free(cleanVersionName(a.said ?? "")), picked: "said" };
+  if (a.choice === "D") return { name: mine(q.pick) ?? mine(q.pick === "B" ? "A" : "B"), picked: "claude" };
+  return { name: mine(a.choice), picked: "tile" };
+}
+
 const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted", "refusal"]);
 
 /**
@@ -93,6 +120,7 @@ const TERMINAL_STOPS = new Set(["end_turn", "budget_reached", "retries_exhausted
  *   message?: object,
  *   onEvent?: (ev: SessionEvent, sessionId: string) => Promise<void>,
  *   resume?: {sessionId: string},
+ *   naming?: {taken: string[]} | null,
  *   now?: () => Date, maxReconnects?: number,
  * }} o
  * @returns {Promise<SessionResult>}
@@ -111,6 +139,8 @@ export async function runSession(o) {
   /** @type {Turn[]} */
   const turns = [];
   const planTurns = [];
+  /** @type {NameTurn | null} */
+  let nameTurn = null;
   const errors = [];
   const notes = new Set();
   const seen = new Set(); // event ids already handled (dedupe across reconnects)
@@ -167,12 +197,31 @@ export async function runSession(o) {
       planTurns.push({ ...p, choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
       return reply(ev, planResult(a));
     }
+    if (ev.name === "name_version") {
+      // Only a maker's own change gets a name (D471): anything else goes by its title.
+      if (!o.naming) {
+        notes.add("named_a_version_that_takes_its_title");
+        return reply(ev, JSON.stringify({ error: "This version goes by the game's title, so it needs no name. Carry on." }));
+      }
+      const q = nameQuestionOf(input);
+      // No way to ask (a recorded run, a restart): "You pick".
+      const a = o.answerer.name ? await o.answerer.name(q) : { choice: /** @type {const} */ ("D") };
+      const got = nameFor(q, a, o.naming.taken);
+      nameTurn = { ...q, choice: a.choice, said: a.choice === "C" ? (a.said ?? "") : null, ...got };
+      ui.named?.(got.name);
+      return reply(ev, nameResult(a, got.name));
+    }
     if (ev.name === "tell_player") {
       say(String(input.message ?? ""), tellStage(input.stage));
       return reply(ev, JSON.stringify({ ok: true }));
     }
     notes.add(`unknown_tool:${ev.name}`);
     return reply(ev, JSON.stringify({ error: `unknown tool ${ev.name}` }));
+  }
+
+  /** @param {any} input */
+  function nameQuestionOf(input) {
+    return { option_a: String(input.option_a ?? ""), option_b: String(input.option_b ?? ""), pick: /** @type {"A"|"B"} */ (input.pick === "B" ? "B" : "A") };
   }
 
   /** @returns {Promise<boolean>} true when the session is finished */
@@ -271,6 +320,9 @@ export async function runSession(o) {
         turns.push({ question: String(input.question ?? ""), option_a: String(input.option_a ?? ""), option_b: String(input.option_b ?? ""), choice: a.choice, said: a.choice === "C" ? (a.said ?? "") : null });
       } else if (use?.name === "show_plan") {
         planTurns.push({ ...planOf(input), choice: a.choice, said: a.choice === "change" ? (a.said ?? "") : null });
+      } else if (use?.name === "name_version" && a.choice) {
+        const name = cleanVersionName(a.name ?? "");
+        nameTurn = { ...nameQuestionOf(input), choice: a.choice, said: a.choice === "C" ? (a.said ?? "") : null, name, picked: a.choice === "C" ? "said" : a.choice === "D" ? "claude" : "tile" };
       }
     }
   }
@@ -333,6 +385,7 @@ export async function runSession(o) {
     sessionId,
     turns,
     planTurns,
+    nameTurn,
     endedBy: madeItNow ? "make_it_now" : "answers",
     stopReason,
     usage,

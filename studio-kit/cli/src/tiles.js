@@ -49,3 +49,19 @@ export function questionResult(a) {
 export function planResult(a) {
   return JSON.stringify(a.choice === "change" ? { choice: "change", said: a.said ?? "" } : { choice: "build" });
 }
+
+/** What the name question asks, on the cabinet and at the terminal (D471). */
+export const NAME_QUESTION = "What should this version be called?";
+
+/** The name question at the terminal. @param {{option_a: string, option_b: string}} q */
+export function formatNameQuestion(q) {
+  return [`Claude asks: ${NAME_QUESTION}`, `  A) ${q.option_a}`, `  B) ${q.option_b}`, "  C) Something else", "  D) You pick"].join("\n");
+}
+
+/**
+ * The tool result text for a name_version answer: the choice, the player's words on C, and the name when the cabinet has one.
+ * @param {{choice: string, said?: string | null}} a @param {string | null} name
+ */
+export function nameResult(a, name) {
+  return JSON.stringify({ choice: a.choice, ...(a.choice === "C" ? { said: a.said ?? "" } : {}), ...(name ? { name } : {}) });
+}

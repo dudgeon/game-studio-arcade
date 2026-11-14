@@ -397,7 +397,7 @@ From the walkthrough (answers saved on its page) and chat:
 - D450: **no recording limit and no silence stop** ("There is no reason for a cutoff in length of transcription"; confirmed over the page's 5-minute pick). A hold records as long as it's held; long audio is chunked, never cut.
 - D453: pages, turned with the stick left and right.
 - D454: live words from Moonshine, final text from Groq.
-- D456: names on the question board: two names, say your own, or "You pick".
+- D456: names on the question board: two names, say your own, or "You pick". Built as D471 to D474 (docs/decisions.md).
 - D459: the kit in software, plus sub-pixel glide.
 - D464: AI in games is paid outside the coin pot, uncapped, with every call's cost logged (Geoff's own answer).
 - D468: lines, choices, and open chat with a character.

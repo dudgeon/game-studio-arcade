@@ -382,3 +382,16 @@ test("Games: the list, Remove from shelf and Put back, hiding a maker, all asked
     assert.match(posts[0].body.by, /in the Manager$/);
   });
 });
+
+test("activity says what a version is called, from the cart_version log, and leaves unnamed ones alone (D474)", () => {
+  const a = activity({
+    studio_session: [
+      { id: "s1", maker: "tester", request: "faster logs", kind: "change", parent: "log-hopper@2", turns: [], outcome: "committed", cart_id: "log-hopper-v3", cart_version: 3, version_name: "Faster logs", started_at: "2026-11-14T10:00:00Z", errors: [] },
+      { id: "s0", maker: "tester", request: "a frog game", kind: "new", parent: null, turns: [], outcome: "committed", cart_id: "log-hopper", cart_version: 1, started_at: "2026-11-10T10:00:00Z", errors: [] },
+    ],
+    cart_version: [{ cart_id: "log-hopper", version: 1 }, { cart_id: "log-hopper-v3", version: 3, version_name: "Faster logs", named_by: "tester", name_picked: "tile" }],
+    play: [{ cart_id: "log-hopper-v3", cart_version: "3", session_id: "s1", started_at: "2026-11-14T10:10:00Z", duration_s: 30 }, { cart_id: "log-hopper", cart_version: 1, session_id: "s0", started_at: "2026-11-10T10:10:00Z", duration_s: 30 }],
+  });
+  assert.deepEqual(a.makes.map((m) => [m.cart.id, m.cart.version, m.cart.version_name]), [["log-hopper-v3", 3, "Faster logs"], ["log-hopper", 1, null]]);
+  assert.deepEqual(a.plays.map((p) => [p.game, p.version_name]), [["log-hopper-v3", "Faster logs"], ["log-hopper", null]]);
+});

@@ -57,6 +57,9 @@ function viewsWith(s) {
 }
 
 /** The arcade's boards (D201) with one string in every slot it can reach. @param {string} s */
+/** A version's name at its widest: 16 of the font's widest letter (D473). */
+const WIDE_NAME = "W".repeat(16);
+
 function boardsWith(s) {
   const makers = [{ maker: "owen", name: s, coins: 19, cents: 193, makes: 3 }, { maker: "alina", name: s, coins: 6, cents: 56, makes: 1 }, { maker: "sam", name: s, coins: 3, cents: 31, makes: 1 }, { maker: "zed", name: s, coins: 1, cents: 9, makes: 1 }];
   const pot = (/** @type {number} */ coins) => ({ coins, cents: coins * 10 + 1, month: "2026-11", refill_on: "2026-12-01", full_coins: 100, makers, last_month: { month: "2026-10", makers, ended_cents: -52, ended_coins: -5 }, usual: { new: 6, change: 3 }, minutes: { new: 7, change: 4 }, over_usual: 1.5 });
@@ -69,6 +72,8 @@ function boardsWith(s) {
   ];
   const nameOf = () => s;
   const fam = /** @type {any} */ (familyOfCart(/** @type {any} */ (carts), "penguin-catch"));
+  const namedCarts = [{ ...carts[0] }, { ...cart, version_name: WIDE_NAME }, { ...cart, id: "penguin-catch-v3", version: 3, version_name: WIDE_NAME, parent: "penguin-catch@2" }];
+  const named = /** @type {any} */ (familyOfCart(/** @type {any} */ (namedCarts), "penguin-catch"));
   const result = { id: 1, ok: true, kind: "new", title: s, maker: "alina", maker_name: s, cost_cents: 68, coins: 7, pot_before_cents: 850, pot_after_cents: 782, note: s };
   const change = { ...result, kind: "change", version: 3, changed: s, parent: { id: "penguin-catch", title: s, version: 2, maker: "alina" } };
   const rules = [1, 2, 3, 4, 5, 6].map((n) => ({ id: `R${n}`, kind: n > 4 ? "you-check" : "auto", text: s, ...(n === 2 ? { was: s } : {}) }));
@@ -134,6 +139,14 @@ function boardsWith(s) {
     "E6": goneView({ kind: "restarted", message: "Your game may still finish: look for it on the shelf." }, { new: 6, change: 2 }),
     "E10": redirectBoard({ say: "Let's make it a little different. How about this?", alternative: s.slice(0, 160) }),
     "E10 for an answer": redirectBoard({ alternative: s.slice(0, 160), answer: true }),
+    // Version names (D471-D474): the widest name the rules allow, on every screen that says one.
+    "S1 a named version": { screen: "shelf", console: s, pot: 100, sel: 1, items: [{ kind: "make", title: "Make a new game", cost: 6 }, ...gameRows(/** @type {any} */ ([{ ...carts[0] }, { ...cart, version_name: WIDE_NAME, plays: 2 }]), nameOf).map((r) => ({ ...r, hasCard: true }))] },
+    "S3 named versions": cardView({ cart, family: named.family, line: named.line, nameOf, usual: { change: 3 } }),
+    "R3 a named version stays saved": coinCheck({ kind: "change", pot: pot(40), maker: s, parentVersion: 12, parentName: WIDE_NAME }),
+    "R5 the name question": { screen: "question", naming: true, question: "What should this version be called?", option_a: WIDE_NAME, option_b: WIDE_NAME, maker: "123 used", makerCoin: true, sel: 3 },
+    "R6 a named version stays saved": { ...plan, mode: "change", parentVersion: 12, parentName: WIDE_NAME, changes: [{ id: "R2", text: s }] },
+    "R7 named": { screen: "progress", kind: "change", versionName: WIDE_NAME, lines: [s], maker: s, step: 1, used_cents: 20, usual: 3, minutesLeft: 3 },
+    "R8 named": resultView({ ...change, version_name: WIDE_NAME, parent: { ...change.parent, version_name: WIDE_NAME } }, pot(70)),
   };
 }
 
@@ -407,4 +420,16 @@ test("a cabinet with no key yet says so, not \"No Wi-Fi\" (D252)", () => {
   assert.deepEqual(check(p.boxes), []);
   const board = p.boxes.flatMap((x) => x.lines.map((l) => l.text)).join(" ");
   assert.match(board, /A grown-up needs to finish setting up\./);
+});
+
+test("the name question is the question board with D as You pick; every other question keeps Make it now (D471)", () => {
+  const p = new Painter();
+  const q = { screen: "question", question: "What should this version be called?", option_a: "Faster logs", option_b: "Turbo river", maker: "2 used", sel: 0 };
+  draw(p, { ...q, naming: true });
+  const text = (/** @type {string} */ id) => p.boxes.find((b) => b.id === id)?.lines.map((l) => l.text).join(" ");
+  assert.equal(text("q-d"), "You pick");
+  assert.equal(text("q-c"), "Something else");
+  assert.equal(text("q-a"), "Faster logs");
+  draw(p, q);
+  assert.equal(text("q-d"), "Make it now");
 });

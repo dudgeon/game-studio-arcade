@@ -4,6 +4,7 @@
 // string to any screen with no browser. All words go through Painter.box (D181).
 import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
+import { YOU_PICK } from "./version-name.js";
 import { ADVANCE, GLYPH_H, H, LINE_H, W, clean, colsFor, fit, heightOf, rowsFor, widthOf, wrap } from "./text.js";
 
 /** @typedef {import("./text.js").BoxRecord} BoxRecord */
@@ -286,7 +287,8 @@ function question(p, v) {
   const a = p.tile({ id: "q-a", letter: "A", text: words.a, y, rows: ROWS.option, lit: v.sel === 0, onCut: "reader", readable: true });
   const b = p.tile({ id: "q-b", letter: "B", text: words.b, y: a.y, rows: ROWS.option, lit: v.sel === 1, onCut: "reader", readable: true });
   const c = p.tile({ id: "q-c", letter: "C", text: "Something else", y: b.y, rows: 1, lit: v.sel === 2, hue: C.purple });
-  p.tile({ id: "q-d", letter: "D", text: "Make it now", y: c.y, rows: 1, lit: v.sel === 3, hue: C.green });
+  // The name question's D lets Claude choose (D471); any other question's D ends the questions.
+  p.tile({ id: "q-d", letter: "D", text: v.naming ? YOU_PICK : "Make it now", y: c.y, rows: 1, lit: v.sel === 3, hue: C.green });
   p.hint(r.cut || a.cut || b.cut ? READ_MORE : CHOOSE);
 }
 

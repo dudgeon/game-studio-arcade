@@ -167,7 +167,8 @@ The live cart library is its own git repo on the Pi, not part of this repo. The 
 carts/sloth-snacks/
   spec.md        source of truth
   cart.json      id, title, maker, with, parent (cart@version or null),
-                 session_id, origin (cabinet|desktop), players, created
+                 session_id, origin (cabinet|desktop), players, created,
+                 version and, when its maker named it, version_name (D472)
   game.js        house runtime: init / update / draw
   assets/        sprites and sounds in house palette and sizes
   playtest.json  last report: per-rule pass/fail, fps, errors
@@ -204,7 +205,7 @@ Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by t
 1. The kid selects a cart and chooses to change it (D87 keeps "pick a game, then change it"; the exact button is set with the launcher), then says who's making.
 2. A new version is created with maker, parent pointer and originating session. The original is never modified.
 3. The kid states the change. The session gets the parent's spec, code and original conversation, and asks only about what's ambiguous, with the same tiles.
-4. Claude edits the spec first, then the code, reusing library pieces.
+4. Claude edits the spec first, then the code, reusing library pieces. When the plan is agreed and the change is the maker's own next version, Claude asks what to call it on the same tiles: two names, "Something else" to say one, and D as "You pick" (D471). The name shows in place of "v3"; the number stays as the order (D472, D474).
 5. The playtest runs the new rules and every inherited rule.
 6. On pass, the fork appears under its parent. On repeated failure: a plain-language message, the original untouched, and the attempt kept in the logs (spec, code, report).
 
@@ -236,6 +237,8 @@ Runtime limits (proposed; now 256×192 and 32 colors, D3 and D81), enforced by t
 ```
 
 Result content (JSON text): `{"choice":"A"}`, `{"choice":"B"}`, `{"choice":"C","said":"<transcript>"}`, or `{"choice":"D"}`. **D means: ask no more questions in this build; record assumptions in the spec and build.**
+
+The Studio agent has three more custom tools (D41, D471): `show_plan`, `tell_player`, and `name_version` (`option_a`, `option_b`, `pick`), which asks a version's name on the same board, with D reading "You pick". Its result carries the name: `{"choice":"A","name":"Faster logs"}`.
 
 ### 9.2 Arcade MCP server on the cabinet (name: `arcade`)
 
