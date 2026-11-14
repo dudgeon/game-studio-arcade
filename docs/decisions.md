@@ -1614,6 +1614,15 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
   - an OS package that takes the network away.
 - **Data:** a cart and a log of the family's must come through every case.
 - **The broken packages** come from a local apt repository on the VM.
+- **The boot path,** `scripts/cabinet-card/test/boot-rehearsal.sh DIR`:
+  - **Revert:** QEMU has no Pi firmware, so a tryboot restart is a normal restart, which is exactly a try that didn't come up. It must be reported, and config.txt must be untouched.
+  - **Keep:** run on a copy of the boot partition, with a command line that names the slot.
+- **Results, 2026-11-13,** on a card from this branch rebased on main 0a137ad (the guard installed from first boot): **24/24 update checks and 10/10 boot checks pass.**
+- **What the rehearsal found and fixed:**
+  - Files written just before a power cut came back empty (D334).
+  - The boot partition had only 115 MB free (D336).
+  - systemd 257 refuses `systemctl reboot "0 tryboot"` with "Too many arguments". The try now uses `systemctl reboot --reboot-argument="0 tryboot"`. Raspberry Pi's own `reboot '0 tryboot'` still works, since `reboot [ARG]` takes it.
+  - The OS step: copying 31 packages first and then upgrading took 66 s.
 
 **D338. The Manager's Software tab: versions, and an Update button.** *(Director's brief; Claude.)*
 - **It shows** what the cabinet runs (version and commit, read live) and the mini's checkout commit.

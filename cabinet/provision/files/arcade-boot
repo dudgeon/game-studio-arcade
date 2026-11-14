@@ -31,6 +31,7 @@ say() { echo "[arcade-boot] $*"; }
 stop() { echo "[arcade-boot] Stopped: $*" >&2; exit 1; }
 
 committed() { sed -n "/^$BEGIN\$/,/^$END\$/s/^os_prefix=\(.*\)\/\$/\1/p" "$BOOT_DIR/config.txt" | tail -1; }
+where() { local c; c="$(committed)"; [ -n "$c" ] && echo "$c" || echo "the top of the boot partition"; }
 
 # config.txt with our block set to SLOT: the rest of the file exactly as it is.
 config_with() { # SLOT
@@ -45,7 +46,6 @@ result() { # OK REASON
   say "$2"
 }
 
-# The files a slot needs, from where the Pi OS packages put them: the top of the boot partition.
 # What a Pi 5 slot holds: its kernel and initramfs (the Pi 4 ones only if there's no Pi 5 one), the BCM2712 device
 # trees, the overlays and cmdline.txt. About 25 MB on the 2026-10-06 image.
 slot_files() {
@@ -135,7 +135,7 @@ cmd_try() {
   config_with "$slot" > "$BOOT_DIR/tryboot.txt.new" && sync && mv "$BOOT_DIR/tryboot.txt.new" "$BOOT_DIR/tryboot.txt"
   state_write "$TRY" "slot=$slot" "id=$id" "previous=$(committed)" "saved=$saved" "at=$(date -u +%FT%TZ)" "kernel_before=$(uname -r)"
   sync
-  say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to ${BOOT_DIR}/$(committed)/."
+  say "trying $slot: restarting with tryboot. If it doesn't come up well, the next restart goes back to $(where)."
   # "0 tryboot" as reboot(2)'s argument, as Raspberry Pi's `reboot '0 tryboot'`. systemd 257 refuses `systemctl reboot ARG`
   # ("Too many arguments", found in the rehearsal); --reboot-argument is its way.
   if ! { if [ -n "${ARCADE_REBOOT_TRY:-}" ]; then $ARCADE_REBOOT_TRY; else systemctl reboot --reboot-argument="0 tryboot"; fi; }; then
@@ -154,7 +154,7 @@ cmd_confirm() {
     # The try never came up, or the Pi was restarted before it was kept: this is the last good boot.
     [ -z "$(state_get "$TRY" saved)" ] || apt_back "$(state_get "$TRY" saved)"
     hold_boot
-    result false "the try of $slot didn't come up (a hang, a crash or a restart): the cabinet went back to $(committed)"
+    result false "the try of $slot didn't come up (a hang, a crash or a restart): the cabinet went back to $(where)"
     rm -f "$TRY"
     return 0
   fi
@@ -168,7 +168,7 @@ cmd_confirm() {
   fi
   [ -z "$(state_get "$TRY" saved)" ] || apt_back "$(state_get "$TRY" saved)"
   hold_boot
-  result false "the try of $slot came up without its network or the service: restarting into $(committed)"
+  result false "the try of $slot came up without its network or the service: restarting into $(where)"
   rm -f "$TRY"
   sync
   $REBOOT
