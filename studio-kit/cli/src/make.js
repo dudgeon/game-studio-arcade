@@ -385,7 +385,7 @@ function readTextIfExists(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
 }
 
-// A session's record survives a power cut whole, or not at all (D337a).
+// A session's record survives a power cut whole, or not at all (D370).
 function writeJson(file, data) {
   writeFileDurable(file, JSON.stringify(data, null, 2) + "\n");
 }

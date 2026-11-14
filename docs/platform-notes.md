@@ -176,7 +176,17 @@ Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also
 
 **Pi 5:** the cabinet fits a Pi 5 with Active Cooler, plus a single NVMe Base (7 mm standoffs) but not the NVMe Base Duo. The X HAT sits on a booster header and 17 mm standoffs. Pi 5 support in the overlay was merged on 2025-07-17 (PR #49). Issue #45 (open) records: controls and audio work with the Pi 5 overlay; the screen flashed until `usb_max_current_enable=1`; the power button powers off but power-on was unreliable for one user; one user saw about 85 °C under the HAT. Install: build `picade.dtbo` from the repo (`make`, `sudo make install`, needs `device-tree-compiler`) and add `dtoverlay=picade` to `/boot/firmware/config.txt`. Pimoroni's guide targets Raspberry Pi OS Lite 64-bit but doesn't name a Debian release, so check on trixie.
 
-**Power:** USB-C into the X HAT, which back-powers the Pi through the GPIO header ("no need for a separate power supply"). Tap the power button (or the HAT's "switch" button) to start; hold 3 s to shut down safely and cut power. Because the Pi can't see the supply, add `usb_max_current_enable=1`.
+**Power:** USB-C into the X HAT, which back-powers the Pi through the GPIO header ("no need for a separate power supply"). Tap the power button (or the HAT's "switch" button) to start. Pimoroni's shop page says "press and hold it for 3 seconds to fully shutdown and disconnect power". That is the HAT's own hard cut, not a clean shutdown. Because the Pi can't see the supply, add `usb_max_current_enable=1`.
+
+**The power button while running (checked 2026-11-14, D371):**
+- **What the overlay does** (picade.dts at f97c2ac): the button is `KEY_POWER` (116) on BCM17, in the same `gpio_keys` node as the other buttons. A `gpio-poweroff` on BCM4 (`force`) asserts after halt so the HAT can cut power. The README's `nopowerbtn` dtparam isn't in the overlay's `__overrides__` at that commit.
+- **What the OS does:** with stock systemd-logind, a tap of KEY_POWER powers off (`HandlePowerKey=poweroff`). logind's long press is fixed at 5 s (`LONG_PRESS_DURATION` in `logind-button.c`, systemd 257), past the HAT's 3 s cut, so logind can't do "hold to switch off".
+- **Our setup:** logind ignores the key, and `arcade-powerkey` starts `systemctl poweroff` once it has been held 2 s.
+- **Not confirmed (🔧, bring-up C6):**
+  - whether the HAT's 3 s cut fires while the shutdown is still running;
+  - whether gpio-poweroff on BCM4 runs on a Pi 5 rather than losing to the firmware's power-off.
+
+  Sources: the overlay at that commit, the pimoroni/picade-hat README and issues #41 and #45, the freedesktop logind.conf man page, systemd v257 `logind-button.c`, and Pimoroni's shop page (seen through search only).
 
 **Audio:** a 3" speaker (5 W, 4 Ω) on the X HAT's I2S DAC with a 3 W mono amplifier (both channels mixed to mono). Default volume is 100%, "a bit much". If sound fails: `dtparam=audio=off` and `dtoverlay=vc4-kms-v3d,noaudio`. One Bookworm user needed PulseAudio for I2S.
 

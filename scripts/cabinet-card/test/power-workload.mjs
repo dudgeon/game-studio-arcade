@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs on a rehearsal cabinet (never a real one) until the power goes: a mix of what the family does, as fast
-// as the service allows (D337a). Prints one line per step on stdout, which the mini keeps:
+// as the service allows (D370). Prints one line per step on stdout, which the mini keeps:
 //   BEGIN <what>          a step started
 //   ACK <what> <json>     the service said it was done: after a power cut, this must still be there
 // Steps: a make through to the shelf (a cart commit, its session, its charge in the coin ledger), a coin top-up

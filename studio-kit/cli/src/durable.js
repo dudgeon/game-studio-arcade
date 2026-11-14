@@ -1,5 +1,5 @@
 // @ts-check
-// Writes that survive the plug being pulled (D337a). The kids switch the cabinet off at the wall; the card has no
+// Writes that survive the plug being pulled (D370). The kids switch the cabinet off at the wall; the card has no
 // fallback (D339). On ext4 a file written and renamed into place can come back empty after a cut, and an append can
 // come back torn; the QEMU power rehearsal (scripts/cabinet-card/test/power-rehearsal.sh) is how we know.
 import fs from "node:fs";
@@ -64,4 +64,28 @@ export function appendLineDurable(file, line) {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * Flush every file and folder under DIR to disk: for files another tool wrote (tar, a recursive copy), before they're
+ * relied on. A session's cart came back with an empty cart.json after a cut without this (D370).
+ * @param {string} dir
+ */
+export function syncTree(dir) {
+  const visit = (/** @type {string} */ p) => {
+    const st = fs.lstatSync(p);
+    if (st.isSymbolicLink()) return;
+    if (st.isDirectory()) for (const n of fs.readdirSync(p)) visit(path.join(p, n));
+    let fd;
+    try {
+      fd = fs.openSync(p, "r");
+      fs.fsyncSync(fd);
+    } catch {
+      // a folder some filesystems won't fsync
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
+    }
+  };
+  visit(dir);
+  syncDir(path.dirname(dir));
 }

@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { writeFileDurable } from "./durable.js";
+import { syncTree, writeFileDurable } from "./durable.js";
 
 export const EXPECTED = ["report.json", "cart.tgz"];
 export const MARKER = "DONE.json";
@@ -99,6 +99,7 @@ export function extractCart(tarball, dest) {
   }
   fs.mkdirSync(dest, { recursive: true });
   execFileSync("tar", ["-xzf", tarball, "-C", dest]);
+  syncTree(dest); // a session's cart is kept whole (D5); tar doesn't flush (D370)
   return dest;
 }
 

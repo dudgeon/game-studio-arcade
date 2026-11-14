@@ -140,8 +140,12 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 
 **C6. Power button** 🔧
 - Tap to switch on: should start the Pi (one Pi 5 user found this unreliable; if so, the HAT's own "switch" button or replugging the supply also works).
-- Hold 3 s to shut down: the screen goes off and, a few seconds later, the HAT cuts power.
-- **Watch for:** if a quick tap while it's running shuts it down, a kid can switch it off by accident. Tell Claude; it can ignore short presses and shut down only on a long one.
+- **Tap while it's running: nothing happens** (Geoff's choice, D371). Check it: tap during a game and on the shelf, and the cabinet carries on.
+- **Hold about 2 s to switch off:** the cabinet starts a clean shutdown while you're still holding. Let go when the screen goes dark. A few seconds later the HAT cuts power.
+- 🔧 **What only the hardware can show** (Claude watches over SSH, `journalctl -u arcade-powerkey -f`):
+  - each tap logs "tap … ignored";
+  - a hold logs "held 2 s: switching off".
+  - **The race:** the HAT has its own hard cut after about a 3 s hold. Hold on past 3 s and the power may go before the shutdown finishes. The cabinet's data survives a hard cut (D370), but a clean shutdown is kinder to the card. If the hard cut comes first, tell Claude: the hold can drop to 1–1.5 s (`/etc/arcade/power-button`, `hold=1.5`).
 
 **C7. Temperature** 🔧
 - Claude reads the Pi's temperature after a few games and during a make. Under 80 °C is fine; the Pi slows itself at 85 °C.

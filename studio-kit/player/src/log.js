@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * Append one line and flush it, starting a fresh line if a power cut left the file ending mid-line, so the new
- * line is never glued to a torn one (D337a; the cabinet service's durable.js does the same).
+ * line is never glued to a torn one (D370; the cabinet service's durable.js does the same).
  * @param {string} file @param {string} line
  */
 function appendLine(file, line) {

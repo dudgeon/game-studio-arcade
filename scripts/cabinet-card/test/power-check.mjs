@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// After a power cut on a rehearsal cabinet (D337a): is everything the service said was done still there, whole?
+// After a power cut on a rehearsal cabinet (D370): is everything the service said was done still there, whole?
 //   node power-check.mjs DATA_DIR SERVICE_URL < acks     (acks: power-workload.mjs's ACK lines, from the mini)
 // Prints JSON {ok, problems, counts}. Exit 1 on any problem. Reads only; never prints a file's contents.
 import { execFileSync } from "node:child_process";

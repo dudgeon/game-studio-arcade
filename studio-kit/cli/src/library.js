@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { writeFileDurable } from "./durable.js";
+import { syncTree, writeFileDurable } from "./durable.js";
 
 const GIT_ENV = {
   GIT_AUTHOR_NAME: "Studio",
@@ -12,7 +12,7 @@ const GIT_ENV = {
   GIT_COMMITTER_NAME: "Studio",
   GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid",
   // Objects, refs and the index on disk before a commit returns: a power cut must not leave the library with an
-  // empty object file, which breaks the whole repository (D337a). Through the environment, so .git/config, which
+  // empty object file, which breaks the whole repository (D370). Through the environment, so .git/config, which
   // is the family's data, is never touched.
   GIT_CONFIG_COUNT: "2",
   GIT_CONFIG_KEY_0: "core.fsync",
@@ -86,6 +86,7 @@ export function commitNewCart(o) {
   // Key frames are regenerable (D62): the library keeps playtest.json, never the PNGs.
   fs.cpSync(o.cartDir, dest, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
   writeFileDurable(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
+  syncTree(dest); // the shelf reads these files, not git's copies (D370)
   git(o.root, ["add", "--", id]);
   git(o.root, ["commit", "-q", "-m", o.message.replace("{id}", id)]);
   return { id, dir: dest, commit: git(o.root, ["rev-parse", "HEAD"]) };
