@@ -268,19 +268,22 @@ test("a key pressed resets the clock and clears the warning (D188)", async () =>
   assert.ok(studio.state().pending);
 });
 
-test("the kid chooses to stop: released with no message, and stop needs something waiting (D188)", async () => {
+test("the kid chooses to stop: released, the idea kept for Make, and stop needs something waiting (D188, D315)", async () => {
   const replay = replayApi({ dir: FIXTURE });
   const { studio, until, paths } = setup({ replay });
   assert.throws(() => studio.stop(), /nothing is waiting/);
   studio.start({ maker: "alina", request: "a penguin game" });
   await until((x) => x.pending?.kind === "question");
   studio.stop();
-  assert.deepEqual(studio.state(), { phase: "idle" });
+  const s = /** @type {any} */ (studio.state());
+  assert.equal(s.phase, "idle");
+  assert.equal(s.notice.kind, "stopped");
+  assert.equal(s.notice.short, "Your idea is saved");
+  assert.deepEqual(s.notice.retry, { maker: "alina", request: "a penguin game", kind: "new", parent: null });
   await new Promise((r) => setTimeout(r, 100));
   const [rec] = readLog(path.join(paths.logs, "studio_session.jsonl"));
   assert.equal(rec.outcome, "abandoned");
-  assert.equal(rec.ended_by, "stopped");
-});
+  assert.equal(rec.ended_by, "stopped");});
 
 test("an archive that's refused interrupts and tries again; one that fails is logged and Make stays free (D188)", async () => {
   const once = replayApi({ dir: FIXTURE, archiveRefusals: 1 });

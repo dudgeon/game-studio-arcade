@@ -58,6 +58,7 @@ const centsOf = (usage) => {
 
 const NOTICES = {
   timed_out: { message: "You were away for a while, so I stopped making this game. Tell me your idea again any time!", short: "Your last game was put away" },
+  stopped: { message: "You stopped making this game.", short: "Your idea is saved" },
   restarted: { message: "Sorry! The cabinet restarted, so your game didn't get finished. Tell me your idea again!", short: "Your last game didn't finish" },
   restarted_building: { message: "Sorry! The cabinet restarted. Your game may still finish: look for it on the shelf.", short: "Your last game may still finish" },
 };
@@ -486,7 +487,8 @@ export function createStudio(o) {
     current.pending = null;
     run = null; // Make is free now, whatever the API does next.
     // The idea goes with the notice, so the kid can try again without saying it again (D300); the cost follows once charged.
-    notice = reason === "timed_out" ? { id: nextId++, kind: reason, ...NOTICES.timed_out, used_cents: current.usedCents, run_id: current.id, retry: { maker: current.maker, request: current.request, kind: current.kind ?? "new", parent: current.parent?.id ?? null } } : null;
+    // A stop keeps the idea too, for "Try again, same idea" or "New idea" from Make (D315).
+    notice = { id: nextId++, kind: reason, ...NOTICES[reason], used_cents: current.usedCents, run_id: current.id, retry: { maker: current.maker, request: current.request, kind: current.kind ?? "new", parent: current.parent?.id ?? null } };
     p.reject(new Released(reason));
     changed();
   }

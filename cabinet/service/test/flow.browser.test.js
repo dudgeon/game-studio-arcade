@@ -346,8 +346,8 @@ test("walked away to the shelf: the put-away notice opens from Make, with its co
   );
 });
 
-test("the way back: ESC on a question asks; keep going returns; stop frees Make with no message (D188)", { skip: skip || false, timeout: 120_000 }, async () => {
-  await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
+test("the way back: ESC on a question asks; keep going returns; stop asks first, then Make keeps the idea (D188, D315)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, data, faults, problems }) => {
     await run(TO_FIRST_QUESTION);
     await run(`
       press esc
@@ -364,16 +364,116 @@ test("the way back: ESC on a question asks; keep going returns; stop frees Make 
       press down
       press down
       press a
-      wait shelf
-      sleep 200
+      wait E13
+      shot stop-are-you-sure
     `);
-    assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
-    assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea");
+    // Are you sure? What it used, that the idea is kept, and Keep going lit (E13).
+    assert.equal(await boxText(page, "header"), "Stop making this game?");
+    assert.match(await boxText(page, "E13-0"), /^Claude stops now\. (Less than 1 coin|\d+ coins?) used\.$/);
+    assert.equal(await boxText(page, "E13-1"), "Your idea is saved for next time.");
+    assert.equal(await boxText(page, "E13-tile-0"), "Yes, stop");
+    assert.equal(await boxText(page, "E13-tile-1"), "Keep going");
+    assert.equal(await page.evaluate(() => /** @type {any} */ (window).launcher.sel()), 1, "Keep going is lit");
+    // A button on the lit tile keeps going; ESC does too. Both go back to the same question.
+    await run(`
+      press b
+      wait question
+      press esc
+      wait E8
+      press down
+      press down
+      press a
+      wait E13
+      press esc
+      wait question
+      press esc
+      wait E8
+      press down
+      press down
+      press a
+      wait E13
+      press up
+      press a
+      wait shelf
+      sleep 300
+    `);
     const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
     assert.equal(rec.outcome, "abandoned");
     assert.equal(rec.ended_by, "stopped");
+    assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
+    assert.equal(await boxText(page, "shelf-by-0"), "Your idea is saved");
+    // Make offers the stopped idea: try again, or a new one (E14).
+    await run(`
+      press a
+      wait E14
+      shot stopped-idea
+    `);
+    assert.match(await boxText(page, "E14-1"), /a penguin game/);
+    assert.equal(await boxText(page, "E14-tile-0"), "Try again, same idea");
+    assert.equal(await boxText(page, "E14-tile-1"), "New idea");
+    // ESC keeps it; a try again goes to the coin check with the idea filled in.
+    await run(`
+      press esc
+      wait shelf
+      sleep 200
+    `);
+    assert.equal(await boxText(page, "shelf-by-0"), "Your idea is saved", "ESC didn't throw the idea away");
+    await run(`
+      press a
+      wait E14
+      press a
+      wait M3
+    `);
+    assert.deepEqual(await faults(), []);
+    assert.deepEqual(problems, []);
+  });
+});
+
+test("stopped, then a new idea: Make is plain again and goes to who's making (D315)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(FIXTURE, async ({ page, run, faults }) => {
+    await run(TO_FIRST_QUESTION);
+    await run(`
+      press esc
+      wait E8
+      press down
+      press down
+      press a
+      wait E13
+      press up
+      press a
+      wait shelf
+      sleep 300
+      press a
+      wait E14
+      press down
+      press a
+      wait who
+      press esc
+      wait shelf
+      sleep 200
+    `);
+    assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea");
     assert.deepEqual(await faults(), []);
   });
+});
+
+test("the walk-away warning shows on the shelf too, after Come back later (D315)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(
+    FIXTURE,
+    async ({ page, run }) => {
+      await run(TO_FIRST_QUESTION);
+      await run(`
+        press esc
+        wait E8
+        press down
+        press a
+        wait shelf
+      `);
+      await page.waitForFunction(() => /^Still there\? Move the stick!/.test(/** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "hint")?.text ?? ""), null, { timeout: 15_000 });
+      assert.equal(await page.evaluate(() => /** @type {any} */ (window).launcher.screen()), "shelf");
+    },
+    { questionTimeout: 6 },
+  );
 });
 
 test("the service restarts mid-question: a moment's notice, then a message, then the shelf (D189)", { skip: skip || false, timeout: 120_000 }, async () => {

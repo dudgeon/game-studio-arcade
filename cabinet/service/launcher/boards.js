@@ -8,7 +8,7 @@
 // every board from real-looking data with no browser.
 import { COLORS as C } from "../../../runtime/src/palette.js";
 import { ADVANCE, GLYPH_H, LINE_H, W, clean, colsFor, heightOf, wrap } from "./text.js";
-import { BODY_Y, HINT_Y, INNER, M, SCREENS, TILE_GAP, TILE_PAD, arrow, flow, planLines } from "./screens.js";
+import { BADGE_W, BODY_Y, HINT_Y, INNER, M, SCREENS, TILE_GAP, TILE_PAD, arrow, flow, planLines } from "./screens.js";
 import { checksFor, iconOf } from "./shelf.js";
 
 /** @typedef {import("./screens.js").Painter} Painter */
@@ -60,7 +60,8 @@ export function header(p, title, right = "", withCoin = false) {
 /**
  * A full-width row: words on the left, a note on the right (with a coin before it, if asked).
  * @param {Painter} p
- * @param {{ id: string, text: unknown, note?: string, noteCoin?: boolean, y: number, x?: number, w?: number, lit: boolean, hue?: number, dim?: boolean, center?: boolean, big?: boolean, onCut?: "ok" | "never" | "reader", noteColor?: number }} o
+ * A `letter` draws a badge at the left, as the question tiles do; any button still picks the lit row (D182).
+ * @param {{ id: string, text: unknown, letter?: string, note?: string, noteCoin?: boolean, y: number, x?: number, w?: number, lit: boolean, hue?: number, dim?: boolean, center?: boolean, big?: boolean, onCut?: "ok" | "never" | "reader", noteColor?: number }} o
  * @returns {number} the next free y
  */
 export function row(p, o) {
@@ -76,9 +77,14 @@ export function row(p, o) {
   const noteCols = Math.min(note.length, Math.floor((w / 2 - (o.noteCoin ? COIN_W : 0)) / ADVANCE));
   const noteW = note ? noteCols * ADVANCE - 1 + (o.noteCoin ? COIN_W : 0) : 0;
   const scale = o.big ? 2 : 1;
-  const textW = w - TILE_PAD * 2 - 4 - (noteW ? noteW + 6 : 0);
+  const badge = o.letter ? BADGE_W + 2 : 0;
+  const textW = w - TILE_PAD * 2 - 4 - badge - (noteW ? noteW + 6 : 0);
   const fg = o.dim ? C.gray : o.lit ? (hue === C.yellow ? C.night : C.white) : C.ice;
-  p.box({ id: o.id, text: o.text, x: x + TILE_PAD + 2, y: o.y + TILE_PAD, w: textW, h: heightOf(1) * scale, scale, color: fg, align: o.center ? "center" : "left", onCut: o.onCut ?? "ok" });
+  if (o.letter) {
+    p.fb.rectfill(x + 2, o.y + 2, BADGE_W - 1, h - 4, o.lit ? C.white : C.gray);
+    p.box({ id: `${o.id}-letter`, text: o.letter, x: x + 2, y: o.y + TILE_PAD, w: BADGE_W - 1, h: GLYPH_H, color: o.lit ? hue : C.night, align: "center", onCut: "never" });
+  }
+  p.box({ id: o.id, text: o.text, x: x + TILE_PAD + 2 + badge, y: o.y + TILE_PAD, w: textW, h: heightOf(1) * scale, scale, color: fg, align: o.center ? "center" : "left", onCut: o.onCut ?? "ok" });
   if (note) {
     const nx = x + w - TILE_PAD - 2 - noteW;
     if (o.noteCoin) coin(p, nx, o.y + TILE_PAD + (o.big ? 4 : 1));
@@ -927,6 +933,7 @@ export function whatToChange(o) {
  * @param {any} n the Studio's notice @param {{ new: number, change: number }} usual
  */
 export function goneView(n, usual) {
+  if (n?.kind === "stopped") return stoppedView(n, usual);
   const board = n?.kind === "restarted" ? (/may still finish/.test(n.message ?? "") ? "E6" : "E5") : "gone";
   /** @type {any[]} */
   const blocks = [{ text: n?.message ?? "This game stopped being made. Tell me your idea again!", rows: 5, keepLines: true }];
@@ -943,6 +950,52 @@ export function goneView(n, usual) {
     sel: 0,
     actions: [...(retry ? ["retry-notice"] : []), "notice-shelf"],
     retry,
+  };
+}
+
+/**
+ * E14: Make, after the kid stopped a make. The idea they stopped, for a try again or a new one (D315).
+ * @param {any} n the Studio's notice @param {{ new: number, change: number }} usual
+ */
+function stoppedView(n, usual) {
+  const retry = n?.retry?.request ? n.retry : null;
+  const cost = retry?.kind === "change" ? usual.change : usual.new;
+  /** @type {any[]} */
+  const blocks = [{ text: n?.message ?? "You stopped making this game.", rows: 2 }];
+  if (retry) blocks.push({ text: `Your idea: "${retry.request}"`, color: C.lime, rows: 6 });
+  if (n?.cost_cents != null) blocks.push({ text: `It used ${usedCoins(n.cost_cents)} (${cents(n.cost_cents)}).`, color: C.silver, rows: 2 });
+  return {
+    screen: "board",
+    board: "E14",
+    title: retry ? "Your idea is saved" : "Make a new game",
+    blocks,
+    tiles: [...(retry ? [{ text: "Try again, same idea", note: `about ${cost}`, noteCoin: true, hue: C.green }] : []), { text: "New idea", hue: retry ? C.blue : C.green }],
+    sel: 0,
+    actions: [...(retry ? ["retry-notice"] : []), "new-idea"],
+    retry,
+  };
+}
+
+/**
+ * E13: are you sure? Before a stop, what it used and that the idea is kept; Keep going is lit (D315).
+ * A started session always costs something, so nothing reads as "0 coins" (D305).
+ * @param {{ usedCents: number }} o
+ */
+export function stopConfirmView(o) {
+  const used = usedCoins(Math.max(1, o.usedCents));
+  return {
+    screen: "board",
+    board: "E13",
+    title: "Stop making this game?",
+    blocks: [
+      { text: `Claude stops now. ${used[0].toUpperCase()}${used.slice(1)} used.`, rows: 2, align: "center", after: 4 },
+      { text: "Your idea is saved for next time.", color: C.lime, rows: 2, align: "center" },
+    ],
+    tiles: [
+      { text: "Yes, stop", letter: "A", hue: C.red },
+      { text: "Keep going", letter: "B", hue: C.green },
+    ],
+    sel: 1,
   };
 }
 
