@@ -1961,6 +1961,29 @@ Each step says what Geoff does, what he'll see, and what Claude does from the mi
 - **Proven:** the unit test checks the block. The wired-only rehearsal of a card with the block was stopped while Geoff's flash ran, so it hasn't run yet; it's the next rehearsal. mDNS from the mini can't be shown in QEMU's user-mode network, only on the home network.
 - **flash-day.md** gains "If it doesn't show up on the network", and its adopt line now says what D336 does: one restart of about a minute, with the slot kept only if Wi-Fi and the shelf come back (bring-up F2).
 
+**D395. The Picade keeps a persistent journal, capped at 50 MB, and cloud-init is off after first boot.** *(Claude, from the Picade's first lost Wi-Fi, 2026-11-14; the director's list, items 1 and 4.)*
+- **Why:** Pi OS keeps the journal in memory only (`40-rpi-volatile-storage.conf`), so the boots that lost the Wi-Fi left no evidence. A higher-numbered drop-in, `90-arcade-persistent.conf`, makes it persistent and caps it.
+- **cloud-init:** it only had first boot to do. `/etc/cloud/cloud-init.disabled` stops it from re-rendering the network later, and stops the card's bootcmd from rewriting `cmdline.txt` on FAT at every boot.
+- **Where:** `cabinet/provision/harden.sh` (`step_harden`, called at the end of the Picade profile's `hw_late`). Safe to run again. The Wi-Fi itself is `wifi.sh` (D410-D415).
+- **On the live Picade:** applied by hand on 2026-11-14 with the same settings; `journalctl --list-boots` now lists every boot.
+
+**D396. The Pi's USB-C port is a network port for the mini (Raspberry Pi's rpi-usb-gadget).** *(Geoff through the director, "Yes, set it up", 2026-11-14.)*
+- **What:** `rpi-usb-gadget on` (in the image): g_ether, dwc2 in peripheral mode, and NetworkManager's "USB Gadget (shared)" profile. The Pi is 10.12.194.1, and it serves the mini an address on 10.12.194.0/28.
+- **config.txt:** `dtoverlay=dwc2,dr_mode=peripheral` sits in our block. The copy the tool appends after the block is removed, and the stock `[cm5]` host-mode line stays.
+- **⚠ Power:** USB-C is also the Pi's power input, and the X HAT already powers it. A cable from the mini must go through a VBUS (power) blocker. Not proven over a cable yet: that waits on the adapter. On the live Picade, `usb0` and g_ether came up after a restart.
+
+**D397. Tailscale on the Picade, pinned, with the sign-in left to a person.** *(Geoff, "Allow it", and through the director, "fully manage provisioning on the cabinet", 2026-11-14.)*
+- **What:** Tailscale's own apt repository for trixie. Its key is accepted only with fingerprint `2596A99EAAB33821893C0A79458CA832957F5868`, the version is pinned in `lock.json` (`picade.tailscale_version`, 1.104.7), and `tailscaled` is enabled.
+- **The sign-in:** a human step in flash-day.md §7, `tailscale up --hostname=arcade --ssh=false --accept-dns=false`. No auth key is stored anywhere.
+- **SSH:** the Picade's own key over the tailnet, never Tailscale SSH. MagicDNS stays off on the cabinet, so its own lookups and play never depend on Tailscale.
+- **A failure:** a failed download or install is logged and provisioning goes on. Tailscale is for reaching the cabinet, never for playing (cabinet independence).
+
+**D398. On the cable, DHCP never gives up and IPv6 is link-local; the Wi-Fi country is set once per card.** *(Claude, from the 2026-11-14 recovery over a direct cable.)*
+- **The finding:** on a direct cable from the mini, NetworkManager stopped asking for an address after 45 s and dropped the link-local address with it, so the mini lost its way in.
+- **The card's network-config:** eth0 gets a NetworkManager passthrough, `ipv4.dhcp-timeout: "2147483647"` (forever) and `ipv6.method: "link-local"`. That's the same as the live Picade's `netplan-eth0` after `nmcli con modify`.
+- **The country:** the bootcmd's `do_wifi_country` now runs under `cloud-init-per once`, so it never rewrites `cmdline.txt` again, even if cloud-init is turned back on.
+- **Tested:** unit tests on network-config, the bootcmd, the hardening steps (in a scratch `/etc`), the overlay dedupe and the Tailscale pin and key check. No rehearsal with the new card yet.
+
 ## 2026-11-14 — The Picade's Wi-Fi: always comes back, always findable, fixable from the cabinet (D410-D419, Wi-Fi worker)
 
 Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-cycle on flash day: Wi-Fi must come back by itself, the mini must always find the cabinet, and a lost Wi-Fi must never need a cable or a reflash. The root cause of that drop is D417.

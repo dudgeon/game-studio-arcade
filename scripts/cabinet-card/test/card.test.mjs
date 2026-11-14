@@ -52,7 +52,7 @@ test("network-config holds the WPA key, never the password, and quotes any netwo
   assert.ok(!text.includes("correct horse battery"));
   assert.match(text, /^network:$/m);
   assert.match(text, /renderer: NetworkManager/);
-  assert.match(text, /\n  ethernets:\n    eth0:\n      dhcp4: true\n      optional: true\n  wifis:\n/, "a cable works too, and no boot waits for one (D393)");
+  assert.match(text, /\n  ethernets:\n    eth0:\n      dhcp4: true\n      optional: true\n      networkmanager:\n        passthrough:\n          ipv4.dhcp-timeout: "2147483647"\n          ipv6.method: "link-local"\n  wifis:\n/, "a cable works too, no boot waits for one (D393), and DHCP on it never gives up, with link-local IPv6 (D398)");
   assert.match(text, /regulatory-domain: "US"/);
   const nameLine = text.split("\n").find((l) => l.endsWith(":") && l.trim().startsWith('"'));
   assert.equal(JSON.parse(nameLine.trim().slice(0, -1)), ssid, "the name survives quoting");
@@ -75,6 +75,8 @@ test("user-data makes the admin with the mini's key, plants the seed service, an
   assert.ok(!/(^|\s)(plain_text_passwd|hashed_passwd|passwd|password):/m.test(text), "no password for anyone");
   const bootcmd = lines.slice(lines.indexOf("bootcmd:") + 1, lines.indexOf("runcmd:"));
   assert.ok(bootcmd.some((l) => /systemctl mask systemd-networkd-wait-online\.service; systemctl stop --no-block systemd-networkd-wait-online\.service/.test(l)), "first boot mustn't sit 2 minutes on networkd (D244)");
+  const country = bootcmd.map((l) => JSON.parse(l.replace(/^ {2}- \[sh, -c, /, "").replace(/\]$/, ""))).find((c) => c.includes("do_wifi_country"));
+  assert.equal(country, "cloud-init-per once arcade-wifi-country sh -c 'raspi-config nonint do_wifi_country US || true; rfkill unblock wifi || true'", "the country is set once per card, not on every boot (D398)");
   const runcmd = lines.slice(lines.indexOf("runcmd:") + 1).filter((l) => l.startsWith("  - "));
   assert.equal(runcmd.length, 2);
   const cmd = (l) => JSON.parse(l.replace(/^ {2}- \[sh, -c, /, "").replace(/\]$/, ""));
@@ -207,6 +209,49 @@ test("config.txt: one block of ours under [all], the key map of D82, and the sto
   const stock = fs.readFileSync(path.join(HERE, "fixtures/config.txt"), "utf8").replace("dtoverlay=vc4-kms-v3d\n", "dtoverlay=vc4-kms-v3d,noaudio\n").replace("dtparam=audio=on\n", "dtparam=audio=off\n");
   assert.equal(text.slice(0, text.indexOf("# BEGIN arcade provision")), stock);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("hardening: a capped persistent journal, cloud-init off, each once; the gadget overlay only in our block (D395, D396)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-harden-"));
+  const env = { HARDEN_ETC: dir, HARDEN_TEST: "1" };
+  const first = profileBash("step_journal_persistent; step_cloud_init_off", env);
+  assert.match(first, /journal: persistent, at most 50 MB/);
+  assert.match(first, /cloud-init: off after first boot/);
+  assert.equal(fs.readFileSync(path.join(dir, "systemd/journald.conf.d/90-arcade-persistent.conf"), "utf8"), "[Journal]\nStorage=persistent\nSystemMaxUse=50M\n");
+  assert.ok(fs.existsSync(path.join(dir, "cloud/cloud-init.disabled")));
+  assert.equal(profileBash("step_journal_persistent; step_cloud_init_off", env), "", "running again changes and says nothing");
+  // rpi-usb-gadget appends its overlay after our block; ours keeps the only copy, and the stock host-mode line stays.
+  const cfg = path.join(dir, "config.txt");
+  fs.copyFileSync(path.join(HERE, "fixtures/config.txt"), cfg);
+  fs.appendFileSync(cfg, "[cm5]\ndtoverlay=dwc2,dr_mode=host\n");
+  profileBash(`REBOOT_FLAG=${JSON.stringify(path.join(dir, "reboot"))}; step_config_txt ${JSON.stringify(cfg)}`);
+  fs.appendFileSync(cfg, "dtoverlay=dwc2,dr_mode=peripheral\n");
+  profileBash(`dedupe_gadget_overlay ${JSON.stringify(cfg)}`);
+  const text = fs.readFileSync(cfg, "utf8");
+  assert.equal(text.match(/^dtoverlay=dwc2,dr_mode=peripheral$/gm)?.length, 1);
+  assert.ok(text.indexOf("dtoverlay=dwc2,dr_mode=peripheral") < text.indexOf("# END arcade provision"), "the copy left is ours");
+  assert.match(text, /^dtoverlay=dwc2,dr_mode=host$/m);
+  assert.ok(text.endsWith("# END arcade provision\n"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("Tailscale: the version pinned in lock.json, the key checked by its fingerprint, and no sign-in by script (D397)", () => {
+  const lock = JSON.parse(fs.readFileSync(path.join(REPO, "cabinet/provision/lock.json"), "utf8"));
+  assert.match(lock.picade.tailscale_version, /^\d+\.\d+\.\d+$/);
+  // Already at the pinned version: nothing downloaded or installed, tailscaled enabled.
+  const seen = path.join(os.tmpdir(), `card-tailscale-${process.pid}`);
+  const out = profileBash(`dpkg-query() { echo ${lock.picade.tailscale_version}; }; curl() { echo CURL; }; apt-get() { echo APT; }; systemctl() { echo "systemctl $*" > ${JSON.stringify(seen)}; }; step_tailscale`);
+  assert.doesNotMatch(out, /CURL|APT/);
+  assert.equal(fs.readFileSync(seen, "utf8"), "systemctl enable --now tailscaled\n");
+  fs.rmSync(seen);
+  assert.match(out, new RegExp(`tailscale: ${lock.picade.tailscale_version.replaceAll(".", "\\.")}, tailscaled running`));
+  // A key with another fingerprint: refused, nothing installed.
+  const bad = profileBash(`dpkg-query() { :; }; curl() { :; }; rm() { :; }; gpg() { echo "fpr:::::::::0000000000000000000000000000000000000000:"; }; mv() { echo MV; }; apt-get() { echo APT; }; systemctl() { :; }; step_tailscale`);
+  assert.match(bad, /the signing key isn't Tailscale's/);
+  assert.doesNotMatch(bad, /MV|APT/);
+  const src = fs.readFileSync(path.join(REPO, "cabinet/provision/harden.sh"), "utf8");
+  assert.doesNotMatch(src.split("\n").filter((l) => !l.startsWith("#")).join("\n"), /tailscale up|authkey/, "the sign-in is a person's");
+  assert.match(src, /TAILSCALE_KEY_FPR=2596A99EAAB33821893C0A79458CA832957F5868/);
 });
 
 test("the profile's D82 keys match the runtime's driver keys", async () => {
