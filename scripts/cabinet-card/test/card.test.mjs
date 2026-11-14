@@ -200,7 +200,7 @@ test("config.txt: one block of ours under [all], the key map of D82, and the sto
   assert.equal(lines[0], "[all]", "a later [pi5] or [cm5] section can't swallow our lines");
   assert.ok(lines.indexOf("dtoverlay=picade") < lines.indexOf("dtparam=button1=44"), "dtparam lines after the overlay apply to it");
   const keys = Object.fromEntries(lines.filter((l) => l.startsWith("dtparam=") && l !== "dtparam=audio=off").map((l) => l.slice(8).split("=")));
-  assert.deepEqual(keys, { button1: "44", button2: "45", button3: "46", button4: "47", button5: "16", button6: "18", start: "28", escape: "1", enter: "59", coin: "60" });
+  assert.deepEqual(keys, { button1: "44", button2: "45", button3: "46", button4: "47", button5: "16", button6: "18", start: "28", escape: "1", enter: "183", coin: "60" });
   assert.ok(lines.includes("usb_max_current_enable=1"));
   // Every parameter we set is one the overlay at the pinned commit has (its __overrides__).
   const overrides = ["up", "down", "left", "right", "button1", "button2", "button3", "button4", "button5", "button6", "enter", "escape", "coin", "start"];
@@ -266,8 +266,18 @@ test("the profile's D82 keys match the runtime's driver keys", async () => {
   assert.equal(get("button6"), KEYS.e);
   assert.equal(get("start"), KEYS.start);
   assert.equal(get("escape"), KEYS.esc);
-  assert.equal(get("enter"), KEYS.f1);
+  assert.equal(get("enter"), KEYS.ent);
   assert.equal(get("coin"), KEYS.f2);
+});
+
+test("no key the Picade sends is one Chromium acts on (D433)", () => {
+  const sent = [...profileBash("config_block").matchAll(/^dtparam=\w+=(\d+)$/gm)].map((m) => Number(m[1]));
+  assert.equal(sent.length, 10, "six buttons, 1UP, ESC, ENT and COIN");
+  // F1 Help, F3 find, F5 reload, F6 the address bar, F7 caret browsing, F10 the menu, F11 full screen, F12 DevTools.
+  const chromium = { F1: 59, F3: 61, F5: 63, F6: 64, F7: 65, F10: 68, F11: 87, F12: 88 };
+  // Its other shortcuts all need Ctrl, Alt, Shift or the Super key, or Tab, Backspace or Space.
+  const combos = { ControlLeft: 29, ShiftLeft: 42, ShiftRight: 54, AltLeft: 56, ControlRight: 97, AltRight: 100, MetaLeft: 125, MetaRight: 126, Tab: 15, Backspace: 14, Space: 57 };
+  for (const [name, code] of Object.entries({ ...chromium, ...combos })) assert.ok(!sent.includes(code), `the Picade sends ${name}`);
 });
 
 test("sound goes to the X HAT's DAC by name, and the overlay's keys count as a keyboard (D253)", () => {

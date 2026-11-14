@@ -17,7 +17,7 @@
 //   shot NAME             a 1024x768 PNG, with the fit report beside it
 //   # …                   a comment
 //
-// Keys: up down left right a b x y q e start enter esc star f1 f2 (D82).
+// Keys: up down left right a b x y q e start enter esc star f1 f2 (D82), and ent: the Picade's ENT, F13 (D433).
 //
 //   node scripts/drive.js --script scripts/flows/penguin.drive --out DIR --replay ../../studio-kit/cli/fixtures/penguin-catch
 //   node scripts/drive.js --script FILE --out DIR --url http://127.0.0.1:8330    (a service already running)
@@ -37,7 +37,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const KEYS = {
   up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight",
   a: "KeyZ", b: "KeyX", x: "KeyC", y: "KeyV", q: "KeyQ", e: "KeyE",
-  start: "Enter", enter: "Enter", esc: "Escape", star: "Escape", f1: "F1", f2: "F2", coin: "F2",
+  start: "Enter", enter: "Enter", esc: "Escape", star: "Escape", f1: "F1", ent: "F13", f2: "F2", coin: "F2",
 };
 
 /** @param {string} name */
@@ -45,6 +45,16 @@ const keyOf = (name) => {
   const k = KEYS[name];
   if (!k) throw new Error(`unknown key: ${name}`);
   return k;
+};
+
+/**
+ * A key goes down or up. Playwright's keyboard has no F13 (the Picade's ENT, D433), so the page gets that one
+ * as the same event from a script.
+ * @param {any} page @param {"keydown" | "keyup"} type @param {string} code
+ */
+const key = (page, type, code) => {
+  if (code !== "F13") return type === "keydown" ? page.keyboard.down(code) : page.keyboard.up(code);
+  return page.evaluate(([t, c]) => void dispatchEvent(new KeyboardEvent(t, { code: c, key: c, cancelable: true, bubbles: true })), [type, code]);
 };
 
 /**
@@ -159,23 +169,23 @@ export async function runSteps(o) {
     const args = rest.split(/\s+/);
     switch (verb) {
       case "press":
-        await page.keyboard.down(keyOf(args[0]));
+        await key(page, "keydown", keyOf(args[0]));
         await page.waitForTimeout(Number(args[1] ?? 60));
-        await page.keyboard.up(keyOf(args[0]));
+        await key(page, "keyup", keyOf(args[0]));
         await page.waitForTimeout(30);
         break;
       case "hold":
-        await page.keyboard.down(keyOf(args[0]));
+        await key(page, "keydown", keyOf(args[0]));
         await page.waitForTimeout(Number(args[1]));
-        await page.keyboard.up(keyOf(args[0]));
+        await key(page, "keyup", keyOf(args[0]));
         await page.waitForTimeout(30);
         break;
       case "down":
-        await page.keyboard.down(keyOf(args[0]));
+        await key(page, "keydown", keyOf(args[0]));
         await page.waitForTimeout(30);
         break;
       case "up":
-        await page.keyboard.up(keyOf(args[0]));
+        await key(page, "keyup", keyOf(args[0]));
         await page.waitForTimeout(30);
         break;
       case "type":

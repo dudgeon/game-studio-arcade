@@ -34,7 +34,7 @@ import {
 import { REDIRECT_ACTIONS, redirectBoard } from "./redirect.js";
 import { checksFor, familyOfCart, gameRows } from "./shelf.js";
 import { holdOverlay } from "./wifi.js";
-import { WIFI_HINT, createWifiFlow } from "./wifi-flow.js";
+import { WIFI_HINT, asEnt, createWifiFlow } from "./wifi-flow.js";
 import { openKeys, sayKey } from "./say-keys.js";
 import { listenForVolume } from "./volume.js";
 
@@ -934,14 +934,16 @@ function noteActivity() {
   post("/api/studio/still-here").catch(() => {});
 }
 
-addEventListener("keydown", (e) => {
+addEventListener("keydown", (ev) => {
+  const e = asEnt(ev); // the Picade's ENT (F13) reads as F1 (D433)
   noteActivity();
+  // Before anything else, and during a game too: no key at the cabinet is ever Chromium's (F1 is its Help, D433).
+  e.preventDefault();
   if (view.screen === "play") {
     if (e.code === "Escape" && !e.repeat) endPlay("star");
     else if (playing && !e.repeat && (e.code in STICK || BUTTONS.has(e.code))) playing.sides.add("p1");
     return;
   }
-  e.preventDefault();
   if (!e.repeat) held.add(e.code);
   if (wifiNow.available && wifi.keydown(e, held)) return;
   if (PINKS.has(e.code) && held.has("F1") && !held.has(COIN)) return void (volumeChord = true);
@@ -965,7 +967,8 @@ addEventListener("keydown", (e) => {
   onButton();
 });
 
-addEventListener("keyup", (e) => {
+addEventListener("keyup", (ev) => {
+  const e = asEnt(ev);
   held.delete(e.code);
   if (e.code === "F1" && !volumeChord && view.screen === "say") {
     if (["idle", "silence"].includes(view.phase)) view = { ...typeIt(view), startedTyping: true };

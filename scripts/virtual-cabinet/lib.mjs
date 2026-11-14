@@ -227,4 +227,5 @@ export const KEYS = {
   start: 28, enter: 28,
   esc: 1, star: 1,
   f1: 59, f2: 60,
+  ent: 183, // the Picade's ENT button: F13, since Chromium opens its Help on F1 (D433)
 };

@@ -4,7 +4,14 @@
 // things it's given: how to show a view, how to ask the service, and how to go back to the shelf.
 import { ACTIONS, KEY_COLS, PAGES, PASS_MAX, PASS_MIN } from "./wifi.js";
 
-/** The two utility buttons a grown-up holds together (D413): ENT is F1, COIN is F2 (D82). */
+/**
+ * ENT is F13 on the Picade and F1 on a keyboard (the virtual cabinet, the mini): Chromium opens its Help on F1,
+ * so the cabinet's own button never sends it (D433). The launcher reads either as "F1".
+ * @template {{ code: string, repeat?: boolean, preventDefault?: () => void }} E @param {E} e @returns {E}
+ */
+export const asEnt = (e) => (e.code === "F13" ? /** @type {any} */ ({ code: "F1", key: "F1", repeat: !!e.repeat, preventDefault: () => e.preventDefault?.() }) : e);
+
+/** The two utility buttons a grown-up holds together (D413): ENT is F1 here (asEnt), COIN is F2 (D82). */
 export const HOLD_KEYS = Object.freeze(["F1", "F2"]);
 export const HOLD_MS = 3000;
 /** Left alone this long, the Wi-Fi screens go back to the shelf. */

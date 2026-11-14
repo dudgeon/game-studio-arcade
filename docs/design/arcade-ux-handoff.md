@@ -7,7 +7,7 @@ This file says what each screen shows and does, and the coin rules and their num
 ## 1. Rules that apply everywhere
 
 - The screen is 256 x 192 at 4x (D81, D180). Every string goes through `text.js`, with its fit rules and tests (D181). Copy on the canvas was written to about 40 columns; where it doesn't fit the real font, shorten it rather than shrink it.
-- Controls: the stick chooses; any of the six player buttons (or START) picks what's lit (D182); ESC goes back (D88); F1 (the Picade's ENT) types on talk screens (D184): on a keyboard where there is one, else with the stick on the grid keyboard (D430, D431). **The one exception is the coin check (M3, R3): only COIN starts spending** (D205). COIN is the X HAT's F2 (D82). On the shelf, COIN opens the coin pot (A1).
+- Controls: the stick chooses; any of the six player buttons (or START) picks what's lit (D182); ESC goes back (D88); ENT (F13 on the Picade, F1 on a keyboard; D433) types on talk screens (D184): on a keyboard where there is one, else with the stick on the grid keyboard (D430, D431). **The one exception is the coin check (M3, R3): only COIN starts spending** (D205). COIN is the X HAT's F2 (D82). On the shelf, COIN opens the coin pot (A1).
 - Kid-language only. No "cart", "kit", "session", "tokens" or "spec" on screen (D183, D190).
 - Names, not initials (D87). Disclose AI on the first make screen ("Hi! I'm Claude, an AI.").
 - Every error and edge screen says what happened, that the game or idea is kept, and what it cost. No "Oh no" over hopeful news.

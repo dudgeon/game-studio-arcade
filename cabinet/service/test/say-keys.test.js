@@ -7,7 +7,8 @@ import { Painter, draw } from "../launcher/screens.js";
 import { check } from "../launcher/text.js";
 import "../launcher/boards.js";
 import { PAGES } from "../launcher/wifi.js";
-import { WIFI_KEYS, keyRows, keyboardKey, moveKey, pressKey } from "../launcher/wifi-flow.js";
+import { WIFI_KEYS, asEnt, createWifiFlow, keyRows, keyboardKey, moveKey, pressKey } from "../launcher/wifi-flow.js";
+import { ESCAPE_JS } from "../src/guests.js";
 import { keysFor, nameKeys, openKeys, sayKey, wordKeys } from "../launcher/say-keys.js";
 
 const key = (/** @type {string} */ code, repeat = false) => ({ code, repeat });
@@ -128,4 +129,40 @@ test("the stick's keyboard fits on every talk screen, with the longest words", (
     draw(p, { screen: "say", purpose: "name", phase: "confirm", transcript: "Wwwwwwwwwwwwwwww", confirmTiles, sel: 2 });
     assert.deepEqual(check(p.boxes), []);
   }
+});
+
+test("ENT is F13 on the Picade and reads as F1; F1 never reaches Chromium from a guest's page (D433)", () => {
+  let prevented = 0;
+  const f13 = { code: "F13", repeat: false, preventDefault: () => prevented++ };
+  const e = asEnt(f13);
+  assert.equal(e.code, "F1");
+  e.preventDefault?.();
+  assert.equal(prevented, 1, "stopping it stops the real key");
+  const z = { code: "KeyZ", repeat: false };
+  assert.equal(asEnt(z), z);
+  // ENT and COIN held on the shelf still open the Wi-Fi screens, with the Picade's ENT.
+  let t = 0;
+  /** @type {any} */
+  let view = { screen: "shelf" };
+  const flow = createWifiFlow({ show: (v) => (view = v), view: () => view, get: async () => ({}), post: async () => ({ networks: [], current: null }), exit: () => {}, now: () => t });
+  const held = new Set(["F1", "F2"]); // as app.js holds them, after asEnt
+  assert.equal(flow.keydown(asEnt({ code: "F13", repeat: false }), held), true);
+  t = 3100;
+  flow.frame(held);
+  assert.equal(view.screen, "wifi-list");
+  // The guest bridge: run it against a pretend page, and press the keys.
+  /** @type {Record<string, (e: any) => void>} */
+  const on = {};
+  const posted = [];
+  new Function("addEventListener", "parent", ESCAPE_JS)((/** @type {string} */ type, /** @type {(e: any) => void} */ fn) => (on[type] = fn), { postMessage: (/** @type {any} */ m) => posted.push(m) });
+  const press = (/** @type {string} */ code) => {
+    const ev = { type: "keydown", code, key: code, repeat: false, stopped: false, prevented: false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.stopped = true; } };
+    on.keydown(ev);
+    return ev;
+  };
+  for (const code of ["F1", "F13"]) assert.deepEqual([press(code).prevented, press(code).stopped], [true, true], code);
+  assert.equal(press("KeyZ").prevented, false, "the game's own keys reach it");
+  assert.equal(posted.length, 0);
+  assert.equal(press("Escape").prevented, true);
+  assert.deepEqual(posted, [{ gsa: "star" }]);
 });

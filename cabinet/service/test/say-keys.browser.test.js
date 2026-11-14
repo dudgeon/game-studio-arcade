@@ -54,7 +54,7 @@ async function withPicade(speech, body) {
 const makers = (/** @type {string} */ data) => JSON.parse(fs.readFileSync(path.join(data, "makers.json"), "utf8")).map((/** @type {any} */ m) => m.name);
 
 test("a new maker says their name; misheard, they type it with the stick; an idea can be typed with the stick too", { skip: skip || false, timeout: 300_000 }, async () => {
-  await withPicade("moonshine", async ({ run, L, text, data, problems }) => {
+  await withPicade("moonshine", async ({ page, run, L, text, data, problems }) => {
     // Someone new starts on the mic, not on a typing screen the Picade can't use.
     await run(`
       wait shelf
@@ -123,7 +123,7 @@ test("a new maker says their name; misheard, they type it with the stick; an ide
     await run(`
       press coin
       wait say idle
-      press f1
+      press ent
       wait say keys
       press esc
       wait say idle
@@ -135,6 +135,16 @@ test("a new maker says their name; misheard, they type it with the stick; an ide
       press a
     `);
     assert.equal(await text("keys-field"), "qW");
+    // F1 itself (a keyboard's, or the Manager's) is stopped before Chromium can open its Help page (D433).
+    const stopped = await page.evaluate(() =>
+      ["F1", "F13"].map((code) => {
+        const down = !dispatchEvent(new KeyboardEvent("keydown", { code, key: code, cancelable: true }));
+        dispatchEvent(new KeyboardEvent("keyup", { code, key: code }));
+        return down;
+      }),
+    );
+    assert.deepEqual(stopped, [true, true]);
+    assert.equal(await L("phase"), "keys", "ENT pressed again on the Picade's keyboard changes nothing");
     await run(`
       press start
       wait say confirm
