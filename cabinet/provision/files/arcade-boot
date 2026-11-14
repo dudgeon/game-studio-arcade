@@ -47,17 +47,44 @@ result() { # OK REASON
 }
 
 # The files a slot needs, from where the Pi OS packages put them: the top of the boot partition.
+# What a Pi 5 slot holds: its kernel and initramfs (the Pi 4 ones only if there's no Pi 5 one), the BCM2712 device
+# trees, the overlays and cmdline.txt. About 25 MB on the 2026-10-06 image.
+slot_files() {
+  local f
+  if [ -f "$BOOT_DIR/kernel_2712.img" ]; then echo kernel_2712.img; [ ! -f "$BOOT_DIR/initramfs_2712" ] || echo initramfs_2712
+  else echo kernel8.img; [ ! -f "$BOOT_DIR/initramfs8" ] || echo initramfs8; fi
+  echo cmdline.txt
+  for f in "$BOOT_DIR"/bcm2712*.dtb; do [ -f "$f" ] && basename "$f"; done
+}
+
+# MB a slot needs, with 8 MB to spare.
+slot_need_mb() { echo $(( $( (cd "$BOOT_DIR" && du -mc $(slot_files) overlays | tail -1 | cut -f1) ) + 8 )); }
+
+# Older slots go, so the boot partition doesn't fill: only the one config.txt boots is kept (D336). They're copies
+# of boot files the packages also hold, not anyone's data. The rehearsal's card had 115 MB free, the seed taking 324.
+prune_slots() {
+  local keep d
+  keep="$(committed)"
+  for d in "$BOOT_DIR"/arcade-*/; do
+    [ -d "$d" ] || continue
+    d="$(basename "$d")"
+    [ "$d" = "$keep" ] && continue
+    rm -rf "${BOOT_DIR:?}/$d" && say "removed the old boot slot $d"
+  done
+}
+
+# The files a slot needs, from where the Pi OS packages put them: the top of the boot partition.
 fill_slot() { # DIR
   local d="$1" f
   rm -rf "$d.tmp"; install -d "$d.tmp/overlays"
-  for f in kernel_2712.img kernel8.img initramfs_2712 initramfs8 cmdline.txt; do [ ! -f "$BOOT_DIR/$f" ] || cp "$BOOT_DIR/$f" "$d.tmp/$f"; done
-  cp "$BOOT_DIR"/bcm27*.dtb "$d.tmp/" 2>/dev/null || true
+  for f in $(slot_files); do cp "$BOOT_DIR/$f" "$d.tmp/$f"; done
   cp -R "$BOOT_DIR/overlays/." "$d.tmp/overlays/"
   # With a README there, the firmware loads overlays from this slot, not the shared folder (config_txt docs).
   [ -f "$d.tmp/overlays/README" ] || echo "Overlays for this boot slot (D336)." > "$d.tmp/overlays/README"
   { [ -f "$d.tmp/kernel_2712.img" ] || [ -f "$d.tmp/kernel8.img" ]; } && ls "$d.tmp"/bcm27*.dtb >/dev/null 2>&1 || { rm -rf "$d.tmp"; return 1; }
   sync
   mv "$d.tmp" "$d"
+  sync
 }
 
 cmd_status() {
@@ -78,7 +105,9 @@ cmd_try() {
   [ ! -e "$TRY" ] || stop "a try is already waiting for its restart ($(state_get "$TRY" slot)). Restart the cabinet, or remove $TRY."
   [ ! -e "$STATE/pending" ] || stop "an update is in progress."
   busy="$(busy_reason)"; [ -z "$busy" ] || stop "$busy. Try again when the cabinet is free."
-  [ "$(df -m --output=avail "$BOOT_DIR" | tail -1)" -ge 120 ] || stop "under 120 MB free on the boot partition."
+  prune_slots
+  local need; need="$(slot_need_mb)"
+  [ "$(df -m --output=avail "$BOOT_DIR" | tail -1)" -ge "$need" ] || stop "the boot partition has under the ${need} MB a new slot needs."
   if [ "$packages" = yes ]; then
     [ -n "$(committed)" ] || stop "this cabinet still boots from the top of the boot partition, which the packages overwrite. Run 'arcade-boot try' once first."
     id="$(date -u +%Y%m%d%H%M%S)"

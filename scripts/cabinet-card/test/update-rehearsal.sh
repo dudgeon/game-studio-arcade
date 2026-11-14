@@ -122,7 +122,7 @@ mk() { # VERSION KIND
     service) mkdir -p $d/etc/systemd/system/arcade-launcher.service.d; printf "[Service]\nExecStartPre=/bin/false\n" > $d/etc/systemd/system/arcade-launcher.service.d/zz-rehearsal.conf
       printf "#!/bin/sh\nsystemctl daemon-reload\n" > $d/DEBIAN/postinst; chmod 755 $d/DEBIAN/postinst ;;
     network) mkdir -p $d/etc/NetworkManager/conf.d; printf "[keyfile]\nunmanaged-devices=*\n" > $d/etc/NetworkManager/conf.d/zz-rehearsal.conf
-      printf "#!/bin/sh\nsystemctl restart NetworkManager\n" > $d/DEBIAN/postinst; chmod 755 $d/DEBIAN/postinst ;;
+      printf "#!/bin/sh\nsystemctl restart NetworkManager\nsleep 2\nip link set \$(ip -4 route show default | awk \"{ print \\\$5; exit }\") down\n" > $d/DEBIAN/postinst; chmod 755 $d/DEBIAN/postinst ;;
   esac
   dpkg-deb -b --root-owner-group $d /tmp/rpkg/arcade-rehearsal_$1_all.deb >/dev/null
 }
@@ -136,7 +136,8 @@ update "$REPO" --os; rc=$?
 r="$(last_result)"; s="$(snap)"
 result broken-os-refused '[ "$rc" != 0 ] && echo "$r" | grep -q "OS packages broke"'
 result broken-os-put-back '[ "$(pkg)" = 1.0 ] && [ "$(val "$s" active)" = active ] && ! look "test -e /etc/systemd/system/arcade-launcher.service.d/zz-rehearsal.conf"'
-result broken-os-software-stays '[ "$(val "$s" version)" = "$good" ] && [ "$(val "$s" data)" = "$(val "$start" data)" ]'
+# This checkout's software came with it and came up healthy, so it stays: only the OS packages go back.
+result broken-os-software-stays 'echo "$r" | grep -q "\"version_after\": \"$(val "$s" version)\"" && [ "$(val "$s" active)" = active ] && [ "$(val "$s" data)" = "$(val "$start" data)" ]'
 publish 3.0
 update "$REPO" --os; rc=$?
 sleep 30
