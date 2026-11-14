@@ -28,6 +28,12 @@ VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
 SSH_DIR="${ARCADE_SSH_DIR:-$VM_ROOT/ssh}"
 KEY="$SSH_DIR/${ARCADE_SSH_KEY_NAME:-arcade-virtual_ed25519}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+# D416: the Picade is found by more than its name: picade-connect.sh tries arcade.local, the router's name for it,
+# then the last address that worked. The host key is still checked under its name.
+FIND=()
+if [ "$HOST" = "$(sed -n 's/^PICADE_HOST=//p' "$REPO/scripts/cabinet-card/picade-ssh.sh")" ] && [ -z "${ARCADE_SSH_PORT:-}" ]; then
+  FIND=(-o "ProxyCommand=$REPO/scripts/cabinet-card/picade-connect.sh %h %p")
+fi
 
 # IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.
 # ARCADE_SSH_CONTROL reuses a connection flow.mjs holds open, so a key takes milliseconds.
@@ -40,6 +46,7 @@ cabinet() {
   ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
     -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
+    ${FIND[@]+"${FIND[@]}"} \
     ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} ${ARCADE_SSH_PORT:+-p "$ARCADE_SSH_PORT"} "cabinet@$HOST" "$@" || rc=$?
   [ "$rc" = 142 ] && return 255
   return "$rc"

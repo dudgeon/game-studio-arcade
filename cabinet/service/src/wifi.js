@@ -123,7 +123,8 @@ export function keyfile(o) {
     "",
   ];
   if (o.kind !== "open") lines.push("[wifi-security]", `key-mgmt=${o.kind === "sae" ? "sae" : "wpa-psk"}`, `psk=${keyfileValue(String(o.password))}`, "");
-  lines.push("[ipv4]", "method=auto", "", "[ipv6]", "method=auto", "addr-gen-mode=default", "");
+  // eui64: the link-local address follows the hardware address, so the mini finds the cabinet on a bare cable or a quiet network.
+  lines.push("[ipv4]", "method=auto", "", "[ipv6]", "method=auto", "addr-gen-mode=eui64", "");
   return lines.join("\n");
 }
 

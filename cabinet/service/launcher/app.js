@@ -139,8 +139,14 @@ const showBoard = (v, actions, extra = {}) => show({ ...v, actions, ...extra });
 
 async function showShelf() {
   following = false;
+  const from = view.screen;
+  const fromWifi = wifi.on();
   try {
     await refresh();
+    // A refresh the shelf asked for itself (a Studio event, a guest still being checked) can land after someone has
+    // moved on, to the pot or a game: it mustn't pull them back. The same for the Wi-Fi screens, which a grown-up
+    // can open while ESC from the pot is still on its way to the shelf. Leaving them asks for the shelf itself.
+    if ((from === "shelf" && view.screen !== "shelf") || (wifi.on() && !fromWifi)) return;
     const ended = (studio.results ?? []).map(resultItem); // how makes ended, until someone has seen (D192)
     const games = gameRows(carts, nameOf).map((r) => ({ ...r, hasCard: true }));
     const items = [...makeTiles(), ...ended, ...games, ...guestRows(guests, nameOf)];

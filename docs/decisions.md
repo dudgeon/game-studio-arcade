@@ -1960,3 +1960,61 @@ Each step says what Geoff does, what he'll see, and what Claude does from the mi
 - **What already worked:** every QEMU rehearsal ran wired-only, through NetworkManager's automatic "Wired connection 1" (rehearsal 1 listed it). So a card written before this change, such as Geoff's first, gets the cable fallback the same way. This makes it the card's own request, not a default.
 - **Proven:** the unit test checks the block. The wired-only rehearsal of a card with the block was stopped while Geoff's flash ran, so it hasn't run yet; it's the next rehearsal. mDNS from the mini can't be shown in QEMU's user-mode network, only on the home network.
 - **flash-day.md** gains "If it doesn't show up on the network", and its adopt line now says what D336 does: one restart of about a minute, with the slot kept only if Wi-Fi and the shelf come back (bring-up F2).
+
+## 2026-11-14 — The Picade's Wi-Fi: always comes back, always findable, fixable from the cabinet (D410-D419, Wi-Fi worker)
+
+Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-cycle on flash day: Wi-Fi must come back by itself, the mini must always find the cabinet, and a lost Wi-Fi must never need a cable or a reflash. The root cause of that drop is D417.
+
+**D410. The networks the cabinet knows are files we write ourselves, whole and flushed, in two places.** *(Claude.)*
+- **How it was:** the card's Wi-Fi reaches NetworkManager through cloud-init and netplan (D251). On Raspberry Pi OS trixie, NetworkManager 1.52 is built with netplan support (checked on the virtual cabinet, 2026-11-14): it rewrites that network by itself into `/etc/netplan/90-NM-<uuid>.yaml`, and what it reads at boot is regenerated into `/run` from the YAML. None of those writes are ours, and the only copy of the home Wi-Fi was a file something else rewrites.
+- **Now:** each network is one NetworkManager keyfile, `arcade-wifi-<hash of the name>.nmconnection`, written beside itself, flushed, renamed, and the folder flushed (D371's rule), in:
+  - `/var/lib/arcade-wifi/` (root, 0700): ours; nothing else writes there;
+  - `/etc/NetworkManager/system-connections/`: where NetworkManager reads it. Keyfiles placed there are read as they are (the virtual cabinet's `arcade-mini-link` is one).
+- **The card's network is adopted at provisioning** (`arcade-wifi.js adopt`): its name and key are read from NetworkManager and written as one of ours, at a higher priority. Netplan's copy stays as a second chance. A cabinet flashed before this gets it at its next update.
+- **Nothing is ever forgotten.** A new network is added beside the old ones; the newest that worked has the highest `autoconnect-priority`.
+- The key or password is in those two root-only files and nowhere else: not a log, not the service's data, not the mini.
+
+**D411. Every network: join by itself, retry for ever, no power saving; the country set.** *(Director's brief; Claude, from NetworkManager's own docs, checked 2026-11-14.)*
+- `/etc/NetworkManager/conf.d/arcade-wifi.conf`: `[main] autoconnect-retries-default=0` (NetworkManager otherwise gives up on a network after 4 tries; 0 is for ever) and `[connection-arcade-wifi] wifi.powersave=2` (2 is "disable"). Our own keyfiles say the same themselves (`autoconnect-retries=0`, `powersave=2`), so they don't depend on the drop-in.
+- **The country** is the card's `regulatory-domain` (D251), kept in `/etc/arcade/wifi-country` at provisioning. The watch (D412) sets it again with `iw reg set` whenever it finds the radio off or blocked.
+- **Found while reading the image:** the card's `bootcmd` runs `raspi-config nonint do_wifi_country` at every boot (cloud-init's bootcmd is per boot), and that command rewrites `/boot/firmware/cmdline.txt` in place each time. A power cut during that rewrite could damage the file the Pi boots from. The line is in `scripts/cabinet-card/lib.mjs`, the card worker's: proposed to them, to run once per card (`cloud-init-per once`) now that the watch covers the radio. Not changed here.
+
+**D412. A watch on the cabinet brings a lost Wi-Fi back: `arcade-wifi-watch.service`.** *(Claude.)* Root, every 15 s, restarted for ever, and it never restarts the cabinet:
+- puts back any of our networks missing from NetworkManager's folder, or different there (an empty file after a power cut), and reloads them;
+- switches the radio on and unblocks it (rfkill) if it's off, with the country;
+- with a saved network and no Wi-Fi: after 30 s, looks for networks and connects, every minute; after 3 min, restarts wpa_supplicant and NetworkManager; after 5 min, reloads the Wi-Fi chip's driver (`brcmfmac`); then one of those two every 10 min, for ever;
+- never restarts NetworkManager while a cable carries the cabinet, which would cut a grown-up's session;
+- says each change in the journal, and leaves `/run/arcade-wifi/status.json` (connected, name, signal, address) for the service.
+- Games play on through all of it: nothing here is in the play path.
+
+**D413. The way in to the Wi-Fi screens: hold ENT and COIN together for 3 seconds on the shelf.** *(Geoff, 2026-11-14, from the mock-up: "i accept this rec".)*
+- Nothing on screen says so while the Wi-Fi works. While it's down, the shelf's bottom line says "No Wi-Fi. Grown-up: hold ENT and COIN".
+- It works on the shelf (and the pot, which COIN opens), with the Wi-Fi up or down; never in a game or a make. A bar fills while both are held; letting go early, or pressing anything else, does nothing. ENT with a pink button is the volume's (D421).
+- It isn't a lock, by design: the screens can only add a network (D410), so the worst a curious kid can do is join another one.
+- The other options shown and not chosen: a "Fix the Wi-Fi" row only while the Wi-Fi is down; a stick pattern kept in the Manager.
+
+**D414. The Wi-Fi screens: pick a network, type its password with the stick, join, see how it went.** *(Geoff picked the grid keyboard, 2026-11-14: "accept"; Claude.)*
+- **W1, the list:** what the cabinet can hear, strongest first, with signal bars and a padlock; the one it's on says "on now", ones it knows say "saved". "Look again" rescans. Networks that hide their name, and ones that ask for a username (802.1X), aren't offered.
+- **W2, the keyboard:** a 10 by 4 grid in three pages (abc, ABC, symbols: every character a Wi-Fi password may hold), and a row of space, delete, show/hide and JOIN. A types the lit key, B deletes, X changes page, 1UP joins. The password shows as typed unless hidden. JOIN lights at 8 characters.
+- **W3, W4:** joining (up to 45 s), then "On Wi-Fi" with the signal, the address and name the mini finds it by, and whether Claude can be reached; or "That didn't work", why, and that the cabinet is back on the Wi-Fi it had. A failed join keeps nothing.
+- A saved or open network joins with no typing. ESC goes back a screen; left alone for 2 minutes, it returns to the shelf.
+- **How it's built:** the kiosk's user still has no sudo. Root's helper (`cabinet/service/bin/arcade-wifi.js`, logic in `src/wifi.js`) answers one request per connection on `/run/arcade-wifi.sock`, which systemd owns and only the `arcade` group may open. The service's `/api/wifi`, `/api/wifi/scan` and `/api/wifi/join` are on its loopback port like the rest. `--wifi-demo` gives the service a pretend Wi-Fi, so the screens run on the mini and the virtual cabinet, which have none.
+
+**D415. "No Wi-Fi" means no Wi-Fi.** *(Claude.)* The shelf's "No Wi-Fi" was really "can't look up api.anthropic.com", so a router with no internet, or a DNS fault, sent a grown-up after the wrong problem. Where the cabinet has the helper, the shelf now says "No internet" when it's joined to Wi-Fi and Claude can't be reached, and "No Wi-Fi" only for a real drop.
+
+**D416. The mini finds the Picade three ways: its name, the router's name for it, the last address that worked.** *(Director's brief; Claude.)*
+- `scripts/cabinet-card/picade-connect.sh` is SSH's ProxyCommand for the Picade. It tries `arcade.local` (mDNS, avahi on the cabinet), then `arcade.lan` and `arcade` (the router's DHCP name), then the address in `~/game-studio-data/cabinets/arcade/last-address`, which it rewrites whenever a name answers.
+- SSH still checks the host key under the name `arcade.local` however it connected, so a different machine on an old address is refused.
+- `cabinet/vm/drive` and the Cabinet Manager use it whenever the host is the Picade's, so the update, connect, driver-keyboard and twin scripts all get it. `picade-connect.sh --where` prints the address and how it was found.
+- Not done: sweeping the network for the Pi when all three fail. The cabinet's own Wi-Fi screen shows its address (D414).
+
+**D417. Why the Picade lost its Wi-Fi on flash day: not proven. What was ruled out, and what the evidence fits.** *(The card worker's capture over a direct cable, 2026-11-14 09:32; the Wi-Fi worker's reading.)*
+- **What happened:** first boot and its one restart were on Wi-Fi (`Dudginsen`, 192.168.86.123, `arcade.local` resolving). After Geoff power-cycled it to fix the joystick plug, the shelf said "No Wi-Fi" at every start, a clean restart included, and the mini's pings failed.
+- **Ruled out, by looking:**
+  - a lost or damaged network: `/etc/netplan/90-NM-*.yaml` was whole and parsed, with the key;
+  - a cut-off update: the OS update never started (a game was being played), and `dpkg --audit` was clean;
+  - the radio blocked or no country: rfkill clear, `iw reg` US, the kernel command line carrying it.
+- **What was seen:** with the cable in, the next boot joined the Wi-Fi by itself 3 s after NetworkManager started, on 5 GHz channel 149 at 63%, while two 2.4 GHz nodes of the mesh were at 89% and 74%. The chip's power saving was on. The journal was volatile, so the failing boots left no record.
+- **What that fits (a reading, not a finding):** NetworkManager's default is 4 tries per network, then nothing for 5 minutes. A mesh that steers a client by refusing it, or a weak basement link, can use those 4 tries in the first seconds of a boot. Every look at the screen in the next 5 minutes says "No Wi-Fi". The fixes for that case are D411 (retry for ever, no power saving) and D412 (a nudge every minute, and it says what it did).
+- **So the next one can be named:** the card worker makes the journal persistent; the watch logs every Wi-Fi change as `arcade-wifi ...`; the shelf tells "No Wi-Fi" from "No internet" (D415).
+- **Also found, not the cause:** NetworkManager rewrote the 90-NM YAML at 09:31:32, that boot. It rewrites the only copy of the home Wi-Fi at every start, which is the exposure D410 closes.
