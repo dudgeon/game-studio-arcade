@@ -1739,13 +1739,30 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
 - The repo root is a one-plugin marketplace (`.claude-plugin/marketplace.json`). `claude plugin validate` passes on both.
 - **Installing into Geoff's Claude Code is his call** (the director's brief). The command is in `game-studio/README.md`.
 
-**D348. get_activity carries the kids' words into a desktop session.** *(Claude; for Geoff to see.)*
-- §9.2's `get_activity` returns what the logs hold, including a kid's request and answers, so Claude can build on what they asked for at the cabinet. Heavy fields (usage, tokens, the spec diff) are left out.
-- That puts the kids' words into Geoff's Claude Code session, on his account. The Manager only shows them in his browser.
-- The tool's description and the skill both say never to copy them into the repo or a file.
-- If Geoff would rather a desktop session never saw them, `get_activity` can drop `request`, `turns` and `said`, and keep the rest.
+**D348. get_activity leaves the kids' words out unless asked for.** *(Director, 2026-11-13, on Claude's note; Claude's mechanics.)*
+- §9.2's `get_activity` returns what the logs hold, with the heavy fields (usage, tokens, the spec diff) left out.
+- **By default it leaves out the kids' own words:**
+  - a cabinet session's `request`;
+  - every `said`: question answers, plan changes, you-check notes, screened words;
+  - screening's `alternative`, `hits` and `why`.
+- What stays is who, when, which game, each question and its A/B options, the choice letter, outcomes and the gate. A desktop session's `request` stays: it's Geoff's summary.
+- `include_words: true` brings the words back, and the result says `words: "included"` or `"left out"`. The tool's description says to ask Geoff first.
+- Why: those words would otherwise land in Geoff's Claude Code session, on his account, while the Manager only shows them in his browser. The skill and the tool still say never to copy them into the repo.
 
-**D349. What's proven, and what isn't.** *(Claude, 2026-11-13.)* See the task note and `game-studio/README.md` for the runs.
+**D349. What's proven, and what isn't.** *(Claude, 2026-11-13.)*
+- **Against the virtual cabinet** (release `0.1.0-f8e4d956bc61`, the director's turn): real Claude Code with the plugin (`claude -p --plugin-dir`, `ARCADE_CABINET=virtual`) ran the flow over the Manager's SSH and token, in 16 turns for $0.84 of Geoff's Claude Code usage:
+  - pulled Tester's `bee-buzz` into a folder;
+  - changed the spec first (a new R8 for one more life, A1, a v2 Changelog line), then `game.js` and `checks.js`;
+  - `validate_cart` and `playtest` passed;
+  - `play` returned its URL;
+  - `publish_cart` made `bee-buzz-v2`: version 2, parent `bee-buzz@1`, family and branch `bee-buzz`, `origin: desktop`, with geoff, library commit `2709923a`. The cabinet's gate passed it in 9.2 s in its own Chromium.
+  - `launch_on_cabinet` was accepted, and `arcade-screenshot` showed G0, "Bee Buzz, by Tester".
+- **Before that, on a local copy of the service** with the real gate: the same flow on `penguin-catch`, in 16 turns for $0.47.
+- **Tests:** the cabinet side's `test/arcade-mcp.test.js`, the plugin's `game-studio/test/`, and the Manager's desktop row. `claude plugin validate` passes for the plugin and the marketplace.
+- **Not proven:**
+  - With a kid at the desk, interactively. That's §14's first joint game with Owen.
+  - On the Picade, which isn't built.
+  - The plugin installed from the marketplace rather than `--plugin-dir`. That's Geoff's install.
 
 ## 2026-11-13 — The twin as the Picade's backup (D350–D359)
 

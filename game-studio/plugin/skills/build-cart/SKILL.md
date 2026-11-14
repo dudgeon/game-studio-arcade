@@ -26,6 +26,6 @@ Two tool sets:
 ## House rules
 
 - **Inspired-by only.** Never copy a real game's name, characters, art, music, levels or look. A falling-blocks game is fine; it isn't called Tetris and doesn't look like it.
-- **The kids' words stay on the cabinet.** `get_activity` shows what they said at the cabinet. Use it to help, and never copy it into a repo, a commit or a file outside the cart.
+- **The kids' words stay on the cabinet.** `get_activity` leaves out what they said there unless you pass `include_words`. Ask Geoff before you do, and never copy their words into a repo, a commit or a file outside the cart.
 - **Never delete.** Don't delete cart folders or versions, here or on the cabinet. Make a new folder instead.
 - **The cabinet is the kids'.** Publish and launch only when Geoff says to.

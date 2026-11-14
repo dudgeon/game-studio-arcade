@@ -172,6 +172,29 @@ const slim = (r) => {
   return { ...rest, playtest: local ? { local } : null, spec_diff_lines: typeof spec_diff === "string" ? spec_diff.split("\n").length : null };
 };
 
+/** Where a kid's own words are in the logs: what they said and typed, and what screening offered back (D348). */
+const WORD_KEYS = new Set(["said", "alternative", "hits"]);
+/**
+ * A record without the kids' own words (D348). A desktop session's summary is Geoff's, so it stays.
+ * @param {any} r
+ * @returns {any}
+ */
+export function withoutWords(r) {
+  const strip = (/** @type {any} */ v) => {
+    if (Array.isArray(v)) return v.map(strip);
+    if (!v || typeof v !== "object") return v;
+    return Object.fromEntries(
+      Object.entries(v)
+        .filter(([k]) => !WORD_KEYS.has(k))
+        .map(([k, x]) => [k, strip(x)]),
+    );
+  };
+  const out = strip(r);
+  if (r.type === "studio_session" && r.origin !== "desktop") delete out.request;
+  if (r.type === "screening") delete out.why;
+  return out;
+}
+
 /**
  * @param {{
  *   paths: { root: string, carts: string, logs: string, sessions: string },
@@ -288,7 +311,7 @@ export function createArcadeMcp(o) {
     },
     {
       name: "get_activity",
-      description: `Read the cabinet's logs, newest first: ${ACTIVITY_TYPES.join(", ")}. Filter by type, cart_id (also matches a session's cart and a play's cart), maker, or since (an ISO time). These hold the kids' own words: use them to help, and never copy them into the repo.`,
+      description: `Read the cabinet's logs, newest first: ${ACTIVITY_TYPES.join(", ")}. Filter by type, cart_id (also matches a session's cart and a play's cart), maker, or since (an ISO time). The kids' own words (what they asked for, said and typed at the cabinet) are left out unless include_words is true: ask Geoff before including them, and never copy them into the repo.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -297,6 +320,7 @@ export function createArcadeMcp(o) {
           maker: { type: "string" },
           since: { type: "string", description: "ISO 8601 time" },
           limit: { type: "integer", minimum: 1, maximum: 200, description: "default 40" },
+          include_words: { type: "boolean", description: "include the kids' own words: requests, answers, typed text; default false" },
         },
         additionalProperties: false,
       },
@@ -312,7 +336,9 @@ export function createArcadeMcp(o) {
         if (a.maker) rows = rows.filter((r) => r.maker === a.maker || r.with === a.maker || r.who === a.maker);
         if (since != null) rows = rows.filter((r) => Date.parse(when(r) ?? "") >= since);
         rows.sort((x, y) => String(when(y) ?? "").localeCompare(String(when(x) ?? "")));
-        return { count: rows.length, records: rows.slice(0, limit).map(slim) };
+        const records = rows.slice(0, limit).map(slim);
+        const words = a.include_words === true;
+        return { count: rows.length, words: words ? "included" : "left out", records: words ? records : records.map(withoutWords) };
       },
     },
     {

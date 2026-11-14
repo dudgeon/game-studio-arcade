@@ -270,6 +270,17 @@ test("a make a restart cut off is one row, with its final outcome and a restart 
   assert.deepEqual([a.makes.find((m) => m.id === "s3").outcome, a.makes.find((m) => m.id === "s3").restarted], ["service_restarted", true]);
 });
 
+test("a desktop publish is its own kind of row: origin desktop, no coins, its gate (D343, D345)", () => {
+  const a = activity({
+    studio_session: [{ id: "desk_1", origin: "desktop", maker: "alina", with: "geoff", request: "Faster fish.", summary: "Faster fish.", kind: "change", parent: "penguin-catch@1", turns: [], ended_by: "published", list_cost: null, outcome: "committed", cart_id: "penguin-catch-v2", cart_version: 2, started_at: "2026-11-13T20:00:00Z", playtest: { local: { ok: true, gate: { ok: true, seconds: 6.1, failing: [] } } } }],
+  });
+  const m = a.makes[0];
+  assert.deepEqual([m.origin, m.kind, m.cents, m.coins, m.charged, m.said, m.answers.length], ["desktop", "change", null, null, false, "Faster fish.", 0]);
+  assert.ok(m.gate);
+  const page = fs.readFileSync(new URL("../page/app.js", import.meta.url), "utf8");
+  assert.match(page, /made at the desk/);
+});
+
 test("times are shown in the house's time zone: the mini's, or MANAGER_TZ (D283)", async () => {
   const was = process.env.MANAGER_TZ;
   try {
