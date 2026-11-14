@@ -316,6 +316,90 @@ $("#games").addEventListener("click", async (e) => {
 });
 $("#gamesreload").addEventListener("click", loadGames);
 
+// ---- Health, the speaker, restart and switch off (D365-D367) ----
+const ago = (s) => (s == null ? "?" : s < 3600 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} days`);
+async function loadHealth() {
+  $("#healthnote").textContent = "Asking the cabinet…";
+  try {
+    const { health: h, warnings, checked_at } = await api("GET", "/health");
+    $("#healthnote").textContent = `Checked ${when(checked_at)}.`;
+    $("#healthwarn").innerHTML = warnings.length
+      ? warnings.map((w) => `<p class="hw ${w.level}">${esc(w.text)}</p>`).join("")
+      : `<p class="hw ok">Nothing to worry about.</p>`;
+    const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
+    const disk = (d) => (d ? `${(d.free_mb / 1024).toFixed(1)} GB free of ${(d.total_mb / 1024).toFixed(1)} GB (${d.free_pct}%)` : "—");
+    $("#healthcard").innerHTML = `<table class="kv">${[
+      row("CPU", h.cpu_temp_c == null ? "<span class=hint>no temperature here (a VM)</span>" : `${h.cpu_temp_c.toFixed(1)} °C`),
+      row("Throttling", h.throttled == null ? "<span class=hint>no answer here (a VM)</span>" : h.throttled.now.length ? `<span class=bad>now: ${esc(h.throttled.now.join(", "))}</span>` : h.throttled.since_boot.length ? `since it started: ${esc(h.throttled.since_boot.join(", "))}` : "none"),
+      row("Wi-Fi", h.wifi ? `${esc(h.wifi.ssid)}: ${esc(h.wifi.signal)}%${h.wifi.dbm != null ? ` (${esc(h.wifi.dbm)} dBm)` : ""}, ${esc(h.wifi.band ?? "?")}` : "<span class=hint>not on Wi-Fi (the virtual cabinet uses the mini's network)</span>"),
+      row("Disk", disk(h.disk?.root)),
+      row("Boot partition", disk(h.disk?.boot)),
+      row("Up for", ago(h.uptime_s)),
+      row("Software", `${esc(h.version ?? "?")}${h.release && h.release !== h.version ? ` <span class=hint>(${esc(h.release)})</span>` : ""}, ${esc(h.profile ?? "?")} profile`),
+      row("Services", Object.entries(h.services ?? {}).map(([s, v]) => `${esc(s)}: ${v === "active" ? "running" : `<span class=bad>${esc(v)}</span>`}`).join(" · ")),
+    ].join("")}</table>`;
+    $("#journal").textContent = h.journal?.length ? h.journal.join("\n") : "None lately.";
+  } catch (e) {
+    $("#healthnote").innerHTML = `<span class=bad>${esc(e.message)}</span>`;
+  }
+  try {
+    const v = await api("GET", "/volume");
+    const s = $("#volume");
+    if (!v.speaker) {
+      s.disabled = true;
+      $("#volumeval").textContent = "no speaker";
+      $("#volumenote").textContent = cabinet === "virtual" ? "The virtual cabinet has no sound card." : "No speaker found: is the X HAT's sound card up?";
+    } else {
+      s.disabled = false;
+      s.value = String(v.percent ?? 0);
+      volumeShown(v.percent);
+    }
+  } catch (e) {
+    $("#volumenote").innerHTML = `<span class=bad>${esc(e.message)}</span>`;
+  }
+}
+function volumeShown(p) {
+  $("#volumeval").textContent = p == null ? "—" : `${p}%`;
+  $("#volumenote").innerHTML = p > 80 ? `<span class=warnt>Loud: Pimoroni warns 100% is a bit much for the Picade's speaker.</span> Kept across restarts.` : "Kept across restarts. Pimoroni warns 100% is a bit much.";
+}
+$("#volume").addEventListener("input", (e) => volumeShown(Number(e.target.value)));
+$("#volume").addEventListener("change", async (e) => {
+  try {
+    const v = await api("POST", "/volume", { percent: Number(e.target.value) });
+    volumeShown(v.percent);
+  } catch (err) {
+    $("#volumenote").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
+  }
+});
+const POWER = {
+  "restart-shelf": { ask: "Restart the shelf? The screen goes dark for about 10 seconds.", yes: "Restart the shelf" },
+  reboot: { ask: "Restart the cabinet? It's back on the shelf in about a minute.", yes: "Restart the cabinet" },
+  poweroff: { ask: "Switch the cabinet off?", yes: "Switch off" },
+};
+$("#power").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const box = $("#powerconfirm");
+  if (b.dataset.power) {
+    const p = POWER[b.dataset.power];
+    const back = b.dataset.power === "poweroff" ? (cabinet === "virtual" ? " It comes back only with scripts/virtual-cabinet/up.sh on the mini." : " It comes back only with its power switch, at the cabinet.") : "";
+    box.hidden = false;
+    box.innerHTML = `${esc(p.ask + back)} <button class="danger" data-go="${b.dataset.power}">${esc(p.yes)}</button> <button data-go="">Cancel</button>`;
+    return;
+  }
+  if (b.dataset.go === undefined) return;
+  box.hidden = true;
+  if (!b.dataset.go) return;
+  $("#powermsg").textContent = "Asking the cabinet…";
+  try {
+    await api("POST", "/power", { action: b.dataset.go, confirm: true });
+    $("#powermsg").textContent = { "restart-shelf": "The shelf is restarting.", reboot: "The cabinet is restarting.", poweroff: "The cabinet is switching off." }[b.dataset.go];
+  } catch (err) {
+    $("#powermsg").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
+  }
+});
+$("#healthreload").addEventListener("click", loadHealth);
+
 // ---- Views and the cabinet picker (D286) ----
 function show(v) {
   view = v;
@@ -325,6 +409,7 @@ function show(v) {
   if (v === "coins") loadPot();
   if (v === "software") loadSoftware();
   if (v === "games") loadGames();
+  if (v === "health") { $("#powerconfirm").hidden = true; $("#powermsg").textContent = ""; loadHealth(); }
   try { localStorage.setItem("gsa-view", v); } catch {}
 }
 for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => show(b.dataset.view));

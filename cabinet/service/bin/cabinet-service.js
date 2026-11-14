@@ -235,7 +235,8 @@ const s = await startService({
   cabinet,
   // The Cabinet Manager's pairing token (D205, D208). None: the Manager endpoints are off.
   // D215: or the pairing file beside the config, made on the cabinet by scripts/coin.mjs pair, read on each request.
-  managerToken: values["manager-token"] ?? config.manager_token ?? (values.config ? tokenFile(path.join(path.dirname(values.config), "manager-token")) : null),
+  // D369: a cabinet with no config yet (a new Picade plays offline, D252) still takes the pairing in /etc/arcade.
+  managerToken: values["manager-token"] ?? config.manager_token ?? tokenFile(values.config ? path.join(path.dirname(values.config), "manager-token") : "/etc/arcade/manager-token"),
   players: config.players,
   consoleName: config.console_name,
   examples: values.examples,

@@ -13,6 +13,9 @@
 //   GET  /api/c/NAME/pot           the pot; POST …/pot/topup {coins, reason, confirm?}; POST …/pot/reset {reason}; POST …/pair (D284)
 //   GET  /api/c/NAME/games         every game, on the shelf or off; POST …/games/remove {id, reason?} and …/games/restore {id} (D364)
 //   GET  /api/c/NAME/makers        every maker; POST …/makers/hide {id, reason?} and …/makers/show {id}
+//   GET  /api/c/NAME/health        temperature, throttling, Wi-Fi, disk, uptime, version, recent service errors, warnings (D365)
+//   GET  /api/c/NAME/volume        the speaker; POST {percent} sets it, kept across restarts (D366)
+//   POST /api/c/NAME/power         {action: restart-shelf|reboot|poweroff, confirm: true}; refused while busy (D367)
 //   GET  /api/c/NAME/update        the cabinet's software version, this checkout's, and the last update's output (D338)
 //   POST /api/c/NAME/update        {os}: update the cabinet from this checkout, as update-cabinet.mjs does (D330, D338)
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -23,6 +26,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { activity } from "./activity.mjs";
+import { warnings as healthWarnings } from "./health.mjs";
 import { backupHealth, readBackupRecord } from "./backup.mjs";
 import { Cabinet, CONFIG_DIR, loadCabinets } from "./cabinet.mjs";
 import { CONTROLS, toLinux } from "./keys.mjs";
@@ -297,11 +301,32 @@ export function createManager(o) {
           return json(res, 200, check(await c.service("POST", "/api/manager/pot/reset", { reason, by })));
         }
       }
+      // Health and controls (D365-D367).
+      if (req.method === "GET" && rest === "/health") {
+        const h = await c.health();
+        return json(res, 200, { health: h, warnings: healthWarnings(h), checked_at: new Date().toISOString() });
+      }
+      if (rest === "/volume") {
+        if (req.method === "GET") return json(res, 200, await c.act("volume"));
+        const b = await readJson(req);
+        const n = Number(b.percent);
+        if (!Number.isInteger(n) || n < 0 || n > 100) return json(res, 400, { error: "volume is a whole number, 0 to 100" });
+        return json(res, 200, await c.act("volume", n));
+      }
+      if (req.method === "POST" && rest === "/power") {
+        const b = await readJson(req);
+        if (!["restart-shelf", "reboot", "poweroff"].includes(b.action)) return json(res, 400, { error: "action is restart-shelf, reboot or poweroff" });
+        // One confirm, on the page: the request has to say it was confirmed.
+        if (b.confirm !== true) return json(res, 400, { error: "not confirmed" });
+        const r = await c.act(b.action);
+        if (r.ok && (b.action === "reboot" || b.action === "poweroff")) c.close();
+        return json(res, r.ok ? 200 : 409, r.ok ? r : { error: r.why ?? "refused" });
+      }
       // Games and makers, off the shelf and back (D360-D364). The cabinet keeps the marks; the Manager only asks.
       if (rest === "/games" || rest.startsWith("/games/") || rest === "/makers" || rest.startsWith("/makers/")) {
         const check = (/** @type {{status: number, body: any}} */ r) => {
           if (r.status === 200) return r.body;
-          throw Object.assign(new Error(typeof r.body === "object" ? r.body.error : String(r.body)), { status: r.status === 401 ? 409 : r.status === 404 && /no such endpoint|keeps no shelf marks/.test(String(r.body?.error)) ? 501 : r.status });
+          throw Object.assign(new Error(typeof r.body === "object" ? r.body.error : String(r.body)), { status: r.status === 401 ? 409 : r.status === 404 && /no such endpoint|keeps no shelf marks/.test(String(r.body?.error)) ? 501 : r.status === 405 && /method not allowed/.test(String(r.body?.error)) ? 501 : r.status });
         };
         if (req.method === "GET" && rest === "/games") return json(res, 200, check(await c.service("GET", "/api/manager/games")));
         if (req.method === "GET" && rest === "/makers") return json(res, 200, check(await c.service("GET", "/api/manager/makers")));

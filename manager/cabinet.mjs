@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "../scripts/cabinet-card/picade.mjs";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 const run = promisify(execFile);
 const HOME = os.homedir();
@@ -17,6 +18,8 @@ export const DATA_DIR = path.join(HOME, "game-studio-data");
 const CABINET_TOKEN = "/etc/arcade/manager-token";
 const SERVICE_PORT = 8330;
 const LOGS = "/var/lib/arcade/logs";
+const REMOTE_HEALTH = path.join(path.dirname(fileURLToPath(import.meta.url)), "remote", "health.py");
+const REMOTE_CONTROL = path.join(path.dirname(fileURLToPath(import.meta.url)), "remote", "control.sh");
 
 /**
  * @typedef {{ name: string, label: string, host: string, key: string, knownHosts: string, tokenFile: string, user?: string }} CabinetConfig
@@ -237,6 +240,29 @@ export class Cabinet {
     const st = fs.statSync(f);
     if (st.mode & 0o077) throw new Error(`${f} can be read by others; chmod 600 it`);
     return fs.readFileSync(f, "utf8").trim();
+  }
+
+  /** The cabinet's health (D365): remote/health.py, sent and run as root; it only reads. */
+  async health() {
+    const out = String(await this.exec("sudo -n python3 -", { input: fs.readFileSync(REMOTE_HEALTH, "utf8"), timeout: 30000 }));
+    return JSON.parse(out.trim().split("\n").at(-1) ?? "{}");
+  }
+
+  /**
+   * One of the cabinet's controls (D366, D367): remote/control.sh, sent and run as root.
+   * @param {"volume" | "busy" | "restart-shelf" | "reboot" | "poweroff"} action @param {number} [value]
+   */
+  async act(action, value) {
+    const args = value === undefined ? action : `${action} ${Math.round(value)}`;
+    let out;
+    try {
+      out = String(await this.exec(`sudo -n bash -s -- ${args}`, { input: fs.readFileSync(REMOTE_CONTROL, "utf8"), timeout: 60000 }));
+    } catch (e) {
+      // A cabinet restarting can drop the connection as it answers.
+      if ((action === "reboot" || action === "poweroff") && /** @type {any} */ (e).code === 255) return { ok: true, done: action, dropped: true };
+      throw e;
+    }
+    return JSON.parse(out.trim().split("\n").at(-1) ?? "{}");
   }
 
   /** Make the cabinet's token if it has none, and keep a copy here (as coin.mjs pair, D208). */

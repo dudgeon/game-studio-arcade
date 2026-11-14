@@ -8,6 +8,8 @@
 #   scripts/manager.sh url       the link that opens it in a browser, with the Manager key (D285). Once per browser.
 #
 # Its log: ~/game-studio-data/manager/manager.log. It keeps nothing else on the mini (D283).
+# With the launchd agent installed (scripts/manager-launchd/install.sh, D368), launchd keeps it on: start and stop
+# say so, and restart asks launchd to restart it.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,6 +23,9 @@ NODE="$(command -v node || true)"
 mkdir -p "$DIR"
 
 running() { [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
+LABEL=com.game-studio-arcade.manager
+agent() { launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; }
+agent_pid() { launchctl print "gui/$(id -u)/$LABEL" 2>/dev/null | sed -n 's/^[[:space:]]*pid = \([0-9]*\).*/\1/p' | head -1; }
 
 addrs() {
   local a
@@ -33,6 +38,7 @@ addrs() {
 
 case "${1:-}" in
   start)
+    if agent; then echo "launchd keeps the Manager on (pid $(agent_pid)); nothing to start."; exit 0; fi
     if running; then echo "The Manager is already running (pid $(cat "$PIDF"))."; exit 0; fi
     nohup "$NODE" "$REPO/manager/server.mjs" --port "$PORT" >> "$LOG" 2>&1 < /dev/null &
     echo $! > "$PIDF"
@@ -45,11 +51,17 @@ case "${1:-}" in
     echo "First time in a browser? Run: scripts/manager.sh url"
     ;;
   stop)
+    if agent; then echo "launchd keeps the Manager on; to stop it for good: scripts/manager-launchd/uninstall.sh" >&2; exit 1; fi
     if running; then kill "$(cat "$PIDF")"; rm -f "$PIDF"; echo "Stopped."; else echo "Not running."; fi
     ;;
-  restart) "$0" stop; "$0" start ;;
+  restart)
+    if agent; then launchctl kickstart -k "gui/$(id -u)/$LABEL" && echo "Restarted by launchd."; exit 0; fi
+    "$0" stop; "$0" start ;;
   status)
-    if running; then
+    if agent; then
+      echo "Running under launchd (pid $(agent_pid)), always on, on port $PORT:"
+      addrs | sed "s|^|  http://|; s|$|:$PORT/|"
+    elif running; then
       echo "Running (pid $(cat "$PIDF")) on port $PORT:"
       addrs | sed "s|^|  http://|; s|$|:$PORT/|"
     else

@@ -16,6 +16,7 @@
     <button data-view="activity">Activity</button>
     <button data-view="coins">Coins</button>
     <button data-view="games">Games</button>
+    <button data-view="health">Health</button>
     <button data-view="software">Software</button>
   </nav>
 </header>
@@ -97,6 +98,26 @@
     <table id="makerlist"></table>
     <h2>History</h2>
     <table id="shelfhistory"></table>
+  </section>
+
+  <section id="health" class="view">
+    <div class="bar"><button id="healthreload">Check again</button><span id="healthnote" class="hint"></span></div>
+    <div id="healthwarn"></div>
+    <div id="healthcard" class="card"></div>
+    <div class="card" id="speaker">
+      <h2>Speaker</h2>
+      <label class="slider">Volume <input id="volume" type="range" min="0" max="100" step="5" disabled> <span id="volumeval">—</span></label>
+      <p id="volumenote" class="hint">Kept across restarts. Pimoroni warns 100% is a bit much.</p>
+    </div>
+    <div class="card" id="power">
+      <h2>Restart and switch off</h2>
+      <p class="hint">Each asks once, and the cabinet refuses while a game is being played or a game is being made.</p>
+      <div class="powerrow"><button data-power="restart-shelf">Restart the shelf</button><button data-power="reboot">Restart the cabinet</button><button data-power="poweroff">Switch off</button></div>
+      <p id="powerconfirm" hidden></p>
+      <p id="powermsg" class="hint"></p>
+    </div>
+    <h2>Recent service warnings</h2>
+    <pre id="journal" class="journal">—</pre>
   </section>
 
   <section id="software" class="view">
