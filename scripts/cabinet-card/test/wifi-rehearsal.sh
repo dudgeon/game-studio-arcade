@@ -86,8 +86,9 @@ grep -q "wlan0:wifi" "$OUT/setup.log" || { echo "no simulated Wi-Fi device: is m
 echo "=== card: the first network through netplan, then adopted"
 psk="$("$N" -e 'console.log(require("crypto").pbkdf2Sync(process.argv[1], process.argv[2], 4096, 32, "sha1").toString("hex"))' "$HOME_PASS" "$HOME_SSID")"
 printf 'network:\n  version: 2\n  renderer: NetworkManager\n  wifis:\n    wlan0:\n      dhcp4: true\n      optional: true\n      regulatory-domain: "US"\n      access-points:\n        "%s":\n          password: "%s"\n' "$HOME_SSID" "$psk" > "$OUT/netplan.yaml"
-# In place of the rehearsal card's own stand-in network, which names a network that isn't there.
-"$D" ssh "sudo rm -f /etc/netplan/*.yaml; sudo tee /etc/netplan/50-cloud-init.yaml >/dev/null; sudo chmod 600 /etc/netplan/50-cloud-init.yaml; sudo netplan apply 2>&1 | grep -v 'too open' | grep -v '^\$'" < "$OUT/netplan.yaml"
+# A new card: in place of the rehearsal card's own stand-in network (which names a network that isn't there), and
+# with nothing of ours kept from an earlier run of this script.
+"$D" ssh "sudo rm -f /etc/netplan/*.yaml /var/lib/arcade-wifi/arcade-wifi-* /etc/NetworkManager/system-connections/arcade-wifi-*; sudo tee /etc/netplan/50-cloud-init.yaml >/dev/null; sudo chmod 600 /etc/netplan/50-cloud-init.yaml; sudo netplan apply 2>&1 | grep -v 'too open' | grep -v '^\$'" < "$OUT/netplan.yaml"
 t="$(until_wifi "netplan-wlan0-" 90)" && step card ok "joined through netplan in $t s" || step card fail "netplan's network didn't join"
 home_id="arcade-wifi-$("$N" -e 'console.log(require("crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "$HOME_SSID")"
 adopted="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js adopt 2>&1 | tail -1; sudo ls /var/lib/arcade-wifi /etc/NetworkManager/system-connections | grep -c $home_id; nmcli -t -f NAME,FILENAME connection show | grep -c '^$home_id:/etc/NetworkManager/system-connections/'")"
