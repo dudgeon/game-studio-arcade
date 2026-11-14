@@ -1022,6 +1022,7 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
   - The shelf takes his name from the version's `guest.json`, so his row reads "by Geoff" whether or not he's in `makers.json`.
   - The entry is there so the logs can name him.
 - Playing a guest stays free: no coins, no Studio session.
+- **Note, 2026-11-14 (director's ask): a kid maker from the mini, too.** `node scripts/maker.mjs add Alina` adds a regular kid maker: the same entry the cabinet's "Someone new" makes (D87), from the cabinet's own new-name slot, after checking the Manager's token. It's for a kid's game made on the mini (desktop-initiated) while the cabinet's name screen can't be used. A name already there is left as is. `--cabinet real` (or `ARCADE_CABINET=real`) reaches the Picade with its own key and token, as the Manager does (D369), for `list` and `add-grown-up` too. Alina was added on the Picade this way, so her game reads "by Alina" and she's on its "Who's making?" list like any kid.
 
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
 - **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.

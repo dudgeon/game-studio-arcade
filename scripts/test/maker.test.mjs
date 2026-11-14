@@ -60,6 +60,33 @@ test("maker: add a grown-up once; the kids' list doesn't offer them; a cabinet n
   }
 });
 
+test("maker: add a kid from the mini, as 'Someone new' would; once; a grown-up's name is left as is (D236)", async () => {
+  const c = await cabinet();
+  try {
+    assert.equal(await c.run(["add", "owen"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Added Owen \(owen\) as a maker, as "Someone new" at the cabinet would/);
+    const all = JSON.parse(fs.readFileSync(c.file, "utf8"));
+    assert.deepEqual(all.map((/** @type {any} */ m) => [m.id, m.name, m.guest, m.grown_up ?? false]), [["alina", "Alina", true, false], ["owen", "Owen", true, false]]);
+    // The kids' list offers them, as any kid.
+    assert.deepEqual((await (await fetch(`${c.s.url}/api/makers`)).json()).makers.map((/** @type {any} */ m) => m.id).sort(), ["alina", "owen"]);
+    assert.equal(await c.run(["add", "Owen"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Owen \(owen\) is already a maker, added at the cabinet\. Left as is\./);
+    assert.equal(JSON.parse(fs.readFileSync(c.file, "utf8")).length, 2);
+    await c.run(["add-grown-up", "Geoff"]);
+    assert.equal(await c.run(["add", "Geoff"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Geoff \(geoff\) is already a maker, a grown-up\. Left as is\./);
+    assert.equal(JSON.parse(fs.readFileSync(c.file, "utf8")).find((/** @type {any} */ m) => m.id === "geoff").grown_up, true);
+    // The token is needed first: a wrong one adds nobody.
+    const wrong = path.join(c.root, "wrong-token");
+    fs.writeFileSync(wrong, `${"c".repeat(64)}\n`, { mode: 0o600 });
+    await assert.rejects(c.run(["add", "Zoe"], wrong), /401/);
+    assert.ok(!JSON.parse(fs.readFileSync(c.file, "utf8")).some((/** @type {any} */ m) => m.id === "zoe"));
+    await assert.rejects(c.run(["add"]), /needs a first name/);
+  } finally {
+    await c.s.close();
+  }
+});
+
 test("maker: the Manager's token is needed, and a name is needed", async () => {
   const c = await cabinet();
   try {
