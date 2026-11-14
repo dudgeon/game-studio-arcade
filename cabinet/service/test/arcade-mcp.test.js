@@ -246,6 +246,23 @@ test("get_activity and cabinet_status", async () => {
   assert.equal(plays.count, 1);
   assert.equal((await call("get_activity", { since: "2099-01-01T00:00:00Z" })).structuredContent.count, 0);
   assert.equal((await call("get_activity", { since: "soon" })).isError, true);
+  // D348: a kid's words are left out unless asked for; a desktop summary (Geoff's) stays.
+  const kid = { type: "studio_session", id: "sesn_k", origin: "cabinet", maker: "alina", request: "a penguin that eats tacos", turns: [{ question: "Fast or slow?", option_a: "Fast", option_b: "Slow", choice: "C", said: "super duper fast" }], plan_turns: [{ choice: "change", said: "more tacos" }], started_at: "2026-11-13T09:00:00Z", outcome: "committed" };
+  fs.appendFileSync(path.join(paths.logs, "studio_session.jsonl"), JSON.stringify(kid) + "\n");
+  fs.appendFileSync(path.join(paths.logs, "screening.jsonl"), JSON.stringify({ at: "2026-11-13T09:01:00Z", kind: "new", maker: "owen", said: "rude words", outcome: "redirected", alternative: "funny words", why: "it said rude words" }) + "\n");
+  fs.appendFileSync(path.join(paths.logs, "you_check.jsonl"), JSON.stringify({ cart_id: "penguin-catch", answered_at: "2026-11-13T09:02:00Z", answers: [{ rule: "R12", text: "The penguin looks happy", answer: "no", said: "he looks grumpy" }] }) + "\n");
+  const plain = (await call("get_activity")).structuredContent;
+  assert.equal(plain.words, "left out");
+  const text = JSON.stringify(plain.records);
+  for (const w of ["tacos", "super duper", "rude words", "funny words", "grumpy"]) assert.ok(!text.includes(w), `"${w}" left out`);
+  const kidRow = plain.records.find((/** @type {any} */ r) => r.id === "sesn_k");
+  assert.equal(kidRow.turns[0].choice, "C", "what was chosen stays");
+  assert.equal(kidRow.request, undefined);
+  assert.equal(plain.records.find((/** @type {any} */ r) => r.type === "you_check").answers[0].answer, "no");
+  assert.equal(plain.records.find((/** @type {any} */ r) => r.type === "studio_session" && r.origin === "desktop").request, "One.", "Geoff's desktop summary stays");
+  const full = (await call("get_activity", { include_words: true })).structuredContent;
+  assert.equal(full.words, "included");
+  assert.ok(JSON.stringify(full.records).includes("super duper fast"));
   const st = (await call("cabinet_status")).structuredContent;
   assert.equal(st.online, true);
   assert.equal(st.release, "test");
