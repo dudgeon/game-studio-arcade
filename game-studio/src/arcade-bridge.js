@@ -157,7 +157,11 @@ export function createBridge(linkOrMaker) {
         const parent = rest.parent ?? pulled?.id ?? undefined;
         const { files, skipped } = packFolder(abs);
         const r = await remote("publish_cart", { ...rest, ...(parent ? { parent } : {}), bundle: { files } });
-        if (r.structuredContent) Object.assign(r.structuredContent, parent && !rest.parent ? { parent_from_folder: true } : {}, skipped.length ? { not_sent: skipped } : {});
+        if (r.structuredContent) {
+          Object.assign(r.structuredContent, parent && !rest.parent ? { parent_from_folder: true } : {}, skipped.length ? { not_sent: skipped } : {});
+          // The text copy says the same (the spec's backward-compatible copy); a refusal keeps its own words.
+          if (!r.isError) r.content = [{ type: "text", text: JSON.stringify(r.structuredContent, null, 2) }];
+        }
         return r;
       }
       return remote(def.name, args);
