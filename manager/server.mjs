@@ -11,6 +11,8 @@
 //   POST /api/c/NAME/keys          {how: "down"|"up", codes: [KeyboardEvent.code], viewer} (D282)
 //   GET  /api/c/NAME/activity      makes, plays, screened requests, coin entries (D283)
 //   GET  /api/c/NAME/pot           the pot; POST …/pot/topup {coins, reason, confirm?}; POST …/pot/reset {reason}; POST …/pair (D284)
+//   GET  /api/c/NAME/games         every game, on the shelf or off; POST …/games/remove {id, reason?} and …/games/restore {id} (D364)
+//   GET  /api/c/NAME/makers        every maker; POST …/makers/hide {id, reason?} and …/makers/show {id}
 //   GET  /api/c/NAME/update        the cabinet's software version, this checkout's, and the last update's output (D338)
 //   POST /api/c/NAME/update        {os}: update the cabinet from this checkout, as update-cabinet.mjs does (D330, D338)
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -293,6 +295,23 @@ export function createManager(o) {
           const reason = String(b.reason ?? "").trim();
           if (!reason) return json(res, 400, { error: "a reset needs a reason, which the kids see" });
           return json(res, 200, check(await c.service("POST", "/api/manager/pot/reset", { reason, by })));
+        }
+      }
+      // Games and makers, off the shelf and back (D360-D364). The cabinet keeps the marks; the Manager only asks.
+      if (rest === "/games" || rest.startsWith("/games/") || rest === "/makers" || rest.startsWith("/makers/")) {
+        const check = (/** @type {{status: number, body: any}} */ r) => {
+          if (r.status === 200) return r.body;
+          throw Object.assign(new Error(typeof r.body === "object" ? r.body.error : String(r.body)), { status: r.status === 401 ? 409 : r.status === 404 && /no such endpoint|keeps no shelf marks/.test(String(r.body?.error)) ? 501 : r.status });
+        };
+        if (req.method === "GET" && rest === "/games") return json(res, 200, check(await c.service("GET", "/api/manager/games")));
+        if (req.method === "GET" && rest === "/makers") return json(res, 200, check(await c.service("GET", "/api/manager/makers")));
+        const SHELF = new Set(["/games/remove", "/games/restore", "/makers/hide", "/makers/show"]);
+        if (req.method === "POST" && SHELF.has(rest)) {
+          const b = await readJson(req);
+          const id = String(b.id ?? "");
+          if (!/^[a-z0-9][a-z0-9_-]{0,99}$/.test(id)) return json(res, 400, { error: "which one? give its id" });
+          const reason = String(b.reason ?? "").trim().slice(0, 300);
+          return json(res, 200, check(await c.service("POST", `/api/manager${rest}`, { id, reason, by: `${os.userInfo().username}, in the Manager` })));
         }
       }
       return json(res, 404, { error: "no such page" });

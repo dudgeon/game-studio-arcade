@@ -59,6 +59,7 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .tag { font-size: 12px; padding: 1px 8px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
 .tag.ok { color: var(--good); border-color: var(--good); }
 .tag.no { color: var(--bad); border-color: var(--bad); }
+button.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
 table { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--panel); }
 th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; }

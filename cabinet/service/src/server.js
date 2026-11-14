@@ -32,6 +32,10 @@
 //   POST /api/manager/pot/reset  {reason, by?}
 //   GET  /api/manager/makers     every maker, grown-ups included (D236)
 //   POST /api/manager/makers/grown-up  {name}: add a grown-up maker; one already there is left as is
+//   GET  /api/manager/games      every game line, on the shelf or off, and the marks' history (D361)
+//   POST /api/manager/games/remove   {id, reason?, by?}: off the shelf, kept in the records (D360)
+//   POST /api/manager/games/restore  {id, by?}: back on the shelf
+//   POST /api/manager/makers/hide    {id, reason?, by?}: off "Who's making?" (D363); /makers/show puts it back
 //   The arcade MCP server, for desktop Claude Code through the game-studio plugin (D340-D346), with the Manager's token:
 //   POST /mcp                    JSON-RPC (src/arcade-mcp.js)
 //   GET  /api/arcade/launch      the launcher listens here for launch_on_cabinet (D344), as server-sent events
@@ -46,6 +50,9 @@ import { timingSafeEqual } from "node:crypto";
 import { StudioBusy, StudioGone, StudioRefused } from "./studio.js";
 import { PotError } from "./pot.js";
 import { serveMcpHttp } from "./arcade-mcp.js";
+import { listCarts, readCart } from "@game-studio-arcade/player/src/library.js";
+import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
+import { gameLines } from "./shelf-marks.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -98,6 +105,7 @@ function readJson(req) {
  *   gateBusy?: () => boolean,
  *   mcp?: ReturnType<typeof import("./arcade-mcp.js").createArcadeMcp> | null,
  *   launches?: ReturnType<typeof import("./arcade-mcp.js").launchRelay> | null,
+ *   marks?: ReturnType<typeof import("./shelf-marks.js").shelfMarks> | null,
  * }} o
  */
 export function createServiceHandler(o) {
@@ -110,6 +118,7 @@ export function createServiceHandler(o) {
     checker: null,
     checkerFromBody: true,
     checksForMadeOnly: true, // D193
+    hideCart: (c) => Boolean(o.marks?.cartOff(c)), // D361
   });
 
   /** @param {http.ServerResponse} res @param {number} status @param {unknown} body */
@@ -152,6 +161,9 @@ export function createServiceHandler(o) {
       const request = typeof body.request === "string" ? body.request.trim() : "";
       if (!request || request.length > MAX_WORDS) throw new HttpError(400, "the request must be some words");
       const parent = typeof body.parent === "string" && body.parent ? body.parent : null;
+      // A game off the shelf can't be changed from the cabinet (D361); the launcher no longer offers it.
+      const parentCart = parent && o.marks ? readCart(o.libraryDir, parent.replace(/@\d+$/, "")) : null;
+      if (parentCart && o.marks?.cartOff(parentCart)) throw new HttpError(409, "that game is off the shelf");
       const screened = await o.screen?.check({ text: request, kind: parent ? "change" : "new", maker: maker.id, offered: body.offered === true });
       if (screened && !screened.ok) return json(res, 200, { ok: false, why: "redirect", redirect: screened });
       o.studio.start({ maker: maker.id, request, parent });
@@ -244,7 +256,11 @@ export function createServiceHandler(o) {
   const manager = async (req, res, pathname, url) => {
     managerOk(req);
     // Makers, grown-ups included (D236): a grown-up is added only here, by a grown-up's command, never by the service itself.
-    if (req.method === "GET" && pathname === "/api/manager/makers") return json(res, 200, { makers: o.makers.read() });
+    if (req.method === "GET" && pathname === "/api/manager/makers") {
+      const off = o.marks?.off("maker") ?? new Map();
+      return json(res, 200, { makers: o.makers.read().map((m) => ({ ...m, on_list: !off.has(m.id) && !m.hidden && !m.grown_up, off: off.get(m.id) ?? null })) });
+    }
+    if (pathname.startsWith("/api/manager/games") || pathname === "/api/manager/makers/hide" || pathname === "/api/manager/makers/show") return shelf(req, res, pathname);
     if (req.method === "POST" && pathname === "/api/manager/makers/grown-up") {
       const body = await readJson(req);
       const before = o.makers.read().length;
@@ -264,6 +280,31 @@ export function createServiceHandler(o) {
       return json(res, 200, { ok: true, entry, warning: preview.over_limit ? `This month could now spend $${(preview.month_total_cents / 100).toFixed(2)}, past the workspace's $${(preview.workspace_limit_cents / 100).toFixed(2)} limit.` : null });
     }
     if (pathname === "/api/manager/pot/reset") return json(res, 200, { ok: true, entry: o.pot.reset({ reason: body.reason, by }) });
+    throw new HttpError(404, "no such endpoint");
+  };
+
+  /** Off the shelf and back (D360-D363). @param {http.IncomingMessage} req @param {http.ServerResponse} res @param {string} pathname */
+  const shelf = async (req, res, pathname) => {
+    const marks = o.marks;
+    if (!marks) throw new HttpError(404, "this cabinet keeps no shelf marks");
+    const carts = () => listCarts([{ root: o.libraryDir, source: "library" }]);
+    const games = () => gameLines(carts(), marks, { plays: readLog(path.join(o.logsDir, "play.jsonl")), makerName: (id) => o.makers.get(id)?.name ?? null });
+    if (req.method === "GET" && pathname === "/api/manager/games") return json(res, 200, { games: games(), history: marks.all().slice(-200).reverse() });
+    if (req.method !== "POST") throw new HttpError(405, "method not allowed");
+    const body = await readJson(req);
+    const id = String(body.id ?? "");
+    const by = typeof body.by === "string" ? body.by.slice(0, 60) : null;
+    const reason = typeof body.reason === "string" ? body.reason : "";
+    if (pathname === "/api/manager/games/remove" || pathname === "/api/manager/games/restore") {
+      if (!games().some((g) => g.id === id)) throw new HttpError(404, `no game "${id}" on this cabinet`);
+      const r = marks.mark({ kind: "game", target: id, action: pathname.endsWith("remove") ? "remove" : "restore", by, via: "manager", reason });
+      return json(res, 200, { ok: true, ...r, game: games().find((g) => g.id === id) });
+    }
+    if (pathname === "/api/manager/makers/hide" || pathname === "/api/manager/makers/show") {
+      if (!o.makers.get(id)) throw new HttpError(404, `no maker "${id}" on this cabinet`);
+      const r = marks.mark({ kind: "maker", target: id, action: pathname.endsWith("hide") ? "remove" : "restore", by, via: "manager", reason });
+      return json(res, 200, { ok: true, ...r });
+    }
     throw new HttpError(404, "no such endpoint");
   };
 
@@ -296,7 +337,8 @@ export function createServiceHandler(o) {
     if (!OURS.has(pathname)) return player(req, res);
     if (req.method === "GET") {
       if (pathname === "/api/config") return json(res, 200, { console: o.consoleName ?? "Quarter Deck", players: o.players ?? 1, speech: o.speech.kind });
-      if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list() });
+      // The list "Who's making?" offers, and every maker's name for the shelf's "by …", hidden ones too (D363).
+      if (pathname === "/api/makers") return json(res, 200, { makers: o.makers.list().filter((m) => !o.marks?.makerOff(m.id)), names: Object.fromEntries(o.makers.read().map((m) => [m.id, m.name])) });
       if (pathname === "/api/pot") return json(res, 200, potView(60));
       if (pathname === "/api/boot") return json(res, 200, o.cabinet?.boot() ?? { intro: false, new_month: false });
       if (pathname === "/api/studio") return json(res, 200, o.studio.state());

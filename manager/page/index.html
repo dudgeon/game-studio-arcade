@@ -15,6 +15,7 @@
     <button data-view="screen" class="on">Screen</button>
     <button data-view="activity">Activity</button>
     <button data-view="coins">Coins</button>
+    <button data-view="games">Games</button>
     <button data-view="software">Software</button>
   </nav>
 </header>
@@ -85,6 +86,17 @@
     <p id="coinmsg" class="hint"></p>
     <h2>Coin history</h2>
     <table id="ledger"></table>
+  </section>
+
+  <section id="games" class="view">
+    <div class="bar"><button id="gamesreload">Refresh</button><span id="gamesnote" class="hint"></span></div>
+    <p class="hint">Remove from shelf hides a game, with every version of it, from the kids on this cabinet. Nothing is erased: it stays in the records, the activity log and the backup, and Put back returns it as it was. A kid's own version of it stays unless you remove that too.</p>
+    <table id="gamelist"></table>
+    <h2>Makers on "Who's making?"</h2>
+    <p class="hint">Hiding a name takes it off the kids' list. Their games stay on the shelf.</p>
+    <table id="makerlist"></table>
+    <h2>History</h2>
+    <table id="shelfhistory"></table>
   </section>
 
   <section id="software" class="view">

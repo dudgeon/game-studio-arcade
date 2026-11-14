@@ -151,8 +151,19 @@ Desktop Claude Code on the mini reaches the cabinet through the `game-studio` pl
 | `launch_on_cabinet` | the game's G0 board, only from the shelf; refused while a make is running or a game is being played (D344) |
 | `get_activity` | the logs, newest first, filtered by type, cart, maker or time |
 | `cabinet_status` | online, release, profile, what's running, the gate |
+| `remove_from_shelf` | `{id, reason?, by?}`: the game's whole line off the kids' shelf, kept in the records (D360-D362) |
+| `restore_to_shelf` | `{id, reason?, by?}`: back on the shelf |
 
 The launcher listens on `GET /api/arcade/launch` and answers on `POST /api/arcade/launch/answer`. Tests: `test/arcade-mcp.test.js`.
+
+## Off the shelf, kept in the records (D360-D363)
+
+A grown-up takes a game, with every version of it, off the kids' shelf, or a maker's name off "Who's making?", from the Cabinet Manager's Games page or the MCP tools. Nothing is erased (D5). The mark is a line in `logs/shelf_marks.jsonl` (`src/shelf-marks.js`): the last line for a game or maker wins, and no file means nothing is off. The cart's files and library history are never touched, so the records, the activity log, the twin and the backup keep the game, and Put back restores it as it was.
+
+- **Left out:** `/api/carts` (so the shelf, "change this game" and the best scores), and `/api/makers`. A change of a game that's off is refused (409).
+- **Kept:** the files and git history, every log, the Manager's activity, `list_carts` (with `off_shelf`), and the twin sync and backup (it's a log, D291).
+- **A kid's version** of a removed game is its own line and stays. The shelf then shows it as its own game, no longer indented (the launcher's `families()` takes the oldest line left as the family's main row).
+- Manager endpoints: `GET /api/manager/games`, `POST /api/manager/games/remove|restore`, `POST /api/manager/makers/hide|show`. Tests: `test/shelf-marks.test.js`.
 
 ## What's stubbed or not here
 
