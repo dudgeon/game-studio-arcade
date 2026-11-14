@@ -737,10 +737,7 @@ function onBoard(v, action) {
       });
     }
     case "retry-notice":
-      if (v.noticeId) {
-        post("/api/studio/notice-seen", { id: v.noticeId }).catch(() => {});
-        studio = { ...studio, notice: undefined };
-      }
+    // Not marked seen: backing out of the coin check keeps the idea on Make, and a make that starts clears it (D316).
     // falls through: the same retry as E3's
     case "retry": {
       leaveResult();
