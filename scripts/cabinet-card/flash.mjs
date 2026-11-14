@@ -13,6 +13,10 @@
 //
 //   node scripts/cabinet-card/flash.mjs --list          the disks it could write, and why the others are refused
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
+//   node scripts/cabinet-card/flash.mjs --check         what the flash gathers, checked against the virtual cabinet; writes nothing
+//
+// The Wi-Fi is asked for, unless ~/.config/game-studio-arcade/wifi.json exists: {"ssid": "...", "password": "..."}
+// (or "psk"), mode 0600, owned by you (D327).
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
 // --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
@@ -42,7 +46,7 @@ import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/l
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
 import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
-import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
+import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, wifiFromFile, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../..");
@@ -137,6 +141,27 @@ function ask(prompt, { secret = false } = {}) {
 function keyFor(ssid, pass) {
   const psk = wifiPsk(ssid, pass);
   return flag("--wpa3") ? pass : psk;
+}
+
+/** An optional Wi-Fi file on the mini (D327); GSA_WIFI_FILE moves it, for tests. */
+const WIFI_FILE = process.env.GSA_WIFI_FILE || join(homedir(), ".config/game-studio-arcade/wifi.json");
+function wifiFromConfig() {
+  let w;
+  try {
+    w = wifiFromFile(WIFI_FILE, { uid: process.getuid?.() ?? -1, stat: (f) => statSync(f), read: (f) => readFileSync(f, "utf8") });
+  } catch (e) {
+    stop(`the Wi-Fi file: ${/** @type {Error} */ (e).message}`);
+  }
+  if (flag("--wpa3")) stop("--wpa3 needs the password typed: the Wi-Fi file holds only its WPA key. Move the file aside for this flash.");
+  say(`Wi-Fi: "${w.ssid}", from ${WIFI_FILE}`);
+  return w;
+}
+
+/** The Wi-Fi: stdin for an image file with no terminal (tests), else the file if there is one, else asked. */
+function wifiNow() {
+  if (!opt("--disk") && !process.stdin.isTTY) return wifiFromStdin();
+  if (existsSync(WIFI_FILE)) return wifiFromConfig();
+  return wifiFromTerminal();
 }
 
 function wifiFromTerminal() {
@@ -343,8 +368,58 @@ async function writeBoot(mount, seedDir, cloud) {
 
 // ---- Main ----
 
+/**
+ * D328: the flash's gather steps against the live virtual cabinet, writing nothing anywhere and printing no secret.
+ * The Groq key: exit code and shape only. The twin: what seed() checks first (replay data, a make running), read
+ * with the helper's read-only info and manifest, never seed() itself, which records the seed on the twin.
+ */
+async function check() {
+  let ok = true;
+  const line = (good, what) => {
+    console.log(`  ${good ? "ok  " : "NO  "} ${what}`);
+    if (!good) ok = false;
+  };
+  console.log("Checking what the flash will gather (nothing is written):");
+  if (existsSync(WIFI_FILE)) {
+    try {
+      const w = wifiFromFile(WIFI_FILE, { uid: process.getuid?.() ?? -1, stat: (f) => statSync(f), read: (f) => readFileSync(f, "utf8") });
+      line(true, `Wi-Fi: "${w.ssid}" from ${WIFI_FILE}`);
+    } catch (e) {
+      line(false, `Wi-Fi file: ${/** @type {Error} */ (e).message}`);
+    }
+  } else line(true, "Wi-Fi: asked at the flash (no Wi-Fi file)");
+  try {
+    const key = await groqFromVirtual({ drive: join(REPO, "cabinet/vm/drive") });
+    line(/^gsk_[A-Za-z0-9_]+$/.test(key), "Groq key: the virtual cabinet answered with a key-shaped value (not shown)");
+  } catch (e) {
+    line(false, `Groq key: ${/** @type {Error} */ (e).message}`);
+  }
+  try {
+    const twin = cabinetEnd(undefined);
+    const ti = twin.call("info");
+    const tm = twin.call("manifest");
+    const files = Object.keys(tm.files);
+    const carts = new Set(files.map((r) => r.match(/^carts\/([^/.][^/]*)\/cart\.json$/)?.[1]).filter(Boolean));
+    line(!ti.replay.length, ti.replay.length ? `twin data: replay data (${ti.replay.join(", ")}) can't go to a live cabinet` : "twin data: no replay data");
+    line(!ti.makeInFlight, ti.makeInFlight ? "twin data: a make is running or still to be collected on the virtual cabinet; flash once it's done" : "twin data: no make running");
+    line(files.length > 0, `twin data: ${files.length} files to copy, ${carts.size} games, release ${ti.release}`);
+  } catch (e) {
+    line(false, `twin data: ${/** @type {Error} */ (e).message}`);
+  }
+  for (const p of [lock.image, lock.node]) {
+    const f = join(DL, p.name);
+    const here = existsSync(f);
+    const match = here && (await sha256File(f)) === p.sha256;
+    line(!here || match, !here ? `${p.name}: not downloaded yet (the flash fetches it)` : match ? `${p.name}: here, SHA-256 matches its pin` : `${p.name}: here, but its SHA-256 doesn't match the pin (the flash fetches it again)`);
+  }
+  console.log("  --   the Picade's identity: asked at the flash (its key from the Console); not checked here, as it needs that key and applies the Studio agent");
+  console.log(ok ? "Ready to flash." : "Not ready: see the NO lines.");
+  process.exitCode = ok ? 0 : 1;
+}
+
 async function main() {
   if (flag("--list")) return listDisks();
+  if (flag("--check")) return check();
   const diskId = opt("--disk");
   const imageFile = opt("--image-file");
   if (!!diskId === !!imageFile) stop("name one target: --disk diskN (a card), or --image-file PATH. --list shows the disks.");
@@ -375,7 +450,7 @@ async function main() {
   }
 
   // 2. Wi-Fi, in memory only.
-  const wifi = diskId || process.stdin.isTTY ? wifiFromTerminal() : wifiFromStdin();
+  const wifi = wifiNow();
 
   // 3. What makes the cabinet ready the moment it's switched on (D320-D323): its own identity and the Groq key.
   // Gathered before the card is touched, so a stop here leaves the card as it was. In memory only.

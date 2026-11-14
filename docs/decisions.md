@@ -1503,3 +1503,19 @@ Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD car
 - A real `ant apply` into `cabinet-picade`, and a real make. Those need the real key, which is Geoff's.
 - Groq's answer from the Picade, which needs a mic and a real key.
 - Everything on the hardware (D253, D257).
+
+**D327. The Wi-Fi can come from a file on the mini.** *(Director's call, 2026-11-13: fewer prompts at the flash; the erase phrase stays.)*
+- `flash.mjs` asks for the Wi-Fi as before. But if `~/.config/game-studio-arcade/wifi.json` exists, it uses that instead and says which network. The file is `{"ssid": "...", "password": "..."}`, or `"psk"` with the 64-hex WPA key.
+- The file must be a plain file owned by Geoff with mode 0600, or the flash stops and says why (`chmod 600`). Its errors never quote it.
+- `--wpa3` needs the password typed, since the file may hold only the key.
+- Nothing writes the file: it's Geoff's to make if he wants it.
+- So at the flash Geoff types the erase phrase, the Picade's key and the mini's sudo password (D323), plus the Wi-Fi only when there's no file.
+
+**D328. `flash.mjs --check`: the gather steps, writing nothing.** *(Director's ask, 2026-11-13.)* Against the live virtual cabinet it checks:
+- the Wi-Fi file, if there is one;
+- the Groq key's exit code and shape (the key is never shown, saved or logged);
+- the twin data, using the helper's read-only `info` and `manifest` (not `seed()`, which records the seed on the twin): no replay data, no make running, files to copy;
+- the pinned image and Node tarball against their hashes.
+
+The Picade's identity isn't checked, because that needs Geoff's key and applies the agent.
+- **Run on 2026-11-13 after the virtual cabinet's update:** exit 0 and "Ready to flash". The Groq key was key-shaped; there was no replay data and no make running; 527 files and 17 games to copy, release 0.1.0-de74998c3fef; both pins matched. The output held no `gsk_` string.

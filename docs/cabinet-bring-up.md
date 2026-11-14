@@ -15,10 +15,10 @@ For when the cabinet is built (Part A). The card carries everything, so the Pica
 
 1. **Once, before the flash, in the Claude Console (you):** make the `cabinet-picade` workspace, set its spend limit, and make a key scoped to it. Copy the key. (D1)
 2. **Flash, at the mini.** The virtual cabinet must be running (the card copies its Groq key and its games). Put the card in the mini's reader. In a Terminal window, in the repo on `main`:
-   `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
+   `node scripts/cabinet-card/flash.mjs --check` first: it says whether everything the card needs is there, and writes nothing. Then `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
    It asks, in this order:
    - the `erase diskN NNGB` phrase it shows;
-   - the Wi-Fi name and password (nothing shows);
+   - the Wi-Fi name and password (nothing shows), unless `~/.config/game-studio-arcade/wifi.json` holds them (D327);
    - **the Picade's key from step 1** (paste it; nothing shows). It names the key's workspace (check it's `cabinet-picade`) and sets the Studio up there.
    - Then the mini's own password, for sudo to write the card.
 

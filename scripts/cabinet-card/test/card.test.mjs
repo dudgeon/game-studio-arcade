@@ -506,3 +506,28 @@ test("first boot unpacks the twin's data into an empty data folder, before the s
   assert.match(prov, /step_twin_data\nstep_carts\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("the Wi-Fi can come from a 0600 file on the mini; it's refused if others can read it, and never quoted (D327)", async () => {
+  const { wifiFromFile } = await import("../lib.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-wifi-"));
+  const file = path.join(dir, "wifi.json");
+  const io = { uid: process.getuid(), stat: (f) => fs.statSync(f), read: (f) => fs.readFileSync(f, "utf8") };
+  fs.writeFileSync(file, JSON.stringify({ ssid: "IEEE", password: "password" }), { mode: 0o600 });
+  assert.deepEqual(wifiFromFile(file, io), { ssid: "IEEE", psk: "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e" }, "the password becomes the WPA key, as typed would");
+  fs.writeFileSync(file, JSON.stringify({ ssid: "IEEE", psk: "F42C6FC52DF0EBEF9EBB4B90B38A5F902E83FE1B135A70E23AED762E9710A12E" }));
+  assert.equal(wifiFromFile(file, io).psk, "f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e", "or the key itself");
+  fs.chmodSync(file, 0o644);
+  assert.throws(() => wifiFromFile(file, io), /can be read by others: chmod 600/);
+  fs.chmodSync(file, 0o600);
+  assert.throws(() => wifiFromFile(file, { ...io, uid: io.uid + 1 }), /belongs to someone else/);
+  fs.writeFileSync(file, '{"ssid": "Net", "password": "SECRETPW12345" ');
+  assert.throws(() => wifiFromFile(file, io), (e) => /isn't JSON/.test(e.message) && !e.message.includes("SECRETPW"));
+  fs.writeFileSync(file, JSON.stringify({ password: "SECRETPW12345" }));
+  assert.throws(() => wifiFromFile(file, io), /no "ssid"/);
+  fs.writeFileSync(file, JSON.stringify({ ssid: "Net" }));
+  assert.throws(() => wifiFromFile(file, io), /no "password"/);
+  fs.writeFileSync(file, JSON.stringify({ ssid: "Net", password: "short" }));
+  assert.throws(() => wifiFromFile(file, io), /8 to 63/);
+  assert.throws(() => wifiFromFile(dir, io), /isn't a plain file/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
