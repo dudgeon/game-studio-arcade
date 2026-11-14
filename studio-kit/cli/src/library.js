@@ -28,11 +28,20 @@ function git(cwd, args) {
 /** @param {string} root */
 export function ensureLibrary(root) {
   fs.mkdirSync(root, { recursive: true });
+  const head = path.join(root, ".git", "HEAD");
   if (!fs.existsSync(path.join(root, ".git"))) {
     git(root, ["init", "-q", "-b", "main"]);
-    fs.writeFileSync(path.join(root, "README.md"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n");
+    writeFileDurable(path.join(root, "README.md"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n");
     git(root, ["add", "README.md"]);
     git(root, ["commit", "-q", "-m", "Start the dev cart library"]);
+    // core.fsync covers objects, refs and the index, not the files `git init` writes. A power cut seconds after the
+    // first make left .git/HEAD empty, and git no longer saw a repository (the QEMU power rehearsal, D370). Once, here.
+    try {
+      execFileSync("sync");
+    } catch {}
+  } else if (!fs.existsSync(head) || fs.statSync(head).size === 0) {
+    // A library whose creation was cut off like that: HEAD back to its only branch. Nothing else is touched (D5).
+    writeFileDurable(head, "ref: refs/heads/main\n");
   }
   return root;
 }
