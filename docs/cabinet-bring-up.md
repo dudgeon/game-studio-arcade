@@ -13,16 +13,17 @@ Sources, checked live 2026-11-11: Pimoroni's [Assembling your Picade](https://le
 
 For when the cabinet is built (Part A). The card carries everything, so the Picade is ready the moment it's switched on: the shelf with the virtual cabinet's games, speech on Groq (Moonshine as the fallback), and Make (D320-D326). Nothing is typed into the cabinet or run against it afterwards. Details are in the parts below.
 
-1. **Once, before the flash, in the Claude Console (you):** make the `cabinet-picade` workspace, set its spend limit, and make a key scoped to it. Copy the key. (D1)
+1. **Once, before the flash (you):**
+   - In the Claude Console: the `cabinet-picade` workspace and its spend limit, then a key scoped to it. Copy the key. (D1)
+   - In a Terminal window on the mini, from the repo on `main`: `scripts/cabinet-card/picade-key.sh`. Paste the key when it asks (nothing shows). It checks the key's workspace, sets the Studio up there, stores the identity privately on the mini, and proves it with one session that sends no message. Look for `ok   workspace ..., agent version N`. (D329)
 2. **Flash, at the mini.** The virtual cabinet must be running (the card copies its Groq key and its games). Put the card in the mini's reader. In a Terminal window, in the repo on `main`:
    `node scripts/cabinet-card/flash.mjs --check` first: it says whether everything the card needs is there, and writes nothing. Then `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
    It asks, in this order:
    - the `erase diskN NNGB` phrase it shows;
    - the Wi-Fi name and password (nothing shows), unless `~/.config/game-studio-arcade/wifi.json` holds them (D327);
-   - **the Picade's key from step 1** (paste it; nothing shows). It names the key's workspace (check it's `cabinet-picade`) and sets the Studio up there.
-   - Then the mini's own password, for sudo to write the card.
+   - then the mini's own password, for sudo to write the card.
 
-   The Groq key and the virtual cabinet's games, makers, coin history and logs come across by themselves. About 5 minutes; it ejects the card. (Part B)
+   Nothing about keys: the Picade's identity (from step 1), the Groq key and the virtual cabinet's games, makers, coin history and logs come across by themselves. About 5 minutes; it ejects the card. (Part B)
 3. **Card into the Pi** from underneath. **Plug your USB mic into a black USB 2 port.** Power on.
 4. **Wait for the shelf.** In the rehearsals (a VM on the mini, wired) it took 2 minutes. On the Pi, over the basement Wi-Fi onto the SD card, expect several times that, mostly the browser step. The screen shows "Setting up the arcade" with each step and restarts once by itself. Then you get the first-time welcome, and the shelf with the virtual cabinet's games and **"Make a new game: Tell Claude your idea"**. (Part C)
 5. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2) The Manager only watches the Picade: its driver keyboard stays off unless you switch it on with `scripts/cabinet-card/driver-keyboard.sh on` (D287).
@@ -95,7 +96,7 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
   (use the disk `--list` says can be written).
 - It shows the card's name, size and partitions, and asks you to type something like `erase disk4 32GB`. Anything else stops it.
 - It asks for the home Wi-Fi name, then the password (nothing shows as you type). The password is never stored: only the Wi-Fi key derived from it goes on the card, and the card deletes that file on first boot.
-- It copies the Groq key from the virtual cabinet (no typing), then asks for **the Picade's key** from D1 (paste; nothing shows). It names that key's workspace, refuses the mini's and the virtual cabinet's, and applies the Studio agent there. It also takes the virtual cabinet's games, makers, coin history and logs, by the twin's rules (never keys or tokens).
+- It reads the Picade's identity that `picade-key.sh` stored (D329; if there's none it says to run that first, before touching the card), copies the Groq key from the virtual cabinet, and takes the virtual cabinet's games, makers, coin history and logs by the twin's rules (never keys or tokens). Nothing about keys is typed.
 - All of that is gathered before the card is touched: if anything stops, the card is as it was.
 - sudo asks for the mini's password to write the card. It writes about 3 GB, reads it back to check, adds the setup files and the keys, and ejects.
 - The keys are on the card's boot partition only until first boot, which moves them into the cabinet's own config (owner `arcade`, mode 0600) and overwrites them with zeros. Until then, keep the card with you.
@@ -152,7 +153,7 @@ Like the virtual cabinet's, but its **own new workspace and key**, so its spendi
 **D1. In the Claude Console, before the flash** (you)
 1. [Workspaces](https://platform.claude.com/settings/workspaces) → **Create workspace**, name it `cabinet-picade`.
 2. Select it → **Spend limits** → set the monthly limit you want for the real cabinet.
-3. [API keys](https://platform.claude.com/settings/keys) → **Create key**, name `arcade`, **scoped to `cabinet-picade`**, expiry **Never**. Owner: a service account if the Console offers one, else you (as for the virtual cabinet, D158). Copy it; paste it only into the flash (B1).
+3. [API keys](https://platform.claude.com/settings/keys) → **Create key**, name `arcade`, **scoped to `cabinet-picade`**, expiry **Never**. Owner: a service account if the Console offers one, else you (as for the virtual cabinet, D158). Copy it, and paste it only into `scripts/cabinet-card/picade-key.sh` (in a Terminal window on the mini). It stores the identity in `~/.config/game-studio-arcade/cabinets/arcade/identity.json` (mode 0600; never the repo) and proves it live. `picade-key.sh --check` proves it again any time (D329).
 
 **D2. Repair tools, only if something needs changing later** (in a Terminal window on the mini):
 - `scripts/cabinet-card/connect-picade.sh`: a new key or workspace for the Picade, over its SSH; `--reapply` after the Studio agent changes.

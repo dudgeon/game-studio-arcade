@@ -4,10 +4,9 @@
 // Wi-Fi and runs provision.sh with the picade profile.
 //
 // The card also carries what makes the cabinet ready the moment it's switched on (D320-D323): before touching the
-// card, flash copies the Groq key from the virtual cabinet (no typing) and runs connect-cabinet.sh --prepare, which
-// asks for the Picade's own Anthropic key, checks its workspace and applies the Studio agent there. First boot puts
-// both into the cabinet's service.json and wipes them from the card. Do the Console step in
-// docs/cabinet-bring-up.md first (the cabinet-picade workspace, its spend limit, its key).
+// card, flash reads the Picade's own identity (set up and proven by scripts/cabinet-card/picade-key.sh, D329) and
+// copies the Groq key from the virtual cabinet. Nothing about keys is typed at the flash. First boot puts both into
+// the cabinet's service.json and wipes them from the card. Do the pre-flash steps in docs/cabinet-bring-up.md first.
 //
 // Run it yourself, in a Terminal window on the mini (not with Claude Code's `!`, so the Wi-Fi password stays out of chats):
 //
@@ -20,7 +19,8 @@
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
 // --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
-// --no-identity writes a card that starts offline (connect-picade.sh later); --no-groq leaves Groq off (Moonshine only);
+// The identity comes from scripts/cabinet-card/picade-key.sh, run once before (D329); --prepare-identity asks for the
+// key here instead (repair). --no-identity writes a card that starts offline; --no-groq leaves Groq off (Moonshine only);
 // --cabinet-config-from FILE puts throwaway values on an image file, for rehearsals and tests (never a card).
 // --no-speech-on-card leaves speech's wheels and model for first boot to download (D257),
 // --wpa3 for a WPA3-only network: its passphrase goes on the card instead of the WPA key (still erased at first boot).
@@ -45,6 +45,7 @@ import { fileURLToPath } from "node:url";
 import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/lib.mjs";
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
 import { cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
+import { IDENTITY_FILE, lockWorkspace, readIdentity } from "./picade-key.mjs";
 import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, wifiFromFile, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
@@ -412,7 +413,12 @@ async function check() {
     const match = here && (await sha256File(f)) === p.sha256;
     line(!here || match, !here ? `${p.name}: not downloaded yet (the flash fetches it)` : match ? `${p.name}: here, SHA-256 matches its pin` : `${p.name}: here, but its SHA-256 doesn't match the pin (the flash fetches it again)`);
   }
-  console.log("  --   the Picade's identity: asked at the flash (its key from the Console); not checked here, as it needs that key and applies the Studio agent");
+  try {
+    const id = readIdentity(IDENTITY_FILE);
+    line(true, `the Picade's identity: ${IDENTITY_FILE}, agent version ${id.agent_version ?? "?"}, workspace ${lockWorkspace() ?? "? (no claude-lock.arcade.json)"} (scripts/cabinet-card/picade-key.sh --check proves it live)`);
+  } catch (e) {
+    line(false, `the Picade's identity: ${/** @type {Error} */ (e).message}`);
+  }
   console.log(ok ? "Ready to flash." : "Not ready: see the NO lines.");
   process.exitCode = ok ? 0 : 1;
 }
@@ -460,14 +466,22 @@ async function main() {
     if (diskId) stop("--cabinet-config-from is for rehearsals and tests: image files only, never a card.");
     cardConfig = configFromFile(fromFile);
   } else if (!flag("--no-identity")) {
-    if (!diskId && !process.stdin.isTTY) stop("with no terminal there's no one to paste the Picade's key: pass --no-identity, or --cabinet-config-from FILE for a rehearsal.");
+    // D329: the identity was set up and proven before the flash by picade-key.sh, so the flash asks nothing about keys.
+    // --prepare-identity is the repair path: connect-cabinet.sh --prepare asks for the key here instead (D320).
+    let identity;
+    if (flag("--prepare-identity")) {
+      if (!diskId && !process.stdin.isTTY) stop("--prepare-identity needs a terminal to paste the Picade's key in.");
+      say("the Picade's own identity: connect-cabinet.sh asks for its key (D320)");
+      identity = await identityFromConnect({
+        script: join(REPO, "scripts/virtual-cabinet/connect-cabinet.sh"),
+        env: { ...process.env, CABINET: "arcade", ARCADE_HOST: PICADE_HOST, ARCADE_SSH_DIR: join(CABINET_DIR, "ssh"), ARCADE_SSH_KEY_NAME: KEY_NAME, GSA_VM_DIR: CABINET_DIR },
+      });
+    } else {
+      identity = readIdentity(IDENTITY_FILE);
+      say(`the Picade's own identity: from ${IDENTITY_FILE} (agent version ${identity.agent_version ?? "?"}, workspace ${lockWorkspace() ?? "?"})`);
+    }
     const groq = flag("--no-groq") ? null : await groqFromVirtual({ drive: join(REPO, "cabinet/vm/drive") });
     if (groq) say("the Groq key: copied from the virtual cabinet, held in memory");
-    say("the Picade's own identity: connect-cabinet.sh asks for its key (D320)");
-    const identity = await identityFromConnect({
-      script: join(REPO, "scripts/virtual-cabinet/connect-cabinet.sh"),
-      env: { ...process.env, CABINET: "arcade", ARCADE_HOST: PICADE_HOST, ARCADE_SSH_DIR: join(CABINET_DIR, "ssh"), ARCADE_SSH_KEY_NAME: KEY_NAME, GSA_VM_DIR: CABINET_DIR },
-    });
     cardConfig = cabinetConfigText({ identity, groq });
   }
   if (!cardConfig) say("no identity on this card: the cabinet starts offline until connect-picade.sh (D252)");

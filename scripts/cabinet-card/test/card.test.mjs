@@ -469,11 +469,12 @@ test("the identity comes back from connect-cabinet.sh --prepare through a FIFO; 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("flash.mjs: with no terminal there's no identity unless told, and nothing is written (D323)", () => {
+test("flash.mjs: with no stored identity it says to run picade-key.sh first, and writes nothing (D329)", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-flash-"));
-  const r = spawnSync(process.execPath, [FLASH, "--image-file", path.join(dir, "x.img"), "--allow-dirty"], { encoding: "utf8", input: "Net\npassword123\n" });
+  // Never the mini's own identity folder: a test mustn't read Geoff's key.
+  const r = spawnSync(process.execPath, [FLASH, "--image-file", path.join(dir, "x.img"), "--allow-dirty"], { encoding: "utf8", input: "Net\npassword123\n", env: { ...process.env, GSA_PICADE_IDENTITY_DIR: path.join(dir, "no-identity") } });
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /no one to paste the Picade's key: pass --no-identity, or --cabinet-config-from FILE/);
+  assert.match(r.stderr, /no Picade identity at .* yet: run scripts\/cabinet-card\/picade-key\.sh first/);
   assert.ok(!fs.existsSync(path.join(dir, "x.img")), "stopped before anything was written");
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -529,5 +530,67 @@ test("the Wi-Fi can come from a 0600 file on the mini; it's refused if others ca
   fs.writeFileSync(file, JSON.stringify({ ssid: "Net", password: "short" }));
   assert.throws(() => wifiFromFile(file, io), /8 to 63/);
   assert.throws(() => wifiFromFile(dir, io), /isn't a plain file/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---- picade-key.sh (D329) ----
+
+test("picade-key stores the identity in a private 0600 file, and reads back only such a file (D329)", async () => {
+  const { writeIdentity, readIdentity } = await import("../picade-key.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "picade-key-"));
+  const file = path.join(dir, "cabinets/arcade/identity.json");
+  const id = { anthropic_api_key: FAKE.anthropic_api_key, agent_id: "agent_FAKE", agent_version: 4, environment_id: "env_FAKE" };
+  writeIdentity(file, id);
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
+  assert.deepEqual(readIdentity(file), id);
+  assert.ok(!fs.existsSync(`${file}.new`), "written in one step");
+  writeIdentity(file, { ...id, agent_version: 5 });
+  assert.equal(readIdentity(file).agent_version, 5, "a new key replaces the old one");
+  fs.chmodSync(file, 0o644);
+  assert.throws(() => readIdentity(file), /can be read by others: chmod 600/);
+  assert.throws(() => readIdentity(path.join(dir, "missing.json")), /run scripts\/cabinet-card\/picade-key\.sh first/);
+  assert.throws(() => writeIdentity(file, { ...id, anthropic_api_key: "sk-ant-admin01-FAKE" }), (e) => !String(e.message).includes("FAKE"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("picade-key's live check: the agent at its version, one capped session with no message, archived (D329)", async () => {
+  const { liveCheck, safeMessage } = await import("../picade-key.mjs");
+  /** @type {any[]} */
+  const calls = [];
+  const client = {
+    beta: {
+      agents: { retrieve: async (id, p) => (calls.push(["retrieve", id, p]), { id, version: 4 }) },
+      sessions: {
+        create: async (body) => (calls.push(["create", body]), { id: "sesn_FAKE" }),
+        archive: async (sid) => (calls.push(["archive", sid]), { id: sid }),
+      },
+    },
+  };
+  const r = await liveCheck(client, { agent_id: "agent_FAKE", agent_version: 4, environment_id: "env_FAKE" });
+  assert.equal(r.agentVersion, 4);
+  assert.deepEqual(calls[0], ["retrieve", "agent_FAKE", { version: 4 }]);
+  const body = calls[1][1];
+  assert.deepEqual(body.agent, { type: "agent", id: "agent_FAKE", version: 4 });
+  assert.equal(body.environment_id, "env_FAKE");
+  assert.deepEqual(body.budget, { type: "limit", max_list_cost: { amount: "5", currency: "USD" } }, "capped at 5 cents");
+  assert.equal(body.initial_events, undefined, "no message: the model never runs");
+  assert.deepEqual(calls[2], ["archive", "sesn_FAKE"], "archived at once (kept, not deleted)");
+  assert.equal(safeMessage(new Error("401 bad key sk-ant-api03-FAKEPICADEKEY000 and gsk_FAKEGROQKEY000\nmore")), "401 bad key [key] and [key]");
+});
+
+test("picade-key.sh refuses arguments and a missing terminal, and --check says to set up first (D329)", () => {
+  const SCRIPT = path.join(REPO, "scripts/cabinet-card/picade-key.sh");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "picade-key-sh-"));
+  const env = { ...process.env, GSA_NODE: process.execPath, GSA_PICADE_IDENTITY_DIR: path.join(dir, "none") };
+  const arg = spawnSync(SCRIPT, ["sk-ant-api03-FAKEPICADEKEY000"], { encoding: "utf8", env });
+  assert.equal(arg.status, 1);
+  assert.match(arg.stderr, /the only option is --check\. The key is never an argument/);
+  assert.ok(!arg.stderr.includes("FAKEPICADE") && !arg.stdout.includes("FAKEPICADE"), "never repeated");
+  const noTty = spawnSync(SCRIPT, [], { encoding: "utf8", env, stdio: ["pipe", "pipe", "pipe"] });
+  assert.match(noTty.stderr, /run this in a Terminal window on the mini/);
+  const check = spawnSync(SCRIPT, ["--check"], { encoding: "utf8", env });
+  assert.equal(check.status, 1);
+  assert.match(check.stderr, /no Picade identity at .* yet: run scripts\/cabinet-card\/picade-key\.sh first/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
