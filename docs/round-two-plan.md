@@ -389,3 +389,16 @@ Steps 1 to 3 can run side by side with step 4: they touch the launcher and the s
 - Moonshine: github.com/moonshine-ai/moonshine `docs/` (transcription, options, models, moonshine-vs-whisper, benchmarks); `moonshine_voice/transcriber.py` as installed on the Picade.
 - Anthropic: the current model list and prices (Claude Haiku 5.5, $0.10 / $0.50 per million tokens).
 - This repo: `cabinet/service/src/speech-live.js`, `cabinet/service/launcher/{app,screens,text,shelf,boards}.js`, `runtime/src`, `runtime/lib`, `studio-kit/context-pack`, `studio-kit/managed-agent/agents`, `docs/cx-audit.md`, `docs/speech.md`, `docs/decisions.md` (D262, D263, D270 to D276, D311).
+
+## Geoff's decisions (2026-11-14)
+
+From the walkthrough (answers saved on its page) and chat:
+
+- D450: **no recording limit and no silence stop** ("There is no reason for a cutoff in length of transcription"; confirmed over the page's 5-minute pick). A hold records as long as it's held; long audio is chunked, never cut.
+- D453: pages, turned with the stick left and right.
+- D454: live words from Moonshine, final text from Groq.
+- D456: names on the question board: two names, say your own, or "You pick".
+- D459: the kit in software, plus sub-pixel glide.
+- D464: AI in games is paid outside the coin pot, uncapped, with every call's cost logged (Geoff's own answer).
+- D468: lines, choices, and open chat with a character.
+- D469: order as planned: speech, pages, names, motion, live words, 2.5D, AI.
