@@ -303,6 +303,49 @@ test("walking away: warned, then a message, then the shelf with Make free, and i
   );
 });
 
+test("walked away to the shelf: the put-away notice opens from Make, with its cost and the saved idea (D188, D300)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(
+    FIXTURE,
+    async ({ page, run, data, faults, problems }) => {
+      await run(TO_FIRST_QUESTION);
+      await run(`
+        press esc
+        wait E8
+        press down
+        press a
+        wait shelf
+      `);
+      // No key now: the clock runs out with the kid on the shelf, as on the virtual cabinet on 2026-11-13.
+      await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-by-0")?.text === "Your last game was put away", null, { timeout: 15_000 });
+      const [rec] = readLog(path.join(data, "logs", "studio_session.jsonl"));
+      assert.equal(rec.ended_by, "timed_out");
+      await run(`
+        press up
+        press up
+        press a
+        wait gone
+        shot put-away-from-the-shelf
+      `);
+      assert.match(await boxText(page, "gone-0"), /away for a while/);
+      assert.equal(await boxText(page, "gone-tile-0"), "Try again, same idea");
+      await run(`
+        press down
+        press a
+        wait shelf
+        sleep 200
+      `);
+      assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea", "seen, so Make is plain again");
+      await run(`
+        press a
+        wait who
+      `);
+      assert.deepEqual(await faults(), []);
+      assert.deepEqual(problems, []);
+    },
+    { questionTimeout: 3 },
+  );
+});
+
 test("the way back: ESC on a question asks; keep going returns; stop frees Make with no message (D188)", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, run, data, faults }) => {
     await run(TO_FIRST_QUESTION);

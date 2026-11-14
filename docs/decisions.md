@@ -1420,3 +1420,10 @@ From docs/validation-virtual.md, on the director's list.
 - All 16 pass: 96 s for the whole shelf. teti and teti-geoff: 5.5 s each.
 - **The Pi will be slower;** how much is what calibration measures.
 - **Not built:** the desktop path. `publish_cart` over MCP runs the same gate once MCP exists (HANDOFF §9.4). The gate doesn't re-run when a cabinet update changes the runtime. Games already on the shelf stay there.
+
+## 2026-11-13 — Stop and walk-away, live (D314)
+
+**D314. A make put away while the kid was on the shelf opens its notice from Make.** *(Claude; from the director's live run of D188's two release paths, 2026-11-13.)*
+- **Found live:** "Come back later" (E8), then nothing pressed for 10 minutes. At 10 minutes the make was released as D188 says (charged 1c "walked away", archived, `terminated` at Anthropic). The Make tile then read "Your last game was put away", but pressing it went straight to "Who's making?". The notice's own board, with what the make used, "Your idea is saved." and "Try again, same idea" (D300), was only ever shown to a kid still on the question, so a kid who'd walked away to the shelf could never reach their saved idea.
+- **Now:** pressing Make while it carries a notice (a walk-away or a restart, E5) opens that notice's board first. "Back to the shelf" marks it seen, and Make is plain again. A browser test walks away to the shelf, lets the clock run out, and opens the notice from Make.
+- **Seen and left as they are, for Geoff:** "Stop making this game" is one press, with no "are you sure?", and drops the idea: the kid lands on the shelf with no message, and nothing offers the idea again. The last-minute "Still there?" warning shows only on the question screen, so a kid on the shelf or in a game isn't warned.

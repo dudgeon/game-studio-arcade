@@ -606,7 +606,9 @@ function onButton() {
   switch (v.screen) {
     case "shelf": {
       const it = v.items[v.sel];
-      if (it.kind === "make") showWho();
+      // A make that ended while the kid was elsewhere (walked away, restart) says so first, with its cost and the
+      // saved idea, before a new one (E5, D188, D300). Otherwise its board only shows to a kid still on the question.
+      if (it.kind === "make") studio.notice ? showGone() : showWho();
       else if (it.kind === "back") {
         following = true;
         followStudio();
