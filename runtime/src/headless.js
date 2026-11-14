@@ -17,11 +17,12 @@ export async function loadCart(file) {
 
 /**
  * @param {string | URL | Arcade.Cart} cart a game.js path or URL, or a cart object
- * @param {{ seed?: number, save?: unknown, players?: number }} [opts] save: initial g.load() data;
- *   players: controllers, 1..8, default 1 (D110)
+ * @param {{ seed?: number, save?: unknown, players?: number, fine?: number }} [opts] save: initial g.load() data;
+ *   players: controllers, 1..8, default 1 (D110); fine: draw a gliding cart's glide buffer too, at this
+ *   many display pixels per game pixel (D476), so a run costs what it costs on a screen. Default none.
  */
 export async function headless(cart, opts = {}) {
   const c = typeof cart === "string" || cart instanceof URL ? await loadCart(cart) : checkCart(cart);
   const save = opts.save === undefined || opts.save === null ? null : JSON.stringify(opts.save);
-  return createTestHandle(c, { seed: opts.seed, save, players: opts.players });
+  return createTestHandle(c, { seed: opts.seed, save, players: opts.players, fine: opts.fine });
 }

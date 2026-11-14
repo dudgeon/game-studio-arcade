@@ -66,6 +66,18 @@ declare namespace Arcade {
     scale?: number;
     /** Draw every opaque pixel in this one color (flashes, shadows). */
     color?: Color;
+    /** Turn the sprite about its pivot, in radians, clockwise (D475). It stays pixel art: whole pixels, no blending. */
+    rot?: number;
+    /** Smooth size, any number above 0 (on top of `scale`): 1.5 is half as big again. Grows from the pivot. */
+    zoom?: number;
+    /** Stretch across only, times `zoom`: with `zoomY`, squash and stretch. */
+    zoomX?: number;
+    /** Stretch up and down only, times `zoom`. */
+    zoomY?: number;
+    /** The point that stays put under `rot` and `zoom`, as fractions of the sprite: default [0.5, 0.5], the middle; [0.5, 1] is its feet. */
+    pivot?: readonly [number, number];
+    /** Draw it this many steps darker, 0..5 (shadows, distance). */
+    shade?: number;
   }
 
   interface TextOptions {
@@ -164,7 +176,7 @@ declare namespace Arcade {
     /** Was the button released this frame? */
     btnr(b: Button, p?: Player): boolean;
 
-    // Drawing. Coordinates are integers (fractions are floored); everything clips to the screen and `clip()`.
+    // Drawing. Coordinates are integers (fractions are floored, unless the cart glides); everything clips to the screen and `clip()`.
     /** Fill the screen (ignores camera and clip). Default color 0. */
     cls(c?: Color): void;
     pset(x: number, y: number, c: Color): void;
@@ -192,6 +204,23 @@ declare namespace Arcade {
     camera(x?: number, y?: number): void;
     /** Limit drawing to a screen rectangle. No arguments resets it. */
     clip(x?: number, y?: number, w?: number, h?: number): void;
+    /**
+     * Glide (D476): from the next draw, positions keep their fractions instead of being floored, so slow
+     * movement and scrolling slide by a quarter of a pixel on the cabinet instead of stepping a whole one.
+     * The art stays the same chunky pixels. Call it once in `init`. It changes only what the screen shows:
+     * `pget`, checks and saved frames still see whole pixels.
+     */
+    glide(on?: boolean): void;
+    /**
+     * A row of `n` pixels from x, y, each copied from sprite `tex` at (u, v), which moves by (du, dv) per pixel
+     * and wraps at the sprite's edges. `shade` 0..5 darkens it. The building block for floors in perspective (D477).
+     */
+    texRow(tex: Sprite, x: number, y: number, n: number, u: number, v: number, du: number, dv: number, shade?: number): void;
+    /**
+     * A column of `n` pixels down from x, y, copied from column `u` of sprite `tex` starting at row `v`, which moves
+     * by `dv` per pixel. `shade` 0..5 darkens it. The building block for walls (D477).
+     */
+    texCol(tex: Sprite, x: number, y: number, n: number, u: number, v: number, dv: number, shade?: number): void;
 
     // Randomness: seeded per run, so tests reproduce (D10). Never use Math.random.
     /** A float in [0, 1). */
@@ -233,6 +262,12 @@ declare namespace Arcade {
     type Flow = import("./lib/flow.js").Flow;
     type Turns = import("./lib/turns.js").Turns;
     type Pop = import("./lib/fx.js").Pop;
+    type Body = import("./lib/motion.js").Body;
+    type Spring = import("./lib/motion.js").Spring;
+    type Camera = import("./lib/camera.js").Camera;
+    type Particle = import("./lib/particles.js").Particle;
+    type View = import("./lib/floor.js").View;
+    type Eye = import("./lib/raycast.js").Eye;
   }
 
   /**

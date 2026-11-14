@@ -2,6 +2,7 @@
 // clock, a framebuffer, input masks, sound events and a save slot. No DOM and
 // no timers: hosts (headless Node, the cart frame) drive it a frame at a time.
 import * as lib from "../lib/index.js";
+import { FineBuffer, fineFactor } from "./fine.js";
 import { Framebuffer, H, W, hashPixels, makeSprite } from "./gfx.js";
 import { textWidth } from "./font.js";
 import { BIT, MAX_PLAYERS, checkPlayers } from "./input.js";
@@ -9,6 +10,7 @@ import { COLORS, PALETTE, colorIndex } from "./palette.js";
 import { createAi } from "./ai.js";
 import { createRng } from "./rng.js";
 import { SFX, Voices, toneToSegment } from "./sound.js";
+import { isXform, sprX, texCol, texRow } from "./xform.js";
 
 export const SAVE_LIMIT = 4096;
 /** The biggest score g.score() takes (D215). */
@@ -35,14 +37,23 @@ function utf8Length(s) {
 }
 
 /**
- * @param {{ cart: Arcade.Cart, seed?: number, save?: string | null, players?: number }} opts
+ * @param {{ cart: Arcade.Cart, seed?: number, save?: string | null, players?: number, fine?: number }} opts
  *   save is the JSON text currently saved for this cart, or null.
  *   players is the number of controllers, 1..MAX_PLAYERS (default 1, D110).
+ *   fine is how many display pixels a game pixel gets, 2..8, for a cart that calls g.glide() (D476).
+ *     Without it (the default) there's no glide buffer and g.glide() does nothing.
  */
-export function createMachine({ cart, seed = 1, save = null, players }) {
+export function createMachine({ cart, seed = 1, save = null, players, fine = 1 }) {
   checkCart(cart);
   const nPlayers = checkPlayers(players);
   const fb = new Framebuffer();
+  // Glide (D476): the cart asks with g.glide(); from the next draw, everything it draws
+  // also goes to `fx`, the same picture on the display's grid. `fb` is drawn as ever.
+  /** @type {FineBuffer | null} */
+  let fineBuf = fineFactor(fine) > 1 ? new FineBuffer(fineFactor(fine)) : null;
+  let glideWanted = false;
+  /** @type {FineBuffer | null} the glide buffer while this draw is gliding */
+  let fx = null;
   const rand = createRng(seed);
   const voices = new Voices();
   let frame = 0;
@@ -128,23 +139,71 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       return ((cur[i] ?? 0) & m) === 0 && ((prev[i] ?? 0) & m) !== 0;
     },
 
-    cls: (c) => fb.cls(col(c, "cls")),
-    pset: (x, y, c) => fb.pset(x, y, col(c, "pset")),
+    cls: (c) => {
+      fb.cls(col(c, "cls"));
+      if (fx) fx.cls(c);
+    },
+    pset: (x, y, c) => {
+      fb.pset(x, y, col(c, "pset"));
+      if (fx) fx.pset(x, y, c);
+    },
     pget: (x, y) => fb.pget(x, y),
-    line: (x0, y0, x1, y1, c) => fb.line(x0, y0, x1, y1, col(c, "line")),
-    rect: (x, y, w, h, c) => fb.rect(x, y, w, h, col(c, "rect")),
-    rectfill: (x, y, w, h, c) => fb.rectfill(x, y, w, h, col(c, "rectfill")),
-    circ: (x, y, r, c) => fb.circ(x, y, r, col(c, "circ")),
-    circfill: (x, y, r, c) => fb.circfill(x, y, r, col(c, "circfill")),
-    text: (s, x, y, c, opts) => fb.text(s, x, y, col(c, "text"), opts),
+    line: (x0, y0, x1, y1, c) => {
+      fb.line(x0, y0, x1, y1, col(c, "line"));
+      if (fx) fx.line(x0, y0, x1, y1, c);
+    },
+    rect: (x, y, w, h, c) => {
+      fb.rect(x, y, w, h, col(c, "rect"));
+      if (fx) fx.rect(x, y, w, h, c);
+    },
+    rectfill: (x, y, w, h, c) => {
+      fb.rectfill(x, y, w, h, col(c, "rectfill"));
+      if (fx) fx.rectfill(x, y, w, h, c);
+    },
+    circ: (x, y, r, c) => {
+      fb.circ(x, y, r, col(c, "circ"));
+      if (fx) fx.circ(x, y, r, c);
+    },
+    circfill: (x, y, r, c) => {
+      fb.circfill(x, y, r, col(c, "circfill"));
+      if (fx) fx.circfill(x, y, r, c);
+    },
+    text: (s, x, y, c, opts) => {
+      const width = fb.text(s, x, y, col(c, "text"), opts);
+      if (fx) fx.text(s, x, y, c, opts);
+      return width;
+    },
     textWidth: (s, scale) => textWidth(String(s), Math.max(1, Math.floor(scale ?? 1))),
     sprite: (rows) => makeSprite(rows),
     spr: (s, x, y, opts) => {
       if (opts?.color !== undefined) col(opts.color, "spr");
+      if (opts && isXform(opts)) {
+        sprX(fb, s, x, y, opts);
+        if (fx) sprX(fx, s, x, y, opts);
+        return;
+      }
       fb.spr(s, x, y, opts);
+      if (fx) fx.spr(s, x, y, opts);
     },
-    camera: (x, y) => fb.camera(x, y),
-    clip: (x, y, w, h) => fb.clip(x, y, w, h),
+    texRow: (tex, x, y, n, u, v, du, dv, shade) => {
+      texRow(fb, tex, x, y, n, u, v, du, dv, shade);
+      if (fx) texRow(fx, tex, x, y, n, u, v, du, dv, shade);
+    },
+    texCol: (tex, x, y, n, u, v, dv, shade) => {
+      texCol(fb, tex, x, y, n, u, v, dv, shade);
+      if (fx) texCol(fx, tex, x, y, n, u, v, dv, shade);
+    },
+    camera: (x, y) => {
+      fb.camera(x, y);
+      if (fx) fx.camera(x, y);
+    },
+    clip: (x, y, w, h) => {
+      fb.clip(x, y, w, h);
+      if (fx) fx.clip(x, y, w, h);
+    },
+    glide: (on = true) => {
+      glideWanted = !!on;
+    },
 
     rand,
     rnd: (n) => Math.floor(rand() * Math.floor(n)),
@@ -190,8 +249,16 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
 
   const state = cart.init(g) ?? {};
   booting = false;
-  fb.reset();
-  cart.draw(g, state);
+  const drawFrame = () => {
+    // Glide starts and stops between draws, never part-way through one.
+    const next = glideWanted ? fineBuf : null;
+    if (next && !fx) next.pixels.fill(0);
+    fx = next;
+    fb.reset();
+    if (fx) fx.reset();
+    cart.draw(g, state);
+  };
+  drawFrame();
 
   return {
     g,
@@ -209,8 +276,29 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       cart.update(g, state);
     },
     draw() {
-      fb.reset();
-      cart.draw(g, state);
+      drawFrame();
+    },
+    /**
+     * The glide picture of the last draw (D476), or null when the cart isn't gliding or this run has
+     * no glide buffer: `k` display pixels per game pixel, `width` x `height` palette indices. The live buffer.
+     */
+    get fine() {
+      return fx ? { k: fx.k, width: fx.w, height: fx.h, pixels: fx.pixels } : null;
+    },
+    /** Did the cart ask to glide (g.glide())? True even with no glide buffer to show it on. */
+    get glides() {
+      return glideWanted;
+    },
+    /** The glide buffer's size: display pixels per game pixel, 1 when there's none. */
+    get fineK() {
+      return fineBuf ? fineBuf.k : 1;
+    },
+    /** Change the glide buffer's size (the host's scale changed); 1 or less drops it. Draw again after. */
+    setFine(/** @type {number} */ k) {
+      const n = fineFactor(k);
+      if (n === (fineBuf ? fineBuf.k : 1)) return;
+      fineBuf = n > 1 ? new FineBuffer(n) : null;
+      fx = null;
     },
     probe() {
       if (!cart.probe) return null;

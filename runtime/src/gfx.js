@@ -41,6 +41,9 @@ function clampScale(scale) {
 }
 
 export class Framebuffer {
+  // The block interface xform.js draws through (D475): here a block is one pixel.
+  k = 1;
+  w = W;
   cx = 0;
   cy = 0;
   clipX0 = 0;
@@ -91,6 +94,18 @@ export class Framebuffer {
   /** Plot in screen space (after camera), honoring clip. */
   _plot(x, y, c) {
     if (x >= this.clipX0 && x < this.clipX1 && y >= this.clipY0 && y < this.clipY1) this.pixels[y * W + x] = c;
+  }
+
+  ax(x) {
+    return Math.floor(x) - this.cx;
+  }
+
+  ay(y) {
+    return Math.floor(y) - this.cy;
+  }
+
+  blk(px, py, c) {
+    this._plot(px, py, c);
   }
 
   pset(x, y, c) {

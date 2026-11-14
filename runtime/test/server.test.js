@@ -38,7 +38,7 @@ test("dev server: runtime and carts, CORS for the opaque-origin frame, CSP on fr
 });
 
 test("cartsIn finds cart folders by game.js", () => {
-  assert.deepEqual(Object.keys(cartsIn(path.join(RUNTIME, "examples"))), ["hello"]);
+  assert.deepEqual(Object.keys(cartsIn(path.join(RUNTIME, "examples"))).sort(), ["hello", "motion"]);
   assert.deepEqual(cartsIn(path.join(RUNTIME, "no-such-dir")), {});
 });
 
@@ -62,6 +62,6 @@ test("carts reach the starter library as g.lib (D50)", async () => {
     update() {},
     draw() {},
   });
-  assert.deepEqual(seen.lib, ["collide", "flow", "fx", "grid", "score", "timers", "turns"]);
+  assert.deepEqual(seen.lib, ["anim", "camera", "collide", "floor", "flow", "fx", "grid", "motion", "parallax", "particles", "raycast", "score", "stack", "timers", "turns"]);
   assert.equal(seen.grid, 6);
 });

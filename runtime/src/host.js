@@ -22,6 +22,7 @@ export const VOICE_MIN_MS = 300;
  *   persist?: boolean,
  *   players?: number,
  *   keymap?: typeof DEFAULT_KEYMAP,
+ *   glide?: boolean,
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
  *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
@@ -36,12 +37,25 @@ export const VOICE_MIN_MS = 300;
  *   voice: the cabinet's microphone, for the cart's voice asks (D489). The host calls `start` when player 1
  *     holds an ask's button, `stop` on release (the action heard, if any, goes to the cart) and `cancel` for a
  *     tap. Without it, and on a test host, a cart never hears anything.
+ *   glide: false never shows a cart's glide picture (D476); play.html takes `?glide=0`.
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
 export function integerScale(w, h, dpr = 1) {
   const k = Math.floor(Math.min((w * dpr) / W, (h * dpr) / H));
   return Math.max(1, k);
+}
+
+/**
+ * The glide buffer's size for a screen scale (D476): one buffer pixel per display pixel, so a
+ * gliding cart moves by display pixels and stays crisp. Above 6 it's the largest whole divisor,
+ * to bound the work; a scale with none (7, 11) gets no glide and looks as it always did.
+ */
+export function fineForScale(scale) {
+  const k = Math.floor(scale);
+  if (!(k >= 2)) return 1;
+  for (let d = Math.min(k, 6); d >= 2; d--) if (k % d === 0) return d;
+  return 1;
 }
 
 /** @param {HostOptions} opts */
@@ -75,6 +89,11 @@ export function createHost(opts) {
     iframe.style.width = `${(W * k) / dpr}px`;
     iframe.style.height = `${(H * k) / dpr}px`;
     arcade.scale = k;
+    const fine = opts.glide === false ? 1 : fineForScale(k);
+    if (fine !== arcade.fine) {
+      arcade.fine = fine;
+      if (arcade.state === "ready") send({ type: "fine", k: fine });
+    }
   };
 
   /** @type {Set<string>} */
@@ -127,6 +146,7 @@ export function createHost(opts) {
       }
     }
   };
+  let bootFine = 1;
   let nextId = 1;
   /** @type {Map<number, { resolve: (v: any) => void, reject: (e: Error) => void }>} */
   const pending = new Map();
@@ -179,6 +199,8 @@ export function createHost(opts) {
     /** Controllers this console has (g.players in the cart). */
     players,
     scale: 1,
+    /** Display pixels per game pixel a gliding cart is drawn at (D476); 1 is no glide. */
+    fine: 1,
     /** Frames the cart drew in the last second (live mode). */
     fps: 0,
     /** requestAnimationFrame callbacks in the last second (the display's refresh rate). */
@@ -222,6 +244,7 @@ export function createHost(opts) {
         // D489: the cart's voice asks. Only a live host with a microphone behind it listens.
         voices = !test && opts.voice && Array.isArray(msg.voices) ? msg.voices.filter((/** @type {any} */ v) => typeof v?.name === "string" && ["a", "b", "x", "y"].includes(v.hold)).slice(0, 4) : [];
         arcade.state = "ready";
+        if (arcade.fine !== bootFine) send({ type: "fine", k: arcade.fine }); // the scale changed while it loaded
         markReady();
         break;
       case "out":
@@ -308,7 +331,8 @@ export function createHost(opts) {
   addEventListener("resize", fit);
 
   iframe.addEventListener("load", () => {
-    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players });
+    bootFine = arcade.fine;
+    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players, fine: arcade.fine });
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).

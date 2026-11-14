@@ -1,5 +1,6 @@
 // Runs inside the sandboxed cart frame (D13, D21). The host page drives it:
-//   host -> frame: { type: "boot", cartUrl, seed, save, players }
+//   host -> frame: { type: "boot", cartUrl, seed, save, players, fine }
+//                  { type: "fine", k }                   the screen's scale changed (D476)
 //                  { type: "tick", n, masks }            run n updates, then draw (one mask per controller)
 //                  { type: "call", id, method, args }    test handle call
 //                  { type: "ai", reply }                 an answer to a g.ai ask (D480)
@@ -14,8 +15,8 @@ import { cartError, createTestHandle } from "./testhandle.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d", { alpha: false }));
-const image = ctx.createImageData(W, H);
-const out32 = new Uint32Array(image.data.buffer);
+let image = ctx.createImageData(W, H);
+let out32 = new Uint32Array(image.data.buffer);
 const RGBA = rgbaTable();
 
 /** @type {ReturnType<typeof createTestHandle> | null} */
@@ -29,11 +30,39 @@ const errorInfo = (e, where = "frame", frame = t ? t.machine().frame : 0) => {
   return { message: err?.message ?? String(e), stack: err?.stack ?? "", where, frame };
 };
 
+// A gliding cart (D476) is shown from its glide buffer, on a canvas of that size; any other cart
+// from the framebuffer, as ever.
 function render() {
   if (!t) return;
-  const px = t.machine().pixels;
+  const m = t.machine();
+  const fine = m.fine;
+  const w = fine ? fine.width : W;
+  const h = fine ? fine.height : H;
+  if (image.width !== w || image.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    image = ctx.createImageData(w, h);
+    out32 = new Uint32Array(image.data.buffer);
+  }
+  const px = fine ? fine.pixels : m.pixels;
   for (let i = 0; i < px.length; i++) out32[i] = RGBA[px[i]];
   ctx.putImageData(image, 0, 0);
+}
+
+/** The host's scale changed: resize the glide buffer and draw the same frame again. */
+function setFine(k) {
+  if (!t || failed) return;
+  const m = t.machine();
+  if (m.fineK === (k > 1 ? k : 1)) return;
+  m.setFine(k);
+  try {
+    m.draw();
+  } catch (e) {
+    failed = true;
+    post({ type: "error", error: errorInfo(cartError(e, "draw", m.frame), "draw", m.frame), fatal: true });
+    return;
+  }
+  render();
 }
 
 function flush() {
@@ -48,12 +77,12 @@ function flush() {
   if (audio.length || save !== undefined || warnings.length || scores.length || ai.length) post({ type: "out", audio, save, warnings, scores, ai });
 }
 
-async function boot({ cartUrl, seed, save, players }) {
+async function boot({ cartUrl, seed, save, players, fine }) {
   try {
     const url = new URL(cartUrl, location.href);
     const mod = await import(url.href);
     const cart = checkCart(mod.default);
-    t = createTestHandle(cart, { seed, save, players });
+    t = createTestHandle(cart, { seed, save, players, fine });
     render();
     flush();
     post({ type: "ready", voices: t.machine().aiVoices() });
@@ -115,6 +144,7 @@ addEventListener("message", (e) => {
   else if (msg.type === "call") call(msg.id, msg.method, msg.args);
   else if (msg.type === "ai") t?.machine().aiDeliver(msg.reply);
   else if (msg.type === "heard") t?.machine().aiHear(msg);
+  else if (msg.type === "fine") setFine(msg.k | 0);
 });
 
 // Keys pressed while the frame has focus go to the host, which owns input.

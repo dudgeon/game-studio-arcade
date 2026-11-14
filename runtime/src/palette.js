@@ -82,3 +82,32 @@ export function colorIndex(c) {
   const n = Math.floor(Number(c)) | 0;
   return ((n % PALETTE_SIZE) + PALETTE_SIZE) % PALETTE_SIZE;
 }
+
+/**
+ * The next darker color for each index, down its own ramp and then to night and black (D477).
+ * For shading: far walls, the far end of a floor.
+ * @type {readonly number[]}
+ */
+export const DARKER = Object.freeze([0, 0, 1, 2, 3, 4, 1, 6, 7, 8, 1, 10, 10, 12, 11, 14, 1, 16, 17, 18, 22, 20, 1, 22, 23, 24, 1, 26, 27, 1, 29, 30]);
+
+/** Most shade steps: five takes any color to black. */
+export const MAX_SHADE = 5;
+
+/** SHADES[n][c] is color c made n steps darker, n 0..MAX_SHADE. */
+export const SHADES = Object.freeze(
+  Array.from({ length: MAX_SHADE + 1 }, (_, n) => {
+    const t = new Uint8Array(PALETTE_SIZE);
+    for (let c = 0; c < PALETTE_SIZE; c++) {
+      let v = c;
+      for (let i = 0; i < n; i++) v = DARKER[v];
+      t[c] = v;
+    }
+    return t;
+  }),
+);
+
+/** The shade table for n steps (clamped to 0..MAX_SHADE; not a number is 0). */
+export function shadeTable(n) {
+  const i = Math.floor(Number(n)) || 0;
+  return SHADES[i < 0 ? 0 : i > MAX_SHADE ? MAX_SHADE : i];
+}

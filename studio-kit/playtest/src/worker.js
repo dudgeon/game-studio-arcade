@@ -71,7 +71,9 @@ async function open() {
   }
   const rt = await import(data.runtimeUrl);
   /** @type {Arcade.TestHandle} */
-  const base = await rt.headless(data.gameUrl, { seed: data.seed });
+  // fine: a cart that glides (D476) also draws its glide picture, at the cabinet's 4 display pixels per
+  // game pixel, so its frame time here includes that work. Other carts, and older runtimes, are unaffected.
+  const base = await rt.headless(data.gameUrl, { seed: data.seed, fine: 4 });
   return {
     base,
     async timedStep() {

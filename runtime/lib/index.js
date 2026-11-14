@@ -8,3 +8,12 @@ export * as score from "./score.js";
 export * as flow from "./flow.js";
 export * as turns from "./turns.js";
 export * as fx from "./fx.js";
+// Motion and depth (D475, D477).
+export * as motion from "./motion.js";
+export * as camera from "./camera.js";
+export * as parallax from "./parallax.js";
+export * as anim from "./anim.js";
+export * as particles from "./particles.js";
+export * as floor from "./floor.js";
+export * as raycast from "./raycast.js";
+export * as stack from "./stack.js";
