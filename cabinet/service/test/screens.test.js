@@ -182,12 +182,16 @@ test("tiles stay on screen with the longest question and options", () => {
   draw(p, { screen: "question", question: LONG.paragraph, option_a: LONG.paragraph, option_b: LONG.paragraph, sel: 0 });
   const d = /** @type {import("../launcher/text.js").BoxRecord} */ (p.boxes.find((b) => b.id === "q-d"));
   assert.ok(d.y + d.h <= H - GLYPH_H - 2, `D ends at ${d.y + d.h}, over the hint`);
-  for (const id of ["q-question", "q-a", "q-b"]) {
+  // D453: the question reads in pages, nothing cut; the option tiles keep the reader.
+  const q = p.boxes.find((x) => x.id === "q-question");
+  assert.equal(q?.cut, false);
+  assert.ok((q?.pages ?? 1) > 1, "the long question has pages");
+  for (const id of ["q-a", "q-b"]) {
     const b = p.boxes.find((x) => x.id === id);
     assert.equal(b?.cut, true, `${id} should be cut`);
     assert.equal(b?.readable, true);
   }
-  assert.equal(p.boxes.find((b) => b.id === "hint")?.lines[0].text, "Right: read it all. Up/down: choose.");
+  assert.equal(p.boxes.find((b) => b.id === "hint")?.lines[0].text, "Left/right: pages. Up/down: choose.");
 });
 
 test("a question with no drawable words still shows real choices, not blank tiles", () => {
@@ -407,4 +411,72 @@ test("a cabinet with no key yet says so, not \"No Wi-Fi\" (D252)", () => {
   assert.deepEqual(check(p.boxes), []);
   const board = p.boxes.flatMap((x) => x.lines.map((l) => l.text)).join(" ");
   assert.match(board, /A grown-up needs to finish setting up\./);
+});
+
+// ---------- D453: long words in pages ----------
+
+test("D453: a long transcript reads in pages, every word on one of them, with the page count on the last row", async () => {
+  const { paginate, wrap, colsFor } = await import("../launcher/text.js");
+  const { turnPage, seenAll, pageOf } = await import("../launcher/pages.js");
+  const words = Array.from({ length: 400 }, (_, i) => `word${i}`).join(" ");
+  /** @type {any} */
+  const v = { screen: "say", phase: "confirm", purpose: "idea", transcript: words, sel: 0 };
+  const p = new Painter();
+  draw(p, v);
+  const t = /** @type {any} */ (p.boxes.find((b) => b.id === "say-transcript"));
+  assert.equal(t.cut, false);
+  assert.ok(t.pages >= 3, `${t.pages} pages`);
+  assert.equal(t.lines.at(-1).text, `1 of ${t.pages} >`);
+  assert.deepEqual(check(p.boxes), []);
+  // "Yes" waits until every page has been seen.
+  assert.equal(p.boxes.find((b) => b.id === "say-yes")?.text, "Read it all first");
+  assert.equal(seenAll(v, p.boxes), false);
+  /** @type {string[]} */
+  const shown = [];
+  for (let i = 0; i < t.pages; i++) {
+    const q = new Painter();
+    draw(q, v);
+    const box = /** @type {any} */ (q.boxes.find((b) => b.id === "say-transcript"));
+    shown.push(...box.lines.slice(0, -1).map((/** @type {any} */ l) => l.text));
+    assert.deepEqual(check(q.boxes), [], `page ${i + 1}`);
+    turnPage(v, "right", q.boxes);
+  }
+  assert.equal(shown.join(" "), words, "every word, once, in order");
+  const last = new Painter();
+  draw(last, v);
+  assert.equal(seenAll(v, last.boxes), true);
+  assert.equal(last.boxes.find((b) => b.id === "say-yes")?.text, "Yes! That's it");
+  turnPage(v, "left", last.boxes);
+  assert.equal(pageOf(v, words), t.pages - 2, "left goes back");
+  // A new transcript starts on page 1, with nothing seen.
+  const v2 = { ...v, transcript: `${words} more` };
+  const n = new Painter();
+  draw(n, v2);
+  assert.equal(pageOf(v2, v2.transcript), 0);
+  assert.equal(seenAll(v2, n.boxes), false);
+  // Short words don't page.
+  const s = new Painter();
+  draw(s, { ...v, transcript: "a cat that catches fish", pages: undefined });
+  assert.equal(s.boxes.find((b) => b.id === "say-transcript")?.pages, undefined);
+  assert.equal(s.boxes.find((b) => b.id === "say-yes")?.text, "Yes! That's it");
+  assert.equal(paginate("", 10, 3, 0).pages, 1);
+  assert.equal(wrap(words, colsFor(244)).length > 30, true);
+});
+
+test("D453/D455: after Add more, the pages hold the earlier words and the new ones", () => {
+  const before = Array.from({ length: 150 }, (_, i) => `early${i}`).join(" ");
+  const p = new Painter();
+  draw(p, { screen: "say", phase: "confirm", purpose: "idea", added: before, transcript: "and then the new bit", sel: 0 });
+  const t = /** @type {any} */ (p.boxes.find((b) => b.id === "say-transcript"));
+  assert.ok(t.pages > 1);
+  assert.equal(t.text, `${before} and then the new bit`);
+});
+
+test("D453: a long rule to check and a long question read in pages", () => {
+  const long = Array.from({ length: 200 }, (_, i) => `rule${i}`).join(" ");
+  const c = new Painter();
+  draw(c, { screen: "check", rule: long, sel: 0, n: 1, of: 1, title: "Game" });
+  const r = /** @type {any} */ (c.boxes.find((b) => b.id === "check-rule"));
+  assert.ok(r.pages > 1);
+  assert.deepEqual(check(c.boxes), []);
 });
