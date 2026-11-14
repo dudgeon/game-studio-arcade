@@ -190,6 +190,23 @@ After this part, nothing needs the card again. Claude does each step with your y
 - **A try that must fail:** a deliberately broken slot. Its kernel command line points at a root that doesn't exist, so it hangs. Look for the hardware watchdog restarting the Pi within about a minute, back on the old slot, with a result saying the try didn't come up. This is the one thing the QEMU rehearsal can't show (D336).
 - **Power:** switch the Picade off at the wall during an update (F1 again with a changed checkout). Switch on: look for the shelf, and a result saying "recovered at boot".
 
+## Part G: if the card ever dies (D339)
+
+Updates can always go back by themselves (Part F). Two failures can't, and Geoff accepted that risk on 2026-11-13: a corrupt root filesystem (SD card wear) and a failed bootloader flash. The sign is a Picade that never reaches the shelf and never answers `boot-update.mjs status`, even after a power cycle and a few minutes' wait. If it does answer, it isn't this: tell Claude.
+
+The kids' games, makers, coin history and logs live on in the twin, as of its last `node scripts/twin.mjs sync`. Anything made on the Picade after that sync is lost with the card. Keep syncing after each session.
+
+**G1. Get the twin up to date.** If the Picade still answers SSH at all, Claude runs `node scripts/twin.mjs sync` first. It only reads the Picade. Otherwise the twin stays as it is.
+
+**G2. A new key, in the Console (you).** The old Picade key lives only on the dead card. On [API keys](https://platform.claude.com/settings/keys), **disable** the old `arcade` key, then make a new one scoped to `cabinet-picade` (as in D1). Copy it.
+
+**G3. Reflash.** Open the cabinet, take the card out from underneath, and do step 2 of "The first end-to-end run" again: `flash.mjs --list`, then `flash.mjs --disk diskN`, with the Wi-Fi details and the new key. Use a new card if the old one is suspect. The virtual cabinet must be running: the card takes its games, makers, coin history and logs, which is the reseed.
+- **The admin SSH:** the flash writes the Picade's key again in `~/game-studio-data/cabinets/arcade/ssh/`. The new card has new host keys, so Claude clears the old `arcade.local` line from that folder's `known_hosts` before connecting.
+
+**G4. First boot, as in Part C.** Look for the twin's games on the shelf. Then Part F again: F1, the update to the latest `main`, and F2, `boot-update.mjs adopt`. From then on the twin follows the Picade again: `twin.mjs status` should say "In sync".
+
+**G5. Put the cabinet back together.**
+
 ---
 
 ## What Claude has checked before the hardware

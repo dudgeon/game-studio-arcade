@@ -1586,6 +1586,9 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
 - **Slots without repartitioning.** Each boot setup is its own folder on the boot partition (`arcade-<time>/`). It holds its own kernel, initramfs, device trees, overlays (with the README that makes them per-slot) and cmdline.txt.
   - A block in config.txt picks one slot with `os_prefix`. The firmware ignores a prefix whose kernel or device tree is missing, and falls back to the top of the partition.
   - Raspberry Pi's own A/B layout (`autoboot.txt`, two boot partitions) would mean repartitioning, so the card would come out. Not now (D339).
+  - **Space:** a slot holds only the Pi 5's files, about 25 MB: `kernel_2712.img`, `initramfs_2712`, the `bcm2712*.dtb` files, overlays and cmdline.txt.
+    - The rehearsal's card had only 115 MB free on its boot partition, because the seed takes 324 MB, mostly speech.
+    - So a try first removes every slot except the one config.txt boots, then needs the new slot's size plus 8 MB. Slots are copies of files the packages hold, not anyone's data.
 - **A try writes only a new folder and `tryboot.txt`,** then restarts with `reboot '0 tryboot'`: one boot from the new folder.
   - On that boot, `arcade-boot-confirm` waits up to 5 minutes for the router, the service and the kiosk.
   - If all three come up, it keeps the slot by rewriting config.txt's slot block. That is the one write that matters.
@@ -1621,9 +1624,12 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
   - the boot update is never on it (D336);
   - like every Manager POST, it needs the Manager's page (D285).
 
-**D339. What this doesn't cover, by choice or not yet.** *(Claude.)*
-- **The bootloader (EEPROM):** by hand only (D335).
-- **Root filesystem corruption,** for example from SD card wear: not recoverable without the card. The SD card is the weak part. An NVMe Base fits the cabinet (platform notes) if it comes to that.
-- **A full two-slot A/B card** (Raspberry Pi's `autoboot.txt` layout, or Connect's OTA on an `rpi-image-gen` image) would protect the root filesystem too. It needs a reflash, so the card comes out once. Worth deciding before the cabinet is closed up for good, not after.
+**D339. What this doesn't cover, and the risk Geoff accepts.** *(Geoff, 2026-11-13, through the director: "Card I have, accept risk"; Claude.)*
+- **The card stays as it is.** That means the card Geoff has, the stock two-partition layout, no A/B root, and no high-endurance card. The alternatives were Raspberry Pi's full A/B layout (`autoboot.txt` with two boot partitions and two roots, or Connect's OTA on an `rpi-image-gen` image) and a high-endurance card. Claude recommended the high-endurance card; Geoff chose neither.
+- **Still unrecoverable without opening the cabinet and reflashing the card:**
+  - **a corrupt root filesystem,** for example from SD card wear or a cut while the OS itself was writing;
+  - **a failed bootloader (EEPROM) flash.** Its self-update is masked, and changing it is by hand only, on Raspberry Pi's advice (D335).
+- **The fix when that happens:** open the cabinet, reflash, and reseed the data from the twin on the mini. The twin keeps the kids' data, as of its last `twin.mjs sync`. The steps are in [cabinet-bring-up.md, Part G](cabinet-bring-up.md#part-g-if-the-card-ever-dies-d339).
+- **An NVMe Base** (platform notes) remains the later fix if the card proves fragile.
 - **Changing the Wi-Fi network or password over the network:** not built. A wrong one would cut the cabinet off.
 - **config.txt changes in a software update** (picade.sh's block) are still written in place and take effect at the next restart, as before (D250). Moving them into a tried slot like D336 is a follow-up.
