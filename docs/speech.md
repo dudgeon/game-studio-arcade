@@ -5,8 +5,9 @@ How a kid's voice becomes the words on "Is this right? I heard:" (M6). Decisions
 ## The path
 
 1. A kid holds a player button on a screen that takes speech (M4/M5, R4). The launcher calls `/api/speech/start`.
-2. `arecord` captures 16 kHz mono from the cabinet's first capture device into the service's memory (D262).
+2. `arecord` captures 16 kHz mono from the cabinet's first capture device into the service's memory (D262), for exactly as long as the button is held: no length cap, no silence stop (D470).
 3. On release (`/api/speech/stop`), the clip goes to Groq if the cabinet has a key and is online, and to Moonshine on the cabinet otherwise. Moonshine also answers whenever Groq fails, is rate-limited, or takes more than 3 s plus 0.1 s per second of audio (D263).
+3a. Long audio is split at quiet moments, never cut: Groq pieces of at most 10 minutes (its 25 MB file limit), Moonshine pieces of at most 30 s (D470).
 4. The words go back to the launcher, which shows M6. An empty result shows E9 ("didn't hear that"). The clip is then zeroed and dropped. No audio is ever written anywhere.
 5. `speech.jsonl` in the cabinet's logs gets one line per hold. It records the engine, the hold and audio lengths, the latency, the word count, and any engines skipped and why. It never holds the words.
 

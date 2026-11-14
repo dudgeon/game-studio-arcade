@@ -57,8 +57,10 @@ import { gameLines } from "./shelf-marks.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
-const MAX_BODY = 16 * 1024;
-const MAX_WORDS = 4000;
+// No length cutoff on what a kid says (D470): an hour of talking is about 9,000 words, 55,000 characters.
+// These only stop a runaway request: 2 million characters is days of talking.
+const MAX_BODY = 8 * 1024 * 1024;
+const MAX_WORDS = 2_000_000;
 
 class HttpError extends Error {
   /** @param {number} status @param {string} message */
