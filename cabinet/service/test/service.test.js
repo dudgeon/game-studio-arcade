@@ -699,3 +699,32 @@ test("when Claude becomes reachable, the screens hear at once, not at the next m
   const bin = fs.readFileSync(path.resolve(import.meta.dirname, "../bin/cabinet-service.js"), "utf8");
   assert.match(bin, /onlineChanged = \(\) => studio\.refresh\(\);/, "the service calls it when its check flips");
 });
+
+test("the volume stream: each level arcade-volkey writes reaches the launcher, and nothing before the first (D421)", async () => {
+  const data = tmp();
+  const paths = dataPaths(data);
+  const { studio } = setup();
+  const volumeFile = path.join(data, "run", "level.json");
+  const s = await startService({ studio, makers: makersStore({ file: path.join(data, "makers.json") }), speech: stubSpeech(), libraryDir: paths.carts, logsDir: paths.logs, port: 0, volumeFile });
+  const stop = new AbortController();
+  try {
+    const res = await fetch(`${s.url}/api/arcade/volume`, { signal: stop.signal });
+    assert.match(res.headers.get("content-type") ?? "", /text\/event-stream/);
+    const reader = /** @type {ReadableStream<Uint8Array>} */ (res.body).getReader();
+    let text = "";
+    const until = async (/** @type {RegExp} */ re) => {
+      while (!re.test(text)) text += new TextDecoder().decode((await reader.read()).value);
+    };
+    await until(/listening/);
+    assert.doesNotMatch(text, /data:/, "no file yet: nothing to show");
+    fs.mkdirSync(path.dirname(volumeFile));
+    fs.writeFileSync(volumeFile, JSON.stringify({ percent: 40, cap: 60, at: 1 }));
+    await until(/data: \{"percent":40,"cap":60\}/);
+    await new Promise((r) => setTimeout(r, 20));
+    fs.writeFileSync(volumeFile, JSON.stringify({ percent: 50, cap: 60, at: 2 }));
+    await until(/data: \{"percent":50,"cap":60\}/);
+  } finally {
+    stop.abort();
+    await s.close();
+  }
+});

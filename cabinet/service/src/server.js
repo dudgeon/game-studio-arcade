@@ -106,8 +106,11 @@ function readJson(req) {
  *   mcp?: ReturnType<typeof import("./arcade-mcp.js").createArcadeMcp> | null,
  *   launches?: ReturnType<typeof import("./arcade-mcp.js").launchRelay> | null,
  *   marks?: ReturnType<typeof import("./shelf-marks.js").shelfMarks> | null,
+ *   volumeFile?: string,
  * }} o
  */
+const VOLUME_FILE = "/run/arcade-volume/level.json";
+
 export function createServiceHandler(o) {
   const player = createPlayerHandler({
     libraryDir: o.libraryDir,
@@ -308,7 +311,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer"]);
+  const OURS = new Set(["/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;
@@ -350,6 +353,24 @@ export function createServiceHandler(o) {
         res.write(": listening\n\n");
         const stop = o.launches.subscribe((m) => res.write(`data: ${JSON.stringify(m)}\n\n`));
         return void res.on("close", () => stop());
+      }
+      if (pathname === "/api/arcade/volume") {
+        // D421: arcade-volkey writes the level here after each press at the cabinet; the launcher shows its bar.
+        // The file may not exist yet (or ever, on the virtual cabinet), so it's watched by its times, not opened.
+        const file = o.volumeFile ?? VOLUME_FILE;
+        res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive" });
+        res.write(": listening\n\n");
+        const changed = (/** @type {fs.Stats} */ now) => {
+          if (!now.mtimeMs) return;
+          try {
+            const l = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (Number.isFinite(l.percent)) res.write(`data: ${JSON.stringify({ percent: l.percent, cap: Number.isFinite(l.cap) ? l.cap : 100 })}\n\n`);
+          } catch {
+            // half-written or unreadable: the next press writes it again
+          }
+        };
+        fs.watchFile(file, { interval: 200 }, changed);
+        return void res.on("close", () => fs.unwatchFile(file, changed));
       }
       return json(res, 405, { ok: false, error: "method not allowed" });
     }
