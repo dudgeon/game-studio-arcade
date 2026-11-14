@@ -33,6 +33,8 @@ import {
 } from "./boards.js";
 import { REDIRECT_ACTIONS, redirectBoard } from "./redirect.js";
 import { checksFor, familyOfCart, gameRows } from "./shelf.js";
+import { holdOverlay } from "./wifi.js";
+import { WIFI_HINT, createWifiFlow } from "./wifi-flow.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -57,6 +59,8 @@ let config = { console: "Arcade", players: 1, speech: "stub" };
 let makers = [];
 /** Every maker's name, those not offered in "Who's making?" too (grown-ups, hidden names, D363). @type {Record<string, string>} */
 let names = {};
+/** The cabinet's Wi-Fi, where it has a helper (D414): { available, connected }. @type {any} */
+let wifiNow = { available: false };
 /** @type {any[]} */
 let carts = [];
 /** Downloaded games (D230), after the carts on the shelf. @type {any[]} */
@@ -112,6 +116,7 @@ async function refresh() {
   carts = (await get("/api/carts")).carts;
   ({ makers, names = {} } = await get("/api/makers"));
   guests = await fetchGuests();
+  wifiNow = await get("/api/wifi").catch(() => wifiNow);
 }
 
 // ---------- moving between screens ----------
@@ -123,6 +128,9 @@ function show(v) {
   const id = v.board ?? v.screen;
   if (boardsSeen.at(-1) !== id) boardsSeen.push(id);
 }
+
+/** The Wi-Fi screens (D413, D414): a grown-up holds ENT and COIN on the shelf. */
+const wifi = createWifiFlow({ show, view: () => view, get, post, exit: () => void showShelf() });
 
 const offline = () => show({ screen: "notice", board: "E4", title: "Just a moment", message: "The cabinet is restarting.", restarting: true });
 
@@ -140,6 +148,8 @@ async function showShelf() {
     const lit = view.screen === "shelf" ? keyOf(view.items[view.sel]) : (returnTo ?? "tile");
     returnTo = null;
     const v = { screen: "shelf", board: studio.phase === "running" ? "S2" : studio.unconnected ? "E11" : studio.offline ? "E1" : "S1", console: config.console, pot: pot()?.coins ?? null, offline: !!studio.offline, unconnected: !!studio.unconnected, items, sel: Math.max(0, items.findIndex((it) => keyOf(it) === lit)), hint: SHELF_HINT };
+    // D415: on Wi-Fi but Claude can't be reached is "No internet"; a real drop says how a grown-up fixes it (D413).
+    if (v.offline && !v.unconnected && wifiNow.available) Object.assign(v, wifiNow.connected ? { offlineWord: "No internet" } : { hint: WIFI_HINT });
     if (view.screen === "shelf") view = v;
     else show(v);
     // A downloaded game still being checked joins the shelf when it passes (D310): look again shortly.
@@ -912,6 +922,7 @@ addEventListener("keydown", (e) => {
   }
   e.preventDefault();
   if (!e.repeat) held.add(e.code);
+  if (wifiNow.available && wifi.keydown(e, held)) return;
   const v = view;
   if (v.screen === "say" && v.phase === "typing") return onTyping(e, v);
   if (e.code in STICK) return onStick(/** @type {any} */ (STICK)[e.code]);
@@ -983,7 +994,9 @@ function frame() {
   // E7: the last minute counts down on the hint line (D188).
   view.warnLeft = waiting && studio.pending.warn_until ? Math.max(0, Math.ceil((studio.pending.warn_until - Date.now()) / 1000)) : null;
   if (view.screen === "say" && view.phase === "confirm") view.confirmTiles = confirmTiles(view);
+  const holding = wifiNow.available ? wifi.frame(held) : null;
   draw(painter, view);
+  if (holding != null) holdOverlay(painter, holding);
   for (const f of check(painter.boxes)) faults.add(`${view.board ?? view.screen}: ${f}`);
   const px = painter.fb.pixels;
   for (let i = 0; i < px.length; i++) out32[i] = RGBA[px[i]];
@@ -1023,6 +1036,7 @@ function connect() {
     offlineSince = 0;
     studio = JSON.parse(e.data);
     if (view.screen === "shelf") showShelf();
+    wifi.internet(!!studio.offline);
     followStudio();
     if (view.screen === "notice" && view.restarting) showShelf();
     // The walk-away's cost arrives a moment after the screen: show it when it does (D300).

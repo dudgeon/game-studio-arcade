@@ -18,6 +18,7 @@ import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
 import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
 import { shelfMarks } from "../src/shelf-marks.js";
+import { demoWifi, socketWifi } from "../src/wifi-client.js";
 import { createGate, gateSettings, cabinetProfile, gatedChecker, playTracker, guestGate, stopGateRuns } from "../src/gate.js";
 
 const { values } = parseArgs({
@@ -42,6 +43,8 @@ const { values } = parseArgs({
     guests: { type: "string", multiple: true },
     // The publish gate (D310): the cabinet re-tests a game in its own Chromium before the shelf. Off only for development.
     "no-gate": { type: "boolean", default: false },
+    // D414: a pretend Wi-Fi, so the Wi-Fi screens can be driven where there's no helper (the mini, the virtual cabinet).
+    "wifi-demo": { type: "boolean", default: false },
     profile: { type: "string" }, // else /etc/arcade/cabinet.conf: labels the gate's frame times (D128)
   },
 });
@@ -233,6 +236,8 @@ const s = await startService({
   logsDir: paths.logs,
   pot,
   cabinet,
+  // The Wi-Fi helper's socket, where provisioning made one (D414); none on the mini.
+  wifi: values["wifi-demo"] ? demoWifi() : socketWifi(),
   // The Cabinet Manager's pairing token (D205, D208). None: the Manager endpoints are off.
   // D215: or the pairing file beside the config, made on the cabinet by scripts/coin.mjs pair, read on each request.
   // D369: a cabinet with no config yet (a new Picade plays offline, D252) still takes the pairing in /etc/arcade.
