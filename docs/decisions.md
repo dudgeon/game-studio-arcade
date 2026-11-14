@@ -2132,3 +2132,15 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **speech.jsonl** gains `pieces` when a hold was split.
 - **Tests:** a 3-minute and a 25-minute hold through a stand-in arecord (every second kept, Groq in 1 and 3 pieces, Moonshine in 30 s pieces), the splitter, and an hour's idea taken whole by the service.
 
+## 2026-11-14 — Security updates to pinned packages (D375)
+
+**D375. A security fix to a package apt.lock pins comes through the repo: bump its line, prove it on the virtual cabinet, then a plain update.** *(Director's instruction, 2026-11-14; Claude.)*
+- **Why `--os` can't take them:** `--os` deliberately holds apt.lock's packages (D335), so the next provisioning never finds them past their pin.
+- **The routine** is in cabinet/README.md, "Security updates to pinned packages":
+  1. see what's newer (`apt-cache policy` on the twin, or `apt-get -s upgrade` on the Picade);
+  2. bump the line;
+  3. prove it with an update of the virtual cabinet;
+  4. merge, then F1 to the Picade.
+- **Rollback:** the update keeps a copy of the old package first and puts it back if the cabinet isn't healthy (D335).
+- **First use, 2026-11-14:** `xz-utils` 5.8.1-1+deb13u1 → deb13u2 (Debian-Security). Every other package in apt.lock was current.
+

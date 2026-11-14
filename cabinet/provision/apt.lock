@@ -1,5 +1,7 @@
 # Packages the provisioning script installs, one per line, as name or name=version.
 # Pinned from a good boot of the virtual cabinet (2026-11-08). To refresh: cabinet/vm/drive apt-lock.
+# An OS update (--os) never moves these; a security fix to one comes by changing its line here (cabinet/README.md,
+# "Security updates to pinned packages"). 2026-11-14: xz-utils deb13u1 -> deb13u2 (Debian-Security).
 alsa-utils=1.2.14-1+rpt1
 avahi-daemon=0.8-16
 cage=0.3.1-1~bpo13+1+rpt2
@@ -11,4 +13,4 @@ nftables=1.1.3-1
 openssh-server=1:10.0p1-7+deb13u4
 python3-venv=3.13.5-1
 wlr-randr=0.4.1-1
-xz-utils=5.8.1-1+deb13u1
+xz-utils=5.8.1-1+deb13u2
