@@ -1830,3 +1830,8 @@ Geoff chose a clean start for the kids' first switch-on (through the director, 2
   - Everything as it was: 66 coins, all four ledger lines, no marks.
   - `--day-one` together with `--from-backup` stopped before writing anything.
 - Neither run showed the marks taking effect, since the Manager's reader isn't on main yet.
+- **The day-one list** (2026-11-14, the director's recommendation, which Geoff accepted; he can change it from the Manager's Games page) is `docs/day-one.json`:
+  - Shelf: teti, teti-geoff, the three starters, and three example lines (candy-cat-drop, cloud-popper, log-hopper).
+  - Hidden makers: tester and tester2. Pot: full.
+  - `flash.mjs --check --day-one docs/day-one.json` checks a file's ids against the live virtual cabinet with the same planner the flash uses, reading only (the twin helper's `manifest` and `read`).
+  - Its run on 2026-11-14 found every id. It gave 8 lines on the shelf and 9 off it (bee-buzz, fly-catcher, frog-flicker, fruit-cat-drop, penguin-slide, pepper-bone-catch, rock-rain, shark-chomp, snowball-drop). The twin's 8342-byte ledger stays on the mini.

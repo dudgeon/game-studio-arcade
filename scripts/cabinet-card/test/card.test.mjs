@@ -672,3 +672,11 @@ test("first boot removes speech's install files from the card after a full succe
   assert.ok(run(0, false).kept, "not installed: kept");
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test("docs/day-one.json is a valid day-one file: full pot, Tester hidden, the agreed shelf (D356)", async () => {
+  const { parseDayOne } = await import("../day-one.mjs");
+  const spec = parseDayOne(fs.readFileSync(path.join(REPO, "docs/day-one.json"), "utf8"));
+  assert.equal(spec.pot, "full");
+  assert.deepEqual(spec.hide_makers, ["tester", "tester2"]);
+  for (const id of ["teti", "teti-geoff", "apple-catch", "comet-dodge", "wall-ball"]) assert.ok(spec.shelf.includes(id), id);
+});
