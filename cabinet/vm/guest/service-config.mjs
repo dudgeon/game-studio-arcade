@@ -5,6 +5,7 @@
 //   node service-config.mjs key       print the installed key to stdout (for --reapply, over SSH)
 //   node service-config.mjs install   read {anthropic_api_key, agent_id, agent_version, environment_id}
 //                                     from stdin, write service.json owned by arcade, mode 0600, go live
+//   node service-config.mjs groq-key  print the installed Groq key to stdout (flash.mjs copies it to the Picade's card, D321)
 //   node service-config.mjs groq      read {groq_api_key} from stdin into service.json: Groq first (D263).
 //                                     An empty key turns Groq off; Moonshine carries on alone.
 import { execFileSync } from "node:child_process";
@@ -52,6 +53,11 @@ if (cmd === "check") {
   const key = JSON.parse(fs.readFileSync(CONFIG, "utf8")).anthropic_api_key;
   if (!key) fail("The cabinet's config has no key.");
   process.stdout.write(key);
+} else if (cmd === "groq-key") {
+  if (!fs.existsSync(CONFIG)) fail("This cabinet has no config yet.", 4);
+  const key = JSON.parse(fs.readFileSync(CONFIG, "utf8")).groq_api_key;
+  if (!key) fail("This cabinet has no Groq key. Put one on with scripts/virtual-cabinet/groq-key.sh.", 4);
+  process.stdout.write(key);
 } else if (cmd === "install") {
   const found = replayData();
   if (found.length) fail(`This cabinet has replay data: ${found.join(", ")}.`, 3);
@@ -87,7 +93,7 @@ if (cmd === "check") {
   if (!process.env.ARCADE_NO_RESTART) execFileSync("systemctl", ["restart", "arcade-launcher"], { stdio: "ignore" });
   console.log(input.groq_api_key ? "Groq is on: it transcribes first, and Moonshine answers when it can't." : "Groq is off: Moonshine transcribes on the cabinet.");
 } else {
-  fail("usage: service-config.mjs check | key | install | groq", 2);
+  fail("usage: service-config.mjs check | key | groq-key | install | groq", 2);
 }
 
 /** service.json, owned by arcade, mode 0600, replaced in one step. @param {any} config */

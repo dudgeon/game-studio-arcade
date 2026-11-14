@@ -17,7 +17,7 @@ SSID='Test "Mesh": Café'
 PASS='not-the-real-password-123'
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-printf '%s\n%s\n' "$SSID" "$PASS" | "$NODE" "$REPO/scripts/cabinet-card/flash.mjs" --image-file "$IMG" --timezone America/New_York --allow-dirty | tee "$OUT/flash.log"
+printf '%s\n%s\n' "$SSID" "$PASS" | "$NODE" "$REPO/scripts/cabinet-card/flash.mjs" --image-file "$IMG" --timezone America/New_York --allow-dirty --no-identity --no-seed | tee "$OUT/flash.log"
 grep -q "read back ok" "$OUT/flash.log" || fail "no read-back"
 
 MNT="$(mktemp -d "$OUT/mnt-XXXX")"

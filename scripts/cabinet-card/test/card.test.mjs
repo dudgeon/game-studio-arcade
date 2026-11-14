@@ -353,3 +353,156 @@ test("one place for the Picade's SSH key: picade-ssh.sh, read by everything that
   for (const f of ["scripts/cabinet-card/connect-picade.sh", "scripts/cabinet-card/driver-keyboard.sh"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /picade-ssh\.sh/, f);
   for (const f of ["scripts/cabinet-card/flash.mjs", "scripts/twin.mjs", "manager/cabinet.mjs"]) assert.match(fs.readFileSync(path.join(REPO, f), "utf8"), /cabinet-card\/picade\.mjs|\.\/picade\.mjs/, f);
 });
+
+// ---- The card carries the keys (D320-D323) ----
+
+const FAKE = { anthropic_api_key: "sk-ant-api03-FAKEPICADEKEY000", agent_id: "agent_FAKE", agent_version: 4, environment_id: "env_FAKE", groq_api_key: "gsk_FAKEGROQKEY000" };
+
+test("first boot installs the card's cabinet config, then wipes it from the card, without printing it (D322)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-config-"));
+  const payload = path.join(dir, "seed");
+  const etc = path.join(dir, "etc");
+  fs.mkdirSync(payload);
+  fs.mkdirSync(etc);
+  const got = path.join(dir, "installed.json");
+  const stub = path.join(dir, "install");
+  fs.writeFileSync(stub, `#!/bin/sh\n[ "$ARCADE_NO_RESTART" = 1 ] || { echo "would restart" >&2; exit 9; }\ncat > ${JSON.stringify(got)}\n[ -f "$FAIL" ] && { echo 'The config on stdin has no agent_id.' >&2; exit 1; }\nexit 0\n`, { mode: 0o755 });
+  const file = path.join(payload, "cabinet-config.json");
+  const script = (body) => `log() { echo "[provision] $*"; }; PAYLOAD=${JSON.stringify(payload)}; ARCADE_HOME=/nowhere; . ${JSON.stringify(path.join(REPO, "cabinet/provision/cabinet-config.sh"))}; ${body}`;
+  const step = (env = {}) => {
+    fs.writeFileSync(file, JSON.stringify(FAKE));
+    return execFileSync("/bin/bash", ["-c", script("step_cabinet_config")], { encoding: "utf8", env: { ...process.env, CONFIG_INSTALL: stub, ARCADE_ETC: etc, ...env } });
+  };
+  let out = step();
+  assert.deepEqual(JSON.parse(fs.readFileSync(got, "utf8")), FAKE, "service-config install got the card's config on stdin, Groq key and all");
+  assert.ok(!fs.existsSync(file), "wiped from the card");
+  assert.match(out, /connected: the card's key, agent and Groq key are in service.json/);
+  assert.match(out, /wiped the cabinet config from the card/);
+  assert.ok(!out.includes("FAKE"), "never printed");
+  // A failed install still wipes it, and says why without quoting it.
+  fs.rmSync(got);
+  fs.writeFileSync(path.join(dir, "fail"), "");
+  out = step({ FAIL: path.join(dir, "fail") });
+  assert.match(out, /didn't install \(The config on stdin has no agent_id\.\): the cabinet starts offline/);
+  assert.ok(!fs.existsSync(file));
+  assert.ok(!out.includes("FAKE"));
+  // A cabinet that already has a config keeps it; the card's copy is still wiped.
+  fs.rmSync(path.join(dir, "fail"));
+  fs.rmSync(got, { force: true });
+  fs.writeFileSync(path.join(etc, "service.json"), "{}");
+  out = step();
+  assert.ok(!fs.existsSync(got), "not installed over an existing config");
+  assert.match(out, /already has one: keeping it/);
+  assert.ok(!fs.existsSync(file));
+  // No file on the card: nothing happens.
+  assert.equal(execFileSync("/bin/bash", ["-c", script("step_cabinet_config")], { encoding: "utf8" }), "");
+  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8"), /step_carts\nstep_cabinet_config\n/, "after the carts (service-config.mjs takes arcade's uid from them), before the services start");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("first boot installs the card's config with the real service-config.mjs, before /etc/arcade exists (D322)", () => {
+  // The 2026-11-13 rehearsal: /etc/arcade isn't made until step_services, so the install had nowhere to write.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-config-real-"));
+  const payload = path.join(dir, "seed");
+  const etc = path.join(dir, "etc-not-yet");
+  const data = path.join(dir, "data");
+  fs.mkdirSync(payload);
+  fs.mkdirSync(path.join(data, "carts"), { recursive: true });
+  const file = path.join(payload, "cabinet-config.json");
+  fs.writeFileSync(file, JSON.stringify(FAKE));
+  const install = `${process.execPath} ${path.join(REPO, "cabinet/vm/guest/service-config.mjs")} install`;
+  const out = execFileSync("/bin/bash", ["-c", `log() { echo "[provision] $*"; }; PAYLOAD=${JSON.stringify(payload)}; . ${JSON.stringify(path.join(REPO, "cabinet/provision/cabinet-config.sh"))}; step_cabinet_config`], { encoding: "utf8", env: { ...process.env, CONFIG_INSTALL: install, ARCADE_ETC: etc, ARCADE_DATA: data } });
+  assert.match(out, /connected: the card's key, agent and Groq key are in service.json/, out);
+  const config = JSON.parse(fs.readFileSync(path.join(etc, "service.json"), "utf8"));
+  assert.equal(config.anthropic_api_key, FAKE.anthropic_api_key);
+  assert.equal(config.groq_api_key, FAKE.groq_api_key, "the Groq key rides along");
+  assert.equal(config.agent_id, FAKE.agent_id);
+  assert.equal(fs.statSync(path.join(etc, "service.json")).mode & 0o777, 0o600);
+  assert.equal(fs.readFileSync(path.join(etc, "service.env"), "utf8"), `ARCADE_SERVICE_ARGS=--config ${path.join(etc, "service.json")}\n`, "the service starts live");
+  assert.ok(!fs.existsSync(file), "wiped from the card");
+  assert.ok(!out.includes("FAKE"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the card's config: a workspace key, the agent ids, and the Groq key; errors never quote it (D320, D321)", async () => {
+  const { parseIdentity, cabinetConfigText, configFromFile, SecretsError } = await import("../secrets.mjs");
+  const text = cabinetConfigText({ identity: FAKE, groq: FAKE.groq_api_key });
+  assert.deepEqual(JSON.parse(text), FAKE);
+  assert.equal(JSON.parse(cabinetConfigText({ identity: FAKE, groq: null })).groq_api_key, undefined, "--no-groq: Moonshine only");
+  for (const bad of ['{"anthropic_api_key":"sk-ant-admin01-FAKE","agent_id":"a","environment_id":"e"}', '{"anthropic_api_key":"nope-FAKE","agent_id":"a","environment_id":"e"}', '{"anthropic_api_key":"sk-ant-api03-FAKE","environment_id":"e"}', "not json FAKE"]) {
+    assert.throws(() => parseIdentity(bad), (e) => e instanceof SecretsError && !String(e.message).includes("FAKE"));
+  }
+  assert.throws(() => cabinetConfigText({ identity: FAKE, groq: "not-a-groq-key" }), SecretsError);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-cfg-"));
+  fs.writeFileSync(path.join(dir, "c.json"), JSON.stringify(FAKE));
+  assert.deepEqual(JSON.parse(configFromFile(path.join(dir, "c.json"))), FAKE);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the Groq key comes from the virtual cabinet over its own SSH, with the Picade's settings stripped (D321)", async () => {
+  const { groqFromVirtual, SecretsError } = await import("../secrets.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-groq-"));
+  const drive = path.join(dir, "drive");
+  const seen = path.join(dir, "seen");
+  fs.writeFileSync(drive, `#!/bin/sh\necho "$* host=\${ARCADE_HOST:-default} dir=\${ARCADE_SSH_DIR:-default}" > ${JSON.stringify(seen)}\ncase "$STUB" in ok) printf 'gsk_FAKEGROQKEY000' ;; none) echo 'This cabinet has no Groq key.' >&2; exit 4 ;; old) exit 2 ;; down) exit 255 ;; junk) printf 'hello' ;; esac\n`, { mode: 0o755 });
+  const env = (STUB) => ({ ...process.env, STUB, ARCADE_HOST: "arcade.local", ARCADE_SSH_DIR: "/picade/ssh" });
+  assert.equal(await groqFromVirtual({ drive, env: env("ok") }), "gsk_FAKEGROQKEY000");
+  assert.equal(fs.readFileSync(seen, "utf8").trim(), "ssh sudo node /opt/arcade/current/cabinet/vm/guest/service-config.mjs groq-key host=default dir=default", "the virtual cabinet's own defaults, not the Picade's");
+  for (const [stubbed, re] of [["none", /no Groq key to copy/], ["old", /older than this/], ["down", /can't reach the virtual cabinet/], ["junk", /doesn't look like a Groq key/]]) {
+    await assert.rejects(groqFromVirtual({ drive, env: env(stubbed) }), (e) => e instanceof SecretsError && re.test(e.message));
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the identity comes back from connect-cabinet.sh --prepare through a FIFO; a stop doesn't hang (D320)", async () => {
+  const { identityFromConnect, SecretsError } = await import("../secrets.mjs");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-id-"));
+  const script = path.join(dir, "connect");
+  const json = JSON.stringify({ anthropic_api_key: FAKE.anthropic_api_key, agent_id: "agent_FAKE", agent_version: 4, environment_id: "env_FAKE" });
+  fs.writeFileSync(script, `#!/bin/sh\n[ "$1" = --prepare ] && [ -p "$2" ] || exit 7\n[ "$STUB" = stop ] && { echo "Stopped: nothing applied" >&2; exit 1; }\nprintf '%s' '${json}' > "$2"\n`, { mode: 0o755 });
+  const id = await identityFromConnect({ script, env: { ...process.env, STUB: "ok" } });
+  assert.equal(id.agent_id, "agent_FAKE");
+  assert.equal(id.anthropic_api_key, FAKE.anthropic_api_key);
+  const started = Date.now();
+  await assert.rejects(identityFromConnect({ script, env: { ...process.env, STUB: "stop" } }), SecretsError);
+  assert.ok(Date.now() - started < 5000, "a script that stops before writing doesn't leave flash waiting");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("flash.mjs: with no terminal there's no identity unless told, and nothing is written (D323)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-flash-"));
+  const r = spawnSync(process.execPath, [FLASH, "--image-file", path.join(dir, "x.img"), "--allow-dirty"], { encoding: "utf8", input: "Net\npassword123\n" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /no one to paste the Picade's key: pass --no-identity, or --cabinet-config-from FILE/);
+  assert.ok(!fs.existsSync(path.join(dir, "x.img")), "stopped before anything was written");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("first boot unpacks the twin's data into an empty data folder, before the starters, never over data (D324)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-twin-"));
+  const payload = path.join(dir, "seed");
+  const data = path.join(dir, "data");
+  const src = path.join(dir, "src");
+  fs.mkdirSync(payload);
+  fs.mkdirSync(path.join(src, "carts/rock-rain"), { recursive: true });
+  fs.mkdirSync(path.join(src, "logs"));
+  fs.writeFileSync(path.join(src, "carts/rock-rain/cart.json"), '{"id":"rock-rain"}');
+  fs.writeFileSync(path.join(src, "makers.json"), '[{"id":"tester"}]');
+  fs.writeFileSync(path.join(src, "logs/coin_ledger.jsonl"), '{"kind":"refill"}\n');
+  fs.writeFileSync(path.join(src, "twin-seed.json"), "{}");
+  execFileSync("tar", ["-czf", path.join(payload, "twin-data.tar.gz"), "-C", src, "."]);
+  const step = () => execFileSync("/bin/bash", ["-c", `log() { echo "[provision] $*"; }; PAYLOAD=${JSON.stringify(payload)}; DATA=${JSON.stringify(data)}; . ${JSON.stringify(path.join(REPO, "cabinet/provision/twin-data.sh"))}; step_twin_data`], { encoding: "utf8", env: { ...process.env, DATA_OWNER: "true" } });
+  let out = step();
+  assert.match(out, /the twin's data is here \(D324\): 1 games/);
+  assert.equal(fs.readFileSync(path.join(data, "carts/rock-rain/cart.json"), "utf8"), '{"id":"rock-rain"}');
+  assert.equal(fs.readFileSync(path.join(data, "logs/coin_ledger.jsonl"), "utf8"), '{"kind":"refill"}\n');
+  assert.ok(fs.existsSync(path.join(payload, "twin-data.tar.gz")), "the card keeps its copy (D5)");
+  // Never over a cabinet's own data.
+  fs.writeFileSync(path.join(data, "makers.json"), '[{"id":"owen"}]');
+  out = step();
+  assert.match(out, /already has data: keeping its own/);
+  assert.equal(fs.readFileSync(path.join(data, "makers.json"), "utf8"), '[{"id":"owen"}]');
+  const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
+  assert.match(prov, /step_twin_data\nstep_carts\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
+  fs.rmSync(dir, { recursive: true, force: true });
+});

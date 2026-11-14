@@ -95,11 +95,20 @@ const roots = [{ root: paths.carts, source: /** @type {const} */ ("library") }, 
 
 // Can Claude be reached? Checked now and then, never in the play path (E1, E2).
 let online = !values.offline;
+// When it changes, the screens hear at once: on a cabinet that starts before its Wi-Fi, the first check fails and the
+// shelf said "No Wi-Fi" until something else changed (the 2026-11-13 card rehearsal, D325).
+/** @type {() => void} */
+let onlineChanged = () => {};
 if (!replaying && !values.offline) {
+  const set = (/** @type {boolean} */ now) => {
+    if (now === online) return;
+    online = now;
+    onlineChanged();
+  };
   const check = () =>
     dns.lookup("api.anthropic.com").then(
-      () => (online = true),
-      () => (online = false),
+      () => set(true),
+      () => set(false),
     );
   check();
   setInterval(check, 20_000).unref();
@@ -164,6 +173,7 @@ const studio = createStudio({
     return ensureKitUploaded({ api: client, cacheFile: paths.kitUploads, out: path.join(paths.root, "kit", "studio-kit.tgz") });
   },
 });
+onlineChanged = () => studio.refresh();
 
 // The guests that ship in the repo (D231), then any in the data folder.
 const guestDirs = values.guests ?? [path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../guests"), path.join(paths.root, "guests")];

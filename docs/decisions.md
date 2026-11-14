@@ -1427,3 +1427,79 @@ From docs/validation-virtual.md, on the director's list.
 - **Found live:** "Come back later" (E8), then nothing pressed for 10 minutes. At 10 minutes the make was released as D188 says (charged 1c "walked away", archived, `terminated` at Anthropic). The Make tile then read "Your last game was put away", but pressing it went straight to "Who's making?". The notice's own board, with what the make used, "Your idea is saved." and "Try again, same idea" (D300), was only ever shown to a kid still on the question, so a kid who'd walked away to the shelf could never reach their saved idea.
 - **Now:** pressing Make while it carries a notice (a walk-away or a restart, E5) opens that notice's board first. "Back to the shelf" marks it seen, and Make is plain again. A browser test walks away to the shelf, lets the clock run out, and opens the notice from Make.
 - **Seen and left as they are, for Geoff:** "Stop making this game" is one press, with no "are you sure?", and drops the idea: the kid lands on the shelf with no message, and nothing offers the idea again. The last-minute "Still there?" warning shows only on the question screen, so a kid on the shelf or in a game isn't warned.
+
+## 2026-11-13 — The card carries the keys and the twin's data (SD-card worker)
+
+Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD card or the cabinet. You should make the SD card carry the key. And be ready the moment it is plugged in." On seeding: "yes -- but you'd better have a plan to push updates to the os cabinet etc -- accessing the sd card will be extremely hard once the cabinet is assembled". The director approved D320-D329 for this. D250-D259 are this worker's earlier block.
+
+**D320. The Picade's identity is made at the flash, not after first boot.** *(Claude; moves D254's connect-picade.sh step before the flash.)*
+- `flash.mjs` runs `connect-cabinet.sh --prepare FIFO` before it touches the card. That's the same script and checks as connecting a running cabinet:
+  - Geoff pastes the Picade's key (no echo).
+  - It names the key's workspace, and refuses the mini's and the virtual cabinet's (D131, D254).
+  - It applies the Studio agent there with `claude-lock.arcade.json`.
+- Then, instead of SSH to a cabinet, it writes the config into a FIFO that `flash.mjs` made in a private folder and reads into memory.
+- With `--prepare` there's no y/n after the plan (the flash already asked to erase the card). So the key is the one thing typed for the identity (the director's point 3).
+- **Geoff's one step before the flash** is the Console (checklist D1): the `cabinet-picade` workspace, its spend limit, and a key scoped to it. Only he can make a key. Claude signs in to nothing.
+- `connect-picade.sh` stays as a repair tool.
+
+**D321. The Groq key is copied from the virtual cabinet, with no typing.** *(Claude.)*
+- Geoff put the Groq key on the virtual cabinet with `groq-key.sh`, which asked about Zero Data Retention then. `flash.mjs` reads it from there over the virtual cabinet's admin SSH, with a new read-only `service-config.mjs groq-key` that prints only the key.
+- The key is held in memory and goes straight onto the card: never an argument, a file on the mini or a log line.
+- If the virtual cabinet isn't up, has no key, or runs an older release, the flash stops before touching the card and says which. `--no-groq` makes a Moonshine-only card.
+- `groq-picade.sh` stays as a repair tool.
+
+**D322. The keys ride on the card only until first boot.** *(Claude.)*
+- The card's boot partition gets `seed/cabinet-config.json`: the Anthropic key, agent and environment ids, and the Groq key. It's written straight onto the card's FAT, never into the seed folder on the mini's disk.
+- First boot's `step_cabinet_config` (after the carts, before the services) installs it with `service-config.mjs install` into `/etc/arcade/service.json` (owner `arcade`, mode 0600). That also switches the service to `--config`.
+- Then it overwrites the card's copy with zeros and removes it, whether the install worked or not. If the install fails, the cabinet plays offline (D252), and the log says why without quoting the file.
+- It never replaces a config a cabinet already has.
+- **Limits, accepted:** until first boot, anyone holding the card can read the keys (FAT has no permissions), so Geoff keeps the card with him. An SD card's controller may keep old blocks after the overwrite. Both keys can be revoked in their consoles.
+- **Rehearsal 8 found a real bug.** `/etc/arcade` doesn't exist yet at that point, so the install crashed and the cabinet came up offline. The fail-soft path worked: the keys were wiped and the shelf played. Fixed (the step makes the folder), and now tested with the real `service-config.mjs`.
+
+**D323. What Geoff types at the flash.** *(Claude, for Geoff to see.)*
+- **Typed:**
+  - the `erase diskN NNGB` phrase (the brief's safety rule for writing a disk);
+  - the Wi-Fi name and password;
+  - the Picade's key;
+  - the mini's password for sudo, which macOS asks for to write a raw disk.
+- **Nothing after power-on.**
+- A throwaway config (`--cabinet-config-from FILE`) and throwaway twin data (`--twin-dir DIR`) are for rehearsals and tests, on image files only; a card refuses them. With no terminal, an image file needs `--no-identity` or a throwaway config.
+
+**D324. The card carries the twin's data; seeding is part of the flash.** *(Geoff's yes, 2026-11-13; carries out D295 at the flash.)*
+- Before touching the card, `flash.mjs` runs the twin's own `seed()` (D295), with a fresh private folder standing in for the Picade. So the rules are exactly `twin.mjs seed`'s:
+  - the synced paths only (D291);
+  - never keys, the config, the Manager token or `kit-uploads` (D292);
+  - no replay data;
+  - no seed while a make runs.
+- The twin records the seed and its baseline as before.
+- The folder is packed as `seed/twin-data.tar.gz` (about 5 MB today), and the folder on the mini is removed even if the flash stops.
+- First boot's `step_twin_data` unpacks it into `/var/lib/arcade` before the starter games, only while that folder is empty, and gives it to `arcade`. The card keeps its copy (D5).
+- After first boot the Picade is the real one, and `twin.mjs sync` follows it (D290). `twin.mjs seed` remains for a cabinet flashed with `--no-seed`.
+
+**D325. The shelf hears at once when Claude becomes reachable.** *(Claude, from rehearsal 9.)*
+- The service checks api.anthropic.com every 20 s, but the screens heard about it only when something else changed. A cabinet whose service starts before its Wi-Fi drew "No Wi-Fi" on the first check and kept it.
+- Now a flip in the check sends the state to the screens at once (`studio.refresh()`).
+- Rehearsal 10 sampled the check for two minutes: online throughout.
+
+**D326. What the card gives the update worker.** *(Claude; the director asked not to build the update path here.)* From first boot, before any update tooling exists:
+- **Admin SSH on the home Wi-Fi.** `cabinet@arcade.local`, sshd enabled, key-only (no passwords, no root). The key is the one `flash.mjs` made on the mini, `~/game-studio-data/cabinets/arcade/ssh/arcade_ed25519` (`picade-ssh.sh`, D259). `cabinet` has passwordless sudo.
+- **Releases side by side.** `/opt/arcade/releases/<version>-<hash>`, with `current` pointing at one and old ones kept. Going back is moving the link and restarting `arcade-launcher` and `arcade-kiosk` (D195).
+- **Provisioning you can re-run.** `provision.sh` is safe to run again; `update-on-cabinet.sh` already runs it from an update payload, with the data check (D196).
+- **Records.** `/etc/arcade/provisioned-version` and `provisioned-commit` say what the card installed. `seed/provision.log` on the boot partition keeps first boot's log, ending in `=== firstboot exit N ===` (D257).
+- **The boot config.** `config.txt`'s own block is between `# BEGIN arcade provision` and `# END arcade provision`.
+- **Pinned packages.** apt packages are pinned in `apt.lock`, and the image in `lock.json`. An OS update means new pins, tried on the twin first (D151, D296).
+- **Not there yet:** an A/B root or any other fallback that survives a bad kernel or bootloader update. With the card hard to reach, that's for the update worker to decide.
+
+**What's proven** (rehearsals 8-10, 2026-11-13; a throwaway Anthropic key, Groq key and twin, never the real ones):
+- Power-on to shelf in about 1.5 minutes.
+- `firstboot exit 0`, then the one restart.
+- "connected" and "wiped" in the log, and the card's copy gone.
+- `service.json` owned by `arcade`, 0600, holding the throwaway keys; the service on `--config`, with speech on `groq+moonshine`.
+- The twin's game on the shelf, owned by `arcade`.
+- The key strings in no other file and in no journal line.
+- The admin SSH as D326 describes it.
+
+**Not proven:**
+- A real `ant apply` into `cabinet-picade`, and a real make. Those need the real key, which is Geoff's.
+- Groq's answer from the Picade, which needs a mic and a real key.
+- Everything on the hardware (D253, D257).

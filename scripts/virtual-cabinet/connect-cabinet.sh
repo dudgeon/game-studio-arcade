@@ -49,10 +49,17 @@ on_cabinet() {
 }
 
 REAPPLY=no
+PREPARE=""
 case "${1:-}" in
   "") ;;
   --reapply) REAPPLY=yes ;;
-  *) stop "the only option is --reapply. The key is never an argument." ;;
+  # D320: for a card that isn't written yet. Everything up to the apply, then the config goes into the named
+  # FIFO (flash.mjs makes it in a private folder and reads it into memory) instead of over SSH to a cabinet.
+  --prepare)
+    PREPARE="${2:-}"
+    [ -p "$PREPARE" ] || stop "--prepare needs the FIFO flash.mjs made. Run scripts/cabinet-card/flash.mjs, not this."
+    ;;
+  *) stop "the options are --reapply and --prepare. The key is never an argument." ;;
 esac
 
 # D16: the mini must never have these set. They'd also outrank what this script is doing.
@@ -62,7 +69,10 @@ command -v ant >/dev/null || stop "the ant CLI is missing: brew install anthropi
 [ -x "$NODE" ] || stop "Node 22 is missing at $NODE"
 
 # 1. The cabinet: reachable, and with no replay data that could move to the Picade (D150).
-if ! state="$(on_cabinet sudo node "$GUEST" check 2>"$VM_ROOT/.connect-check.err")"; then
+# With --prepare there's no cabinet yet: the card is about to be written, so it has no data at all.
+if [ -n "$PREPARE" ]; then
+  state=prepare
+elif ! state="$(on_cabinet sudo node "$GUEST" check 2>"$VM_ROOT/.connect-check.err")"; then
   reason="$(grep -v -E 'Please note|rptl|^$' "$VM_ROOT/.connect-check.err" | tail -1 || true)"
   rm -f "$VM_ROOT/.connect-check.err"
   case "$reason" in
@@ -70,7 +80,7 @@ if ! state="$(on_cabinet sudo node "$GUEST" check 2>"$VM_ROOT/.connect-check.err
     *) stop "can't reach the cabinet at ${ARCADE_HOST:-arcade-virtual.local}: $reason. Is it running? scripts/virtual-cabinet/up.sh" ;;
   esac
 fi
-rm -f "$VM_ROOT/.connect-check.err"
+rm -f "$VM_ROOT/.connect-check.err" 2>/dev/null || true
 
 # 2. The key: from the keyboard with no echo, or from the cabinet. Never from stdin of a pipeline.
 if [ "$REAPPLY" = yes ]; then
@@ -119,9 +129,14 @@ cd "$AGENT_DIR"
 if [ -f "$LOCK" ]; then targets=(); else targets=(agents/studio.md environments/studio.yaml); fi
 apply() { printf '%s' "$key" | ant --api-key-stdin apply --lock-file "$LOCK" "$@" ${targets[@]+"${targets[@]}"}; }
 apply --dry-run || stop "ant couldn't make a plan."
-printf '\nApply this plan to workspace %s? It costs nothing. (y/n) ' "$workspace" >/dev/tty
-IFS= read -r answer </dev/tty
-case "$answer" in y|Y|yes) ;; *) stop "nothing applied, and nothing changed on the cabinet." ;; esac
+if [ -n "$PREPARE" ]; then
+  # D323: flash.mjs already asked to erase the card; the Picade's key is the one thing typed for its identity.
+  printf '\nApplying it to workspace %s. It costs nothing.\n' "$workspace" >/dev/tty
+else
+  printf '\nApply this plan to workspace %s? It costs nothing. (y/n) ' "$workspace" >/dev/tty
+  IFS= read -r answer </dev/tty
+  case "$answer" in y|Y|yes) ;; *) stop "nothing applied, and nothing changed on the cabinet." ;; esac
+fi
 apply --yes || stop "ant apply failed. Anything it did create is recorded in $AGENT_DIR/$LOCK, so run this again."
 
 # 5. What the apply made, read from the lock file. These ids aren't secrets; the lock file gets committed.
@@ -138,10 +153,16 @@ ids="$(read_lock)" || stop "$LOCK doesn't list an agent and an environment."
 read -r lock_workspace agent_id agent_version environment_id <<<"$ids"
 [ "$lock_workspace" = "$workspace" ] || stop "$LOCK is for $lock_workspace, but the key is for $workspace."
 
-# 6. Into the cabinet, over SSH's stdin.
-# The pipe is inside the loop, so each try sends it again. Installing twice is harmless.
+# 6. Into the cabinet, over SSH's stdin. Or, with --prepare, into flash.mjs's FIFO for the card (D320).
 installed=no
+if [ -n "$PREPARE" ]; then
+  printf '{"anthropic_api_key":"%s","agent_id":"%s","agent_version":%s,"environment_id":"%s"}' "$key" "$agent_id" "$agent_version" "$environment_id" > "$PREPARE" \
+    || stop "couldn't hand the config to flash.mjs."
+  installed=yes
+fi
+# The pipe is inside the loop, so each try sends it again. Installing twice is harmless.
 for _ in $(seq 1 "${ARCADE_CONNECT_TRIES:-60}"); do
+  [ "$installed" = yes ] && break
   printf '{"anthropic_api_key":"%s","agent_id":"%s","agent_version":%s,"environment_id":"%s"}' "$key" "$agent_id" "$agent_version" "$environment_id" \
     | "$DRIVE" ssh sudo node "$GUEST" install 2>/dev/null
   rc="${PIPESTATUS[1]}"
@@ -158,6 +179,11 @@ if [ "$REAPPLY" = no ] && [ "$(pbpaste 2>/dev/null || true)" = "$key" ]; then
 fi
 key=""
 
+if [ -n "$PREPARE" ]; then
+  echo "The Picade's identity is ready for the card: workspace $workspace, agent $agent_id version $agent_version."
+  echo "Commit the lock file; it holds no secrets: studio-kit/managed-agent/$LOCK"
+  exit 0
+fi
 sleep 3
 active="$(on_cabinet systemctl is-active arcade-launcher 2>/dev/null || true)"
 [ "$active" = active ] || stop "the cabinet service didn't come back up. On the cabinet: sudo journalctl -u arcade-launcher -n 20"

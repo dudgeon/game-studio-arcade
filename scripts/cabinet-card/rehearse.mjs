@@ -129,7 +129,12 @@ function prepare(out) {
   const img = join(out, "card.img");
   if (!existsSync(img)) {
     // The real flash path, into a file; a stand-in Wi-Fi network (there's no Wi-Fi in the VM).
-    const r = spawnSync(NODE, [join(HERE, "flash.mjs"), "--image-file", img, "--allow-dirty"], {
+    // REHEARSE_CONFIG: a file of throwaway keys and ids for the card (never real ones), or none for an offline card.
+    const config = process.env.REHEARSE_CONFIG ? ["--cabinet-config-from", process.env.REHEARSE_CONFIG] : ["--no-identity"];
+    // REHEARSE_TWIN_DIR: a folder of throwaway twin data for the card (D324), or none.
+    if (process.env.REHEARSE_TWIN_DIR) config.push("--twin-dir", process.env.REHEARSE_TWIN_DIR);
+    else config.push("--no-seed");
+    const r = spawnSync(NODE, [join(HERE, "flash.mjs"), "--image-file", img, "--allow-dirty", ...config], {
       input: "Rehearsal network\nrehearsal-password-123\n",
       stdio: ["pipe", "inherit", "inherit"],
       env: { ...process.env, GSA_CABINET_DIR: join(out, "cabinet") },

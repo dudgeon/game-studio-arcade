@@ -45,6 +45,7 @@ function setup(o = {}) {
     nameOf: () => "Alina",
     questionTimeoutMs: o.questionTimeoutMs,
     warningMs: o.warningMs,
+    ...(o.online ? { online: o.online } : {}),
   });
   /** @param {(s: any) => boolean} pred */
   const until = (pred) =>
@@ -678,4 +679,20 @@ test("the server: routes, origin guard, bad input", async () => {
   } finally {
     await s.close();
   }
+});
+
+test("when Claude becomes reachable, the screens hear at once, not at the next make (D325)", () => {
+  let up = false;
+  const { studio } = setup({ online: () => up });
+  assert.equal(studio.state().offline, true);
+  /** @type {any[]} */
+  const heard = [];
+  const stop = studio.subscribe((s) => heard.push(s));
+  up = true;
+  studio.refresh();
+  stop();
+  assert.equal(heard.length, 1);
+  assert.equal(heard[0].offline, undefined, "the shelf's \"No Wi-Fi\" goes away");
+  const bin = fs.readFileSync(path.resolve(import.meta.dirname, "../bin/cabinet-service.js"), "utf8");
+  assert.match(bin, /onlineChanged = \(\) => studio\.refresh\(\);/, "the service calls it when its check flips");
 });
