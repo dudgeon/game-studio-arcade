@@ -1679,7 +1679,7 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
 - **Still unrecoverable without opening the cabinet and reflashing the card:**
   - **a corrupt root filesystem,** for example from SD card wear or a cut while the OS itself was writing;
   - **a failed bootloader (EEPROM) flash.** Its self-update is masked, and changing it is by hand only, on Raspberry Pi's advice (D335).
-- **The fix when that happens:** open the cabinet, reflash, and reseed the data from the twin on the mini. The twin keeps the kids' data, as of its last `twin.mjs sync`. The steps are in [cabinet-bring-up.md, Part G](cabinet-bring-up.md#part-g-if-the-card-ever-dies-d339).
+- **The fix when that happens:** open the cabinet, reflash, and restore the data from the mini's hourly backup of the Picade (`flash.mjs --from-backup`, D350-D355). The steps are in [cabinet-bring-up.md, Part G](cabinet-bring-up.md#part-g-if-the-card-ever-dies-d339-d354-d355).
 - **An NVMe Base** (platform notes) remains the later fix if the card proves fragile.
 - **Changing the Wi-Fi network or password over the network:** not built. A wrong one would cut the cabinet off.
 - **config.txt changes in a software update** (picade.sh's block) are still written in place and take effect at the next restart, as before (D250). Moving them into a tried slot like D336 is a follow-up.

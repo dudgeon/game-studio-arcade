@@ -180,22 +180,6 @@ Like the virtual cabinet's, but its **own new workspace and key**, so its spendi
 
 ---
 
-## If the card dies
-
-Geoff kept the card he has and accepted the risk (2026-11-13). If it dies, the Picade is rebuilt from the mini's hourly copy. What comes back, and what doesn't (D355):
-- **Back exactly as they were at the last backup:** every game and every version, with its maker and its lineage (which game it changed, its line); the makers list; the coin pot (it's worked out from the coin history, which comes back line for line); play, make and screening logs; downloaded games.
-- **Lost:** anything after the last backup, normally under an hour of use. A make that was running when the card died is never collected, and its cost isn't recorded, so the pot may show a coin or two more than it really had.
-- **Made fresh by the new card, as at the first flash:** the Picade's key and identity, the Manager pairing (`node scripts/coin.mjs pair`), the welcome screens, which show once more.
-
-**Steps** (the reflashing itself is the update worker's part, below; the data part is this):
-1. **If the Picade still boots**, even badly: run one more backup first, `node scripts/twin-backup/run.mjs`, so the last hour isn't lost.
-2. **Check the copy:** in the Manager, "Last backup" should name the time and the number of games you expect. `ls ~/game-studio-data/twin/backup/carts` lists them.
-3. **Write a new card from the copy:** the usual `flash.mjs --disk …` with **`--from-backup`**. It takes the games from the mini's backup of the Picade, not from the virtual cabinet, which may hold test games of its own (D354). Everything else about the flash is as in Part B.
-4. **First boot** puts the games in place before the starter games, as in E1. **Look for:** the kids' games on the shelf with their names, and the same coins as the Manager showed before.
-5. After that, the hourly backup simply carries on.
-
-<!-- The update worker's reflash steps (new card, Wi-Fi, identity) go here. -->
-
 ## Part F: updates over the Wi-Fi, before the cabinet is closed up (D330-D339)
 
 After this part, nothing needs the card again. Claude does each step with your yes, from the mini, when nobody's playing.
@@ -215,22 +199,47 @@ After this part, nothing needs the card again. Claude does each step with your y
 - **A try that must fail:** a deliberately broken slot. Its kernel command line points at a root that doesn't exist, so it hangs. Look for the hardware watchdog restarting the Pi within about a minute, back on the old slot, with a result saying the try didn't come up. This is the one thing the QEMU rehearsal can't show (D336).
 - **Power:** switch the Picade off at the wall during an update (F1 again with a changed checkout). Switch on: look for the shelf, and a result saying "recovered at boot".
 
-## Part G: if the card ever dies (D339)
+## Part G: if the card ever dies (D339, D354, D355)
 
-Updates can always go back by themselves (Part F). Two failures can't, and Geoff accepted that risk on 2026-11-13: a corrupt root filesystem (SD card wear) and a failed bootloader flash. The sign is a Picade that never reaches the shelf and never answers `boot-update.mjs status`, even after a power cycle and a few minutes' wait. If it does answer, it isn't this: tell Claude.
+Updates can always go back by themselves (Part F). Two failures can't: a corrupt root filesystem (SD card wear) and a failed bootloader flash. Geoff kept the card he has and accepted that risk (2026-11-13). The sign is a Picade that never reaches the shelf and never answers `node scripts/cabinet-card/boot-update.mjs status`, even after a power cycle and a few minutes' wait. If it does answer, it isn't this: tell Claude.
 
-The kids' games, makers, coin history and logs live on in the twin, as of its last `node scripts/twin.mjs sync`. Anything made on the Picade after that sync is lost with the card. Keep syncing after each session.
+The Picade is then rebuilt from the mini's hourly backup (E3).
 
-**G1. Get the twin up to date.** If the Picade still answers SSH at all, Claude runs `node scripts/twin.mjs sync` first. It only reads the Picade. Otherwise the twin stays as it is.
+**What comes back, and what doesn't (D355):**
+- **Back exactly as they were at the last backup:**
+  - every game and every version, with its maker and its lineage (which game it changed, its line);
+  - the makers list;
+  - the coin pot. It's worked out from the coin history, which comes back line for line.
+  - play, make and screening logs;
+  - downloaded games.
+- **Lost:** anything after the last backup, normally under an hour of use. A make that was running when the card died is never collected and its cost isn't recorded, so the pot may show a coin or two more than it really had.
+- **Made fresh by the new card, as at the first flash:**
+  - the Manager pairing (`node scripts/coin.mjs pair`);
+  - the welcome screens, which show once more.
 
-**G2. A new key, in the Console (you).** The old Picade key lives only on the dead card. On [API keys](https://platform.claude.com/settings/keys), **disable** the old `arcade` key, then make a new one scoped to `cabinet-picade` (as in D1). Copy it.
+**G1. Save the last hour, if you can.** If the Picade still boots at all, even badly, Claude runs one more backup first: `node scripts/twin-backup/run.mjs`. It only reads the Picade.
+- Seed, sync and backup share one lock (`~/game-studio-data/twin/lock`, D352). If an hourly run holds it, this backup, a `twin.mjs` sync, or the flash's own seed in G4 stops with "busy". Wait a minute and run it again.
 
-**G3. Reflash.** Open the cabinet, take the card out from underneath, and do step 2 of "The first end-to-end run" again: `flash.mjs --list`, then `flash.mjs --disk diskN`, with the Wi-Fi details and the new key. Use a new card if the old one is suspect. The virtual cabinet must be running: the card takes its games, makers, coin history and logs, which is the reseed.
-- **The admin SSH:** the flash writes the Picade's key again in `~/game-studio-data/cabinets/arcade/ssh/`. The new card has new host keys, so Claude clears the old `arcade.local` line from that folder's `known_hosts` before connecting.
+**G2. Check the copy.** In the Manager, "Last backup" should name the time and the number of games you expect. `ls ~/game-studio-data/twin/backup/carts` lists them.
 
-**G4. First boot, as in Part C.** Look for the twin's games on the shelf. Then Part F again: F1, the update to the latest `main`, and F2, `boot-update.mjs adopt`. From then on the twin follows the Picade again: `twin.mjs status` should say "In sync".
+**G3. The Picade's identity.** It's stored privately on the mini (D329), so the new card gets the same one.
+- **Check it still works:** `scripts/cabinet-card/picade-key.sh --check`, which asks for nothing.
+- **The old card still holds the key** (in its `/etc/arcade/service.json`). If the old card leaves the house, or the check fails:
+  - on [API keys](https://platform.claude.com/settings/keys), **disable** the old `arcade` key;
+  - make a new one scoped to `cabinet-picade` (as in D1);
+  - run `scripts/cabinet-card/picade-key.sh` with it.
 
-**G5. Put the cabinet back together.**
+**G4. Write a new card from the backup.** Open the cabinet and take the card out from underneath. Use a new card if the old one is suspect.
+- **Do:** as in step 2 of "The first end-to-end run": `flash.mjs --check`, `flash.mjs --list`, then `flash.mjs --disk diskN --from-backup`.
+- **Where the games come from:** with `--from-backup` the flash takes them from the mini's backup of the Picade, not from the virtual cabinet, which may hold test games of its own (D354). Everything else about the flash is as in Part B.
+- **The admin SSH:** the flash writes the Picade's SSH key again in `~/game-studio-data/cabinets/arcade/ssh/`. The new card has new host keys, so Claude clears the old `arcade.local` line from that folder's `known_hosts` before connecting.
+
+**G5. First boot, as in Part C.** It puts the games in place before the starter games, as in E1.
+- **Look for:** the kids' games on the shelf with their names, and the same coins as the Manager showed before.
+- **Then Part F again:** F1, the update to the latest `main`, and F2, `boot-update.mjs adopt`.
+- **After that:** pair the Manager again (`node scripts/coin.mjs pair`), and the hourly backup simply carries on.
+
+**G6. Put the cabinet back together.**
 
 ---
 
