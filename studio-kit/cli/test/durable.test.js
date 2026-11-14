@@ -1,4 +1,4 @@
-// Writes that survive a power cut (D370). What a cut does to a disk is rehearsed in QEMU
+// Writes that survive a power cut (D371). What a cut does to a disk is rehearsed in QEMU
 // (scripts/cabinet-card/test/power-rehearsal.sh); here, the parts that need no cut.
 import test from "node:test";
 import assert from "node:assert/strict";

@@ -125,7 +125,7 @@ export function potStore(o) {
       pot_before_cents: before,
       pot_after_cents: before + delta,
     };
-    // Flushed before the top-up or charge is reported, and never glued to a torn line (D370).
+    // Flushed before the top-up or charge is reported, and never glued to a torn line (D371).
     appendLineDurable(file, JSON.stringify(entry));
     return entry;
   };

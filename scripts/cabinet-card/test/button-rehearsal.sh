@@ -1,5 +1,5 @@
 #!/bin/bash
-# The power button (D371) on a QEMU copy of the card, by hand, after the first boot (as for update-rehearsal.sh):
+# The power button (D372) on a QEMU copy of the card, by hand, after the first boot (as for update-rehearsal.sh):
 #
 #   scripts/cabinet-card/test/button-rehearsal.sh DIR
 #

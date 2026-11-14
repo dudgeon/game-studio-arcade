@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The cabinet's power button (D371): a tap does nothing, holding it switches the cabinet off cleanly.
+"""The cabinet's power button (D372): a tap does nothing, holding it switches the cabinet off cleanly.
 
 Geoff's choice (2026-11-14): "Tap ignored, hold to switch off". The Picade's overlay reports the button as KEY_POWER
 on its gpio_keys device. systemd-logind can't do this itself: its long press is fixed at 5 s (LONG_PRESS_DURATION in

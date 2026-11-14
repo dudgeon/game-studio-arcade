@@ -99,7 +99,7 @@ export function extractCart(tarball, dest) {
   }
   fs.mkdirSync(dest, { recursive: true });
   execFileSync("tar", ["-xzf", tarball, "-C", dest]);
-  syncTree(dest); // a session's cart is kept whole (D5); tar doesn't flush (D370)
+  syncTree(dest); // a session's cart is kept whole (D5); tar doesn't flush (D371)
   return dest;
 }
 

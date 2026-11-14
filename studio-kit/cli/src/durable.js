@@ -1,5 +1,5 @@
 // @ts-check
-// Writes that survive the plug being pulled (D370). The kids switch the cabinet off at the wall; the card has no
+// Writes that survive the plug being pulled (D371). The kids switch the cabinet off at the wall; the card has no
 // fallback (D339). On ext4 a file written and renamed into place can come back empty after a cut, and an append can
 // come back torn; the QEMU power rehearsal (scripts/cabinet-card/test/power-rehearsal.sh) is how we know.
 import fs from "node:fs";
@@ -68,7 +68,7 @@ export function appendLineDurable(file, line) {
 
 /**
  * Flush every file and folder under DIR to disk: for files another tool wrote (tar, a recursive copy), before they're
- * relied on. A session's cart came back with an empty cart.json after a cut without this (D370).
+ * relied on. A session's cart came back with an empty cart.json after a cut without this (D371).
  * @param {string} dir
  */
 export function syncTree(dir) {

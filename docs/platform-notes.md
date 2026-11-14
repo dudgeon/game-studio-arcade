@@ -178,7 +178,7 @@ Checked 2026-11-07. Sources: pishop.us/product/picade-with-10-inch-display (also
 
 **Power:** USB-C into the X HAT, which back-powers the Pi through the GPIO header ("no need for a separate power supply"). Tap the power button (or the HAT's "switch" button) to start. Pimoroni's shop page says "press and hold it for 3 seconds to fully shutdown and disconnect power". That is the HAT's own hard cut, not a clean shutdown. Because the Pi can't see the supply, add `usb_max_current_enable=1`.
 
-**The power button while running (checked 2026-11-14, D371):**
+**The power button while running (checked 2026-11-14, D372):**
 - **What the overlay does** (picade.dts at f97c2ac): the button is `KEY_POWER` (116) on BCM17, in the same `gpio_keys` node as the other buttons. A `gpio-poweroff` on BCM4 (`force`) asserts after halt so the HAT can cut power. The README's `nopowerbtn` dtparam isn't in the overlay's `__overrides__` at that commit.
 - **What the OS does:** with stock systemd-logind, a tap of KEY_POWER powers off (`HandlePowerKey=poweroff`). logind's long press is fixed at 5 s (`LONG_PRESS_DURATION` in `logind-button.c`, systemd 257), past the HAT's 3 s cut, so logind can't do "hold to switch off".
 - **Our setup:** logind ignores the key, and `arcade-powerkey` starts `systemctl poweroff` once it has been held 2 s.

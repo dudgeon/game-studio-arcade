@@ -12,7 +12,7 @@ const GIT_ENV = {
   GIT_COMMITTER_NAME: "Studio",
   GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid",
   // Objects, refs and the index on disk before a commit returns: a power cut must not leave the library with an
-  // empty object file, which breaks the whole repository (D370). Through the environment, so .git/config, which
+  // empty object file, which breaks the whole repository (D371). Through the environment, so .git/config, which
   // is the family's data, is never touched.
   GIT_CONFIG_COUNT: "2",
   GIT_CONFIG_KEY_0: "core.fsync",
@@ -35,7 +35,7 @@ export function ensureLibrary(root) {
     git(root, ["add", "README.md"]);
     git(root, ["commit", "-q", "-m", "Start the dev cart library"]);
     // core.fsync covers objects, refs and the index, not the files `git init` writes. A power cut seconds after the
-    // first make left .git/HEAD empty, and git no longer saw a repository (the QEMU power rehearsal, D370). Once, here.
+    // first make left .git/HEAD empty, and git no longer saw a repository (the QEMU power rehearsal, D371). Once, here.
     try {
       execFileSync("sync");
     } catch {}
@@ -86,7 +86,7 @@ export function commitNewCart(o) {
   // Key frames are regenerable (D62): the library keeps playtest.json, never the PNGs.
   fs.cpSync(o.cartDir, dest, { recursive: true, filter: (src) => path.basename(src) !== "playtest-frames" });
   writeFileDurable(path.join(dest, "cart.json"), JSON.stringify({ ...o.cartJson, id }, null, 2) + "\n");
-  syncTree(dest); // the shelf reads these files, not git's copies (D370)
+  syncTree(dest); // the shelf reads these files, not git's copies (D371)
   git(o.root, ["add", "--", id]);
   git(o.root, ["commit", "-q", "-m", o.message.replace("{id}", id)]);
   return { id, dir: dest, commit: git(o.root, ["rev-parse", "HEAD"]) };

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Everyday power cuts, rehearsed on a QEMU copy of the Picade's card (D370). By hand, on the mini, after
+# Everyday power cuts, rehearsed on a QEMU copy of the Picade's card (D371). By hand, on the mini, after
 # rehearse.mjs prepare + start and the first boot (as for update-rehearsal.sh):
 #
 #   scripts/cabinet-card/test/power-rehearsal.sh DIR [ROUNDS=20]

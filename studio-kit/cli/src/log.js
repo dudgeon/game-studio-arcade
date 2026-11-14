@@ -23,7 +23,7 @@ export function readLog(file) {
     try {
       out.push(JSON.parse(line));
     } catch {
-      // A torn line from a power cut: skipped, never rewritten (D5, D370).
+      // A torn line from a power cut: skipped, never rewritten (D5, D371).
     }
   }
   return out;
