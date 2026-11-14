@@ -2,7 +2,8 @@
 //   host -> frame: { type: "boot", cartUrl, seed, save, players }
 //                  { type: "tick", n, masks }            run n updates, then draw (one mask per controller)
 //                  { type: "call", id, method, args }    test handle call
-//   frame -> host: { type: "ready" } | { type: "out", audio, save, scores }
+//                  { type: "ai", reply }                 an answer to a g.ai ask (D480)
+//   frame -> host: { type: "ready" } | { type: "out", audio, save, scores, ai }
 //                  { type: "error", error } | { type: "result", id, value?, error? }
 //                  { type: "key", code, down }           keys pressed while the frame has focus
 import { H, W } from "./gfx.js";
@@ -42,7 +43,8 @@ function flush() {
   const warnings = m.drainWarnings();
   const scores = m.drainScores();
   for (const w of warnings) console.warn(`[cart] frame ${w.frame}: ${w.message}`);
-  if (audio.length || save !== undefined || warnings.length || scores.length) post({ type: "out", audio, save, warnings, scores });
+  const ai = m.drainAi();
+  if (audio.length || save !== undefined || warnings.length || scores.length || ai.length) post({ type: "out", audio, save, warnings, scores, ai });
 }
 
 async function boot({ cartUrl, seed, save, players }) {
@@ -110,6 +112,7 @@ addEventListener("message", (e) => {
   if (msg.type === "boot") boot(msg);
   else if (msg.type === "tick") tick(Math.max(1, Math.min(8, msg.n | 0)), Array.isArray(msg.masks) ? msg.masks : []);
   else if (msg.type === "call") call(msg.id, msg.method, msg.args);
+  else if (msg.type === "ai") t?.machine().aiDeliver(msg.reply);
 });
 
 // Keys pressed while the frame has focus go to the host, which owns input.

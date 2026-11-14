@@ -257,8 +257,9 @@ export function createManager(o) {
         return json(res, 200, { ok: true });
       }
       if (req.method === "GET" && rest === "/activity") {
-        const [logs, now] = await Promise.all([c.logs(), c.studioNow?.().catch(() => null)]);
-        return json(res, 200, { ...activity(logs), now: now ?? null });
+        // D488: AI in games' spend is summed on the cabinet, from its whole cost log. A cabinet without it yet gives null.
+        const [logs, now, ai] = await Promise.all([c.logs(), c.studioNow?.().catch(() => null), c.service("GET", "/api/manager/game-ai").then((r) => (r.status === 200 ? r.body : null), () => null)]);
+        return json(res, 200, { ...activity(logs), now: now ?? null, ai });
       }
       if (req.method === "POST" && rest === "/pair") {
         await c.pair();

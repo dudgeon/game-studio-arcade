@@ -105,6 +105,27 @@ declare namespace Arcade {
     voice?: number;
   }
 
+  /**
+   * AI in a game (D480). A game never waits: `next` and `pick` answer in the same frame, with a fresh
+   * answer when the cabinet has one and the game's own fallback otherwise. In a playtest there are only fallbacks.
+   */
+  interface Ai {
+    /**
+     * Declare lines the game wants made up, in `init`. `ask` says what one line is; `fallback` is at
+     * least 3 lines of the game's own; `max` is the longest line it can show (20..120, default 80).
+     */
+    lines(name: string, opts: { ask: string; fallback: readonly string[]; max?: number }): void;
+    /** The next line for a declared `lines` ask. Always a line, at once. */
+    next(name: string): string;
+    /** Declare a choice between 2..8 of the game's own words, in `init`. */
+    choice(name: string, opts: { ask: string; options: readonly string[] }): void;
+    /**
+     * One of a declared choice's options, at once. `facts` are numbers, true/false or one of the
+     * options (at most 8); the answer to them is used at the next `pick`.
+     */
+    pick(name: string, facts?: Record<string, number | boolean | string>): string;
+  }
+
   /** The console handle passed to every cart function. */
   interface G {
     readonly W: Width;
@@ -123,6 +144,8 @@ declare namespace Arcade {
      * turns on the controllers there are (`g.lib.turns` hands them over).
      */
     readonly players: number;
+    /** Made-up lines and choices from a small model, with the game's own fallbacks (D480). */
+    readonly ai: Ai;
 
     // Input. `p` defaults to 1. A player beyond `g.players` never holds anything.
     /** Is the button held this frame? */

@@ -37,6 +37,7 @@ no-templates -->
 - `checks`: `checks.js`, `t`, and the tested bot `t.bot`. Read it before writing checks.
 - `sprites`: drawing with `g.sprite` rows, in sizes that read at 256×192.
 - `spec`: writing rules a machine or a person can check. Read it when not starting from a template's spec.
+- `game-ai`: `g.ai`, for made-up lines (new jokes) and choices (a boss's mood) while the game is played. Only when it's a strong fit; read it before using or offering it.
 
 ## House rules
 
