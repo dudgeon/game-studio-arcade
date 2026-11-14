@@ -1,0 +1,35 @@
+<style>
+#nm { left: 24px; top: 64px; }
+#nm > div { transition: opacity .4s; }
+#nm .row { left: 8px; right: 8px; height: 24px; line-height: 22px; padding: 0 6px; border: 2px solid #ffcd75; background: #29366f; border-radius: 3px; white-space: nowrap; top: 34px; }
+#nm #vtag, #nm #ntag { transition: opacity .4s; }
+#nm #ntag { position: absolute; left: 96px; top: 2px; opacity: 0; }
+[data-state~="named"] #vtag { opacity: 0; }
+[data-state~="named"] #ntag { opacity: 1; }
+#nm #q { left: 8px; right: 8px; top: 70px; color: #ffcd75; }
+#nm #ta { top: 96px; } #nm #tb { top: 122px; } #nm #tc { top: 148px; } #nm #td { top: 174px; }
+#nm #te { top: 200px; }
+#nm .tile s { display: none; text-decoration: none; }
+[data-state~="three"] #nm .tile s { display: inline; }
+[data-state~="three"] #nm .tile b { display: none; }
+#nm .tile b { font-weight: 700; }
+[data-state~="after"] #q, [data-state~="after"] #ta, [data-state~="after"] #tb, [data-state~="after"] #tc, [data-state~="after"] #td { opacity: .25; }
+#nm-h { left: 24px; top: 20px; }
+#nwhere { left: 376px; top: 70px; width: 240px; }
+#lin { left: 376px; top: 192px; width: 240px; }
+#late { left: 376px; top: 290px; width: 240px; }
+</style>
+<div class="h" id="nm-h">Names for versions</div>
+<div class="cab" id="nm" data-f>
+  <div class="hd">Log Hopper <span>Alina</span></div>
+  <div class="row" id="nrow">Log Hopper <span class="tag" id="vtag">v3</span><span class="tag" id="ntag">Faster logs</span></div>
+  <div id="q" data-in="fade">What should this version be called?</div>
+  <div class="tile" id="ta" data-in="up">A  Faster logs</div>
+  <div class="tile" id="tb" data-in="up">B  Turbo river</div>
+  <div class="tile" id="tc" data-in="up"><b>C  Something else (say it)</b><s>C  Log rush</s></div>
+  <div class="tile" id="td" data-in="up"><b>D  You pick</b><s>Say my own</s></div>
+  <div class="tile" id="te" data-in="up">You pick</div>
+</div>
+<div class="card" id="nwhere" data-in="left" data-f><div class="lab">Where the name lives</div><div class="s">In the spec's Changelog, and in cart.json for the shelf. The number stays underneath, as the order.</div></div>
+<div class="card" id="lin" data-in="left" data-f><div class="lab">Shown on</div><div class="s">The shelf, "is ready!", the versions list, the Manager.</div></div>
+<div class="card" id="late" data-in="left" data-f><div class="lab">After the build</div><div class="s">Claude has gone by then, so the cabinet would need its own model call for names.</div></div>

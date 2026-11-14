@@ -1,0 +1,45 @@
+/* Scenes for the Studio round two walkthrough. The world is 640x400. The cabinet's screen is drawn in the
+   launcher's own palette (runtime/src/palette.js names): night, navy, blue, yellow, green, coral, silver. */
+.cam { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #1f2328; }
+.cam > * { position: absolute; }
+.h { font-size: 24px; line-height: 30px; font-weight: 600; }
+.t { font-size: 17px; line-height: 24px; }
+.s { font-size: 14px; line-height: 20px; color: #5b636d; }
+.lab { font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #5b636d; }
+.stamp { background: #1f2328; color: #fff; padding: 6px 12px; border-radius: 7px; font-size: 15px; line-height: 21px; font-weight: 600; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border: 1px solid #8b939c; border-radius: 7px; background: #fff; font-size: 14px; white-space: nowrap; }
+.chip.bad { border-color: #c2410c; color: #c2410c; font-weight: 600; }
+.chip.good { border-color: #1f2328; font-weight: 600; }
+.card { background: #fff; border: 1px solid #c9cdd3; border-radius: 9px; padding: 10px 12px; box-shadow: 0 6px 18px rgba(31,35,40,.10); }
+.card b { font-weight: 600; }
+.num { font: 600 30px/34px ui-monospace, "SF Mono", Menlo, monospace; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* The cabinet's screen: 256x192 drawn at 1.25x (320x240). */
+.cab { width: 320px; height: 240px; background: #1a1c2c; border: 6px solid #1f2328; border-radius: 10px; overflow: hidden; color: #f4f4f4; font: 700 13px/17px ui-monospace, "SF Mono", Menlo, monospace; box-shadow: 0 10px 28px rgba(31,35,40,.22); }
+.cab > * { position: absolute; }
+.cab .hd { left: 0; top: 0; right: 0; height: 20px; background: #29366f; border-bottom: 2px solid #3b5dc9; color: #ffcd75; padding: 1px 8px; white-space: nowrap; }
+.cab .hd span { float: right; color: #94b0c2; }
+.cab .hint { left: 0; right: 0; bottom: 3px; text-align: center; color: #94b0c2; font-size: 13px; white-space: nowrap; }
+.cab .y { color: #ffcd75; }
+.cab .dim { color: #94b0c2; }
+.cab .tile { left: 8px; right: 8px; height: 22px; border: 2px solid #3b5dc9; border-radius: 3px; padding: 0 6px; line-height: 19px; white-space: nowrap; background: #1a1c2c; transition: background-color .3s, border-color .3s, color .3s; }
+.cab .tile.lit { background: #38b764; border-color: #a7f070; color: #1a1c2c; }
+.cab .tile.litb { background: #3b5dc9; border-color: #73eff7; }
+.cab .tag { display: inline-block; background: #29366f; color: #f4f4f4; padding: 0 5px; border-radius: 2px; margin-left: 6px; font-size: 13px; }
+.cab .words { left: 8px; right: 8px; color: #f4f4f4; }
+.cab .words i { font-style: normal; display: inline-block; height: 9px; border-radius: 2px; background: #f4f4f4; margin: 4px 5px 0 0; opacity: .9; }
+.cab .mic { left: 138px; width: 44px; height: 44px; border-radius: 50%; background: #b13e53; box-shadow: 0 0 0 4px #ef7d57; }
+.cab .mic::after { content: ""; position: absolute; left: 17px; top: 9px; width: 10px; height: 18px; border-radius: 5px; background: #f4f4f4; box-shadow: 0 12px 0 -3px #f4f4f4; }
+.cab .bar { left: 8px; right: 8px; height: 8px; background: #29366f; border-radius: 2px; overflow: hidden; }
+.cab .bar u { display: block; height: 100%; width: 0; background: #38b764; transition: width 2.4s linear, background-color .4s; }
+
+/* A hold on a time line: what was held, and what was kept. */
+.hold { height: 16px; border-radius: 4px; background: #e3e6ea; overflow: hidden; }
+.hold u { display: block; height: 100%; background: #1f2328; border-radius: 4px 0 0 4px; }
+.hold.cut { background: repeating-linear-gradient(45deg, #f6d9cc, #f6d9cc 5px, #fbeee8 5px, #fbeee8 10px); outline: 1.5px solid #c2410c; }
+.holdlab { font: 13px/16px ui-monospace, "SF Mono", Menlo, monospace; color: #5b636d; white-space: nowrap; }
+
+.ans-row { display: flex; gap: 12px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid #e3e6ea; font-size: 15px; line-height: 21px; }
+.ans-row .q { flex: none; width: 190px; color: #5b636d; }
+.ans-row .a { font-weight: 600; }

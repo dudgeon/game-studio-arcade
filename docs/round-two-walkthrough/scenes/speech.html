@@ -1,0 +1,26 @@
+<style>
+#sp-h { left: 24px; top: 20px; }
+#sp-s { left: 24px; top: 52px; }
+.hr { left: 150px; }
+.hl { left: 24px; width: 118px; text-align: right; }
+#capline { left: 294px; top: 84px; width: 0; height: 216px; border-left: 2px dashed #c2410c; }
+#caplab { left: 302px; top: 84px; color: #c2410c; font-weight: 600; font-size: 14px; }
+#lost1 { left: 344px; top: 242px; } #lost2 { left: 556px; top: 276px; }
+#ok1 { left: 24px; top: 326px; } #ok2 { left: 24px; top: 362px; }
+#silent { left: 356px; top: 326px; }
+</style>
+<div class="h" id="sp-h">Today's six holds on the Picade</div>
+<div class="s" id="sp-s">From the cabinet's speech log: lengths and timings only, never the words.</div>
+<div class="holdlab hl" style="top:98px">held 10.7 s</div><div class="hold hr" style="top:98px;width:51px" id="h1" data-in="grow"><u style="width:100%"></u></div>
+<div class="holdlab hl" style="top:132px">held 8.6 s</div><div class="hold hr" style="top:132px;width:41px" id="h2" data-in="grow"><u style="width:100%"></u></div>
+<div class="holdlab hl" style="top:166px">held 7.9 s</div><div class="hold hr" style="top:166px;width:38px" id="h3" data-in="grow"><u style="width:100%"></u></div>
+<div class="holdlab hl" style="top:200px">held 14.9 s</div><div class="hold hr" style="top:200px;width:72px" id="h4" data-in="grow"><u style="width:100%"></u></div>
+<div class="holdlab hl" style="top:234px">held 39.3 s</div><div class="hold hr cut" style="top:234px;width:189px" id="h5" data-in="grow" data-f><u style="width:144px"></u></div>
+<div class="holdlab hl" style="top:268px">held 83.2 s</div><div class="hold hr cut" style="top:268px;width:400px" id="h6" data-in="grow" data-f><u style="width:144px"></u></div>
+<div id="capline" data-in="fade"></div>
+<div id="caplab" data-in="fade">30 s: recording stops, silently</div>
+<div class="holdlab" id="lost1" data-in="fade" style="color:#c2410c">9 s lost</div>
+<div class="holdlab" id="lost2" data-in="fade" style="color:#c2410c">53 s lost</div>
+<div class="chip good" id="ok1" data-in="up" data-f>Groq answered all six, in 0.6 to 2.2 s</div>
+<div class="chip good" id="ok2" data-in="up" data-f>No timeouts, no fallbacks, no errors</div>
+<div class="chip bad" id="silent" data-in="up" data-f>Nothing on screen says it stopped</div>

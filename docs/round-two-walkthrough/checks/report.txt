@@ -1,0 +1,46 @@
+desktop after play: {"cur":0,"t":3.986203,"mode":"intro","cap":"The kids have made two games at the cabinet by voice, and changed one. The flow works."}
+desktop option playing: {"mode":"option","t":2.435892}
+desktop saved: Saved on this page. Copy decisions sends it by hand.
+desktop after save, chapter 3
+desktop copy button: Copied
+desktop clipboard:
+Studio round two walkthrough · all decisions (studio-round-two-2026-11)
+For director-game-studio-arcade. Saved in this page's db under answers/<id>.
+
+D450 (cap) How long a kid can talk: 2 minutes [two-minutes] (recommended)
+  Comment: check run: a comment
+D453 (review) Reading back a long idea: not answered
+D454 (live) Words as they're heard: not answered
+D456 (names) Names for versions: not answered
+D459 (motion) How far motion and depth go: not answered
+D464 (ai-pay) Who pays for AI in games: not answered
+D468 (ai-scope) What games may ask for: not answered
+D469 (order) The order of work: not answered
+
+Research: https://github.com/dudgeon/game-studio-arcade/blob/main/docs/round-two-plan.md
+desktop horizontal overflow px: 0
+desktop targets under 40px: ["● Limit 36x44","● AI: cost 35x44","● AI: scope 25x44"]
+desktop errors: []
+phone after play: {"cur":0,"t":3.957885,"mode":"intro","cap":"The kids have made two games at the cabinet by voice, and changed one. The flow works."}
+phone option playing: {"mode":"option","t":2.423801}
+phone saved: Saved on this page. Copy decisions sends it by hand.
+phone after save, chapter 3
+phone copy button: Copied
+phone clipboard:
+Studio round two walkthrough · all decisions (studio-round-two-2026-11)
+For director-game-studio-arcade. Saved in this page's db under answers/<id>.
+
+D450 (cap) How long a kid can talk: 2 minutes [two-minutes] (recommended)
+  Comment: check run: a comment
+D453 (review) Reading back a long idea: not answered
+D454 (live) Words as they're heard: not answered
+D456 (names) Names for versions: not answered
+D459 (motion) How far motion and depth go: not answered
+D464 (ai-pay) Who pays for AI in games: not answered
+D468 (ai-scope) What games may ask for: not answered
+D469 (order) The order of work: not answered
+
+Research: https://github.com/dudgeon/game-studio-arcade/blob/main/docs/round-two-plan.md
+phone horizontal overflow px: 0
+phone targets under 40px: ["Why now 31x30","Cut off 39x30","● Limit 13x30","● Review 19x30","● Live words 18x30","● Names 19x30","Measured 41x30","● Motion 21x30","AI: how 40x30","● AI: cost 13x30","● AI: scope 9x30","● Order 18x30","Done 15x30"]
+phone errors: []

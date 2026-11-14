@@ -1,0 +1,33 @@
+<style>
+#lv { left: 24px; top: 64px; }
+#lv .mic { top: 30px; }
+#lv #lmsg { left: 0; right: 0; top: 90px; text-align: center; color: #ffcd75; }
+#lv .words { top: 116px; opacity: .75; }
+#lv .words i { background: #94b0c2; }
+#lv #meter { left: 110px; top: 196px; width: 100px; height: 14px; display: flex; gap: 4px; align-items: flex-end; }
+#lv #meter b { flex: 1; background: #38b764; border-radius: 1px; animation: lvl 0.9s ease-in-out infinite alternate; }
+#lv #meter b:nth-child(2) { animation-delay: .2s; } #lv #meter b:nth-child(3) { animation-delay: .45s; } #lv #meter b:nth-child(4) { animation-delay: .1s; } #lv #meter b:nth-child(5) { animation-delay: .6s; }
+@keyframes lvl { from { height: 3px; } to { height: 14px; } }
+#lv #lbar { top: 214px; }
+#lv #lbar u { width: 35%; transition: none; }
+#lv-h { left: 24px; top: 20px; }
+#src { left: 376px; top: 70px; width: 240px; }
+#moon { left: 376px; top: 150px; width: 240px; }
+#groq { left: 376px; top: 236px; width: 240px; }
+#final { left: 376px; top: 322px; }
+</style>
+<div class="h" id="lv-h">Words as they're heard</div>
+<div class="cab" id="lv" data-f>
+  <div class="hd">Tell me your game idea</div>
+  <div class="mic"></div>
+  <div id="lmsg">Listening...</div>
+  <div class="words" id="lw1" data-in="fade"><i style="width:38px"></i><i style="width:22px"></i><i style="width:54px"></i><i style="width:30px"></i><i style="width:46px"></i></div>
+  <div class="words" id="lw2" data-in="fade" style="top:134px"><i style="width:26px"></i><i style="width:62px"></i><i style="width:34px"></i><i style="width:20px"></i><i style="width:50px"></i></div>
+  <div class="words" id="lw3" data-in="fade" style="top:152px"><i style="width:48px"></i><i style="width:28px"></i><i style="width:40px"></i></div>
+  <div id="meter" data-in="fade"><b></b><b></b><b></b><b></b><b></b></div>
+  <div class="bar" id="lbar" data-in="fade"><u></u></div>
+</div>
+<div class="card" id="src" data-in="left" data-f><div class="lab">Groq</div><div class="s">Can't stream. It only takes a finished clip.</div></div>
+<div class="card" id="moon" data-in="left" data-f><div class="lab">Moonshine, on the cabinet</div><div class="s">Streams words about twice a second. Free, and works offline. Rougher than Groq.</div></div>
+<div class="card" id="groq" data-in="left" data-f><div class="lab">Groq, re-sent every 3 s</div><div class="s">About 2.7 cents for a long hold, and it hits the free limit of 20 a minute.</div></div>
+<div class="chip good" id="final" data-in="up">Either way, Groq writes the final text</div>
