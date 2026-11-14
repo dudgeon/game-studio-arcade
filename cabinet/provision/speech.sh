@@ -23,6 +23,7 @@ step_speech() {
     local from=()
     [ -d "$PAYLOAD/speech/wheels" ] && from=(--no-index --find-links "$PAYLOAD/speech/wheels")
     "$venv.tmp/bin/pip" install --quiet --disable-pip-version-check --no-cache-dir --require-hashes --only-binary :all: --no-deps "${from[@]}" -r "$lock"
+    sync  # on disk before it has its final name (D334)
     mv "$venv.tmp" "$venv"
   fi
   ln -sfn "$venv" "$SPEECH_HOME/venv"
@@ -39,6 +40,7 @@ step_speech() {
     tmp="$f.tmp"
     if [ -f "$PAYLOAD/speech/models/$name" ]; then cp "$PAYLOAD/speech/models/$name" "$tmp"; else curl -fsSL --retry 3 -o "$tmp" "$base/$name"; fi
     echo "$sha  $tmp" | sha256sum -c --status - || { rm -f "$tmp"; log "speech: $name doesn't match its hash"; return 1; }
+    sync "$tmp"  # on disk before it has its final name (D334)
     mv "$tmp" "$f"
   done < <(node -e '
     const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));

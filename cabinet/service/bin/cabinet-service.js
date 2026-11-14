@@ -191,6 +191,8 @@ const s = await startService({
   screen,
   guests,
   plays,
+  // An update waits for a gate check as it does for a play (D332).
+  gateBusy: () => gate?.busy() ?? false,
   studio,
   makers,
   speech,

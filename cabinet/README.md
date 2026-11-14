@@ -47,12 +47,18 @@ After the Studio agent changes: `scripts/virtual-cabinet/connect-cabinet.sh --re
 ## Update the cabinet
 
 ```sh
-node scripts/virtual-cabinet/update-cabinet.mjs    # from a clean checkout of main
+node scripts/virtual-cabinet/update-cabinet.mjs               # the virtual cabinet, from a clean checkout of main
+node scripts/virtual-cabinet/update-cabinet.mjs --picade --os # the Picade: software, OS packages, and the agent's brief if it changed
 ```
 
-This is how fixes reach a running cabinet (D195). Its data and key stay as they are, the version moves, and the old release is kept. A game being played is interrupted when the service restarts. It refuses while a make is running or one is still to be collected. The cabinet checks every data file and the config before and after (D196): logs may only grow, everything else must be byte-identical. It rolls back if the service doesn't return.
+Or the Manager's **Software** tab, which runs the same command (D338). This is how fixes reach a running cabinet (D195, D330):
+- **What's kept:** its data and key stay as they are, and the old release is kept. The version moves.
+- **When it runs:** it refuses during a make, a game or a gate check, and says which (D332). The shelf restarts once.
+- **Checks:** the cabinet checks every data file and the config before and after (D196). Logs may only grow; everything else must be byte-identical.
+- **Ways back:** if the cabinet isn't healthy afterwards (service, SSH, its own router; D333), it goes back with the old release's own provisioning (D331). OS packages go back from copies it kept (D335). If the power goes partway, the next boot puts it back (D334).
+- **What it never touches:** the kernel and boot firmware. Those change only with `scripts/cabinet-card/boot-update.mjs`, through tryboot (D336).
 
-To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`.
+To go back by hand: on the cabinet, `ls /opt/arcade/releases`, point `/opt/arcade/current` at the older one, and restart `arcade-launcher` and `arcade-kiosk`. Each update's folder, log and result are in `/var/lib/arcade-update/`.
 
 ## Add coins or reset the pot
 

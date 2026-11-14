@@ -75,6 +75,29 @@ Sources: code.claude.com/docs/en/{plugins-reference, plugins/create, plugins/ins
 
 - The current release is **trixie (Debian 13)**, released 2026-10-06 with kernel 6.18. It's available as Lite 64-bit and supports the Pi 5. Target trixie, not bookworm.
 
+### Updating a Pi 5 over the network (checked 2026-11-13, for D330-D339)
+
+Sources: [config.txt](https://www.raspberrypi.com/documentation/computers/config_txt.html) (CT), [Raspberry Pi hardware](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html) (RP), [OS](https://www.raspberrypi.com/documentation/computers/os.html), [rpi-eeprom README](https://github.com/raspberrypi/rpi-eeprom), [RPi-Distro/firmware](https://github.com/RPi-Distro/firmware) branch `pios/trixie`, [Connect](https://www.raspberrypi.com/documentation/services/connect.html), the 2026-10-06 Lite image's `.info` manifest, and archive.raspberrypi.com's index.
+
+- **tryboot (RP):** `sudo reboot '0 tryboot'` sets a one-shot flag. On trixie's systemd 257, `reboot [ARG]` takes it, but `systemctl reboot "0 tryboot"` fails with "Too many arguments": use `systemctl reboot --reboot-argument="0 tryboot"` (found in the QEMU rehearsal, 2026-11-13). For that boot only, the firmware reads `tryboot.txt` instead of `config.txt`. "A crash or reset will cause the original `config.txt` file to be loaded on the next reboot."
+- **Official A/B (CT):** partition 1 holds only `autoboot.txt` (`[all] tryboot_a_b=1`, `boot_partition=2`, `[tryboot] boot_partition=3`). You commit by swapping the two partitions in `autoboot.txt`, a one-sector write. This needs a card laid out that way. The stock image (FAT boot + ext4 root) isn't.
+- **`os_prefix` (CT):** it's prepended to "kernels, `initramfs`, `cmdline.txt`, `.dtbs` and overlays". The firmware "first tests the supplied prefix value for viability": unless the kernel and .dtb are found there, the prefix is ignored. Overlays come from the prefix only if `${os_prefix}overlays/README` exists. This is what D336 uses, on the stock layout.
+- **Hangs need a watchdog.** The docs describe going back only on "crash or reset". `kernel_watchdog_timeout=N` (CT, default 0) hands a hardware watchdog to the OS at boot. CT says it's preferred over `dtparam=watchdog`, and the OS must kick it, "typically" with systemd `RuntimeWatchdogSec`. Not confirmed in the docs: the trixie defaults for either, and whether a watchdog reset clears the tryboot flag the way "a reset" does. 🔧 on the Picade.
+- **Kernel and boot files on trixie:**
+  - The kernel is `linux-image-rpi-2712` (meta, `1:6.18.50-1+rpt1` in the image), with versioned `linux-image-6.18.50+rpt-rpi-2712`. The boot firmware is `raspi-firmware` (`1:1.20260915-1`). The image has no `flash-kernel` and no `unattended-upgrades`.
+  - `raspi-firmware`'s hooks (`postinst.d/z50-raspi-firmware`, `initramfs/post-update.d/z50-raspi-firmware`) `cp` the new kernel and initramfs over `kernel_2712.img` and `initramfs_2712` at the top of the FAT partition, in place. A power cut there can leave a kernel that won't boot.
+  - The OS page: apt "also updates your Linux kernel and firmware". `rpi-update` "can introduce instability, rendering your system unreliable or unbootable".
+- **Bootloader (EEPROM):**
+  - `rpi-eeprom-update.service` "runs at startup and applies an update if a new image is available" (RP); `systemctl mask rpi-eeprom-update` stops it.
+  - The default path stages `pieeprom.upd` on the boot partition for `recovery.bin` to flash at the next boot. Pi 5 also offers opt-in A/B EEPROM ("updates are written to the other partition, leaving the committed partition untouched").
+  - Recovering a bad flash otherwise needs the card (Imager's bootloader-restore). Not confirmed: whether the default `recovery.bin` path survives a power cut mid-flash.
+- **No network recovery without Ethernet (RP):** "Booting over wireless LAN is not supported"; HTTP boot needs wired Ethernet. The Picade is Wi-Fi only, so a cabinet that won't boot can't be rescued over the network. Every boot change must be able to go back by itself.
+- **apt archive:**
+  - archive.raspberrypi.com has no snapshot service, and its `Packages` index lists one version per package. So `apt install pkg=older` can't roll back.
+  - Old `.deb`s stay in the pool, fetchable by URL. D335 keeps its own copy (`dpkg-repack`) before changing anything.
+- **Raspberry Pi Connect's OTA** does real two-slot A/B updates, but only on an `rpi-image-gen` A/B image ("needs physical access" to reimage; 16 GB minimum). Not for this card as flashed.
+- **Measured on the QEMU rehearsal of the card (2026-11-13):** the first OS update after the 2026-10-06 image moved 31 packages in 66 s, including openssl, curl, apt, tzdata, raspi-config, rpi-connect-lite and the non-Broadcom Wi-Fi firmware. The boot set was held. `dpkg-repack` kept a copy of each first.
+
 ## Speech
 
 - **Groq `whisper-large-v3-turbo`:** $0.04/hour of audio with a **10-second minimum billed per request**, which is negligible at $0.0001 per clip. Uploads are capped at 25 MB. Inputs and outputs aren't retained by default, but abuse logs are kept for up to 30 days. **Turn on Zero Data Retention** at console.groq.com/settings/data-controls; the transcription endpoints are ZDR-eligible.

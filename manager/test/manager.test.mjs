@@ -8,6 +8,8 @@ import { test } from "node:test";
 import { activity } from "../activity.mjs";
 import { loadCabinets } from "../cabinet.mjs";
 import { toLinux } from "../keys.mjs";
+import { updater } from "../update.mjs";
+import { EventEmitter } from "node:events";
 import { createManager, goodHost, homeAddress, houseTimeZone, managerKey } from "../server.mjs";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000", "hex");
@@ -52,8 +54,8 @@ function fakeCabinet(o = {}) {
   return c;
 }
 
-async function withManager(cabinets, fn) {
-  const server = createManager({ key: "sesame", cabinets: new Map(Object.entries(cabinets)) });
+async function withManager(cabinets, fn, extra = {}) {
+  const server = createManager({ key: "sesame", cabinets: new Map(Object.entries(cabinets)), ...extra });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
@@ -287,4 +289,55 @@ test("times are shown in the house's time zone: the mini's, or MANAGER_TZ (D283)
     if (was === undefined) delete process.env.MANAGER_TZ;
     else process.env.MANAGER_TZ = was;
   }
+});
+
+// The Update button (D338): the same update-cabinet.mjs a grown-up runs, with a stand-in for the process.
+function fakeRun() {
+  const runs = [];
+  const run = (args) => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    runs.push({ args, child });
+    return child;
+  };
+  return { runs, run };
+}
+
+test("the Update button runs update-cabinet.mjs for that cabinet, one at a time, and keeps its output (D338)", async () => {
+  const f = fakeRun();
+  const updates = updater({ run: f.run, checkout: () => "abc123def456" });
+  const cab = fakeCabinet();
+  cab.exec = async () => "0.1.0-111\nabc123def456\n";
+  await withManager({ real: cab, other: fakeCabinet() }, async (base) => {
+    const cookie = await login(base);
+    const get = async (n) => (await fetch(`${base}/api/c/${n}/update`, { headers: { Cookie: cookie } })).json();
+    let s = await get("real");
+    assert.deepEqual([s.running, s.checkout, s.cabinet.version, s.cabinet.commit], [false, "abc123def456", "0.1.0-111", "abc123def456"]);
+    assert.equal((await post(base, cookie, "/api/c/real/update", { os: true })).status, 200);
+    assert.deepEqual(f.runs[0].args, ["--picade", "--os"]);
+    assert.equal((await post(base, cookie, "/api/c/real/update", {})).status, 409, "one at a time");
+    assert.equal((await post(base, cookie, "/api/c/other/update", {})).status, 404, "only cabinets it knows how to update");
+    const out = f.runs[0].child.stdout;
+    out.emit("data", '[update] sending abc to the picade cabinet\n{\n "ok": false,\n "reason": "a game is being played (teti): nothing was changed"\n}\n');
+    out.emit("data", "[update] Stopped: a game is being played\n");
+    f.runs[0].child.emit("close", 1);
+    s = await get("real");
+    assert.equal(s.running, false);
+    assert.equal(s.ok, false);
+    assert.equal(s.result.reason, "a game is being played (teti): nothing was changed");
+    assert.deepEqual(s.lines, ["[update] sending abc to the picade cabinet", "[update] Stopped: a game is being played"]);
+    assert.equal((await post(base, cookie, "/api/c/real/update", {})).status, 200, "another once it's done");
+    assert.deepEqual(f.runs[1].args, ["--picade"]);
+  }, { updates });
+});
+
+test("the Update button needs the Manager's page, like every POST (D285)", async () => {
+  const f = fakeRun();
+  await withManager({ virtual: fakeCabinet() }, async (base) => {
+    const cookie = await login(base);
+    const r = await fetch(`${base}/api/c/virtual/update`, { method: "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(r.status, 403);
+    assert.equal(f.runs.length, 0);
+  }, { updates: updater({ run: f.run, checkout: () => "x" }) });
 });

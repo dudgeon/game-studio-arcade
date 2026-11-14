@@ -11,6 +11,8 @@
 //   POST /api/c/NAME/keys          {how: "down"|"up", codes: [KeyboardEvent.code], viewer} (D282)
 //   GET  /api/c/NAME/activity      makes, plays, screened requests, coin entries (D283)
 //   GET  /api/c/NAME/pot           the pot; POST …/pot/topup {coins, reason, confirm?}; POST …/pot/reset {reason}; POST …/pair (D284)
+//   GET  /api/c/NAME/update        the cabinet's software version, this checkout's, and the last update's output (D338)
+//   POST /api/c/NAME/update        {os}: update the cabinet from this checkout, as update-cabinet.mjs does (D330, D338)
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
@@ -22,6 +24,7 @@ import { activity } from "./activity.mjs";
 import { backupHealth, readBackupRecord } from "./backup.mjs";
 import { Cabinet, CONFIG_DIR, loadCabinets } from "./cabinet.mjs";
 import { CONTROLS, toLinux } from "./keys.mjs";
+import { updater } from "./update.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PORT = 8335;
@@ -100,12 +103,14 @@ export function houseTimeZone() {
 const dollars = (/** @type {number} */ c) => `${c < 0 ? "-" : ""}$${(Math.abs(c) / 100).toFixed(2)}`;
 
 /**
- * @param {{ key: string, cabinets: Map<string, any>, page?: string, backupRecord?: string }} o
+ * @param {{ key: string, cabinets: Map<string, any>, page?: string, backupRecord?: string, updates?: ReturnType<typeof updater> }} o
  *   cabinets: name -> a Cabinet (or a stand-in with the same methods, for tests)
  *   backupRecord: the hourly backup's record, for the Picade's "last backup" (D353); default ~/game-studio-data/twin/backup.json
+ *   updates: the Update button's runner (D338); a stand-in for tests
  */
 export function createManager(o) {
   const page = o.page ?? path.join(HERE, "page");
+  const updates = o.updates ?? updater();
   const cookie = cookieValue(o.key);
   /** @type {Map<string, { watchers: Set<http.ServerResponse>, timer: NodeJS.Timeout | null, busy: boolean }>} */
   const watch = new Map();
@@ -252,6 +257,18 @@ export function createManager(o) {
       if (req.method === "POST" && rest === "/pair") {
         await c.pair();
         return json(res, 200, { ok: true });
+      }
+      if (rest === "/update") {
+        if (!updates.can(name)) return json(res, 404, { error: "this cabinet can't be updated from the Manager" });
+        if (req.method === "POST") {
+          const b = await readJson(req);
+          updates.start(name, { os: b.os === true });
+          return json(res, 200, updates.state(name));
+        }
+        // What the cabinet runs now: read on each look, so it's right after an update or a rollback.
+        const on = await c.exec("cat /etc/arcade/provisioned-version /etc/arcade/provisioned-commit 2>/dev/null; true", { timeout: 15000 }).catch(() => null);
+        const [version = null, commit = null] = typeof on === "string" ? on.trim().split("\n") : [];
+        return json(res, 200, { ...updates.state(name), cabinet: { version, commit, reachable: on !== null } });
       }
       if (rest === "/pot" || rest.startsWith("/pot/")) {
         const check = (/** @type {{status: number, body: any}} */ r) => {

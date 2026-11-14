@@ -219,6 +219,49 @@ $("#pairbtn").addEventListener("click", async () => {
   }
 });
 
+// ---- Software: update the cabinet (D338) ----
+let updateTimer = null;
+async function loadSoftware() {
+  clearTimeout(updateTimer);
+  let s;
+  try {
+    s = await api("GET", "/update");
+  } catch (err) {
+    $("#versions").innerHTML = `<p class=bad>${esc(err.message)}</p>`;
+    $("#update").hidden = true;
+    return;
+  }
+  $("#update").hidden = false;
+  const c = s.cabinet ?? {};
+  const same = c.commit && s.checkout && c.commit.startsWith(s.checkout);
+  $("#versions").innerHTML = `<h2>Versions</h2>
+    <div>On the cabinet: <b>${esc(c.version ?? (c.reachable ? "unknown" : "can't reach it"))}</b>${c.commit ? ` <span class=hint>(commit ${esc(c.commit)})</span>` : ""}</div>
+    <div>On the mini: <b>commit ${esc(s.checkout)}</b> ${same ? `<span class="tag ok">same</span>` : c.commit ? `<span class=tag>newer or different</span>` : ""}</div>`;
+  $("#updatebtn").disabled = s.running;
+  $("#updatebtn").textContent = s.running ? "Updating…" : "Update";
+  const r = s.result;
+  $("#updatemsg").innerHTML = s.running
+    ? `Updating since ${esc(when(s.started_at))}${s.os ? ", with OS packages" : ""}. You can leave this page; it carries on.`
+    : s.ok === true
+      ? `<span class=tag ok>updated</span> ${esc(when(s.ended_at))}${r?.os ? ` · ${esc(r.os.changed)} OS packages` : ""}${r?.restart_wanted ? " · some of it takes effect at the cabinet's next restart" : ""}`
+      : s.ok === false
+        ? `<span class="tag no">not updated</span> ${esc(when(s.ended_at))}: ${esc(r?.reason ?? s.lines.filter((l) => /Stopped/.test(l)).at(-1) ?? "see below")}${r?.rolled_back ? " It went back to what it had." : ""}`
+        : "";
+  $("#updatelog").hidden = !s.lines.length;
+  $("#updatelog").textContent = s.lines.join("\n");
+  if (s.running && view === "software") updateTimer = setTimeout(loadSoftware, 3000);
+}
+$("#update").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await api("POST", "/update", { os: e.target.os.checked });
+  } catch (err) {
+    $("#updatemsg").innerHTML = `<span class=bad>${esc(err.message)}</span>`;
+    return;
+  }
+  loadSoftware();
+});
+
 // ---- Views and the cabinet picker (D286) ----
 function show(v) {
   view = v;
@@ -226,6 +269,7 @@ function show(v) {
   for (const s of document.querySelectorAll(".view")) s.classList.toggle("on", s.id === v);
   if (v === "activity") loadActivity();
   if (v === "coins") loadPot();
+  if (v === "software") loadSoftware();
   try { localStorage.setItem("gsa-view", v); } catch {}
 }
 for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => show(b.dataset.view));

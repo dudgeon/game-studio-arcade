@@ -1,0 +1,78 @@
+#!/bin/bash
+# Puts the cabinet back after an update that was cut off (D334): the power went, or the update's unit died.
+# Runs at every boot (arcade-update-recover.service) and before any update, as root. With nothing pending it only
+# looks after os-watch, at boot. Safe to run again at any point: a cut during the recovery is recovered next boot.
+#
+#   arcade-update-recover          an update's own check (no os-watch)
+#   arcade-update-recover --boot   at boot
+set -u
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../update-lib.sh
+# Beside it when installed; one folder up in an update's payload (check/files/).
+if [ -s "$HERE/update-lib.sh" ]; then . "$HERE/update-lib.sh"; elif [ -s "$HERE/../update-lib.sh" ]; then . "$HERE/../update-lib.sh"; else . /usr/local/lib/arcade-update/update-lib.sh; fi
+DATA="${ARCADE_DATA:-/var/lib/arcade}"
+BOOT=no
+[ "${1:-}" = --boot ] && BOOT=yes
+
+if [ -e "$STATE/pending" ]; then
+  P="$STATE/pending"
+  payload="$(state_get "$P" payload)"
+  exec >> "$payload/update.log" 2>&1
+  ulog "recovering an update that didn't finish (stage $(state_get "$P" stage))"
+  # A finished update that was cut off just before it tidied up: nothing to put back.
+  if [ -s "$payload/result.json" ]; then
+    rm -f "$P"
+    ulog "it had finished; nothing to put back"
+    exit 0
+  fi
+  # A package install a power cut stopped is finished first, then whatever was kept is put back (D335).
+  dpkg --configure -a || true
+  [ -z "$(state_get "$P" os_saved)" ] || apt_back "$(state_get "$P" os_saved)"
+  if [ "$(state_get "$P" software)" = done ]; then
+    note="the new software stayed (it had come up healthy), and the OS packages were put back"
+    state_write "$STATE/last-good" "$payload"
+  else
+    apt_back "$payload/lock-before"
+    software_back "$(state_get "$P" previous)" "$(state_get "$P" version)" "$(state_get "$P" commit)" "$(state_get "$P" profile)"
+    note="the cabinet software went back to $(state_get "$P" version)"
+  fi
+  service_up 60 && active=true || active=false
+  report=null
+  kept=false
+  if [ -f "$payload/data.before" ] && [ -f "$payload/check/data-check.mjs" ]; then
+    report="$(node "$payload/check/data-check.mjs" check "$DATA" "$payload/data.before")" && kept=true
+    [ -n "$report" ] || report=null
+  fi
+  node -e '
+    const [note, after, active, kept, report] = process.argv.slice(1);
+    process.stdout.write(JSON.stringify({ ok: false, reason: `the update was cut off partway (a power cut or a restart): ${note}`,
+      version_after: after, rolled_back: true, recovered_at_boot: true, service_active: active === "true",
+      data_kept: kept === "true", data: JSON.parse(report) }, null, 1) + "\n");
+  ' "$note" "$(cat /etc/arcade/provisioned-version 2>/dev/null)" "$active" "$kept" "$report" > "$payload/result.json.new"
+  mv "$payload/result.json.new" "$payload/result.json"
+  sync
+  rm -f "$P"
+  ulog "recovered: $note"
+  exit 0
+fi
+
+# After OS packages changed (D333): this boot must reach the router within 10 minutes, or they go back and it restarts.
+# Its only false alarm is a router that's off for 10 minutes: then the cabinet goes back to the packages it had.
+if [ "$BOOT" = yes ] && [ -e "$STATE/os-watch" ]; then
+  W="$STATE/os-watch"
+  payload="$(state_get "$W" payload)"
+  exec >> "$payload/update.log" 2>&1
+  ulog "first boot since the OS packages changed: checking the network"
+  if net_ok "${ARCADE_OS_WATCH_TRIES:-300}"; then
+    rm -f "$W"
+    ulog "the network is up: the OS packages stay"
+    exit 0
+  fi
+  ulog "no network in 10 minutes since the OS packages changed: putting them back, then restarting"
+  apt_back "$(state_get "$W" saved)"
+  printf '{\n "ok": false,\n "reason": "after the OS packages changed, the cabinet lost its network at the next start, so they were put back",\n "rolled_back": true,\n "recovered_at_boot": true\n}\n' > "$payload/after-restart.json"
+  rm -f "$W"
+  sync
+  systemctl reboot
+fi
+exit 0

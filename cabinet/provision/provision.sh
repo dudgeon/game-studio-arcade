@@ -38,6 +38,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/cabinet-config.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/twin-data.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/update-guard.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
@@ -107,6 +109,8 @@ step_node() {
     echo "$sha  $tarball" | sha256sum -c -
     install -d "$dest.tmp"
     tar -xJf "$tarball" -C "$dest.tmp" --strip-components=1
+    # On disk before it has its final name: a power cut must not leave a named folder of empty files (D334).
+    sync
     mv "$dest.tmp" "$dest"
   fi
   ln -sfn "$dest/bin/node" /usr/local/bin/node
@@ -122,6 +126,9 @@ step_bundle() {
     tar -xzf "$PAYLOAD/bundle.tar.gz" -C "$release.tmp"
     # Exact versions from the repo's lock file, each checked by its hash; no install scripts run.
     (cd "$release.tmp" && PATH="$ARCADE_HOME/node/$(lock_value version)/bin:$PATH" npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+    # On disk before it has its final name: a named release is never unpacked again, so a power cut must not
+    # leave one of empty files (D334, found in the rehearsal of 2026-11-13).
+    sync
     mv "$release.tmp" "$release"
   fi
   ln -sfn "$release" "$ARCADE_HOME/current"
@@ -195,6 +202,7 @@ hw_late
 step_boot_wait
 stage "Starting the arcade"
 step_services
+step_update_guard
 stage "Finishing"
 install -d /etc/arcade
 echo "$RELEASE_NAME" > /etc/arcade/provisioned-version

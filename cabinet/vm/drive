@@ -16,6 +16,7 @@
 # Keys: up down left right a b x y q e start enter esc star f1 f2 (D82). coin is f2, the COIN button (D205).
 # ARCADE_HOST picks the cabinet (default arcade-virtual.local; D124). ARCADE_SSH_DIR picks the folder with its
 # SSH key and known_hosts (default the virtual cabinet's); the Picade's card script makes its own (D251).
+# ARCADE_SSH_PORT reaches a rehearsal VM's forwarded port (D337).
 #
 # The mini can lose the cabinet for a while (D156), so this waits it out for up to ARCADE_RIDE_S (default 300)
 # seconds. Reads just repeat. Each key has an id, and a repeat with that id is pressed only if it wasn't already
@@ -39,7 +40,7 @@ cabinet() {
   ssh -4 -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=8 \
     -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
     -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
-    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} "cabinet@$HOST" "$@" || rc=$?
+    ${ARCADE_SSH_CONTROL:+-S "$ARCADE_SSH_CONTROL"} ${ARCADE_SSH_PORT:+-p "$ARCADE_SSH_PORT"} "cabinet@$HOST" "$@" || rc=$?
   [ "$rc" = 142 ] && return 255
   return "$rc"
 }

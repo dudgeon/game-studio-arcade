@@ -49,8 +49,11 @@ test("the update records the data before provisioning, and checks it on every wa
   const at = (t) => s.indexOf(t);
   assert.ok(at("data-check.mjs\" record") > 0 && at("data-check.mjs\" record") < at('provision.sh" --profile'), "recorded before");
   const after = s.slice(at('provision.sh" --profile'));
-  assert.equal(after.match(/^\s*data_check$/gm)?.length, 3, "checked after a failure, a rollback and a success");
-  assert.match(s, /studio-left\.json/, "won't run with makes left to collect");
+  // The software rollback checks inside software_rollback (D331); the OS stage's three ways out, and success (D335).
+  assert.match(s.slice(at("software_rollback() {"), at('provision.sh" --profile')), /^\s*data_check$/m, "checked after a software rollback");
+  assert.equal(after.match(/^\s*data_check$/gm)?.length, 4, "checked after each OS outcome and a success");
+  assert.match(s, /busy_reason/, "won't run with makes left to collect (update-lib.sh, D332)");
+  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/update-lib.sh"), "utf8"), /studio-left\.json/);
   assert.match(s, /\[ "\$DATA_KEPT" = true \] \|\| finish false/);
 });
 

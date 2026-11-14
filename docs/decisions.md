@@ -1545,6 +1545,145 @@ The Picade's identity isn't checked, because that needs Geoff's key and applies 
 - Board tiles can now carry a letter badge (`row`'s `letter`), drawn like the question tiles'.
 - Browser tests: stop asks first, keep going and ESC return to the question, then a stop, the idea on Make, ESC keeping it and a try again reaching the coin check; a stop then a new idea; and the shelf's warning. Each fails without the change.
 
+## 2026-11-13 — Updating the Picade over the network, with a safe way back (D330-D339)
+
+Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the os cabinet etc -- accessing the sd card will be extremely hard once the cabinet is assembled". This adds a rule: **after the first flash, nothing ever needs the card pulled.** Every update can go back by itself, and the cabinet stays reachable over Wi-Fi. The Pi facts used here are in [platform-notes.md](platform-notes.md#updating-a-pi-5-over-the-network-checked-2026-11-13-for-d330-d339).
+
+**D330. One command, or a Manager button, updates the Picade: its cabinet software, the Studio agent's brief, and its OS packages.** *(Director's brief, 2026-11-13; design by Claude.)*
+- **The command:** `node scripts/virtual-cabinet/update-cabinet.mjs --picade --os`, run from a clean `main`.
+  - It reaches the Picade with its own key (picade-ssh.sh, D259). Without `--picade` it updates the virtual cabinet, as before.
+  - **Cabinet software:** the service, launcher, runtime, studio kit, guests and the provisioning script, as in D195. Data and the key are kept.
+  - **OS packages,** with `--os` (D335).
+  - **The agent's brief:** afterwards, if `studio-kit/managed-agent` differs between the cabinet's last commit and this checkout, it runs `connect-picade.sh --reapply`. That is the Managed Agents apply in the Picade's own workspace, with the key read from the cabinet.
+    - If the commit is unknown or was dirty, it reapplies anyway; that changes nothing when the definition is the same.
+    - It's skipped while the cabinet isn't connected, and `--no-agent` skips it.
+- **What's automatic within an update, and what stays a deliberate command:**
+
+| What | How | Why |
+|---|---|---|
+| Cabinet software (service, launcher, kit, guests, units, helpers) | Automatic, in every update | Rolls back with its own provisioning (D331) |
+| Packages apt.lock pins (Chromium, cage, …) | Automatic, only when apt.lock changes in the repo | Tested on the twin first; copies kept (D335) |
+| Other OS packages (security fixes: openssl, curl, tzdata, …) | Automatic with `--os` | `apt-get upgrade` only; copies kept; put back if unhealthy (D335) |
+| Agent brief | Automatic when the agent changed | `--reapply`; spends nothing |
+| Kernel, boot firmware, initramfs, the Pi's Wi-Fi firmware | **Deliberate:** `scripts/cabinet-card/boot-update.mjs` | Through tryboot, never in an ordinary update (D336) |
+| Bootloader (EEPROM) | **Deliberate and by hand, only if Raspberry Pi says a fix needs it** | Its own self-update is masked; a bad flash needs the card (D335) |
+
+- **Never during play or a make (D332).** There is no schedule. An update runs when Geoff runs it, or Claude with his yes. Nothing updates itself.
+
+**D331. A failed software update goes back with that release's own provisioning, not just its link.** *(Claude.)*
+- **Before D331:** a rollback pointed `/opt/arcade/current` back at the old release. The newer provisioning's unit files, helpers and settings stayed, so a broken unit file stayed broken.
+- **Now:** the cabinet keeps `last-good`, the payload of the last update that came up healthy. A rollback re-runs that payload's provisioning script over the cabinet.
+  - On the first update after the card, the card's own seed (`/boot/firmware/seed`) serves as that payload.
+  - It uses whichever payload's bundle matches the release it's going back to. With none, it moves the link alone, as before.
+- **No network needed:** that provisioning finds its release, Node, speech and packages already there.
+
+**D332. An update never interrupts anyone: it refuses during a make, a game, or a gate check.** *(Director's brief: "Updates never run during play or a make"; Claude.)*
+- **The cabinet checks itself,** before it records or changes anything, so the Manager, the command and a script all get the same answer.
+- **Busy means:**
+  - a make is running, or one is still to be collected (D191);
+  - the launcher's play heartbeat is fresh (D310, at most 30 s old);
+  - the publish gate is checking a game.
+- `GET /api/arcade/playing` on the service answers `{playing, what, gate_busy}`.
+- **The result names the reason,** e.g. "a game is being played (teti): nothing was changed". Try again later.
+- **A service that doesn't answer isn't busy:** a broken cabinet must still take a fix.
+
+**D333. "Healthy" means the service answers, SSH is running, and the cabinet still reaches its own router.** *(Claude.)*
+- **When:** after the software step and after the OS step.
+- **The router counts** if it answers a ping, or failing that, ARP. The mini isn't involved: it may be off (cabinet independence).
+- **After OS packages changed,** the next boot must reach the router within 10 minutes (`os-watch`), or the packages go back and the cabinet restarts.
+  - The only false alarm is a router that's off for those 10 minutes. Then the cabinet ends up on the older packages, which is harmless.
+  - The next update clears the watch, since it proves the network.
+- **A rollback that leaves no network** restarts NetworkManager. If that isn't enough, it restarts the cabinet on the old packages.
+
+**D334. A power cut at any point in an update puts the cabinet back at the next boot.** *(Claude; the rehearsal found the flaw it fixes.)*
+- **The marker:** `/var/lib/arcade-update/pending` is written before the first change, and removed only after `result.json`.
+- **At every boot,** `arcade-update-recover.service` runs. If `pending` is there, it:
+  - finishes any half-done package install (`dpkg --configure -a`);
+  - puts back the package copies;
+  - restores the old release with its own provisioning (D331), or keeps the new software if it had already come up healthy;
+  - checks the data against the record taken before;
+  - writes a `result.json` saying `recovered_at_boot`.
+- **An update started while `pending` is there** recovers first, with its own copy of the recovery.
+- **Files reach the disk before they're used.** The rehearsal's first power cut left every file the update had just written empty: ext4 had renamed them into place before their contents were on disk. That included the recovery unit, and an empty unit file is a masked unit. Now:
+  - the guards are written with flush-then-rename (`put_file`);
+  - the update runs `sync` before its first change;
+  - provisioning flushes a release, Node, the speech venv and the model files before giving them their final names. Otherwise a cut mid-unpack could leave a named release of empty files, which is never unpacked again.
+- **Every cabinet gets the guard.** Every provisioning run installs it, and so does the update itself before it changes anything, so a card flashed without it gets it on the first update.
+
+**D335. OS packages: `apt-get upgrade` only, a copy of every package first, the boot packages held.** *(Claude.)*
+- **`upgrade`, never `full-upgrade`,** so nothing is added or removed. A security fix that needs a new package waits for apt.lock.
+- **apt.lock's own packages are held during the OS step.** They move only when apt.lock changes in the repo and the software update installs those versions. Otherwise an OS update would move Chromium past its pin, and the next provisioning would fail trying to go back.
+- **The boot packages are held all the time:** `linux-image-*`, `linux-headers-*`, `raspi-firmware`, `initramfs-tools*`, `firmware-brcm80211` (the Pi's Wi-Fi chip), `rpi-eeprom`, `raspberrypi-sys-mods`, `rpi-update`.
+  - raspi-firmware's hooks overwrite the kernel on the boot partition in place (platform notes), so these move only through D336.
+- **A copy of each package first.** Raspberry Pi's archive keeps one version in its index and has no snapshots, so the cabinet makes its own copies:
+  - with `dpkg-repack`, installed when first needed, into the update's own folder;
+  - a failure puts them back with `dpkg -i`;
+  - the same goes for apt.lock packages a software update moves.
+- **The bootloader's self-update at boot is masked** (`rpi-eeprom-update.service`). A bad bootloader flash is the one failure that needs the card (Imager's recovery).
+  - Update it only by hand, on Raspberry Pi's advice, with nobody playing. There's no command for it yet.
+- **It needs 2 GB free,** and stops with nothing changed when there's less.
+
+**D336. The kernel and boot firmware change only through tryboot, into a new folder, and are kept only once the cabinet comes back well.** *(Claude, from Raspberry Pi's docs, checked 2026-11-13.)*
+- **Slots without repartitioning.** Each boot setup is its own folder on the boot partition (`arcade-<time>/`). It holds its own kernel, initramfs, device trees, overlays (with the README that makes them per-slot) and cmdline.txt.
+  - A block in config.txt picks one slot with `os_prefix`. The firmware ignores a prefix whose kernel or device tree is missing, and falls back to the top of the partition.
+  - Raspberry Pi's own A/B layout (`autoboot.txt`, two boot partitions) would mean repartitioning, so the card would come out. Not now (D339).
+  - **Space:** a slot holds only the Pi 5's files, about 25 MB: `kernel_2712.img`, `initramfs_2712`, the `bcm2712*.dtb` files, overlays and cmdline.txt.
+    - The rehearsal's card had only 115 MB free on its boot partition, because the seed takes 324 MB, mostly speech.
+    - So a try first removes every slot except the one config.txt boots, then needs the new slot's size plus 8 MB. Slots are copies of files the packages hold, not anyone's data.
+- **A try writes only a new folder and `tryboot.txt`,** then restarts with `reboot '0 tryboot'`: one boot from the new folder.
+  - On that boot, `arcade-boot-confirm` waits up to 5 minutes for the router, the service and the kiosk.
+  - If all three come up, it keeps the slot by rewriting config.txt's slot block. That is the one write that matters.
+  - If not, or if the try hangs, crashes or loses power, the next boot reads config.txt, which still names the last slot, and the boot packages are put back from their copies.
+  - The confirm knows a try by `arcade.slot=<id>` in that slot's own cmdline.txt.
+- **A hang must turn into a restart.** The slot block sets `kernel_watchdog_timeout=15`, and systemd kicks the watchdog (`RuntimeWatchdogSec=15s`).
+  - 🔧 Not confirmed in the docs: that a watchdog reset clears the tryboot flag as "a reset" does. Prove it on the Picade with a deliberately broken try before relying on it.
+- **Commands:** `scripts/cabinet-card/boot-update.mjs`, from a Terminal on the mini, never from the Manager. It waits for the outcome and reports it.
+  - `adopt`, once after bring-up: puts today's boot files in their own slot, so later package updates never touch what boots.
+  - `packages`: lifts the hold, updates the boot packages, copies them into a new slot, and tries it.
+  - `status`.
+- 🔧 **Not rehearsable in QEMU.** The rehearsal boots Debian's kernel without the Pi's firmware, so only the Picade can prove tryboot itself. The config.txt handling is tested on the mini.
+
+**D337. Proven in a QEMU rehearsal of the card, including a broken update and a power cut.** *(Director's brief; Claude.)*
+- **How:** `scripts/cabinet-card/test/update-rehearsal.sh DIR` runs on the card image `flash.mjs` writes, booted with `rehearse.mjs` (unchanged; the port comes from `REHEARSE_SSH_PORT`). It never touches the virtual cabinet or the Picade.
+- **The cases:**
+  - an update refused during a game;
+  - a software and OS update;
+  - the network check after the next restart;
+  - a broken release plus a broken unit file;
+  - a power cut while the new release unpacks, then the same update again;
+  - an OS package that breaks the service;
+  - an OS package that takes the network away.
+- **Data:** a cart and a log of the family's must come through every case.
+- **The broken packages** come from a local apt repository on the VM.
+- **The boot path,** `scripts/cabinet-card/test/boot-rehearsal.sh DIR`:
+  - **Revert:** QEMU has no Pi firmware, so a tryboot restart is a normal restart, which is exactly a try that didn't come up. It must be reported, and config.txt must be untouched.
+  - **Keep:** run on a copy of the boot partition, with a command line that names the slot.
+- **Results, 2026-11-13,** on a card from this branch rebased on main 0a137ad (the guard installed from first boot): **24/24 update checks and 10/10 boot checks pass.**
+- **What the rehearsal found and fixed:**
+  - Files written just before a power cut came back empty (D334).
+  - The boot partition had only 115 MB free (D336).
+  - systemd 257 refuses `systemctl reboot "0 tryboot"` with "Too many arguments". The try now uses `systemctl reboot --reboot-argument="0 tryboot"`. Raspberry Pi's own `reboot '0 tryboot'` still works, since `reboot [ARG]` takes it.
+  - The OS step: copying 31 packages first and then upgrading took 66 s.
+
+**D338. The Manager's Software tab: versions, and an Update button.** *(Director's brief; Claude.)*
+- **It shows** what the cabinet runs (version and commit, read live) and the mini's checkout commit.
+- **The button** runs the same `update-cabinet.mjs` for that cabinet (`real` becomes `--picade`), with a checkbox for OS packages, and shows its output and the cabinet's result.
+- **Limits:**
+  - one update per cabinet at a time;
+  - the cabinet refuses while it's busy (D332);
+  - the boot update is never on it (D336);
+  - like every Manager POST, it needs the Manager's page (D285).
+
+**D339. What this doesn't cover, and the risk Geoff accepts.** *(Geoff, 2026-11-13, through the director: "Card I have, accept risk"; Claude.)*
+- **The card stays as it is.** That means the card Geoff has, the stock two-partition layout, no A/B root, and no high-endurance card. The alternatives were Raspberry Pi's full A/B layout (`autoboot.txt` with two boot partitions and two roots, or Connect's OTA on an `rpi-image-gen` image) and a high-endurance card. Claude recommended the high-endurance card; Geoff chose neither.
+- **Still unrecoverable without opening the cabinet and reflashing the card:**
+  - **a corrupt root filesystem,** for example from SD card wear or a cut while the OS itself was writing;
+  - **a failed bootloader (EEPROM) flash.** Its self-update is masked, and changing it is by hand only, on Raspberry Pi's advice (D335).
+- **The fix when that happens:** open the cabinet, reflash, and reseed the data from the twin on the mini. The twin keeps the kids' data, as of its last `twin.mjs sync`. The steps are in [cabinet-bring-up.md, Part G](cabinet-bring-up.md#part-g-if-the-card-ever-dies-d339).
+- **An NVMe Base** (platform notes) remains the later fix if the card proves fragile.
+- **Changing the Wi-Fi network or password over the network:** not built. A wrong one would cut the cabinet off.
+- **config.txt changes in a software update** (picade.sh's block) are still written in place and take effect at the next restart, as before (D250). Moving them into a tried slot like D336 is a follow-up.
+
 ## 2026-11-13 — The twin as the Picade's backup (D350–D359)
 
 Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): if the Picade's card dies, it's reflashed and reloaded from the mini. So the mini's copy is the only backup of the kids' games. Code: `scripts/twin-backup/`, `manager/backup.mjs`, `scripts/twin.mjs`.
