@@ -751,3 +751,9 @@ test("commit-starters.sh commits the twin's untracked starters the first-boot wa
   assert.match(busy.stdout, /a make is running/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("--erase-confirmed must name this exact card, or the flash stops before writing (D394)", () => {
+  const src = fs.readFileSync(FLASH, "utf8");
+  assert.match(src, /const given = opt\("--erase-confirmed"\);\n\s+if \(given !== undefined\) \{\n\s+if \(given !== phrase\) stop\(/);
+  assert.ok(src.indexOf('opt("--erase-confirmed")') < src.indexOf("confirmed = info;"), "checked before the card is marked confirmed");
+});

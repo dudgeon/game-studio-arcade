@@ -489,8 +489,15 @@ async function main() {
     console.log(describe(info, partitionsOf(diskId)).join("\n"));
     const phrase = confirmPhrase(info);
     console.log(`\nIt becomes the cabinet's card: Raspberry Pi OS Lite ${lock.image.name}, hostname ${hostname}, profile ${PROFILE}.`);
-    const typed = ask(`Type "${phrase}" to erase it, or anything else to stop: `);
-    if (typed.trim() !== phrase) stop("nothing written.");
+    // D394: a wrapper that already names this exact card (disk and size) can pass the phrase; any other card stops.
+    const given = opt("--erase-confirmed");
+    if (given !== undefined) {
+      if (given !== phrase) stop(`--erase-confirmed says "${given}", but this card is "${phrase}". Nothing written.`);
+      say(`erasing ${diskId} (${phrase.split(" ").pop()}), as confirmed`);
+    } else {
+      const typed = ask(`Type "${phrase}" to erase it, or anything else to stop: `);
+      if (typed.trim() !== phrase) stop("nothing written.");
+    }
     confirmed = info;
     target = `/dev/r${diskId}`;
   } else {
