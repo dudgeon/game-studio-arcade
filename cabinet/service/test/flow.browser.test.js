@@ -429,6 +429,84 @@ test("the way back: ESC on a question asks; keep going returns; stop asks first,
   });
 });
 
+test("try again, then backing out of the coin check, keeps the idea on Make: after a stop and after a walk-away (D316)", { skip: skip || false, timeout: 120_000 }, async () => {
+  await withCabinet(
+    FIXTURE,
+    async ({ page, run, faults, problems }) => {
+      const byMake = () => boxText(page, "shelf-by-0");
+      const untilMake = (/** @type {string} */ t) => page.waitForFunction((/** @type {string} */ want) => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-by-0")?.text === want, t, { timeout: 15_000 });
+      // A stop: Make, E14, Try again, the coin check, ESC. Twice, so it holds.
+      await run(TO_FIRST_QUESTION);
+      await run(`
+        press esc
+        wait E8
+        press down
+        press down
+        press a
+        wait E13
+        press up
+        press a
+        wait shelf
+      `);
+      await untilMake("Your idea is saved");
+      for (let i = 0; i < 2; i++) {
+        await run(`
+          press up
+          press up
+          press a
+          wait E14
+          press a
+          wait M3
+          press esc
+          wait shelf
+          sleep 200
+        `);
+        assert.equal(await byMake(), "Your idea is saved", `back out of the coin check, try ${i + 1}`);
+      }
+      // A walk-away the same way: Make, the put-away board, Try again, the coin check, ESC.
+      await run(`
+        press a
+        wait E14
+        press down
+        press a
+        wait who
+        press a
+        wait M3
+        press coin
+        wait say idle
+        press f1
+        wait say typing
+        type a penguin game
+        press enter
+        wait say confirm
+        press a
+        wait question
+        press esc
+        wait E8
+        press down
+        press a
+        wait shelf
+      `);
+      await untilMake("Your last game was put away");
+      await run(`
+        press up
+        press up
+        press a
+        wait gone
+        press a
+        wait M3
+        press esc
+        wait shelf
+        sleep 200
+      `);
+      assert.equal(await byMake(), "Your last game was put away");
+      assert.deepEqual(await faults(), []);
+      assert.deepEqual(problems, []);
+    },
+    { questionTimeout: 4 },
+  );
+});
+
 test("stopped, then a new idea: Make is plain again and goes to who's making (D315)", { skip: skip || false, timeout: 120_000 }, async () => {
   await withCabinet(FIXTURE, async ({ page, run, faults }) => {
     await run(TO_FIRST_QUESTION);
