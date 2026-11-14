@@ -5,6 +5,7 @@
 //   node scripts/cabinet-card/boot-update.mjs status            what the Picade boots now, and the last try
 //   node scripts/cabinet-card/boot-update.mjs adopt             once: put what boots now in its own slot (no packages)
 //   node scripts/cabinet-card/boot-update.mjs packages          update the boot packages into a new slot and try it
+//   node scripts/cabinet-card/boot-update.mjs prove-revert      bring-up F3: a try that hangs on purpose; it must come back on its own
 //   ... [--rehearsal DIR]                                       a QEMU rehearsal instead of the Picade (D337)
 //
 // The Picade restarts into the new slot for one boot only. It keeps the slot if it comes back with its network and
@@ -24,7 +25,7 @@ const stop = (m) => {
   console.error(`[boot-update] Stopped: ${m}`);
   process.exit(1);
 };
-if (!["status", "adopt", "packages"].includes(what)) stop("say status, adopt or packages");
+if (!["status", "adopt", "packages", "prove-revert"].includes(what)) stop("say status, adopt, packages or prove-revert");
 const target = updateTarget(argv.includes("--rehearsal") ? argv : ["--picade"]);
 const ENV = { ...process.env, ...target.env, ARCADE_SSH_TIMEOUT_S: "60", ARCADE_RIDE_S: "30" };
 /** @param {string} command */
@@ -40,7 +41,7 @@ if (what === "status") process.exit(0);
 const before = on("sudo cat /var/lib/arcade-update/boot-result.json 2>/dev/null; cat /proc/sys/kernel/random/boot_id").stdout;
 const bootId = before.trim().split("\n").pop();
 // In its own unit, so the restart it asks for doesn't depend on this connection.
-const r = on(`sudo systemd-run --quiet --unit=arcade-boot-try-${Date.now()} --wait --collect --pipe ${ARCADE_BOOT} try${what === "packages" ? " --packages" : ""}`);
+const r = on(`sudo systemd-run --quiet --unit=arcade-boot-try-${Date.now()} --wait --collect --pipe ${ARCADE_BOOT} try${what === "packages" ? " --packages" : what === "prove-revert" ? " --broken-for-test" : ""}`);
 process.stdout.write(r.stdout);
 if (r.status !== 0 && r.status !== 255) stop(`${r.stderr.trim() || "the try didn't start"}`);
 if (/nothing to try/.test(r.stdout)) process.exit(0);
@@ -54,6 +55,14 @@ while (Date.now() < deadline) {
   if (id === bootId || state !== "settled") continue;
   const res = JSON.parse(rest.join("\n") || "{}");
   console.log(JSON.stringify(res, null, 1));
+  if (what === "prove-revert") {
+    // The broken try must not have been kept, and the Pi must have come back by itself (bring-up F3).
+    if (!res.ok && /didn't come up/.test(res.reason ?? "")) {
+      say("the way back works: the broken try hung, and the Picade came back on its last slot by itself");
+      process.exit(0);
+    }
+    stop(`the broken try didn't come back as it should: ${res.reason}`);
+  }
   if (!res.ok) stop(res.reason ?? "the try didn't stick");
   say(res.reason);
   process.exit(0);

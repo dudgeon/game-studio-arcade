@@ -40,6 +40,8 @@ worktree() { # NAME: a fresh worktree of HEAD
 cleanup() { for w in "$WT"/*; do [ -d "$w" ] && git -C "$REPO" worktree remove --force "$w" >/dev/null 2>&1; done; }
 trap cleanup EXIT
 mkdir -p "$WT"; : > "$LOG"
+# Each prepare makes new host keys; drive keeps its own known_hosts for the rehearsal's address.
+ssh-keygen -R "[127.0.0.1]:$REHEARSE_SSH_PORT" -f "$DIR/cabinet/ssh/known_hosts" >/dev/null 2>&1
 
 echo "=== setup: a cart and a log of the family's that must come through every case"
 look 'sudo -u arcade mkdir -p /var/lib/arcade/carts/rehearsal-cart && sudo cp -R /var/lib/arcade/carts/$(ls /var/lib/arcade/carts | grep -v rehearsal | head -1)/. /var/lib/arcade/carts/rehearsal-cart/ && sudo chown -R arcade:arcade /var/lib/arcade/carts/rehearsal-cart && echo kept | sudo -u arcade tee -a /var/lib/arcade/logs/rehearsal.log >/dev/null' >/dev/null

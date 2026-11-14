@@ -5,6 +5,7 @@
 #   arcade-boot try                   copy what boots now into its own slot and try booting from it (the first time)
 #   arcade-boot try --packages        update the boot packages (kernel, boot firmware), put them in a new slot, try it
 #   arcade-boot confirm               at boot (arcade-boot-confirm.service): keep a try that came up well, or go back
+#   arcade-boot try --broken-for-test a try that hangs on purpose, to prove the way back (bring-up F3)
 #
 # How it stays safe. Each slot is a folder on the boot partition (arcade-ID/) holding its own kernel, initramfs,
 # device trees, overlays and cmdline.txt; config.txt picks one with os_prefix. A try writes only a new folder and
@@ -69,8 +70,10 @@ cmd_status() {
 }
 
 cmd_try() {
-  local packages=no saved="" slot id busy
+  local packages=no broken=no saved="" slot id busy
   [ "${1:-}" = --packages ] && packages=yes
+  # Bring-up F3 only: a slot whose root doesn't exist, so the try hangs and the watchdog must bring the Pi back.
+  [ "${1:-}" = --broken-for-test ] && broken=yes
   [ "$(id -u)" = 0 ] || stop "run as root"
   [ ! -e "$TRY" ] || stop "a try is already waiting for its restart ($(state_get "$TRY" slot)). Restart the cabinet, or remove $TRY."
   [ ! -e "$STATE/pending" ] || stop "an update is in progress."
@@ -96,6 +99,11 @@ cmd_try() {
   slot="arcade-$id"
   fill_slot "$BOOT_DIR/$slot" || stop "the new slot is missing a kernel or a device tree."
   sed -i "1s/\$/ arcade.slot=$id/" "$BOOT_DIR/$slot/cmdline.txt"
+  if [ "$broken" = yes ]; then
+    [ -n "$(committed)" ] || stop "adopt first: a broken try needs a slot to come back to."
+    sed -i -E "1s/root=[^ ]+/root=PARTUUID=00000000-02/" "$BOOT_DIR/$slot/cmdline.txt"
+    say "this try is broken on purpose: it can't find its root, so it hangs until the watchdog restarts the Pi"
+  fi
   config_with "$slot" > "$BOOT_DIR/tryboot.txt.new" && sync && mv "$BOOT_DIR/tryboot.txt.new" "$BOOT_DIR/tryboot.txt"
   state_write "$TRY" "slot=$slot" "id=$id" "previous=$(committed)" "saved=$saved" "at=$(date -u +%FT%TZ)" "kernel_before=$(uname -r)"
   sync

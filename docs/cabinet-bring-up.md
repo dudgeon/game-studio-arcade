@@ -171,6 +171,25 @@ Like the virtual cabinet's, but its **own new workspace and key**, so its spendi
 - With a kid, from the shelf: Make → answer with the stick and buttons → a game lands on the shelf → play it.
 - Claude watches from the mini (logs, temperature, timing) and records the result for the validation run.
 
+## Part F: updates over the Wi-Fi, before the cabinet is closed up (D330-D339)
+
+After this part, nothing needs the card again. Claude does each step with your yes, from the mini, when nobody's playing.
+
+**F1. First network update** ✅ rehearsed
+- **Do:** `node scripts/virtual-cabinet/update-cabinet.mjs --picade --os`, or the Manager's Software tab → Update, with "OS packages too".
+- **Look for:** "updated", every data file kept, and the number of OS packages. The shelf restarts once.
+- **If not:** the result says why. The cabinet goes back by itself.
+
+**F2. Put today's boot files in their own slot** 🔧
+- **Do:** `node scripts/cabinet-card/boot-update.mjs adopt`. The Picade restarts once (about a minute) and keeps the slot only if it comes back with Wi-Fi and the shelf.
+- **Look for:** "kept arcade-…", and the shelf back on the screen.
+- **If not:** it says what happened and the Picade is on its old boot. Tell Claude.
+
+**F3. Prove the way back on the real hardware** 🔧 (Claude, with your yes; about 10 minutes)
+- **Restart:** `sudo systemctl reboot` over SSH. Look for the shelf, and `boot-update.mjs status` naming the same slot.
+- **A try that must fail:** a deliberately broken slot. Its kernel command line points at a root that doesn't exist, so it hangs. Look for the hardware watchdog restarting the Pi within about a minute, back on the old slot, with a result saying the try didn't come up. This is the one thing the QEMU rehearsal can't show (D336).
+- **Power:** switch the Picade off at the wall during an update (F1 again with a changed checkout). Switch on: look for the shelf, and a result saying "recovered at boot".
+
 ---
 
 ## What Claude has checked before the hardware
