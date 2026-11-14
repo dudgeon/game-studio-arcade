@@ -343,7 +343,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
   | player buttons 5–6 | button5–6 | Q E (16 18) | not given to carts in v0; spare for the launcher or later |
   | utility 1UP | start | Enter (28) | START |
   | utility ESC | escape | Escape (1) | ★, provisionally (D84) |
-  | utility ENT, COIN | enter, coin | F1, F2 (59 60) | launcher only, never reach carts |
+  | utility ENT, COIN | enter, coin | F13, F2 (183 60) *(ENT was F1 (59) until D433)* | launcher only, never reach carts |
   | power button | (KEY_POWER) | | safe shutdown |
 - Which physical button is which (the button layout on the console, which utility buttons are on the front or sides) is set when the cabinet is built, and the table is updated then. *(Set 2026-11-14 before assembly, in [hardware/picade-wiring.png](hardware/picade-wiring.png): A B on the near row, blue then yellow; X Y on the far row; pink 5 and 6 spare; 1UP front left, COIN front right, ESC left side, ENT right side. Replaces the plan in ca35d25.)*
 - P2 stays in the runtime (keyboard WASD and gamepad 1) for the desktop and for whatever D84 decides. *(D85: the number of controllers is now a setting, default 1 on the cabinet; implemented by D110–D112, so P2 gets input only when it is 2 or more.)*
@@ -2061,3 +2061,35 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **In the launcher** (`app.js`, a few lines): a pink pressed while ENT is held isn't a button. On the talk screen ENT now opens typing when it's let go, and not if a pink was pressed meanwhile; a tap works as before (D184).
 - **No clash with the Wi-Fi screen's ENT and COIN hold** (checked with the Wi-Fi worker, 2026-11-14): theirs needs both held for 3 s and any other key cancels it; here a pink does nothing while COIN is held.
 - **Tested:** the watcher against recorded key events, the stream in the service's test, and the chord and the bar in headless Chromium. **Not yet proven on the Picade:** the real buttons, the bar over a game, and whether 60% is the right cap by ear.
+
+## 2026-11-14 — Nothing at the cabinet needs a keyboard (D430-D439, name-entry worker)
+
+Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabinet OFFERS NO AFFORDANCES to enter a name." The Picade has no keyboard, and "Someone new" opened a typing screen (D184).
+
+**D430. A new name is said, like everything else; typing is the fallback.** *(D87, as Geoff set it; D184's flag flipped. Claude.)*
+- "Someone new" opens the mic: "Hold any button and say your name". The name heard is shown, "Is this your name?", with **Yes, that's me**, **Say it again** and **Type it**.
+- This is so wherever the cabinet can hear: the Picade and the virtual cabinet (Groq and Moonshine, D260). Where it can't (the speech stub on the mini and in tests, or no speech engine set up), a new name starts in typing as before.
+- The service tells the launcher whether the cabinet has a keyboard: `keyboard` in `/api/config`, false for the `picade` profile and true elsewhere. With a keyboard, typing is the keyboard's screen as it was (F1, D184), so the virtual cabinet keeps F1 typing. With none, typing is the stick's keyboard (D431), and the hint names the button: "ENT: type instead" (D82, D433).
+
+**D431. One on-screen keyboard: the Wi-Fi screens' grid (D414), on every talk screen.** *(Geoff chose the grid for Wi-Fi; the director's brief: reuse it, don't build a second. Claude.)*
+- ENT on a talk screen ("Tell me your game idea", "Something else", "What should change?", a new name, and "I didn't hear anything") opens the grid keyboard. The stick moves, A types, B deletes, X changes page, 1UP is DONE, ESC goes back to the mic.
+- **A name:** letters only, on one page of three rows, with delete and DONE. The first letter is a capital and the rest small. The limit is the 16 the service already keeps (D87's `NAME_MAX`); the header counts down what's left.
+- **An idea or an answer:** the Wi-Fi keyboard's three pages (abc, ABC, symbols), with space, delete and DONE, up to 300 characters. The line over the field is the question being answered.
+- DONE goes to the same "Is this right?" step as spoken or typed words (D201), so it can't start a build.
+- The button that opened the keyboard types nothing until it's let go (D182).
+- With a keyboard (the virtual cabinet, the mini), F1 on the typing screen swaps to the stick's keyboard and back, keeping the words, so the grid can be tried there too.
+- **How it's built:** `wifi.js` now exports the field and the grid (`fieldTop`, `keyGrid`) and `wifi-flow.js` the keys' logic (`moveKey`, `pressKey`, `keyboardKey`), each taking a keyboard's pages and action row; the Wi-Fi password screen is one user and `say-keys.js` the other. The Wi-Fi screens draw and behave as they did.
+
+**D432. What else needed a keyboard at the cabinet: the list.** *(Claude's sweep of the launcher, the runtime and the cabinet's docs, 2026-11-14.)*
+- **Fixed here:** the new maker's name (D430); F1 "type instead" on the idea, "Something else" and "what should change" screens; "Type it" after the cabinet didn't hear (E9). All are ENT and the stick now (D431).
+- **Already had a way:** the Wi-Fi password (D414), the volume (D421), back to the shelf (ESC, D88), starting a make (COIN, D205), shutting down (the power button, D372).
+- **Never at the cabinet, by design:** the API key, the Groq key, pairing, coins and hiding a maker are the Manager's and the mini's scripts.
+- **Left as it is:** a second player's keys (W A S D) exist only on a keyboard; the Picade has one player's controls and the controller count defaults to 1 (D85). Guest players read the same keys the Picade sends (D82) and their own menus aren't opened from the cabinet.
+
+**D433. ENT is F13, not F1: no key at the cabinet is one Chromium acts on.** *(Geoff, 2026-11-14: "you need to prevent this from happening in the future". The director's brief; Claude.)*
+- **What happened:** Alina pressed ENT after a game. ENT was F1 (D82), and Chromium opened its Help page over the kiosk, which nothing at the cabinet could close; the kiosk had to be restarted. The launcher stopped F1 on its own screens, but not while a game was up.
+- **The key:** the overlay's `enter` is now 183 (KEY_F13), in `picade.sh`'s block of `config.txt`. It takes effect at the next restart; until then the old F1 still works, since the launcher takes either. Checked on the virtual cabinet (trixie, Chromium 156, the same packages): F13 tapped twice on the shelf through a uinput keyboard leaves the screen pixel for pixel the same. xkb calls the key XF86Tools, which Chromium has no shortcut for.
+- **Every other Picade key, against Chromium's shortcuts:** F1 Help, F3 find, F5 reload, F6 the address bar, F7 caret browsing, F10 the menu, F11 full screen, F12 DevTools; everything else needs Ctrl, Alt, Shift, Super, Tab, Backspace or Space. The Picade sends none of them: arrows, Z X C V Q E, Enter, Escape, F13, and F2 for COIN, which Chromium does nothing on. A test holds the block to that list.
+- **Who reads ENT:** the launcher reads F13 as F1 at the door (`asEnt`, `wifi-flow.js`), so typing, the volume chord and the Wi-Fi hold (ENT and COIN) are unchanged, and the virtual cabinet's F1 works as before. `arcade-volkey` takes F13 or F1 as the held key. The driver keyboard (`arcade-keyd`) can press 183; `drive press ent` sends it, and the Manager's on-screen button is now "ENT" and sends it too. F1 on Geoff's own keyboard through the Manager is still F1.
+- **The second guard, for an F1 that comes anyway** (a plugged-in keyboard, the Manager): the launcher stops every key's default before anything else, during a game too; the guest bridge script stops F1 and F13 before a guest's page sees them; the house runtime's host stops them as well (its cart frame already stopped every key). A guest that nests its own frames is beyond the bridge, which is why the key itself changed.
+- **Not yet proven on the Picade:** that its Chromium reports the button as `F13` after the restart (Geoff's check: ENT on the shelf and in a game opens nothing; ENT on a talk screen opens the keyboard; ENT with a pink changes the volume).

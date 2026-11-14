@@ -1,4 +1,4 @@
-// A browser's KeyboardEvent.code as a Linux key code, US layout (D282). arcade-keyd takes codes 1-119.
+// A browser's KeyboardEvent.code as a Linux key code, US layout (D282). arcade-keyd takes codes 1-119, and 183.
 
 /** @type {Record<string, number>} */
 export const LINUX = {
@@ -11,6 +11,7 @@ export const LINUX = {
   KeyZ: 44, KeyX: 45, KeyC: 46, KeyV: 47, KeyB: 48, KeyN: 49, KeyM: 50, Comma: 51, Period: 52, Slash: 53, ShiftRight: 54,
   AltLeft: 56, Space: 57,
   F1: 59, F2: 60, F3: 61, F4: 62, F5: 63, F6: 64, F7: 65, F8: 66, F9: 67, F10: 68,
+  F13: 183, // the Picade's ENT (D433)
   NumpadEnter: 96, ControlRight: 97, AltRight: 100,
   Home: 102, ArrowUp: 103, PageUp: 104, ArrowLeft: 105, ArrowRight: 106, End: 107, ArrowDown: 108, PageDown: 109, Delete: 111,
 };
@@ -27,7 +28,7 @@ export const CONTROLS = [
   { id: "y", label: "Y", code: "KeyV", key: "V" },
   { id: "start", label: "START", code: "Enter", key: "Enter" },
   { id: "esc", label: "ESC ★", code: "Escape", key: "Esc" },
-  { id: "f1", label: "F1", code: "F1", key: "F1" },
+  { id: "f1", label: "ENT", code: "F13", key: "F1" }, // the cabinet's own ENT key; F1 on your keyboard still sends F1 (D433)
   { id: "coin", label: "COIN", code: "F2", key: "F2" },
 ];
 

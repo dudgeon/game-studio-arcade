@@ -82,7 +82,7 @@
     <text x="60" y="830">A B X Y: the game buttons. On Studio screens any of the six picks the lit tile.</text>
     <text x="60" y="856">START (1UP): starts a game. COIN: spends coins to make a game; on the shelf, shows the pot.</text>
     <text x="60" y="882">ESC (left side): back to the shelf. On a side so it isn't pressed by accident mid-game.</text>
-    <text x="60" y="908">ENT (right side): "type it instead" on the talk screen, with a keyboard.</text>
+    <text x="60" y="908">ENT (right side): type with the stick on a talk screen; held with a pink button, the volume.</text>
     <text x="60" y="934">Spare pink buttons: unused for now.</text>
   </g>
 

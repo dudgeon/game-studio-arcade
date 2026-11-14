@@ -98,7 +98,7 @@ test("the picade profile runs the volume step after the sound is set up, and a u
 
 // ---------- D421: hold ENT and press a pink button ----------
 const VOLKEY = path.join(REPO, "cabinet/provision/files/arcade-volkey");
-const KEY = { q: 16, e: 18, f1: 59, f2: 60, z: 44 };
+const KEY = { q: 16, e: 18, f1: 59, f2: 60, z: 44, ent: 183 };
 
 /** Linux input events (struct input_event, 64-bit): each step is [key, 1 down | 0 up | 2 repeat]. */
 function events(steps) {
@@ -130,6 +130,11 @@ async function watch(steps, { percent = 40 } = {}) {
   assert.match(out, /lost /, "the watcher read the events");
   return { calls: fs.readFileSync(calls, "utf8").split("\n").filter(Boolean), shown: fs.existsSync(show) ? JSON.parse(fs.readFileSync(show, "utf8")) : null };
 }
+
+test("the Picade's ENT is F13 (D433): held with a pink it's the volume, as F1 is on a driver keyboard", async () => {
+  const r = await watch([["ent", 1], ["q", 1], ["q", 0], ["e", 1], ["e", 0], ["ent", 0], ["e", 1], ["e", 0], ["ent", 1], ["f2", 1], ["q", 1], ["q", 0]]);
+  assert.deepEqual(r.calls, ["down", "up"]);
+});
 
 test("ENT held and a pink pressed: 5 is quieter, 6 is louder, one step a press, and the level is written for the bar", async () => {
   const r = await watch([["f1", 1], ["q", 1], ["q", 0], ["e", 1], ["e", 2], ["e", 2], ["e", 0], ["e", 1], ["e", 0], ["f1", 0]]);

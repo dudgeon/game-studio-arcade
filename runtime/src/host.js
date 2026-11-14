@@ -232,7 +232,7 @@ export function createHost(opts) {
   /** @param {KeyboardEvent} e */
   const onKey = (e) => {
     if (test) return;
-    if (e.code in keymap) e.preventDefault();
+    if (e.code in keymap || e.code === "F1" || e.code === "F13") e.preventDefault(); // F1 is Chromium's Help (D433)
     if (e.type === "keydown") {
       if (e.repeat) return;
       keys.add(e.code);

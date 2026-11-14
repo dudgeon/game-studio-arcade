@@ -74,7 +74,8 @@ dtparam=button5=16
 dtparam=button6=18
 dtparam=start=28
 dtparam=escape=1
-dtparam=enter=59
+# D433: ENT is F13 (183), not F1 (59): Chromium opens its Help page on F1, and nothing at the cabinet can close it.
+dtparam=enter=183
 dtparam=coin=60
 # D396: the USB-C port as a network port for the mini (rpi-usb-gadget; harden.sh)
 dtoverlay=dwc2,dr_mode=peripheral
