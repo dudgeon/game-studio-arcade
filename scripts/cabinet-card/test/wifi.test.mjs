@@ -75,6 +75,23 @@ test("when the name is quiet it tries the router's name, then the last address, 
   l.close();
 });
 
+test("off the home Wi-Fi: Tailscale's address, then the addresses the card worker recorded for the cable and the USB port", { skip: !mac }, async () => {
+  const l = await listener();
+  const ts = setup({});
+  const tailscale = path.join(ts.dir, "tailscale");
+  fs.writeFileSync(tailscale, '#!/bin/bash\n[ "$1 $2 $3" = "ip -4 arcade" ] && echo 127.0.0.1\n', { mode: 0o755 });
+  const viaTailscale = await connect({ ...ts.env, PICADE_TAILSCALE: tailscale }, l.port);
+  assert.equal(viaTailscale.out, "SSH-2.0-test\n");
+  assert.match(viaTailscale.err, /\(tailscale\)/);
+
+  const usb = setup({});
+  fs.writeFileSync(path.join(usb.dir, "last-known-address.json"), '{\n  "eth0": { "mac": "02:00:00:00:00:01", "link_local": "fe80::ff:fe00:1" },\n  "usb_gadget": { "ipv4": "127.0.0.1" }\n}\n');
+  const viaUsb = await connect({ ...usb.env, PICADE_TAILSCALE: "", PICADE_CABLE_IF: "lo0" }, l.port);
+  assert.equal(viaUsb.out, "SSH-2.0-test\n");
+  assert.match(viaUsb.err, /\(usb-port\)/);
+  l.close();
+});
+
 test("with nothing answering it fails, saying what it tried; a damaged last-address file is never used", { skip: !mac }, async () => {
   const none = setup({});
   const r = spawnSync("/bin/bash", [CONNECT, "arcade.local", "1"], { env: none.env, encoding: "utf8" });

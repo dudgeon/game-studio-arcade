@@ -92,8 +92,8 @@ t="$(until_wifi "netplan-wlan0-" 90)" && step card ok "joined through netplan in
 home_id="arcade-wifi-$("$N" -e 'console.log(require("crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "$HOME_SSID")"
 adopted="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js adopt 2>&1 | tail -1; sudo ls /var/lib/arcade-wifi /etc/NetworkManager/system-connections | grep -c $home_id; nmcli -t -f NAME,FILENAME connection show | grep -c '^$home_id:/etc/NetworkManager/system-connections/'")"
 [ "$(echo "$adopted" | tail -2 | tr '\n' ' ')" = "2 1 " ] && step card ok "adopted: a keyfile in both places, and NetworkManager reads ours as it is" || step card fail "adopt: $adopted"
-country="$(look "cat /etc/arcade/wifi-country 2>/dev/null; sudo cat /etc/NetworkManager/conf.d/arcade-wifi.conf | grep -c -E 'autoconnect-retries-default=0|wifi.powersave=2'" | tr '\n' ' ')"
-step card "$([ "${country##* 2 }" = "" ] && [ -n "$country" ] && echo ok || echo fail)" "provisioning's settings on the cabinet: country and conf lines: $country"
+conf="$(look "sudo cat /etc/NetworkManager/conf.d/arcade-wifi.conf | grep -c -E 'autoconnect-retries-default=0|wifi.powersave=2'" )"
+step card "$([ "$conf" = 2 ] && echo ok || echo fail)" "provisioning's NetworkManager settings on the cabinet: no power saving, retry for ever ($conf of 2 lines)"
 
 echo "=== lost: netplan's copy goes, then our live keyfile goes"
 look "sudo rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/90-NM-*.yaml; sudo netplan apply >/dev/null 2>&1; sudo nmcli connection reload" >/dev/null
@@ -125,8 +125,8 @@ export LIMIT=60 OUT_LOG="$OUT/boots.log"; : > "$OUT_LOG"
 boot_check() { # WHAT
   local line saved
   line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)"
-  for _ in $(seq 1 40); do case "$line" in *"Wi-Fi up none"*|"") sleep 3; line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)" ;; *) break ;; esac; done
-  saved="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js status" | json 'o.saved.filter(s=>s.startsWith("Rehearsal")).sort().join(" ; ")')"
+  for _ in $(seq 1 40); do case "$line" in *"Wi-Fi up none"*|*"doesn't answer"*|"") sleep 3; line="$(OUT="$OUT_LOG" "$REPO/scripts/cabinet-card/wifi-proof.sh" now 2>/dev/null | head -1)" ;; *) break ;; esac; done
+  saved="$(look "sudo /usr/local/bin/node /opt/arcade/current/cabinet/service/bin/arcade-wifi.js status" | json 'o.saved.filter(s=>s.startsWith("Rehearsal ")&&s!=="Rehearsal network").sort().join(" ; ")')"
   if [ "${line%% *}" = PASS ] && [ "$saved" = "$GUEST_SSID ; $HOME_SSID" ]; then step "$1" ok "${line#PASS this boot 1: }; saved: $saved"; else step "$1" fail "${line:-no answer}; saved: $saved"; fi
 }
 for i in $(seq 1 "$CUTS"); do

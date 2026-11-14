@@ -1983,7 +1983,7 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - puts back any of our networks missing from NetworkManager's folder, or different there (an empty file after a power cut), and reloads them;
 - switches the radio on and unblocks it (rfkill) if it's off, with the country;
 - with a saved network and no Wi-Fi: after 30 s, looks for networks and connects, every minute; after 3 min, restarts wpa_supplicant and NetworkManager; after 5 min, reloads the Wi-Fi chip's driver (`brcmfmac`); then one of those two every 10 min, for ever;
-- never restarts NetworkManager while a cable carries the cabinet, which would cut a grown-up's session;
+- never restarts NetworkManager while a cable carries the cabinet's default route, which would cut a grown-up's session. Only that counts as a cable: the Picade's eth0 and its USB service port both say "connected" with nothing plugged in (the card worker's finding);
 - says each change in the journal, and leaves `/run/arcade-wifi/status.json` (connected, name, signal, address) for the service.
 - Games play on through all of it: nothing here is in the play path.
 
@@ -2006,7 +2006,8 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - `scripts/cabinet-card/picade-connect.sh` is SSH's ProxyCommand for the Picade. It tries `arcade.local` (mDNS, avahi on the cabinet), then `arcade.lan` and `arcade` (the router's DHCP name), then the address in `~/game-studio-data/cabinets/arcade/last-address`, which it rewrites whenever a name answers.
 - SSH still checks the host key under the name `arcade.local` however it connected, so a different machine on an old address is refused.
 - `cabinet/vm/drive` and the Cabinet Manager use it whenever the host is the Picade's, so the update, connect, driver-keyboard and twin scripts all get it. `picade-connect.sh --where` prints the address and how it was found.
-- Not done: sweeping the network for the Pi when all three fail. The cabinet's own Wi-Fi screen shows its address (D414).
+- **Off the home Wi-Fi altogether,** it then tries the card worker's service paths (D395-D397), in this order: Tailscale's address for `arcade` (once a person has signed the cabinet in, and if the mini has Tailscale), a cable straight to the Pi's Ethernet port (eth0's link-local address, on the mini's `en0`), and the USB-C service port. The last two addresses come from `last-known-address.json` in the Picade's folder on the mini, which the card worker keeps; nothing about the hardware is in the repo.
+- Not done: sweeping the network for the Pi when every way fails. The cabinet's own Wi-Fi screen shows its address (D414).
 
 **D417. Why the Picade lost its Wi-Fi on flash day: not proven. What was ruled out, and what the evidence fits.** *(The card worker's capture over a direct cable, 2026-11-14 09:32; the Wi-Fi worker's reading.)*
 - **What happened:** first boot and its one restart were on Wi-Fi (`Dudginsen`, 192.168.86.123, `arcade.local` resolving). After Geoff power-cycled it to fix the joystick plug, the shelf said "No Wi-Fi" at every start, a clean restart included, and the mini's pings failed.
