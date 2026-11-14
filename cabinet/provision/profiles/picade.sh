@@ -18,6 +18,7 @@ hw_late() {
   step_config_txt
   step_input_rule
   step_sound
+  step_volume
   step_driver_keyboard
   step_power_button
 }

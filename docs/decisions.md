@@ -2018,3 +2018,17 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **What that fits (a reading, not a finding):** NetworkManager's default is 4 tries per network, then nothing for 5 minutes. A mesh that steers a client by refusing it, or a weak basement link, can use those 4 tries in the first seconds of a boot. Every look at the screen in the next 5 minutes says "No Wi-Fi". The fixes for that case are D411 (retry for ever, no power saving) and D412 (a nudge every minute, and it says what it did).
 - **So the next one can be named:** the card worker makes the journal persistent; the watch logs every Wi-Fi change as `arcade-wifi ...`; the shelf tells "No Wi-Fi" from "No internet" (D415).
 - **Also found, not the cause:** NetworkManager rewrote the 90-NM YAML at 09:31:32, that boot. It rewrites the only copy of the home Wi-Fi at every start, which is the exposure D410 closes.
+
+**D420. Every card starts quiet: the speaker at 30%, stored, and a chosen level is never reset.** *(Geoff's ask, 2026-11-14: the X HAT's speaker is far too loud as it comes, and the screen's own volume buttons do nothing for it. Claude.)*
+- **One tool, `arcade-volume`** (`cabinet/provision/files/`, installed in `/usr/local/bin`, run as root): `get`, `default`, `set N` (0 to 100), `up` and `down`. It drives the softvol `PCM` control on card `sndrpihifiberry` (D253) and stores each change with `alsactl store`, as the Manager's slider does (D366).
+- **`default` sets 30% only when no level is stored** for the speaker's `PCM` control in `/var/lib/alsa/asound.state` (only the speaker's own block: the mic is a sound card too). A stored level is someone's choice, so it's kept.
+- **When it runs:** in the picade profile's `hw_late` (`step_volume`, so an update runs it too), and from `arcade-volume-default.service` at every boot, after `alsa-restore` and before the kiosk. The boot run is the one that counts on a new card: at first boot the DAC isn't there until the restart (D250).
+- **A card already running** has a stored level if anything has set one (the card worker set 30% by hand on the first Picade), so an update keeps it.
+- **`up` and `down` are for the cabinet's own controls (D421):** steps of 10, down to 0, up to a cap of 60. A level above the cap (set from the Manager) only comes down. The cap is a first guess, to tune by ear on the Picade.
+- The Manager's `control.sh` is unchanged and still works on a cabinet without the tool.
+- **Tested** with stand-ins for `amixer`, `aplay` and `alsactl` (`scripts/cabinet-card/test/volume.test.mjs`). **Not yet proven on the Picade:** that the boot run sets 30% on a new card, and that `alsa-restore` brings a softvol level back after a restart (D366 left that for the hardware too).
+
+**D421. Open, for Geoff: how the volume is changed at the cabinet.** *(Claude proposes; the choice is Geoff's.)* Three options, mocked up for him 2026-11-14. Each shows a small bar for a second and stops at D420's cap.
+1. **The two pink buttons (5 and 6) are quieter and louder, anywhere.** Claude's pick: nothing to remember, works mid-game, and house games never see those buttons (D82). It uses up the spare buttons, and they stop counting as "any button picks" (D182).
+2. **Hold COIN and push the stick up or down, anywhere.** Keeps the pink buttons spare. A hidden combination, the stick still moves the player mid-game, and COIN on the shelf would open the pot on letting go.
+3. **A Sound tile on the shelf.** Visible and labelled, but only from the shelf, and the largest change to the launcher.

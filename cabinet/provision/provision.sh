@@ -46,6 +46,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/power-button.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/wifi.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/volume.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
