@@ -9,6 +9,8 @@ Sources, checked live 2026-11-11: Pimoroni's [Assembling your Picade](https://le
 
 ---
 
+**On the day itself:** [flash-day.md](flash-day.md) walks through it in order, from the card reader arriving to the kids' first game.
+
 ## The first end-to-end run, short
 
 For when the cabinet is built (Part A). The card carries everything, so the Picade is ready the moment it's switched on: the shelf with the virtual cabinet's games, speech on Groq (Moonshine as the fallback), and Make (D320-D326). Nothing is typed into the cabinet or run against it afterwards. Details are in the parts below.

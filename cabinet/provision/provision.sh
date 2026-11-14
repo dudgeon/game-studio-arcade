@@ -146,7 +146,7 @@ step_carts() {
     src="$ARCADE_HOME/current/studio-kit/context-pack/templates/$name"
     id="$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$src/cart.json")"
     [ -n "$id" ] || { echo "no id in $src/cart.json" >&2; return 1; }
-    STARTER_IDS="$STARTER_IDS $id" # step_library commits them, on a new library (D370)
+    STARTER_IDS="$STARTER_IDS $id" # step_library commits them, on a new library (D390)
     if [ ! -e "$DATA/carts/$id" ]; then
       cp -R "$src" "$DATA/carts/$id"
       chown -R arcade:arcade "$DATA/carts/$id"

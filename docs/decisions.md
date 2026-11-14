@@ -1836,7 +1836,7 @@ Geoff chose a clean start for the kids' first switch-on (through the director, 2
   - `flash.mjs --check --day-one docs/day-one.json` checks a file's ids against the live virtual cabinet with the same planner the flash uses, reading only (the twin helper's `manifest` and `read`).
   - Its run on 2026-11-14 found every id. It gave 8 lines on the shelf and 9 off it (bee-buzz, fly-catcher, frog-flicker, fruit-cat-drop, penguin-slide, pepper-bone-catch, rock-rain, shark-chomp, snowball-drop). The twin's 8342-byte ledger stays on the mini.
 
-**D370. A card with no twin data starts the cart library at first boot, with the starters committed.** *(Claude, from the update worker's finding, 2026-11-14. D370 because D356-D359 are used and D360-D369 are the Manager's.)*
+**D390. A card with no twin data starts the cart library at first boot, with the starters committed.** *(Claude, from the update worker's finding, 2026-11-14. D390-D399 are this worker's block: D356-D359 are used, D360-D369 are the Manager's, and D370-D379 the update worker's.)*
 - **The finding:** provisioning copies the three starters into `/var/lib/arcade/carts`, but the library's git repo only appeared with the first make. The service's `ensureLibrary` commits only its README, and a make commits only its own folder, so the starters stayed untracked for good.
 - **Wider than unseeded cards:** the virtual cabinet has the same gap today. Its library holds every made game, but apple-catch, comet-dodge and wall-ball are untracked (read-only look, 2026-11-14).
 - **The fix (`cabinet/provision/library.sh`, after `step_carts`):** on a cabinet with no library yet, first boot starts it the service's own way, as `arcade`: the same README, the same "Studio" author, and the same first commit ("Start the dev cart library"). Then it commits each starter as `starter <id> v1 (D161)`. The service's `ensureLibrary` then finds the library ready and changes nothing.
@@ -1848,3 +1848,21 @@ Geoff chose a clean start for the kids' first switch-on (through the director, 2
   - a seeded library untouched, with its untracked folder still untracked.
 - **Rehearsal 13** (a card with no twin data): the log said "3 starters committed". The library had the four commits by Studio, nothing untracked, and `.git` and README owned by `arcade`. First boot exited 0.
 - **Not done, offered:** committing the untracked starters in the twin's library, and so on a seeded card too. That's a small change, but it adds commits to the twin's history, which then reach the Picade by seed and come back by sync. Done once on the twin before the flash, both would match. It's the director's call whether to do it.
+
+**D391. The twin's own starters are committed too: `scripts/virtual-cabinet/commit-starters.sh`.** *(The director's yes, 2026-11-14; Claude.)*
+- The virtual cabinet's apple-catch, comet-dodge and wall-ball are untracked in its library (D390). This script commits each one the way first boot now does: `starter <id> v1 (D161)`, by "Studio", as `arcade`, over the twin's admin SSH. Then a card seeded from the twin carries their history too.
+- **It only adds commits.** A starter already tracked is left alone, so running it again does nothing. `--dry-run` says what it would do and changes nothing. It refuses while a make is running or still to be collected, because the service commits to the same library.
+- **Run it before the flash.** After the Picade exists, a commit on the twin is the twin's own and sync sets it aside (D294).
+- **Tested** on a stand-in library: the dry run, three commits after the made game's history, a re-run that does nothing, and the refusal during a make.
+- **Live dry run, 2026-11-14:** "would commit 3 starters; untracked now: 3". The real run waits for the director to sequence it.
+
+**D392. The flash day, as a walkthrough: [flash-day.md](flash-day.md).** *(Director's ask, 2026-11-14.)* Linked from the checklist, it covers:
+1. picade-key.sh;
+2. `flash.mjs --check --day-one docs/day-one.json`, then the flash;
+3. card in, mic in, power on, first boot;
+4. Manager pairing;
+5. the hourly backup's install;
+6. the first update and `boot-update.mjs adopt`;
+7. the kids' first make.
+
+Each step says what Geoff does, what he'll see, and what Claude does from the mini meanwhile, using the current scripts.

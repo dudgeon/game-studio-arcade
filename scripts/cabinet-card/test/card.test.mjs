@@ -681,7 +681,7 @@ test("docs/day-one.json is a valid day-one file: full pot, Tester hidden, the ag
   for (const id of ["teti", "teti-geoff", "apple-catch", "comet-dodge", "wall-ball"]) assert.ok(spec.shelf.includes(id), id);
 });
 
-test("a card with no twin data starts the cart library the service's way, starters committed; a seeded one is untouched (D370)", async () => {
+test("a card with no twin data starts the cart library the service's way, starters committed; a seeded one is untouched (D390)", async () => {
   const { ensureLibrary } = await import("../../../studio-kit/cli/src/library.js");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-library-"));
   const git = (cwd, ...a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
@@ -709,5 +709,44 @@ test("a card with no twin data starts the cart library the service's way, starte
   assert.match(step(seeded), /already there: leaving it as it is/);
   assert.equal(git(path.join(seeded, "carts"), "rev-parse", "HEAD"), before);
   assert.match(git(path.join(seeded, "carts"), "status", "--porcelain"), /\?\? loose-starter\//, "an untracked folder stays untracked");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("commit-starters.sh commits the twin's untracked starters the first-boot way, once, and only adds (D391)", () => {
+  const SCRIPT = path.join(REPO, "scripts/virtual-cabinet/commit-starters.sh");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "starters-"));
+  const lib = path.join(dir, "carts");
+  const git = (...a) => execFileSync("git", a, { cwd: lib, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid" } }).trim();
+  // Like the twin today: a library with made games, the three starters untracked.
+  fs.mkdirSync(lib, { recursive: true });
+  git("init", "-q", "-b", "main");
+  fs.writeFileSync(path.join(lib, "README.md"), "# Dev cart library\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "Start the dev cart library");
+  fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates/dodge"), path.join(lib, "log-hopper"), { recursive: true });
+  git("add", "log-hopper");
+  git("commit", "-q", "-m", "make log-hopper v1 (sesn_X)");
+  for (const [name, id] of [["catch", "apple-catch"], ["dodge", "comet-dodge"], ["paddle", "wall-ball"]]) fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates", name), path.join(lib, id), { recursive: true });
+  const run = (...args) => spawnSync(SCRIPT, args, { encoding: "utf8", env: { ...process.env, COMMIT_STARTERS_LOCAL: dir } });
+  const before = git("rev-parse", "HEAD");
+  const dry = run("--dry-run");
+  assert.equal(dry.status, 0, dry.stdout + dry.stderr);
+  assert.match(dry.stdout, /would commit 3 starters/);
+  assert.equal(git("rev-parse", "HEAD"), before, "a dry run changes nothing");
+  const r = run();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /committed 3 starters; untracked now: 0/);
+  assert.deepEqual(git("log", "--format=%s", "-3", "--reverse").split("\n"), ["starter apple-catch v1 (D161)", "starter comet-dodge v1 (D161)", "starter wall-ball v1 (D161)"]);
+  assert.equal(git("rev-list", "--count", "HEAD"), "5", "only commits added; the made game's history is as it was");
+  assert.equal(git("log", "-1", "--format=%an <%ae>"), "Studio <studio@game-studio-arcade.invalid>");
+  const head = git("rev-parse", "HEAD");
+  const again = run();
+  assert.match(again.stdout, /already in the library[\s\S]*committed 0 starters/);
+  assert.equal(git("rev-parse", "HEAD"), head, "running it again does nothing");
+  // Never while a make runs: the service commits to the same library.
+  fs.writeFileSync(path.join(dir, "studio-run.json"), "{}");
+  const busy = run();
+  assert.equal(busy.status, 4);
+  assert.match(busy.stdout, /a make is running/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

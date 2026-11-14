@@ -1,4 +1,4 @@
-# Sourced by provision.sh, for both profiles (D370). On a cabinet with no cart library yet (a card flashed without
+# Sourced by provision.sh, for both profiles (D390). On a cabinet with no cart library yet (a card flashed without
 # the twin's data), this starts the library exactly as the service's ensureLibrary does (studio-kit/cli/src/library.js:
 # the same README, author and first commit), then commits each starter step_carts copied in, as its version 1. So the
 # starters have a history from the first boot, not only made games. A library that's already there (a seeded card,
@@ -28,5 +28,5 @@ step_library() {
     lib_git commit -q -m "starter $id v1 (D161)"
     n=$((n + 1))
   done
-  log "started the cart library: ${n} starters committed (D370)"
+  log "started the cart library: ${n} starters committed (D390)"
 }
