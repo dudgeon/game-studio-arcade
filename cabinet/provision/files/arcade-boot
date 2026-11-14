@@ -34,9 +34,17 @@ committed() { sed -n "/^$BEGIN\$/,/^$END\$/s/^os_prefix=\(.*\)\/\$/\1/p" "$BOOT_
 where() { local c; c="$(committed)"; [ -n "$c" ] && echo "$c" || echo "the top of the boot partition"; }
 
 # config.txt with our block set to SLOT: the rest of the file exactly as it is.
+# The block stays where it is, so other blocks keep their order: picade.sh re-appends its own block at the end, and
+# if ours moved too, each update would see config.txt "changed" and rewrite it (seen on the Picade, 2026-11-14).
 config_with() { # SLOT
-  sed "/^$BEGIN\$/,/^$END\$/d" "$BOOT_DIR/config.txt"
-  printf '%s\n[all]\nos_prefix=%s/\nkernel_watchdog_timeout=15\n%s\n' "$BEGIN" "$1" "$END"
+  local block
+  block="$(printf '%s\n[all]\nos_prefix=%s/\nkernel_watchdog_timeout=15\n%s' "$BEGIN" "$1" "$END")"
+  if grep -qx "$BEGIN" "$BOOT_DIR/config.txt"; then
+    BLOCK="$block" awk -v b="$BEGIN" -v e="$END" '$0 == b { print ENVIRON["BLOCK"]; skip = 1; next } skip && $0 == e { skip = 0; next } !skip' "$BOOT_DIR/config.txt"
+  else
+    cat "$BOOT_DIR/config.txt"
+    printf '%s\n' "$block"
+  fi
 }
 
 result() { # OK REASON
@@ -87,7 +95,7 @@ fill_slot() { # DIR
 }
 
 cmd_status() {
-  echo "boots: ${BOOT_DIR}/$(committed)/ (empty: the top of the boot partition)"
+  echo "boots: $(where)"
   echo "kernel running: $(uname -r)"
   [ -e "$TRY" ] && echo "trying: $(state_get "$TRY" slot), since $(state_get "$TRY" at)"
   [ -e "$RESULT" ] && echo "last result: $(tr -d '\n' < "$RESULT")"
