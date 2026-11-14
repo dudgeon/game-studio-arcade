@@ -1,0 +1,132 @@
+// The Picade's Wi-Fi from the mini's side and the provisioning script's (D411, D412, D416): how the mini finds
+// the cabinet when its name doesn't answer, and what provisioning installs. No cabinet and no network.
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, "../../..");
+const CONNECT = path.join(REPO, "scripts/cabinet-card/picade-connect.sh");
+const WIFI_SH = path.join(REPO, "cabinet/provision/wifi.sh");
+const mac = process.platform === "darwin";
+
+/** A stand-in for the cabinet's SSH port: says hello and echoes. */
+function listener() {
+  return new Promise((resolve) => {
+    const server = net.createServer((s) => {
+      s.on("error", () => {}); // the finder's probe connects and drops
+      s.write("SSH-2.0-test\n");
+      s.pipe(s);
+    });
+    server.listen(0, "127.0.0.1", () => resolve({ port: /** @type {net.AddressInfo} */ (server.address()).port, close: () => server.close() }));
+  });
+}
+
+/** A folder for the Picade's files on the mini, and a name lookup that knows only `names`. */
+function setup(/** @type {Record<string, string>} */ names) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "picade-find-"));
+  const resolver = path.join(dir, "resolve.sh");
+  fs.writeFileSync(resolver, `#!/bin/bash\ncase "$1" in\n${Object.entries(names).map(([n, ip]) => `  ${n}) echo ${ip} ;;`).join("\n")}\nesac\n`, { mode: 0o755 });
+  return { dir, env: { ...process.env, GSA_CABINET_DIR: dir, PICADE_RESOLVE: resolver } };
+}
+
+/** Run it as SSH would, read the first line the far end says. */
+function connect(/** @type {NodeJS.ProcessEnv} */ env, /** @type {number} */ port) {
+  return new Promise((resolve) => {
+    const child = spawn("/bin/bash", [CONNECT, "arcade.local", String(port)], { env });
+    let out = "";
+    let err = "";
+    child.stderr.on("data", (d) => (err += d));
+    child.stdout.on("data", (d) => {
+      out += d;
+      if (out.includes("\n")) child.kill();
+    });
+    child.on("close", (code) => resolve({ out, err, code }));
+  });
+}
+
+test("the mini finds the Picade by its name and remembers the address", { skip: !mac }, async () => {
+  const l = await listener();
+  const { dir, env } = setup({ "arcade.local": "127.0.0.1" });
+  const r = await connect(env, l.port);
+  assert.equal(r.out, "SSH-2.0-test\n");
+  assert.equal(r.err, "");
+  assert.equal(fs.readFileSync(path.join(dir, "last-address"), "utf8"), "127.0.0.1\n");
+  l.close();
+});
+
+test("when the name is quiet it tries the router's name, then the last address, and says which", { skip: !mac }, async () => {
+  const l = await listener();
+  const router = setup({ "arcade.lan": "127.0.0.1" });
+  const viaRouter = await connect(router.env, l.port);
+  assert.equal(viaRouter.out, "SSH-2.0-test\n");
+  assert.match(viaRouter.err, /didn't answer by name; reaching it at 127\.0\.0\.1 \(arcade\.lan\)/);
+
+  const last = setup({});
+  fs.writeFileSync(path.join(last.dir, "last-address"), "127.0.0.1\n");
+  const viaLast = await connect(last.env, l.port);
+  assert.equal(viaLast.out, "SSH-2.0-test\n");
+  assert.match(viaLast.err, /\(last-address\)/);
+  l.close();
+});
+
+test("with nothing answering it fails, saying what it tried; a damaged last-address file is never used", { skip: !mac }, async () => {
+  const none = setup({});
+  const r = spawnSync("/bin/bash", [CONNECT, "arcade.local", "1"], { env: none.env, encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /can't find the Picade/);
+  fs.writeFileSync(path.join(none.dir, "last-address"), "127.0.0.1; rm -rf x\n");
+  const bad = spawnSync("/bin/bash", [CONNECT, "arcade.local", "1"], { env: none.env, encoding: "utf8" });
+  assert.equal(bad.status, 1);
+});
+
+test("SSH to the Picade goes through the finder: the driver and the Manager", () => {
+  const drive = fs.readFileSync(path.join(REPO, "cabinet/vm/drive"), "utf8");
+  assert.match(drive, /ProxyCommand=\$REPO\/scripts\/cabinet-card\/picade-connect\.sh %h %p/);
+  assert.match(fs.readFileSync(path.join(REPO, "manager/cabinet.mjs"), "utf8"), /ProxyCommand=\$\{PICADE_CONNECT\} %h %p/);
+  assert.ok(fs.statSync(CONNECT).mode & 0o100, "picade-connect.sh is executable");
+});
+
+/** A function of wifi.sh's, run in bash. */
+const fn = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `. "${WIFI_SH}"; ${name}`], { encoding: "utf8" });
+
+test("provisioning turns Wi-Fi power saving off and retries a network for ever (D411)", () => {
+  const conf = fn("nm_wifi_conf");
+  assert.match(conf, /^\[main\]\nautoconnect-retries-default=0$/m);
+  assert.match(conf, /^\[connection-arcade-wifi\]\nwifi\.powersave=2$/m);
+});
+
+test("the watch and the socket: root's, restarted for ever, and only the kiosk's user may ask (D412, D414)", () => {
+  const watch = fn("wifi_watch_unit");
+  assert.match(watch, /^ExecStart=\/usr\/local\/bin\/node \/opt\/arcade\/current\/cabinet\/service\/bin\/arcade-wifi\.js watch$/m);
+  assert.match(watch, /^Restart=always$/m);
+  assert.doesNotMatch(watch, /^User=/m);
+  assert.match(watch, /^RuntimeDirectory=arcade-wifi$/m);
+  const socket = fn("wifi_socket_unit");
+  assert.match(socket, /^ListenStream=\/run\/arcade-wifi\.sock$/m);
+  assert.match(socket, /^SocketGroup=arcade$/m);
+  assert.match(socket, /^SocketMode=0660$/m);
+  assert.match(socket, /^Accept=yes$/m);
+  const serve = fn("wifi_serve_unit");
+  assert.match(serve, /arcade-wifi\.js serve$/m);
+  assert.match(serve, /^StandardInput=socket$/m);
+  // The paths the units name are the ones the helper uses.
+  const src = fs.readFileSync(path.join(REPO, "cabinet/service/src/wifi.js"), "utf8");
+  assert.match(src, /SOCKET = "\/run\/arcade-wifi\.sock"/);
+  assert.match(src, /STATUS_FILE = "\/run\/arcade-wifi\/status\.json"/);
+  assert.ok(fs.existsSync(path.join(REPO, "cabinet/service/bin/arcade-wifi.js")));
+});
+
+test("provisioning runs the Wi-Fi step after the arcade is unpacked, and writes its files whole", () => {
+  const provision = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
+  assert.match(provision, /\. "\$SELF_DIR\/wifi\.sh"/);
+  assert.ok(provision.indexOf("\nstep_wifi\n") > provision.indexOf("\nstep_services\n"));
+  const sh = fs.readFileSync(WIFI_SH, "utf8");
+  for (const f of ["arcade-wifi.conf", "arcade-wifi-watch.service", "arcade-wifi.socket", "arcade-wifi@.service"]) assert.match(sh, new RegExp(`put_file "\\$tmp/\\w+" \\S*${f.replace(/[.@]/g, "\\$&")} 0644`), f);
+  assert.equal(spawnSync("/bin/bash", ["-n", WIFI_SH]).status, 0);
+});

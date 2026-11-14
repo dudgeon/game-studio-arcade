@@ -143,6 +143,15 @@ If first boot can't join the Wi-Fi (a wrong name or password, or a weak signal i
 - If the Wi-Fi didn't join, the fix is to re-write the card with the right Wi-Fi details.
 - Or keep the cable: while a cable is plugged in, the cabinet prefers it over the Wi-Fi.
 
+## If the Wi-Fi is lost later
+
+Once the cabinet has its Wi-Fi software (D410-D416), a lost Wi-Fi needs no cable and no card.
+
+- **It usually fixes itself.** The cabinet keeps trying its saved networks for ever, and after a few minutes restarts its own Wi-Fi parts. Games play on meanwhile.
+- **The shelf says which problem it is:** "No Wi-Fi" is the cabinet off the network; "No internet" is the cabinet on the Wi-Fi with the router's internet down.
+- **To pick or change the network at the cabinet:** on the shelf, hold **ENT and COIN together for 3 seconds**. Choose the network with the stick, type its password on the on-screen keyboard (A types, B deletes, X changes the page, 1UP joins), and the screen says whether it worked, with the cabinet's address. A network is only ever added: the old one is never forgotten.
+- **From the mini,** Claude finds the cabinet by `arcade.local`, then the router's name for it, then the last address that worked (`scripts/cabinet-card/picade-connect.sh --where`).
+
 **If anything goes wrong on the day:** stop, and tell Claude what the screen says.
 - The repair tools are `connect-picade.sh` (the Picade's key or agent) and `groq-picade.sh` (the Groq key).
 - A dead card is rebuilt from the backup with `flash.mjs --disk diskN --from-backup` (D354). That's never a day-one card: it comes back as it was.

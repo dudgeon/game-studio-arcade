@@ -82,7 +82,11 @@ export function createWifiFlow(o) {
     } catch {
       // Keep what the last look found; the list shows it.
     }
-    if (o.view().screen === "wifi-list") list();
+    // The list keeps its place: the lit network stays lit when a look finishes under the stick.
+    const now = o.view();
+    if (now.screen !== "wifi-list") return;
+    const lit = now.networks?.[now.sel]?.ssid;
+    list({ sel: Math.max(0, found.networks.findIndex((/** @type {any} */ n) => n.ssid === lit)) });
   }
 
   /** @param {any} net @param {string | null} password */
@@ -164,6 +168,8 @@ export function createWifiFlow(o) {
           if (!e.repeat) holdFrom = now();
           return true;
         }
+        // Any other key ends a hold: ENT with a pink button is the volume's (D421), never this.
+        if (!HOLD_KEYS.includes(e.code)) holdFrom = null;
         return false;
       }
       touch();

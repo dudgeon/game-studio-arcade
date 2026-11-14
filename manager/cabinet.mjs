@@ -7,7 +7,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "../scripts/cabinet-card/picade.mjs";
+import { PICADE_CONNECT, PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "../scripts/cabinet-card/picade.mjs";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -85,7 +85,9 @@ export class Cabinet {
 
   sshArgs() {
     const c = this.config;
-    return ["-4", "-i", c.key, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "StrictHostKeyChecking=accept-new", "-o", `UserKnownHostsFile=${c.knownHosts}`, "-S", this.control];
+    // D416: the Picade is found by its name, the router's name for it, or the last address that worked.
+    const find = c.host === PICADE_HOST ? ["-o", `ProxyCommand=${PICADE_CONNECT} %h %p`] : [];
+    return ["-4", "-i", c.key, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "StrictHostKeyChecking=accept-new", "-o", `UserKnownHostsFile=${c.knownHosts}`, ...find, "-S", this.control];
   }
 
   get target() {

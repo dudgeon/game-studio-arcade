@@ -14,6 +14,8 @@ const value = (name) => {
 };
 
 export const PICADE_HOST = value("PICADE_HOST");
+/** SSH's ProxyCommand for the Picade (D416): its name, the router's name for it, then the last address that worked. */
+export const PICADE_CONNECT = join(dirname(PICADE_SSH_FILE), "picade-connect.sh");
 export const PICADE_DATA_ROOT = value("PICADE_DATA_ROOT");
 export const PICADE_DIR_UNDER_DATA = value("PICADE_DIR_UNDER_DATA");
 export const PICADE_KEY_NAME = value("PICADE_KEY_NAME");
