@@ -110,7 +110,7 @@ node scripts/cabinet-card/boot-update.mjs adopt
 
 **You'll see:**
 - **The update:** it refuses if anyone is playing or making. Otherwise it brings the cabinet software, the agent's brief and the OS packages up to date, checks the cabinet is healthy (the service, SSH, its router), and keeps the old release to go back to.
-- **adopt:** it puts today's boot files in their own slot, so later package updates never touch what boots (D336). If it restarts the Picade, the cabinet comes back to the shelf; it reports when it's done.
+- **adopt:** it puts today's boot files in their own slot, so later package updates never touch what boots (D336). It restarts the Picade once, which takes about a minute, and keeps the slot only if the cabinet comes back with its Wi-Fi and the shelf (bring-up F2). If not, the next boot goes back to how it was.
 
 **Claude, meanwhile:** reads both reports. If either goes back, it says why before anything else is tried.
 
@@ -128,6 +128,20 @@ node scripts/cabinet-card/boot-update.mjs adopt
 **Claude, from the mini, meanwhile:** watches on the Manager (Real cabinet) and reads the make's log and cost. Afterwards it checks that the backup picked the game up within the hour.
 
 ---
+
+## If it doesn't show up on the network
+
+If first boot can't join the Wi-Fi (a wrong name or password, or a weak signal in the basement), the cabinet can't install, and the mini can't find it on `arcade.local`.
+
+**You:**
+1. Plug an Ethernet cable from the router (or a mesh point's Ethernet port) into the Pi's Ethernet port. It's reachable on the assembled cabinet.
+2. Power-cycle the cabinet: hold the power button about 3 seconds to switch off, then tap it to switch on.
+
+**You'll see:** first boot carries on over the cable. A card written before this change also gets the cable through NetworkManager's own automatic wired connection; cards from now on also ask for it themselves (D393).
+
+**Claude, meanwhile:** finds it on `arcade.local` over its own key, then tells you whether the Wi-Fi joined too.
+- If the Wi-Fi didn't join, the fix is to re-write the card with the right Wi-Fi details.
+- Or keep the cable: while a cable is plugged in, the cabinet prefers it over the Wi-Fi.
 
 **If anything goes wrong on the day:** stop, and tell Claude what the screen says.
 - The repair tools are `connect-picade.sh` (the Picade's key or agent) and `groq-picade.sh` (the Groq key).

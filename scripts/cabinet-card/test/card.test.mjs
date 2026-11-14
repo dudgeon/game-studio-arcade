@@ -52,6 +52,7 @@ test("network-config holds the WPA key, never the password, and quotes any netwo
   assert.ok(!text.includes("correct horse battery"));
   assert.match(text, /^network:$/m);
   assert.match(text, /renderer: NetworkManager/);
+  assert.match(text, /\n  ethernets:\n    eth0:\n      dhcp4: true\n      optional: true\n  wifis:\n/, "a cable works too, and no boot waits for one (D393)");
   assert.match(text, /regulatory-domain: "US"/);
   const nameLine = text.split("\n").find((l) => l.endsWith(":") && l.trim().startsWith('"'));
   assert.equal(JSON.parse(nameLine.trim().slice(0, -1)), ssid, "the name survives quoting");

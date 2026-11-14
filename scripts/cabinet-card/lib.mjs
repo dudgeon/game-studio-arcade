@@ -58,6 +58,12 @@ export function networkConfig({ ssid, psk, country }) {
     "network:",
     "  version: 2",
     "  renderer: NetworkManager",
+    // D393: a cable to the router works too, alongside the Wi-Fi: for a wrong password or a weak basement signal.
+    // optional: no boot waits for a cable. NetworkManager prefers the cable while one is plugged in (its default).
+    "  ethernets:",
+    "    eth0:",
+    "      dhcp4: true",
+    "      optional: true",
     "  wifis:",
     "    wlan0:",
     "      dhcp4: true",
