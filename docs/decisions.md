@@ -1456,7 +1456,7 @@ Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD car
 - **Limits, accepted:** until first boot, anyone holding the card can read the keys (FAT has no permissions), so Geoff keeps the card with him. An SD card's controller may keep old blocks after the overwrite. Both keys can be revoked in their consoles.
 - **Rehearsal 8 found a real bug.** `/etc/arcade` doesn't exist yet at that point, so the install crashed and the cabinet came up offline. The fail-soft path worked: the keys were wiped and the shelf played. Fixed (the step makes the folder), and now tested with the real `service-config.mjs`.
 
-**D323. What Geoff types at the flash.** *(Claude, for Geoff to see.)*
+**D323. What Geoff types at the flash.** *(Claude, for Geoff to see. Changed by D327 and D329: the Wi-Fi only when there's no file, and nothing about keys; the Picade's key is pasted once into picade-key.sh, before the flash.)*
 - **Typed:**
   - the `erase diskN NNGB` phrase (the brief's safety rule for writing a disk);
   - the Wi-Fi name and password;
@@ -1503,3 +1503,37 @@ Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD car
 - A real `ant apply` into `cabinet-picade`, and a real make. Those need the real key, which is Geoff's.
 - Groq's answer from the Picade, which needs a mic and a real key.
 - Everything on the hardware (D253, D257).
+
+**D327. The Wi-Fi can come from a file on the mini.** *(Director's call, 2026-11-13: fewer prompts at the flash; the erase phrase stays.)*
+- `flash.mjs` asks for the Wi-Fi as before. But if `~/.config/game-studio-arcade/wifi.json` exists, it uses that instead and says which network. The file is `{"ssid": "...", "password": "..."}`, or `"psk"` with the 64-hex WPA key.
+- The file must be a plain file owned by Geoff with mode 0600, or the flash stops and says why (`chmod 600`). Its errors never quote it.
+- `--wpa3` needs the password typed, since the file may hold only the key.
+- Nothing writes the file: it's Geoff's to make if he wants it.
+- So at the flash Geoff types the erase phrase, the Picade's key and the mini's sudo password (D323), plus the Wi-Fi only when there's no file.
+
+**D328. `flash.mjs --check`: the gather steps, writing nothing.** *(Director's ask, 2026-11-13.)* Against the live virtual cabinet it checks:
+- the Wi-Fi file, if there is one;
+- the Groq key's exit code and shape (the key is never shown, saved or logged);
+- the twin data, using the helper's read-only `info` and `manifest` (not `seed()`, which records the seed on the twin): no replay data, no make running, files to copy;
+- the pinned image and Node tarball against their hashes.
+
+The Picade's identity isn't checked, because that needs Geoff's key and applies the agent.
+- **Run on 2026-11-13 after the virtual cabinet's update:** exit 0 and "Ready to flash". The Groq key was key-shaped; there was no replay data and no make running; 527 files and 17 games to copy, release 0.1.0-de74998c3fef; both pins matched. The output held no `gsk_` string.
+
+**D329. The Picade's key goes in now, not at the flash: `scripts/cabinet-card/picade-key.sh`.** *(Geoff, 2026-11-13, on "you type it once at the flash": "seems like something you should just address now vs wait til later". Supersedes D320's paste at the flash.)*
+- **When:** Geoff runs it once, in his own Terminal on the mini, from the main checkout, after making the `cabinet-picade` workspace and its key in the Console.
+- **What it does:**
+  - It runs `connect-cabinet.sh --prepare`, so the checks are D320's: the key read with no echo, a workspace key only, refusing the mini's and the virtual cabinet's workspaces, and the Studio agent applied there with `claude-lock.arcade.json`.
+  - It stores the key, agent, version and environment in `~/.config/game-studio-arcade/cabinets/arcade/identity.json`: folder 0700, file 0600, written in one step. That's beside the mini's other identities (`~/.config/game-studio-arcade/identity` for WIF). Not in the repo, and not in the Keychain, which would put a dialog on Geoff's screen.
+  - It proves the identity live: the agent is retrieved at its version, then one session is created against it with a 5-cent cap and no message (so the model never runs), and archived at once.
+  - It prints only ok or fail, the workspace id (from the lock file; a workspace key can't read its workspace's name) and the agent version. Any error it prints has key-shaped strings replaced.
+- **`picade-key.sh --check`** repeats the proof with the stored identity and asks for nothing.
+- **The flash** reads that file and asks nothing about keys. With no file, it says to run `picade-key.sh` first and stops before touching the card. `--prepare-identity` (D320's paste at the flash) stays as a repair path, as does `connect-picade.sh` for a running Picade. `flash.mjs --check` (D328) reports the stored identity too, without its key.
+- **The lock file:** `studio-kit/managed-agent/claude-lock.arcade.json` is written in the checkout Geoff runs it from. It holds no secrets and gets committed after his run.
+- **Tested:**
+  - the file's mode and folder, written in one step;
+  - refusals: a readable file, a missing one, an admin key;
+  - the live check's calls with a stand-in client: retrieve at the version, a 5-cent cap, no initial events, archived;
+  - the key never echoed;
+  - `--check` with a throwaway key against the real API: a clean `fail ... 401` with no key in the output, nothing spent.
+- **Not tested here:** a real run, which needs Geoff's real key.

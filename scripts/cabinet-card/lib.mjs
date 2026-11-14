@@ -180,3 +180,26 @@ export function lockedWheels(lockText) {
   }
   return out;
 }
+
+/**
+ * The home Wi-Fi from an optional file on the mini (D327): {"ssid": "...", "password": "..."} or {"ssid", "psk"}.
+ * It must be a plain file only its owner (this user) can read or write, as the cabinet's own config is (0600).
+ * Errors say what's wrong, never what's in it. Returns { ssid, psk }.
+ * @param {string} file @param {{ uid: number, stat: (f: string) => { mode: number, uid: number, isFile: () => boolean }, read: (f: string) => string }} io
+ */
+export function wifiFromFile(file, io) {
+  const st = io.stat(file);
+  if (!st.isFile()) throw new Error(`${file} isn't a plain file`);
+  if (st.uid !== io.uid) throw new Error(`${file} belongs to someone else`);
+  if ((st.mode & 0o077) !== 0) throw new Error(`${file} can be read by others: chmod 600 ${file}`);
+  let o;
+  try {
+    o = JSON.parse(io.read(file));
+  } catch {
+    throw new Error(`${file} isn't JSON like {"ssid": "...", "password": "..."}`);
+  }
+  if (typeof o?.ssid !== "string" || !o.ssid) throw new Error(`${file} has no "ssid"`);
+  const secret = typeof o.psk === "string" ? o.psk : o.password;
+  if (typeof secret !== "string") throw new Error(`${file} has no "password" (or "psk")`);
+  return { ssid: o.ssid, psk: wifiPsk(o.ssid, secret) };
+}
