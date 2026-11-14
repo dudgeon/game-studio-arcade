@@ -31,6 +31,8 @@ const TYPES = {
   ".wasm": "application/wasm",
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
+  // A TIC-80 cart, read by its web player (D380).
+  ".tic": "application/octet-stream",
 };
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const PLAY_ID = /^[A-Za-z0-9_-]{1,64}$/;
