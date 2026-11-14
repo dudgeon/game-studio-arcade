@@ -16,6 +16,7 @@ import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
+import { createGameAi, gameAiModel } from "../src/game-ai.js";
 import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
 import { shelfMarks } from "../src/shelf-marks.js";
 import { demoWifi, socketWifi } from "../src/wifi-client.js";
@@ -220,7 +221,12 @@ const mcp = createArcadeMcp({
   status: () => ({ console: config.console_name ?? "Quarter Deck", profile: values.profile ?? cabinetProfile(), release, replaying, gate: gate ? { host: gate.settings.host, budget_ms: gate.settings.budgetMs, cpu_factor: gate.settings.cpuFactor, frame_time_blocks: gate.settings.frameTimeBlocks } : null }),
 });
 
+// AI in games (D480-D488): the cabinet's own key, outside the coin pot, every call's cost logged. Off when
+// replaying or with no key, and with "game_ai": false in the config; games then run on their own fallbacks.
+const gameAi = createGameAi({ logsDir: paths.logs, keepDir: path.join(paths.root, "game-ai"), model: client && !replaying && config.game_ai !== false ? gameAiModel(client) : null, online: () => online, perMinute: config.game_ai?.per_minute });
+
 const s = await startService({
+  gameAi,
   mcp,
   launches,
   screen,

@@ -22,11 +22,14 @@ const SLACK_MS = 4;
  *   keymap?: typeof DEFAULT_KEYMAP,
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
+ *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
  * }} HostOptions
  *   test: paused clock and no live input; frames only advance through `test.step()`.
  *   persist: keep g.save() data in localStorage (default: true unless test).
  *   players: how many controllers this console has, 1..8 (default 1, D110). The
  *     cabinet passes its config's `players`; play.html takes `?players=N`.
+ *   ai: answers the cart's g.ai asks (D480). Only the cabinet's launcher has one; without it, and always
+ *     on a test host, nobody answers and the cart runs on its fallbacks. `stop: true` ends asking for this run.
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
@@ -89,6 +92,8 @@ export function createHost(opts) {
     return synth;
   };
 
+  let aiStopped = false;
+  let stopped = false;
   let nextId = 1;
   /** @type {Map<number, { resolve: (v: any) => void, reject: (e: Error) => void }>} */
   const pending = new Map();
@@ -194,6 +199,21 @@ export function createHost(opts) {
         for (const w of msg.warnings ?? []) arcade.warnings.push(w);
         // D215: round scores, for the player's post-game screen. Only whole numbers in range get this far.
         for (const n of msg.scores ?? []) if (Number.isInteger(n) && n >= 0) arcade.scores.push(n);
+        // D480: g.ai asks go to whoever can answer; a test host never asks anyone (D486).
+        if (!test && opts.ai && !aiStopped) {
+          for (const ask of Array.isArray(msg.ai) ? msg.ai.slice(0, 8) : []) {
+            const id = ask?.id;
+            Promise.resolve()
+              .then(() => opts.ai?.(ask))
+              .then(
+                (r) => {
+                  if (r?.stop) aiStopped = true;
+                  if (!stopped) send({ type: "ai", reply: { id, ok: !!r?.ok, lines: r?.lines, pick: r?.pick } });
+                },
+                () => !stopped && send({ type: "ai", reply: { id, ok: false } }),
+              );
+          }
+        }
         if (msg.save !== undefined && persist) {
           try {
             localStorage.setItem(saveKey, msg.save);
@@ -255,7 +275,7 @@ export function createHost(opts) {
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).
-  let stopped = false;
+  stopped = false;
   let last = performance.now();
   let acc = 0;
   let drawn = 0;

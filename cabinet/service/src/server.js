@@ -19,6 +19,7 @@
 //   GET  /api/arcade/playing     {playing, what, gate_busy}: whether a game or a gate check is on now; an update waits (D332)
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
+//   POST /api/game-ai            {cart_id, play_id, kind, name, ask, …}: a game's g.ai ask (D480, src/game-ai.js)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
 //   POST /api/speech/feed        {text} or {wav}: the stub only
 //   GET  /api/guests, POST /api/guest-plays  guest games (D230-D232, src/guests.js)
@@ -30,6 +31,7 @@
 //   GET  /api/manager/pot/preview?coins=N   what a top-up would do, and whether it passes the workspace limit (D204)
 //   POST /api/manager/pot/topup  {coins, reason, by?}
 //   POST /api/manager/pot/reset  {reason, by?}
+//   GET  /api/manager/game-ai    what AI in games has cost: this month, all time, per game, guard trips (D488)
 //   GET  /api/manager/makers     every maker, grown-ups included (D236)
 //   POST /api/manager/makers/grown-up  {name}: add a grown-up maker; one already there is left as is
 //   GET  /api/manager/games      every game line, on the shelf or off, and the marks' history (D361)
@@ -54,6 +56,7 @@ import { serveMcpHttp } from "./arcade-mcp.js";
 import { listCarts, readCart } from "@game-studio-arcade/player/src/library.js";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { gameLines } from "./shelf-marks.js";
+import { readAsk, summarizeGameAi } from "./game-ai.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -112,6 +115,7 @@ function readJson(req) {
  *   marks?: ReturnType<typeof import("./shelf-marks.js").shelfMarks> | null,
  *   wifi?: import("./wifi-client.js").WifiPort | null,
  *   volumeFile?: string,
+ *   gameAi?: ReturnType<typeof import("./game-ai.js").createGameAi> | null,
  * }} o
  */
 const VOLUME_FILE = "/run/arcade-volume/level.json";
@@ -200,6 +204,14 @@ export function createServiceHandler(o) {
       o.plays?.set(body.playing === true, typeof body.what === "string" ? body.what.slice(0, 80) : null);
       return json(res, 200, { ok: true });
     }
+    if (pathname === "/api/game-ai") {
+      // D480: a game's g.ai ask, passed on by the launcher. Only for the game on screen now, and only a made game's.
+      if (!o.gameAi) return json(res, 200, { ok: false, why: "off", stop: true });
+      const cart = readCart(o.libraryDir, String(body.cart_id ?? ""));
+      if (!cart) throw new HttpError(404, "no such game");
+      if (o.plays && o.plays.what() !== cart.id) return json(res, 200, { ok: false, why: "not_playing" });
+      return json(res, 200, await o.gameAi.ask({ cart, playId: typeof body.play_id === "string" ? body.play_id.slice(0, 80) : null, ask: readAsk(body) }));
+    }
     if (pathname === "/api/arcade/launch/answer") {
       o.launches?.answer(String(body.launch ?? ""), body.ok === true, typeof body.why === "string" ? body.why : undefined);
       return json(res, 200, { ok: true });
@@ -286,6 +298,8 @@ export function createServiceHandler(o) {
       if (!maker) throw new HttpError(400, "a grown-up maker needs a first name");
       return json(res, 200, { ok: true, maker, added: o.makers.read().length > before });
     }
+    // D488: what AI in games has cost, summed from the whole cost log (the Manager's own read is only each log's tail).
+    if (req.method === "GET" && pathname === "/api/manager/game-ai") return json(res, 200, { on: o.gameAi?.on ?? false, ...summarizeGameAi(readLog(path.join(o.logsDir, "game_ai.jsonl")), new Date().toISOString().slice(0, 7)) });
     if (!o.pot) throw new HttpError(404, "this cabinet has no coin pot");
     if (req.method === "GET" && pathname === "/api/manager/pot") return json(res, 200, { ...potView(0), rules: o.pot.settings });
     if (req.method === "GET" && pathname === "/api/manager/pot/preview") return json(res, 200, o.pot.preview(Number(url.searchParams.get("coins") ?? 0)));
@@ -326,7 +340,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume"]);
+  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume", "/api/game-ai"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;

@@ -2143,3 +2143,46 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **Tests:** a 3-minute and a 25-minute hold through a stand-in arecord (every second kept, Groq in 1 and 3 pieces, Moonshine in 30 s pieces), the splitter, and an hour's idea taken whole by the service.
 
 ## 2026-11-14 — Security updates to pinned packages (D375)
+
+
+## 2026-11-14 — AI in games (D480-D489, AI-in-games worker)
+
+Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's answers in the walkthrough: paid "outside the coin pot, uncapped, but log the cost" (D464), and lines, choices and open chat with a character (D468). The whole design, and the open-chat safety rules, are in [game-ai.md](game-ai.md).
+
+**D480. Games ask for made-up lines and choices through `g.ai`, and never wait.** *(Carries out D463. Claude.)*
+- `g.ai.lines(name, { ask, fallback, max })` and `g.ai.choice(name, { ask, options })` are declared in `init`, at most 8 a game. `g.ai.next(name)` and `g.ai.pick(name, facts)` answer in the same frame: a fresh answer if one has arrived, else the cart's own fallback line or a seeded-random option.
+- **The key never reaches a cart.** The cart frame queues the ask, the runtime host hands it to the launcher, the launcher posts it to the cabinet service (`POST /api/game-ai`), and only the service calls the model, with the cabinet's own key (D131). The sandboxed frame can't call the service itself (its origin is refused, as before).
+- One call brings 12 lines; the next goes out when three are left. A pick's facts are answered for the next pick. One call is in the air per ask, and a failed call waits 10 seconds before another.
+- `g.ai` has its own seeded random stream, so using it doesn't change what `g.rand` gives.
+- Guest games have no `g.ai`. The Manager's simulator and the desktop player have nobody to ask, so games there run on their fallbacks: the mini is never in the path.
+
+**D481. The model: Claude Haiku 5.5, thinking off, low effort, structured output.** *(Claude.)* `claude-haiku-5-5`, $0.10 per million tokens in and $0.50 out (Anthropic's current model list, read 2026-11-14; the same as D272 found). `thinking: disabled`, `effort: low`, a JSON schema (an array of lines, or an enum of the cart's options, so a choice can't come back as anything else), 8 s timeout, no retries. About 0.024 cents for 12 lines and 0.004 cents for a choice (the plan's estimate; each call's real cost is in its log line).
+
+**D482. Paid outside the coin pot, with no cap; every call's cost is logged, never its words.** *(Geoff, D464: "Outside the coin pot, uncapped, but log the cost". The log's shape is the director's default, 2026-11-14.)* `logs/game_ai.jsonl` on the cabinet, one line a call: time, game and version, play, the ask's name and kind, model, tokens in and out, cost in dollars, milliseconds, and the outcome (`fresh`, `no_answer`, `error`, `offline`, `rate_limited`), with how many lines were kept and dropped. No ask text and no answer text, the same rule as the speech log. This replaces the plan's "the ask, the answer" in the log.
+
+**D483. The runaway guard: 30 calls a minute per game, then that game's AI rests 5 minutes.** *(The director's default: a limit whose only job is to catch a loop. The numbers are Claude's.)*
+- Normal play is 2 to 6 calls a minute, so play never meets it. A game asking for a line every frame reaches it in about half a minute.
+- When it trips the game carries on with its fallbacks, the launcher stops asking for the rest of that play, and one flagged line goes in the log (`outcome: "rate_limited"`, `flag: "runaway"`), not one per refused call. The Manager shows it.
+- It isn't a budget: no cap per game, per day or per month. Worst case, a looping game left running all day: about 7,200 calls, roughly $1.70.
+- `"game_ai": { "per_minute": N }` in the cabinet's config changes the number.
+
+**D484. Safety for lines and choices: a house brief, the word list on every line, and no way for a player's words to get in.** *(Carries out D465. Claude.)*
+- The brief goes in front of every ask and a cart can't change it: for kids 8 to 13, kind and silly, cartoon action fine; no swearing, slurs, mocking people, grown-up or frightening content, real people, brands or links; no questions back to the player, nothing personal, no talk of being an AI; plain ASCII. The cart's ask is data inside tags.
+- Every line out must be plain ASCII, within the cart's `max`, have no link, and pass the word list (D271). A line that fails is dropped. A refusal is no lines.
+- A cart has no text input, and a pick's facts can only be numbers, true/false or one of that choice's own options. The service checks this again.
+- Only the game the launcher says is on screen may ask, and only a game in the cabinet's library.
+- No second model call judges each line (the plan's reasoning stands): the output is short, constrained and listed. Open chat is different (D489).
+- `"game_ai": false` in the cabinet's config turns it off.
+
+**D485. With no answer a game plays the same: fallbacks are required, and the cabinet keeps lines.** *(Claude.)* `lines` with fewer than three fallback lines is an error in `init`. The cabinet keeps each ask's newest 50 lines in `game-ai/<cart>.json` in its data folder (not a log); offline, or after an error, a game gets a shuffle of those before its built-in lines. A changed ask starts a new pile.
+
+**D486. The playtest and the publish gate never call the model.** *(Carries out D466. Claude.)* A headless run and a test host have nobody to ask, by construction: the machine only queues asks, and only a live host with an answerer passes them on. So tests see fallbacks and seeded picks, repeat exactly, and cost nothing. A bad declaration throws in `init`, so validate and the playtest catch it.
+
+**D487. The Studio learns it, and offers it only when it's a strong fit.** *(Carries out D467; Geoff, 2026-11-14: "Studio should only offer if it is a strong fit for the game type — should not push it".)* A `game-ai` guide in the context pack and a catalog line. The spec keeps its sections: each ask is listed under Assumptions with why it's there (no new "AI" section, so the spec format and its parser don't change). The agent's brief gets one line; that needs an `ant apply` in each cabinet's workspace, so it's its own commit (as D274).
+
+**D488. The Manager's Activity page shows what AI in games costs.** *(Claude.)* An "AI in games" block: this month's spend and calls, all time, a row per game, and the guard's trips. The sums are the cabinet's (`GET /api/manager/game-ai`, from its whole cost log), since the Manager's own log read is only each file's tail.
+
+**D489. Voice in games and open chat: approved to build, in that order.** *(Geoff, 2026-11-14, through the director.)*
+- **Open chat's twelve safety rules** (game-ai.md) are approved, with Geoff's changes: **every chat turn's text is kept on the cabinet** for him to read and shown in the Manager ("Everything"), in the cabinet's logs only; **no turn limit**; the Studio offers chat **only when it's a strong fit** and doesn't push it; **on straight away** on both cabinets.
+- **Voice actions are added,** in Geoff's words: "Games should also be able to use push to talk/moonshine model to interact with games during gameplay, and game can call haiku to interpret and decide action based on transcription". A game opens hold-to-talk mid-play (the cabinet owns the mic), the cabinet hears with Moonshine for speed and offline, and the model picks one action from a set the game declares. The same screening and safety rules apply. The mic and Moonshine are the speech worker's; this is built with them.
+- Order: lines and choices (D480 to D488, built), then voice actions, then open chat.

@@ -5,6 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
+import { gameAiFor } from "./game-ai.js";
 import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows, guestsChecking } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
@@ -424,16 +425,18 @@ function startPlay(cart) {
   stage.hidden = false;
   canvas.hidden = true;
   const startedAt = new Date().toISOString();
+  const playId = newId();
   const host = (cart.guest ? createGuestHost : createHost)({
     container: stage,
     cartUrl: cart.url,
     players: config.players,
+    ai: gameAiFor(cart.id, playId), // D480: g.ai asks go to the service; guests have none
     onStar: () => endPlay("star"),
     onError: () => {
       if (playing) playing.errors++;
     },
   });
-  playing = { cart, host, playId: newId(), startedAt, t0: performance.now(), errors: 0, sides: new Set(), ended: false };
+  playing = { cart, host, playId, startedAt, t0: performance.now(), errors: 0, sides: new Set(), ended: false };
   // The publish gate waits while a game is being played (D310): say so now, and every few seconds.
   const beat = () => post("/api/arcade/playing", { playing: true, what: cart.id }).catch(() => {});
   beat();

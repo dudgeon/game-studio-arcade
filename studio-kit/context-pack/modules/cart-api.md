@@ -36,4 +36,6 @@ Types for JSDoc: `Arcade.Lib.Grid Shape Piece Box Thing Rule Hit Timer Repeat Sc
 
 **Saves:** `g.save(data)`, `g.load()`: one JSON value, at most 4 KB. For high scores use `g.lib.score`.
 
+**AI:** `g.ai` gives made-up lines and choices, with the game's own fallbacks. See the `game-ai` guide before using it.
+
 **Assets:** none needed; carts draw with shapes and sprites.
