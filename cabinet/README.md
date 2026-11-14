@@ -4,7 +4,7 @@ The software that makes a stock Raspberry Pi OS Lite into a cabinet (D4, D122), 
 
 **Status:** the virtual cabinet runs the cabinet service, on replay until it has a key (D154). No VM window yet (D141), so nobody can sit and play at it. The `picade` profile has never run: it needs the Picade.
 
-**The Picade (D250-D256):** its card is written by `scripts/cabinet-card/flash.mjs` and it's connected by `scripts/cabinet-card/connect-picade.sh`. Follow [docs/cabinet-bring-up.md](../docs/cabinet-bring-up.md) from unboxing to the first make.
+**The Picade (D250-D259, D320-D326):** its card is written by `scripts/cabinet-card/flash.mjs` and carries its own identity, the Groq key and the twin's data, so it is ready when switched on. `connect-picade.sh` and `groq-picade.sh` are repair tools. Follow [docs/cabinet-bring-up.md](../docs/cabinet-bring-up.md) from unboxing to the first make.
 
 | Path | What it is |
 |---|---|

@@ -3,12 +3,21 @@
 // and SHA-256 as the virtual cabinet), then a seed on its FAT partition, so the Pi boots unattended, joins the home
 // Wi-Fi and runs provision.sh with the picade profile.
 //
+// The card also carries what makes the cabinet ready the moment it's switched on (D320-D323): before touching the
+// card, flash copies the Groq key from the virtual cabinet (no typing) and runs connect-cabinet.sh --prepare, which
+// asks for the Picade's own Anthropic key, checks its workspace and applies the Studio agent there. First boot puts
+// both into the cabinet's service.json and wipes them from the card. Do the Console step in
+// docs/cabinet-bring-up.md first (the cabinet-picade workspace, its spend limit, its key).
+//
 // Run it yourself, in a Terminal window on the mini (not with Claude Code's `!`, so the Wi-Fi password stays out of chats):
 //
 //   node scripts/cabinet-card/flash.mjs --list          the disks it could write, and why the others are refused
 //   node scripts/cabinet-card/flash.mjs --disk disk4    write the card in disk4, after showing what it erases
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
+// --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
+// --no-identity writes a card that starts offline (connect-picade.sh later); --no-groq leaves Groq off (Moonshine only);
+// --cabinet-config-from FILE puts throwaway values on an image file, for rehearsals and tests (never a card).
 // --no-speech-on-card leaves speech's wheels and model for first boot to download (D257),
 // --wpa3 for a WPA3-only network: its passphrase goes on the card instead of the WPA key (still erased at first boot).
 //
@@ -30,7 +39,9 @@ import { pipeline } from "node:stream/promises";
 import { Readable, Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/lib.mjs";
-import { PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
+import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
+import { cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
+import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -216,6 +227,30 @@ function folderBytes(dir) {
   return n;
 }
 
+/**
+ * The twin's data at flash time, for the card (D324): the twin's own seed (D295), into an empty folder standing in
+ * for the Picade, so the same rules apply (D291, D292: never keys, config or Manager token). Packed for the card.
+ * @param {string} work a private temp folder, removed after the flash
+ */
+function twinSnapshot(work) {
+  const dir = join(work, "twin-data");
+  mkdirSync(dir, { mode: 0o700 });
+  const from = opt("--twin-dir");
+  if (from && opt("--disk")) stop("--twin-dir is for rehearsals and tests: image files only, never a card.");
+  const twin = from ? folderEnd(resolve(from)) : cabinetEnd(undefined);
+  let r;
+  try {
+    r = twinSeed(folderEnd(dir), twin, new Date());
+  } catch (e) {
+    stop(`couldn't take the twin's data for the card: ${/** @type {Error} */ (e).message}. Or flash with --no-seed.`);
+  }
+  const tgz = join(work, "twin-data.tar.gz");
+  run("tar", ["-czf", tgz, "--no-xattrs", "--no-mac-metadata", "-C", dir, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
+  rmSync(dir, { recursive: true, force: true });
+  say(`the twin's data: ${r.copied} files, ${(statSync(tgz).size / 2 ** 20).toFixed(1)} MiB, from ${twin.name}`);
+  return tgz;
+}
+
 // ---- Writing ----
 
 /** xz -dc image | [sudo] dd of=target. Returns the image's bytes and SHA-256, hashed on the way through. */
@@ -342,7 +377,32 @@ async function main() {
   // 2. Wi-Fi, in memory only.
   const wifi = diskId || process.stdin.isTTY ? wifiFromTerminal() : wifiFromStdin();
 
-  // 3. The pinned files and the seed, built in a temp folder that's removed at the end.
+  // 3. What makes the cabinet ready the moment it's switched on (D320-D323): its own identity and the Groq key.
+  // Gathered before the card is touched, so a stop here leaves the card as it was. In memory only.
+  let cardConfig = null;
+  const fromFile = opt("--cabinet-config-from");
+  if (fromFile) {
+    if (diskId) stop("--cabinet-config-from is for rehearsals and tests: image files only, never a card.");
+    cardConfig = configFromFile(fromFile);
+  } else if (!flag("--no-identity")) {
+    if (!diskId && !process.stdin.isTTY) stop("with no terminal there's no one to paste the Picade's key: pass --no-identity, or --cabinet-config-from FILE for a rehearsal.");
+    const groq = flag("--no-groq") ? null : await groqFromVirtual({ drive: join(REPO, "cabinet/vm/drive") });
+    if (groq) say("the Groq key: copied from the virtual cabinet, held in memory");
+    say("the Picade's own identity: connect-cabinet.sh asks for its key (D320)");
+    const identity = await identityFromConnect({
+      script: join(REPO, "scripts/virtual-cabinet/connect-cabinet.sh"),
+      env: { ...process.env, CABINET: "arcade", ARCADE_HOST: PICADE_HOST, ARCADE_SSH_DIR: join(CABINET_DIR, "ssh"), ARCADE_SSH_KEY_NAME: KEY_NAME, GSA_VM_DIR: CABINET_DIR },
+    });
+    cardConfig = cabinetConfigText({ identity, groq });
+  }
+  if (!cardConfig) say("no identity on this card: the cabinet starts offline until connect-picade.sh (D252)");
+  // The twin's data, also before the card is touched (D324). Geoff's yes, 2026-11-13.
+  const snapWork = mkdtempSync(join(tmpdir(), "card-twin-"));
+  // The kids' data never outlives the flash on the mini, whatever stops it.
+  process.on("exit", () => rmSync(snapWork, { recursive: true, force: true }));
+  const twinData = flag("--no-seed") ? null : twinSnapshot(snapWork);
+
+  // 4. The pinned files and the seed, built in a temp folder that's removed at the end.
   const commit = repoCommit();
   const image = await pinned(lock.image);
   const nodeTarball = await pinned(lock.node);
@@ -353,6 +413,8 @@ async function main() {
     mkdirSync(seedDir);
     buildSeed(seedDir, { hostname, authorizedKey, nodeTarball, commit, timezone });
     if (!flag("--no-speech-on-card")) await speechPayload(seedDir);
+    if (twinData) cpSync(twinData, join(seedDir, "twin-data.tar.gz"));
+    rmSync(snapWork, { recursive: true, force: true });
     say(`seed: ${(folderBytes(seedDir) / 2 ** 20).toFixed(0)} MiB`);
     const instance = `${hostname}-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}-${randomBytes(3).toString("hex")}`;
     const cloud = {
@@ -361,8 +423,11 @@ async function main() {
       "network-config": networkConfig({ ssid: wifi.ssid, psk: wifi.psk, country }),
     };
     wifi.psk = "";
+    // Straight onto the card's FAT with the rest, never into the seed folder on the mini's disk (D322).
+    if (cardConfig) cloud[CARD_CONFIG] = cardConfig;
+    cardConfig = null;
 
-    // 4. Write, read back, seed.
+    // 5. Write, read back, seed.
     if (confirmed) {
       if (!sameDisk(confirmed, diskInfo(diskId))) stop(`${diskId} isn't the card you confirmed any more. Nothing written.`);
       run("diskutil", ["unmountDisk", diskId]);
@@ -387,13 +452,13 @@ async function main() {
     rmSync(work, { recursive: true, force: true });
   }
 
-  // 5. A new card is a new cabinet to SSH: forget the old host keys.
+  // 6. A new card is a new cabinet to SSH: forget the old host keys.
   if (confirmed) rmSync(join(SSH_DIR, "known_hosts"), { force: true });
   say(confirmed ? `done: ${diskId} is ejected. Put it in the Pi and follow docs/cabinet-bring-up.md, step 3.` : `done: ${target}`);
   say(`admin login once it's up: ARCADE_HOST=${hostname}.local ARCADE_SSH_DIR=${SSH_DIR} ARCADE_SSH_KEY_NAME=${KEY_NAME} cabinet/vm/drive ssh (user ${ADMIN})`);
 }
 
 main().catch((err) => {
-  console.error(`[card] ${err instanceof Stop ? "Stopped" : "FAILED"}: ${err.message}`);
+  console.error(`[card] ${err instanceof Stop || err instanceof SecretsError ? "Stopped" : "FAILED"}: ${err.message}`);
   process.exit(1);
 });

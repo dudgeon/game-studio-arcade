@@ -34,6 +34,10 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 . "$SELF_DIR/timezone.sh"
 # shellcheck source=/dev/null
 . "$SELF_DIR/speech.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/cabinet-config.sh"
+# shellcheck source=/dev/null
+. "$SELF_DIR/twin-data.sh"
 
 step_hostname() {
   if [ "$(cat /etc/hostname 2>/dev/null)" != "$HOSTNAME_WANTED" ]; then
@@ -181,7 +185,9 @@ stage "Installing Node"
 step_node
 stage "Unpacking the arcade"
 step_bundle
+step_twin_data
 step_carts
+step_cabinet_config
 stage "Installing speech: Moonshine and its model, about 400 MB"
 step_speech
 stage "Setting up the cabinet's buttons, sound and screen"

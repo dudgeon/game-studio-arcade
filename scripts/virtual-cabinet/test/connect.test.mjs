@@ -3,7 +3,7 @@
 // at a temp folder. The parts that need a real cabinet are in connect-vm.sh, run by hand.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFile, execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -203,6 +203,41 @@ test("refuses another cabinet's workspace: each cabinet has its own (D131, D254)
   assert.equal(same.code, 0, same.out);
 });
 
+test("--prepare: the config goes to flash.mjs's FIFO, never over SSH, and the key nowhere else (D320)", { skip }, async () => {
+  const w = world();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "prepare-"));
+  const fifo = path.join(dir, "config");
+  execFileSync("mkfifo", ["-m", "600", fifo]);
+  let got = "";
+  const reading = new Promise((resolve) => {
+    const r = fs.createReadStream(fifo, { encoding: "utf8" });
+    r.on("data", (d) => (got += d));
+    r.on("end", resolve);
+  });
+  const r = await inTerminal(w, { args: ["--prepare", fifo], env: { CABINET: "arcade" } });
+  await reading;
+  assert.equal(r.code, 0, r.out);
+  const config = JSON.parse(got);
+  assert.equal(config.anthropic_api_key, KEY);
+  assert.equal(config.agent_id, "agent_TEST");
+  assert.equal(config.environment_id, "env_TEST");
+  assert.equal(config.agent_version, 3);
+  assert.equal(read(path.join(w.log, "drive.argv")), "", "no SSH: there's no cabinet yet");
+  assert.ok(fs.existsSync(path.join(w.agent, "claude-lock.arcade.json")), "the Picade's own lock file");
+  assert.deepEqual(keyFilesOutsideConfig(w).filter((f) => f !== "log/curl.stdin" && f !== "bin/ant"), [], "the key isn't in any file (the stand-ins hold it by design)");
+  assert.ok(!r.out.includes("FAKEKEY"), "nor in the output");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("--prepare needs a FIFO, not a file", { skip }, async () => {
+  const w = world();
+  const plain = path.join(w.root, "plain");
+  fs.writeFileSync(plain, "");
+  const r = await noTerminal(w, { args: ["--prepare", plain] });
+  assert.notEqual(r.code, 0);
+  assert.match(r.out, /needs the FIFO/);
+});
+
 test("says so when the API refuses the key, or it isn't scoped to a workspace", { skip }, async () => {
   assert.match((await inTerminal(world(), { env: { STUB_STATUS: "401" } })).out, /refused this key/);
   assert.match((await inTerminal(world(), { env: { STUB_STATUS: "400" } })).out, /isn't scoped to a workspace/);
@@ -333,6 +368,21 @@ test("a seeded cart with no session isn't replay data", { skip }, async () => {
   fs.mkdirSync(path.join(w.data, "carts/apple-catch"));
   fs.writeFileSync(path.join(w.data, "carts/apple-catch/cart.json"), JSON.stringify({ id: "apple-catch" }));
   assert.equal((await inTerminal(w)).code, 0);
+});
+
+test("service-config groq-key prints the cabinet's Groq key, and says when there's none (D321)", { skip }, () => {
+  const w = world();
+  const env = envOf(w);
+  const run = (cmd, input) => spawnSync(process.execPath, [SERVICE_CONFIG, cmd], { env, input, encoding: "utf8" });
+  assert.equal(run("groq-key").status, 4, "no config yet");
+  assert.equal(run("install", JSON.stringify({ anthropic_api_key: KEY, agent_id: "a", environment_id: "e" })).status, 0);
+  const none = run("groq-key");
+  assert.equal(none.status, 4);
+  assert.match(none.stderr, /no Groq key/);
+  assert.equal(run("groq", JSON.stringify({ groq_api_key: "gsk_FAKEGROQ123" })).status, 0);
+  const got = run("groq-key");
+  assert.equal(got.status, 0);
+  assert.equal(got.stdout, "gsk_FAKEGROQ123", "exactly the key, no newline, nothing else");
 });
 
 test("service-config: bad input fails without quoting the key", { skip }, async () => {

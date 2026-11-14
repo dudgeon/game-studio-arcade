@@ -11,18 +11,23 @@ Sources, checked live 2026-11-11: Pimoroni's [Assembling your Picade](https://le
 
 ## The first end-to-end run, short
 
-For when the cabinet is built (Part A). Details for each step are in the parts below.
+For when the cabinet is built (Part A). The card carries everything, so the Picade is ready the moment it's switched on: the shelf with the virtual cabinet's games, speech on Groq (Moonshine as the fallback), and Make (D320-D326). Nothing is typed into the cabinet or run against it afterwards. Details are in the parts below.
 
-1. **Card into the mini's reader.** In a Terminal window, in the repo on `main`:
+1. **Once, before the flash, in the Claude Console (you):** make the `cabinet-picade` workspace, set its spend limit, and make a key scoped to it. Copy the key. (D1)
+2. **Flash, at the mini.** The virtual cabinet must be running (the card copies its Groq key and its games). Put the card in the mini's reader. In a Terminal window, in the repo on `main`:
    `node scripts/cabinet-card/flash.mjs --list`, then `node scripts/cabinet-card/flash.mjs --disk diskN` with the disk it names.
-   Type the `erase diskN NNGB` phrase it shows, the Wi-Fi name, the Wi-Fi password (nothing shows), then the mini's password for sudo. About 5 minutes (the first time it also fetches speech's files, about 300 MB, once); it ejects the card. (Part B)
-2. **Card into the Pi** from underneath. **Plug your USB mic into a black USB 2 port.** Power on.
-3. **Wait for the shelf.** In the rehearsal (a VM on the mini, wired, 2026-11-12) it took 2 minutes; on the Pi, over the basement Wi-Fi onto the SD card, expect several times that, mostly the browser step. The screen shows "Setting up the arcade" with each step, restarts once by itself, then shows the first-time welcome and the shelf. Until step 5 the shelf says **"Not connected"** and Make says **"Not connected to Claude yet"**: that's expected. (If it says "No Wi-Fi", that one is a real Wi-Fi problem: see C2.) (Part C)
-4. **Console:** make the `cabinet-picade` workspace, its spend limit, and a key scoped to it. (D1)
-5. **Terminal:** `scripts/cabinet-card/connect-picade.sh`, paste the key, check the workspace, answer `y`. (D2)
-6. **Terminal:** `scripts/cabinet-card/groq-picade.sh`, answer the Zero Data Retention question, then paste the same Groq key the virtual cabinet has (nothing shows). Speech then uses Groq first, with Moonshine on the cabinet as the fallback (D263); `--off` takes the key off again.
-7. **Claude, with your yes:** `node scripts/twin.mjs seed --yes` copies the virtual cabinet's games and history onto the Picade (add `--set-aside-real` if the checks left log lines on it). It reaches the Picade with the SSH key step 1 made, in `~/game-studio-data/cabinets/arcade/ssh/`. (E1)
-8. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2) The Manager only watches the Picade: its driver keyboard stays off unless you switch it on with `scripts/cabinet-card/driver-keyboard.sh on` (D287).
+   It asks, in this order:
+   - the `erase diskN NNGB` phrase it shows;
+   - the Wi-Fi name and password (nothing shows);
+   - **the Picade's key from step 1** (paste it; nothing shows). It names the key's workspace (check it's `cabinet-picade`) and sets the Studio up there.
+   - Then the mini's own password, for sudo to write the card.
+
+   The Groq key and the virtual cabinet's games, makers, coin history and logs come across by themselves. About 5 minutes; it ejects the card. (Part B)
+3. **Card into the Pi** from underneath. **Plug your USB mic into a black USB 2 port.** Power on.
+4. **Wait for the shelf.** In the rehearsals (a VM on the mini, wired) it took 2 minutes. On the Pi, over the basement Wi-Fi onto the SD card, expect several times that, mostly the browser step. The screen shows "Setting up the arcade" with each step and restarts once by itself. Then you get the first-time welcome, and the shelf with the virtual cabinet's games and **"Make a new game: Tell Claude your idea"**. (Part C)
+5. **Make a game with the cabinet's own controls:** stick and **A** to pick Make and your name; **hold a player button and talk**, let go to send; answer each question with the stick and A (D is "Make it now"); play the new game; **ESC** back to the shelf. Claude watches from the mini on the Manager (`scripts/manager.sh url`, Real cabinet) and reads the logs. (E2) The Manager only watches the Picade: its driver keyboard stays off unless you switch it on with `scripts/cabinet-card/driver-keyboard.sh on` (D287).
+
+Afterwards, Claude commits `studio-kit/managed-agent/claude-lock.arcade.json` (no secrets in it), and from then on the twin follows the Picade: `node scripts/twin.mjs sync`. Updates reach the Picade over the network (its admin SSH is up from first boot); the card isn't touched again.
 
 ---
 
@@ -90,7 +95,11 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
   (use the disk `--list` says can be written).
 - It shows the card's name, size and partitions, and asks you to type something like `erase disk4 32GB`. Anything else stops it.
 - It asks for the home Wi-Fi name, then the password (nothing shows as you type). The password is never stored: only the Wi-Fi key derived from it goes on the card, and the card deletes that file on first boot.
-- sudo asks for the mini's password to write the card. It writes about 3 GB, reads it back to check, adds the setup files, and ejects.
+- It copies the Groq key from the virtual cabinet (no typing), then asks for **the Picade's key** from D1 (paste; nothing shows). It names that key's workspace, refuses the mini's and the virtual cabinet's, and applies the Studio agent there. It also takes the virtual cabinet's games, makers, coin history and logs, by the twin's rules (never keys or tokens).
+- All of that is gathered before the card is touched: if anything stops, the card is as it was.
+- sudo asks for the mini's password to write the card. It writes about 3 GB, reads it back to check, adds the setup files and the keys, and ejects.
+- The keys are on the card's boot partition only until first boot, which moves them into the cabinet's own config (owner `arcade`, mode 0600) and overwrites them with zeros. Until then, keep the card with you.
+- If the virtual cabinet isn't running, it stops and says so before touching the card. `--no-groq`, `--no-seed` and `--no-identity` leave those parts off (see D320-D324).
 - If it refuses the card: it says why (internal disk, not a card reader, too big, read-only switch). Read the reason before trying anything else.
 
 **B2. Card into the Pi** 🔧
@@ -136,32 +145,27 @@ Why black for the mic: a mic needs nothing faster than USB 2, and USB 3 ports an
 
 ---
 
-## Part D: the cabinet's own Claude identity (D131, D254)
+## Part D: the cabinet's own Claude identity (D131, D254, D320)
 
-Like the virtual cabinet's, but its **own new workspace and key**, so its spending is capped and counted on its own.
+Like the virtual cabinet's, but its **own new workspace and key**, so its spending is capped and counted on its own. You make them once, before the flash; the flash does the rest.
 
-**D1. In the Claude Console** (you)
+**D1. In the Claude Console, before the flash** (you)
 1. [Workspaces](https://platform.claude.com/settings/workspaces) → **Create workspace**, name it `cabinet-picade`.
 2. Select it → **Spend limits** → set the monthly limit you want for the real cabinet.
-3. [API keys](https://platform.claude.com/settings/keys) → **Create key**, name `arcade`, **scoped to `cabinet-picade`**, expiry **Never**. Owner: a service account if the Console offers one, else you (as for the virtual cabinet, D158). Copy it; don't paste it anywhere else.
+3. [API keys](https://platform.claude.com/settings/keys) → **Create key**, name `arcade`, **scoped to `cabinet-picade`**, expiry **Never**. Owner: a service account if the Console offers one, else you (as for the virtual cabinet, D158). Copy it; paste it only into the flash (B1).
 
-**D2. On the mini, in a Terminal window** (not Claude Code's `!`):
-```
-scripts/cabinet-card/connect-picade.sh
-```
-- Paste the key (nothing shows). It names the workspace; check it's `cabinet-picade`'s. It refuses the mini's workspace and the virtual cabinet's. Read the plan, answer `y`.
-- Look for: "Done. The cabinet is live in workspace …". Until this, the cabinet plays games but Make waits, showing it needs a connection (D252).
-- Then tell Claude: it commits `studio-kit/managed-agent/claude-lock.arcade.json` (no secrets in it).
+**D2. Repair tools, only if something needs changing later** (in a Terminal window on the mini):
+- `scripts/cabinet-card/connect-picade.sh`: a new key or workspace for the Picade, over its SSH; `--reapply` after the Studio agent changes.
+- `scripts/cabinet-card/groq-picade.sh`: a new Groq key; `--off` takes it off (Moonshine carries on).
 
 ---
 
-## Part E: data, then the first real make
+## Part E: the data, and the first real make
 
-**E1. Copy the twin's data** (D290-D298)
-- The real cabinet starts as a copy of the virtual cabinet's games, logs and makers (Geoff, 2026-11-11). After D2, before E2. Nothing on either cabinet is deleted (D5); keys and config never move.
-- **Do** (Claude, with your yes): `node scripts/twin.mjs status`, then `node scripts/twin.mjs seed --yes`. If the checks above left log lines on the Picade, the seed lists them and stops; `--set-aside-real` moves them aside on the Picade first (kept).
-- **Look for:** the virtual cabinet's games on the Picade's shelf (Tester's included; `twin-seed.json` lists them as test data), and `status` saying "In sync".
-- **If not:** tell Claude. From then on the twin follows the Picade: `node scripts/twin.mjs sync`.
+**E1. The twin's data** (D290-D299, D324)
+- The card carries the virtual cabinet's games, makers, coin history and logs as they were at the flash (Geoff's yes, 2026-11-13). First boot puts them in place before the starter games. Nothing on either cabinet is deleted (D5); keys, config and the Manager token never move.
+- **Look for:** the virtual cabinet's games on the Picade's shelf (Tester's included; `twin-seed.json` lists them as test data).
+- From then on the Picade is the real one and the twin follows it: `node scripts/twin.mjs sync` (and `status`).
 
 **E2. First make on the cabinet** 🔧
 - With a kid, from the shelf: Make → answer with the stick and buttons → a game lands on the shelf → play it.
@@ -176,4 +180,9 @@ scripts/cabinet-card/connect-picade.sh
 - ✅ The Picade's config.txt lines on a copy of the image's own config.txt: one block, under `[all]`, every key D82 names, audio lines off.
 - ✅ The first-boot setup (cloud-init) reviewed against the image's own cloud-init and Raspberry Pi's user-rename code: the admin user is made the way Raspberry Pi's own tool expects, so no "rename user" wizard appears on the screen.
 - ✅ **A full rehearsal of first boot** (2026-11-12): the card image `flash.mjs` writes, booted in a throwaway VM on the mini with Debian's kernel standing in for the Pi's (`scripts/cabinet-card/rehearse.mjs`). cloud-init made the admin user and masked the wizard, the seed ran `provision.sh --profile picade` with speech from the card, the progress screen showed each step, it restarted once, and the offline shelf came up and played a starter game. Power-on to shelf: 2 minutes. The Wi-Fi settings survived the restart. Four things it found are fixed (D250, D257).
+- ✅ **A card that carries the keys and the twin's data** (2026-11-13, throwaway keys and a throwaway twin, never the real ones):
+  - First boot put the keys into `service.json` (owner `arcade`, 0600) and wiped them from the card.
+  - It put the twin's game on the shelf and came up connected (Claude reachable), with speech on Groq plus Moonshine.
+  - The keys were in no other file and no log.
+  - The admin SSH (key only) was up for updates.
 - 🔧 Everything in Parts A and C: power, the overlay on a Pi 5, the panel, the DAC, the buttons' wiring, the power button, Wi-Fi in the basement, temperature, and the first boot itself.

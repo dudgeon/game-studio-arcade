@@ -524,6 +524,8 @@ export function createStudio(o) {
 
   return {
     state,
+    /** Something outside the Studio changed what state() says (Claude reachable or not): tell the screens. */
+    refresh: changed,
     /** @param {(s: any) => void} f */
     subscribe(f) {
       listeners.add(f);
