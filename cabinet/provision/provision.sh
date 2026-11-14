@@ -39,6 +39,8 @@ log() { echo "[provision $(date -u +%H:%M:%S)] $*"; }
 # shellcheck source=/dev/null
 . "$SELF_DIR/twin-data.sh"
 # shellcheck source=/dev/null
+. "$SELF_DIR/library.sh"
+# shellcheck source=/dev/null
 . "$SELF_DIR/update-guard.sh"
 
 step_hostname() {
@@ -144,6 +146,7 @@ step_carts() {
     src="$ARCADE_HOME/current/studio-kit/context-pack/templates/$name"
     id="$(sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' "$src/cart.json")"
     [ -n "$id" ] || { echo "no id in $src/cart.json" >&2; return 1; }
+    STARTER_IDS="$STARTER_IDS $id" # step_library commits them, on a new library (D370)
     if [ ! -e "$DATA/carts/$id" ]; then
       cp -R "$src" "$DATA/carts/$id"
       chown -R arcade:arcade "$DATA/carts/$id"
@@ -194,6 +197,7 @@ stage "Unpacking the arcade"
 step_bundle
 step_twin_data
 step_carts
+step_library
 step_cabinet_config
 stage "Installing speech: Moonshine and its model, about 400 MB"
 step_speech

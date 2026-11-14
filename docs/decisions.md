@@ -1835,3 +1835,16 @@ Geoff chose a clean start for the kids' first switch-on (through the director, 2
   - Hidden makers: tester and tester2. Pot: full.
   - `flash.mjs --check --day-one docs/day-one.json` checks a file's ids against the live virtual cabinet with the same planner the flash uses, reading only (the twin helper's `manifest` and `read`).
   - Its run on 2026-11-14 found every id. It gave 8 lines on the shelf and 9 off it (bee-buzz, fly-catcher, frog-flicker, fruit-cat-drop, penguin-slide, pepper-bone-catch, rock-rain, shark-chomp, snowball-drop). The twin's 8342-byte ledger stays on the mini.
+
+**D370. A card with no twin data starts the cart library at first boot, with the starters committed.** *(Claude, from the update worker's finding, 2026-11-14. D370 because D356-D359 are used and D360-D369 are the Manager's.)*
+- **The finding:** provisioning copies the three starters into `/var/lib/arcade/carts`, but the library's git repo only appeared with the first make. The service's `ensureLibrary` commits only its README, and a make commits only its own folder, so the starters stayed untracked for good.
+- **Wider than unseeded cards:** the virtual cabinet has the same gap today. Its library holds every made game, but apple-catch, comet-dodge and wall-ball are untracked (read-only look, 2026-11-14).
+- **The fix (`cabinet/provision/library.sh`, after `step_carts`):** on a cabinet with no library yet, first boot starts it the service's own way, as `arcade`: the same README, the same "Studio" author, and the same first commit ("Start the dev cart library"). Then it commits each starter as `starter <id> v1 (D161)`. The service's `ensureLibrary` then finds the library ready and changes nothing.
+- **A library that's already there is left as it is:** a seeded card (the twin's library), the twin itself, or a re-run.
+- **Tested:**
+  - the commits and their author;
+  - `ensureLibrary` changes nothing afterwards;
+  - the same README;
+  - a seeded library untouched, with its untracked folder still untracked.
+- **Rehearsal 13** (a card with no twin data): the log said "3 starters committed". The library had the four commits by Studio, nothing untracked, and `.git` and README owned by `arcade`. First boot exited 0.
+- **Not done, offered:** committing the untracked starters in the twin's library, and so on a seeded card too. That's a small change, but it adds commits to the twin's history, which then reach the Picade by seed and come back by sync. Done once on the twin before the flash, both would match. It's the director's call whether to do it.

@@ -396,7 +396,7 @@ test("first boot installs the card's cabinet config, then wipes it from the card
   assert.ok(!fs.existsSync(file));
   // No file on the card: nothing happens.
   assert.equal(execFileSync("/bin/bash", ["-c", script("step_cabinet_config")], { encoding: "utf8" }), "");
-  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8"), /step_carts\nstep_cabinet_config\n/, "after the carts (service-config.mjs takes arcade's uid from them), before the services start");
+  assert.match(fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8"), /step_carts\nstep_library\nstep_cabinet_config\n/, "after the carts (service-config.mjs takes arcade's uid from them), before the services start");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -504,7 +504,7 @@ test("first boot unpacks the twin's data into an empty data folder, before the s
   assert.match(out, /already has data: keeping its own/);
   assert.equal(fs.readFileSync(path.join(data, "makers.json"), "utf8"), '[{"id":"owen"}]');
   const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
-  assert.match(prov, /step_twin_data\nstep_carts\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
+  assert.match(prov, /step_twin_data\nstep_carts\nstep_library\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -679,4 +679,35 @@ test("docs/day-one.json is a valid day-one file: full pot, Tester hidden, the ag
   assert.equal(spec.pot, "full");
   assert.deepEqual(spec.hide_makers, ["tester", "tester2"]);
   for (const id of ["teti", "teti-geoff", "apple-catch", "comet-dodge", "wall-ball"]) assert.ok(spec.shelf.includes(id), id);
+});
+
+test("a card with no twin data starts the cart library the service's way, starters committed; a seeded one is untouched (D370)", async () => {
+  const { ensureLibrary } = await import("../../../studio-kit/cli/src/library.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-library-"));
+  const git = (cwd, ...a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
+  const step = (data) =>
+    execFileSync("/bin/bash", ["-c", `log() { echo "[provision] $*"; }; DATA=${JSON.stringify(data)}; . ${JSON.stringify(path.join(REPO, "cabinet/provision/library.sh"))}; STARTER_IDS=" apple-catch comet-dodge wall-ball"; step_library`], { encoding: "utf8", env: { ...process.env, GIT_AS: " ", DATA_OWNER_FILE: "true" } });
+  // New: three starters copied in, no library yet.
+  const fresh = path.join(dir, "fresh");
+  for (const [name, id] of [["catch", "apple-catch"], ["dodge", "comet-dodge"], ["paddle", "wall-ball"]]) fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates", name), path.join(fresh, "carts", id), { recursive: true });
+  const out = step(fresh);
+  assert.match(out, /started the cart library: 3 starters committed/);
+  const lib = path.join(fresh, "carts");
+  assert.equal(git(lib, "status", "--porcelain"), "", "nothing left untracked");
+  assert.deepEqual(git(lib, "log", "--format=%s", "--reverse").split("\n"), ["Start the dev cart library", "starter apple-catch v1 (D161)", "starter comet-dodge v1 (D161)", "starter wall-ball v1 (D161)"]);
+  assert.equal(git(lib, "log", "-1", "--format=%an <%ae>"), "Studio <studio@game-studio-arcade.invalid>", "the service's author");
+  // The service's own ensureLibrary finds it ready and changes nothing.
+  const head = git(lib, "rev-parse", "HEAD");
+  ensureLibrary(lib);
+  assert.equal(git(lib, "rev-parse", "HEAD"), head);
+  assert.equal(fs.readFileSync(path.join(lib, "README.md"), "utf8"), "# Dev cart library\n\nOne folder per cart. Never delete; every version is a commit.\n", "the same README as ensureLibrary writes");
+  // Seeded (the twin's library, starters untracked as on the virtual cabinet): left exactly as it is.
+  const seeded = path.join(dir, "seeded");
+  fs.cpSync(fresh, seeded, { recursive: true });
+  fs.cpSync(path.join(REPO, "studio-kit/context-pack/templates/catch"), path.join(seeded, "carts", "loose-starter"), { recursive: true });
+  const before = git(path.join(seeded, "carts"), "rev-parse", "HEAD");
+  assert.match(step(seeded), /already there: leaving it as it is/);
+  assert.equal(git(path.join(seeded, "carts"), "rev-parse", "HEAD"), before);
+  assert.match(git(path.join(seeded, "carts"), "status", "--porcelain"), /\?\? loose-starter\//, "an untracked folder stays untracked");
+  fs.rmSync(dir, { recursive: true, force: true });
 });

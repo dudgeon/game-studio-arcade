@@ -129,6 +129,7 @@ function inTerminal(w, { key = KEY, confirm = "y", args = [], env = {} } = {}) {
 function noTerminal(w, { args = [], env = {}, input = "" } = {}) {
   return new Promise((resolve) => {
     const child = execFile(SCRIPT, args, { env: envOf(w, env) }, (err, stdout, stderr) => resolve({ code: err?.code ?? 0, out: stdout + stderr }));
+    child.stdin.on("error", () => {}); // the script may stop before reading its stdin: EPIPE is expected then
     child.stdin.end(input);
   });
 }
