@@ -58,6 +58,9 @@ find_picade() {
     ip="$("${PICADE_TAILSCALE-$ts}" ip -4 "$base" 2>/dev/null | head -1)"
     if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip tailscale"; return 0; fi
   fi
+  # Its Tailscale address as recorded, for a mini that's on the tailnet but has no tailscale command to ask.
+  ip="$(sed -n 's/.*"tailscale": *{.*"ipv4": *"\(100\.[0-9.]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"
+  if ipv4 "$ip" && answers "$ip" "$port"; then echo "$ip tailscale"; return 0; fi
   ip="$(sed -n 's/.*"link_local": *"\(fe80:[0-9a-f:]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"
   if [ -n "$ip" ] && answers "$ip%${PICADE_CABLE_IF:-en0}" "$port"; then echo "$ip%${PICADE_CABLE_IF:-en0} direct-cable"; return 0; fi
   ip="$(sed -n 's/.*"usb_gadget": *{ *"ipv4": *"\([0-9.]*\)".*/\1/p' "$KNOWN" 2>/dev/null | head -1)"

@@ -23,16 +23,27 @@
 # (D195), so a key lands exactly once. `drive ssh` and `drive run` don't repeat: their commands may not be safe to.
 set -euo pipefail
 
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+# The Picade's name, key and folder are defined in one place (D259).
+# shellcheck source=/dev/null
+. "$REPO/scripts/cabinet-card/picade-ssh.sh"
+# ARCADE_CABINET=real (or CABINET=real) is the Picade, as in the game-studio plugin; so is ARCADE_HOST set to its name.
+case "${ARCADE_CABINET:-${CABINET:-}}" in real|picade) : "${ARCADE_HOST:=$PICADE_HOST}" ;; esac
 HOST="${ARCADE_HOST:-arcade-virtual.local}"
 VM_ROOT="${GSA_VM_DIR:-$HOME/game-studio-data/vm}"
-SSH_DIR="${ARCADE_SSH_DIR:-$VM_ROOT/ssh}"
-KEY="$SSH_DIR/${ARCADE_SSH_KEY_NAME:-arcade-virtual_ed25519}"
-REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-# D416: the Picade is found by more than its name: picade-connect.sh tries arcade.local, the router's name for it,
-# then the last address that worked. The host key is still checked under its name.
 FIND=()
-if [ "$HOST" = "$(sed -n 's/^PICADE_HOST=//p' "$REPO/scripts/cabinet-card/picade-ssh.sh")" ] && [ -z "${ARCADE_SSH_PORT:-}" ]; then
+if [ "$HOST" = "$PICADE_HOST" ] && [ -z "${ARCADE_SSH_PORT:-}" ]; then
+  # The Picade has its own key and known_hosts (D259): never the virtual cabinet's, which it would refuse, and
+  # whose known_hosts would take its host key.
+  SSH_DIR="${ARCADE_SSH_DIR:-$PICADE_DIR/ssh}"
+  KEY="$SSH_DIR/${ARCADE_SSH_KEY_NAME:-$PICADE_KEY_NAME}"
+  # D416: and it's found by more than its name: picade-connect.sh tries arcade.local, the router's name for it,
+  # the last address that worked, then the ways in that don't need the home Wi-Fi. The host key is still checked
+  # under its name.
   FIND=(-o "ProxyCommand=$REPO/scripts/cabinet-card/picade-connect.sh %h %p")
+else
+  SSH_DIR="${ARCADE_SSH_DIR:-$VM_ROOT/ssh}"
+  KEY="$SSH_DIR/${ARCADE_SSH_KEY_NAME:-arcade-virtual_ed25519}"
 fi
 
 # IPv4 only: mDNS can offer an IPv6 address first that the mini can't route to.

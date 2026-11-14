@@ -109,6 +109,32 @@ test("SSH to the Picade goes through the finder: the driver and the Manager", ()
   assert.ok(fs.statSync(CONNECT).mode & 0o100, "picade-connect.sh is executable");
 });
 
+test("the driver reaches the Picade with the Picade's own key and known_hosts, never the virtual cabinet's", () => {
+  // A stand-in ssh that prints what it was given.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drive-ssh-"));
+  fs.writeFileSync(path.join(dir, "ssh"), '#!/bin/bash\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
+  const picade = path.join(dir, "picade");
+  const vm = path.join(dir, "vm");
+  const drive = (/** @type {Record<string, string>} */ env) =>
+    execFileSync("/bin/bash", [path.join(REPO, "cabinet/vm/drive"), "ssh", "true"], { encoding: "utf8", env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, GSA_CABINET_DIR: picade, GSA_VM_DIR: vm, ARCADE_RIDE_S: "1", ...env } });
+  for (const env of [{ CABINET: "real" }, { ARCADE_CABINET: "real" }, { ARCADE_HOST: "arcade.local" }]) {
+    const args = drive(env);
+    assert.match(args, new RegExp(`^${picade}/ssh/arcade_ed25519$`, "m"), JSON.stringify(env));
+    assert.match(args, new RegExp(`^UserKnownHostsFile=${picade}/ssh/known_hosts$`, "m"));
+    assert.match(args, /^cabinet@arcade\.local$/m);
+    assert.match(args, /^ProxyCommand=.*picade-connect\.sh %h %p$/m);
+    assert.doesNotMatch(args, new RegExp(vm));
+  }
+  const virtual = drive({});
+  assert.match(virtual, new RegExp(`^${vm}/ssh/arcade-virtual_ed25519$`, "m"));
+  assert.match(virtual, /^cabinet@arcade-virtual\.local$/m);
+  assert.doesNotMatch(virtual, /ProxyCommand/);
+  // A rehearsal on a forwarded port keeps the key it was given.
+  const rehearsal = drive({ ARCADE_HOST: "127.0.0.1", ARCADE_SSH_PORT: "2299", ARCADE_SSH_DIR: path.join(dir, "r"), ARCADE_SSH_KEY_NAME: "arcade_ed25519" });
+  assert.match(rehearsal, new RegExp(`^${dir}/r/arcade_ed25519$`, "m"));
+  assert.doesNotMatch(rehearsal, /ProxyCommand/);
+});
+
 /** A function of wifi.sh's, run in bash. */
 const fn = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `. "${WIFI_SH}"; ${name}`], { encoding: "utf8" });
 
