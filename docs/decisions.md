@@ -1435,6 +1435,8 @@ From docs/validation-virtual.md, on the director's list.
 - Board tiles can now carry a letter badge (`row`'s `letter`), drawn like the question tiles'.
 - Browser tests: stop asks first, keep going and ESC return to the question, then a stop, the idea on Make, ESC keeping it and a try again reaching the coin check; a stop then a new idea; and the shelf's warning. Each fails without the change.
 
+**D316. "Try again, same idea" keeps the idea until the make starts.** *(Found in D315's live check; the director's go, 2026-11-13.)* Choosing "Try again, same idea" used to mark the notice seen at once, so backing out of the coin check left Make plain and the idea gone, after a stop (E14) and after a walk-away (D300) alike. Now the launcher doesn't mark it seen. Backing out leaves Make offering the idea again, and a make that starts clears it, as the service already did for any start. A browser test backs out of the coin check twice after a stop and once after a walk-away, and fails without the change.
+
 ## 2026-11-13 — The card carries the keys and the twin's data (SD-card worker)
 
 Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD card or the cabinet. You should make the SD card carry the key. And be ready the moment it is plugged in." On seeding: "yes -- but you'd better have a plan to push updates to the os cabinet etc -- accessing the sd card will be extremely hard once the cabinet is assembled". The director approved D320-D329 for this. D250-D259 are this worker's earlier block.
@@ -1792,5 +1794,3 @@ Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): i
 - **The kids' games keep their makers and lineage.** `cart.json` (maker, parent, family, branch, session) and the library's history come back byte for byte, and so does `makers.json`.
 - **Not carried, by design (D292):** `cabinet-state.json`, so the welcome screens show once more and a "resting" month is forgotten until the workspace limit refuses again. Also the Manager pairing (re-pair) and `kit-uploads.json` (re-uploaded on the first make).
 - **The loss window is the time since the last backup:** an hour normally, longer if the mini slept or the Picade was off the Wi-Fi. A card that still boots should get one more `run.mjs` first.
-
-**D316. "Try again, same idea" keeps the idea until the make starts.** *(Found in D315's live check; the director's go, 2026-11-13.)* Choosing "Try again, same idea" used to mark the notice seen at once, so backing out of the coin check left Make plain and the idea gone, after a stop (E14) and after a walk-away (D300) alike. Now the launcher doesn't mark it seen. Backing out leaves Make offering the idea again, and a make that starts clears it, as the service already did for any start. A browser test backs out of the coin check twice after a stop and once after a walk-away, and fails without the change.
