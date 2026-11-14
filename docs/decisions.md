@@ -1637,6 +1637,7 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
   - If all three come up, it keeps the slot by rewriting config.txt's slot block. That is the one write that matters.
   - If not, or if the try hangs, crashes or loses power, the next boot reads config.txt, which still names the last slot, and the boot packages are put back from their copies.
   - The confirm knows a try by `arcade.slot=<id>` in that slot's own cmdline.txt.
+  - **The block stays where it is** when a new slot is kept (2026-11-14). picade.sh re-appends its own block at the end, so a moving slot block made every later software update see config.txt as "changed" and rewrite it on the FAT partition, with a spurious "restart wanted". Seen on the Picade after F2.
 - **A hang must turn into a restart.** The slot block sets `kernel_watchdog_timeout=15`, and systemd kicks the watchdog (`RuntimeWatchdogSec=15s`).
   - 🔧 Not confirmed in the docs: that a watchdog reset clears the tryboot flag as "a reset" does. Prove it on the Picade with a deliberately broken try before relying on it.
 - **Commands:** `scripts/cabinet-card/boot-update.mjs`, from a Terminal on the mini, never from the Manager. It waits for the outcome and reports it.
