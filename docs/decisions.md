@@ -1503,3 +1503,32 @@ Geoff, 2026-11-13: "I don't want to have to add the key manually onto the SD car
 - A real `ant apply` into `cabinet-picade`, and a real make. Those need the real key, which is Geoff's.
 - Groq's answer from the Picade, which needs a mic and a real key.
 - Everything on the hardware (D253, D257).
+
+## 2026-11-13 — The twin as the Picade's backup (D350–D359)
+
+Geoff kept the card he has and accepted the risk ("Card I have, accept risk"): if the Picade's card dies, it's reflashed and reloaded from the mini. So the mini's copy is the only backup of the kids' games. Code: `scripts/twin-backup/`, `manager/backup.mjs`, `scripts/twin.mjs`.
+
+**D350. An hourly backup on the mini.** *(Claude, at the director's ask.)* A launchd agent (`com.game-studio-arcade.twin-backup`, `scripts/twin-backup/install.sh`) runs `scripts/twin-backup/run.mjs`. It runs every hour and once at load, as a background process at low priority, with no window and no focus. The cabinet is never asked for anything: the mini pulls (D293), so cabinet independence holds. If there's no card yet (no SSH key) or the Picade doesn't answer on port 22 within 5 s, the run records that and exits 0, quietly. A reachable Picade that can't be copied exits 1 and says why in `~/game-studio-data/twin/launchd.log`. Install and uninstall are one script each. Uninstall keeps every copy (D5). Installing it is Geoff's yes, once the Picade is up (bring-up E3).
+
+**D351. The backup is a plain folder on the mini, not only the twin.** *(Claude.)* Each run syncs the Picade into `~/game-studio-data/twin/backup` first, then into the twin VM.
+- The folder is written by nothing but sync, so it's a pure copy of the Picade. The twin also holds its own test makes until its next sync (D294), and it isn't there when UTM is off.
+- In this folder every file the Picade replaced keeps its older copy in `twin-sync/set-aside/<time>/`, not only files the twin changed: `makers.json`, git refs, a rewritten log. So a card that starts corrupting data can't overwrite the good copy.
+- The twin's sync failing (it's off, or making) doesn't fail the backup; the record says so.
+
+**D352. One lock for seed, sync and backup.** *(Claude.)* `~/game-studio-data/twin/lock`, taken by `seed()` (so the flash's seed too, D324), `twin.mjs sync` and the backup. A backup that finds it held records "busy" and waits for the next hour. A seed that finds it held stops and says so. A lock whose process is gone, or that is over 6 hours old, is taken over.
+
+**D353. "Last backup" in the Manager's health (HANDOFF 9.4).** *(Claude.)* The backup writes `~/game-studio-data/twin/backup.json`: its last try (result, message, whether the Picade answered), the last good copy (time, games, files), and the twin's part. The Manager reads it and shows one line under the Picade's screen (not the virtual cabinet's). The line turns red (warn) when the newest copy is over a day old while the cabinet is on, which means the Manager can reach it now or the backup's last try did. It also warns when the job hasn't run for 3 hours while the cabinet is on (not installed, or the mini asleep). A cabinet that's simply off shows its last copy and since when it's been off, without a warning.
+
+**D354. A dead card is rebuilt from the backup folder, through the flash's own seed path.** *(Claude.)*
+- `flash.mjs --from-backup` takes the twin's data for the card from `~/game-studio-data/twin/backup` instead of the twin VM, with the same seed rules (D324, D291, D292). It works with `--disk`, unlike `--twin-dir`.
+- **The rehearsal** (`scripts/test/twin-restore.test.mjs`, throwaway folders only): a lived-in Picade with a git library of five versions over two games, lineage, a `gc`, makers, two months of a coin ledger written by the service's own pot code, sessions, logs and a downloaded game; two hourly backups; then the card "dies". The data is rebuilt from the backup folder alone through `seed()`, the flash's `tar`, and first boot's `step_twin_data`.
+- **What it proved:** every synced file is byte-identical to the Picade at the last backup, and nothing else is there. The library passes `git fsck`, has a clean tree, and every commit is in its log. The shelf reads the same carts with the same makers, parents, families and branches. `makers.json` is identical. The ledger is identical line for line, and the service's own pot code computes the same state.
+- **A bug it found, now fixed:** after a `git gc` the library's `refs/heads` is empty, and a file-by-file copy dropped empty folders, so the copy wasn't a git repository. Manifests now carry empty folders, and sync and seed create them. The twin's library today still has its branch as a loose file (checked on the 2026-11-11 pull), so seeds done so far were not affected.
+
+**D355. After a reflash, what comes back.** *(Claude, from D354's rehearsal; answers the director's question.)*
+- **The coin pot comes back as it was at the last backup.** The pot is worked out from `logs/coin_ledger.jsonl` alone, plus settings. The flash writes no pot settings, so both cards use the code's defaults. Two things differ:
+  - Charges after the last backup are lost, so the pot can read slightly high.
+  - A make running when the card died is never collected (`studio-left.json` is the card's own), so its cost is never recorded.
+- **The kids' games keep their makers and lineage.** `cart.json` (maker, parent, family, branch, session) and the library's history come back byte for byte, and so does `makers.json`.
+- **Not carried, by design (D292):** `cabinet-state.json`, so the welcome screens show once more and a "resting" month is forgotten until the workspace limit refuses again. Also the Manager pairing (re-pair) and `kit-uploads.json` (re-uploaded on the first make).
+- **The loss window is the time since the last backup:** an hour normally, longer if the mini slept or the Picade was off the Wi-Fi. A card that still boots should get one more `run.mjs` first.

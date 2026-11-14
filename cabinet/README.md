@@ -75,6 +75,9 @@ The virtual cabinet is the Picade's digital twin (D290-D297): the Picade is the 
 node scripts/twin.mjs seed --yes   # once, at bring-up: the Picade starts as a copy of the twin
 node scripts/twin.mjs status      # what differs: release, games, files (writes nothing)
 node scripts/twin.mjs sync        # pull into the twin; the twin's own changes are set aside, never deleted
+scripts/twin-backup/install.sh    # the hourly backup (D350): Picade → ~/game-studio-data/twin/backup, then the twin
+scripts/twin-backup/uninstall.sh  # stop it; the copies stay
+node scripts/twin-backup/run.mjs  # one backup now
 ```
 
 The real cabinet is the Picade, reached as `connect-picade.sh` reaches it: `arcade.local` with the key the card script made in `~/game-studio-data/cabinets/arcade/ssh/`, defined once in `scripts/cabinet-card/picade-ssh.sh` (D259, D299; `--real HOST` if that name does not resolve). It is only read, except by `seed`. Anything the twin made itself goes to `/var/lib/arcade/twin-sync/set-aside/<time>/` on the twin. `--real-dir` and `--twin-dir` work on two folders here instead.

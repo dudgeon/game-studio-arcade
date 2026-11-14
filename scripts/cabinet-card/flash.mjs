@@ -16,6 +16,7 @@
 //
 // Options: --country US (Wi-Fi country), --timezone Area/City (default: the mini's), --locale en_US.UTF-8,
 // --no-seed leaves the twin's data off the card (D324); --twin-dir DIR takes it from a folder (rehearsals, image files only);
+// --from-backup takes it from the mini's hourly backup of the Picade instead of the twin: the card died (D354);
 // --no-identity writes a card that starts offline (connect-picade.sh later); --no-groq leaves Groq off (Moonshine only);
 // --cabinet-config-from FILE puts throwaway values on an image file, for rehearsals and tests (never a card).
 // --no-speech-on-card leaves speech's wheels and model for first boot to download (D257),
@@ -40,7 +41,7 @@ import { Readable, Transform } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { makeBundle, makeProvisionTar, miniTimezone } from "../virtual-cabinet/lib.mjs";
 import { PICADE_HOST, PICADE_KEY_NAME, picadeDir } from "./picade.mjs";
-import { cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
+import { backupDir, cabinetEnd, folderEnd, seed as twinSeed } from "../twin.mjs";
 import { CARD_CONFIG, SecretsError, cabinetConfigText, configFromFile, groqFromVirtual, identityFromConnect } from "./secrets.mjs";
 import { ADMIN, PROFILE, SEED_FILES, confirmPhrase, describe, lockedWheels, metaData, networkConfig, profileHostname, refusals, sameDisk, userData, wifiPsk } from "./lib.mjs";
 
@@ -237,7 +238,9 @@ function twinSnapshot(work) {
   mkdirSync(dir, { mode: 0o700 });
   const from = opt("--twin-dir");
   if (from && opt("--disk")) stop("--twin-dir is for rehearsals and tests: image files only, never a card.");
-  const twin = from ? folderEnd(resolve(from)) : cabinetEnd(undefined);
+  // A dead card is rebuilt from the backup folder: a pure copy of the Picade, without the twin's own test makes (D354).
+  if (flag("--from-backup") && !existsSync(join(backupDir(), "carts"))) stop(`--from-backup: there's no backup at ${backupDir()} (scripts/twin-backup/run.mjs makes it).`);
+  const twin = from ? folderEnd(resolve(from)) : flag("--from-backup") ? folderEnd(backupDir()) : cabinetEnd(undefined);
   let r;
   try {
     r = twinSeed(folderEnd(dir), twin, new Date());

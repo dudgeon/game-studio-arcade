@@ -47,9 +47,13 @@ function hashOf(file, bytes) {
 function walk(root) {
   /** @type {string[]} */
   const out = [];
+  /** Folders with nothing in them. Git needs its empty ones (refs/heads after a gc packs the refs, D354). @type {string[]} */
+  const empty = [];
   /** @param {string} dir */
   const visit = (dir) => {
-    for (const name of fs.readdirSync(dir).sort()) {
+    const names = fs.readdirSync(dir).sort();
+    if (!names.length && dir !== root) empty.push(path.relative(root, dir).split(path.sep).join("/"));
+    for (const name of names) {
       if (name.endsWith(".tmp") || name.endsWith(".twin-tmp")) continue;
       const full = path.join(dir, name);
       const st = fs.lstatSync(full);
@@ -63,21 +67,22 @@ function walk(root) {
     if (fs.lstatSync(full).isDirectory()) visit(full);
     else out.push(top);
   }
-  return out;
+  return { files: out, empty };
 }
 
 /** @param {string} root */
 export function manifest(root) {
   /** @type {Record<string, { size: number, hash: string, mode: string }>} */
   const files = {};
-  for (const rel of walk(root)) {
+  const w = walk(root);
+  for (const rel of w.files) {
     const full = path.join(root, rel);
     const st = fs.statSync(full);
     files[rel] = { size: st.size, hash: hashOf(full, st.size), mode: (st.mode & 0o777).toString(8) };
   }
   const tops = fs.existsSync(root) ? fs.readdirSync(root).sort() : [];
   const notCovered = tops.filter((t) => !SYNCED.includes(t) && !OWN.includes(t) && !t.endsWith(".tmp"));
-  return { files, notCovered };
+  return { files, emptyDirs: w.empty, notCovered };
 }
 
 /** Replay data must never reach a live cabinet (D150, D155): the same test as service-config.mjs. @param {string} root */
@@ -144,7 +149,7 @@ export function read(root, input) {
 /**
  * @typedef {{ rel: string, expect: string | null }} Guard   expect: the file's hash when the plan was made, null if it was absent
  * @param {string} root
- * @param {{ stamp: string, setAside: (Guard & { reason: string })[], write: (Guard & { b64: string, mode?: string })[], append: (Guard & { b64: string })[], baseline?: boolean, lastSync?: object }} input
+ * @param {{ stamp: string, setAside: (Guard & { reason: string })[], write: (Guard & { b64: string, mode?: string })[], append: (Guard & { b64: string })[], dirs?: string[], baseline?: boolean, lastSync?: object }} input
  */
 export function apply(root, input) {
   const current = (/** @type {string} */ rel) => {
@@ -187,6 +192,11 @@ export function apply(root, input) {
     if (g.mode) fs.chmodSync(tmp, parseInt(g.mode, 8));
     fs.renameSync(tmp, full);
     written++;
+  }
+  // The source's empty folders, made here too (never removed: a folder the twin has extra holds nothing).
+  for (const d of input.dirs ?? []) {
+    if (!SAFE(d)) throw new Error(`refusing path ${d}`);
+    fs.mkdirSync(path.join(root, d), { recursive: true });
   }
   let appended = 0;
   for (const g of input.append) {

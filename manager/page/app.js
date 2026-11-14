@@ -38,7 +38,18 @@ function watch() {
   source.addEventListener("status", (e) => {
     status = JSON.parse(e.data);
     drivable();
+    backupLine();
   });
+}
+
+/** "Last backup" for the Picade (D353): a warning when the newest copy is over a day old while it's on. */
+function backupLine() {
+  const el = $("#backup");
+  const b = status && status.backup;
+  el.hidden = !b;
+  if (!b) return;
+  el.className = `backup ${b.state}`;
+  el.textContent = b.text;
 }
 
 function freshness() {

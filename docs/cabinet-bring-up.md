@@ -171,6 +171,30 @@ Like the virtual cabinet's, but its **own new workspace and key**, so its spendi
 - With a kid, from the shelf: Make → answer with the stick and buttons → a game lands on the shelf → play it.
 - Claude watches from the mini (logs, temperature, timing) and records the result for the validation run.
 
+**E3. Turn on the hourly backup** (D350, with your yes)
+- The card is the only place the kids' games live until they're copied. So once the Picade is on the Wi-Fi, the mini copies them every hour.
+- **Do** (on the mini, from the main checkout): `scripts/twin-backup/install.sh`. It runs once straight away, then every hour, with no window. Undo with `scripts/twin-backup/uninstall.sh` (the copies stay).
+- **Look for:** in the Cabinet Manager, under the Picade's screen, "Last backup N minutes ago (N games, N files)". It turns red if the newest copy is over a day old while the Picade is on.
+- **If not:** `cat ~/game-studio-data/twin/backup.json` and `~/game-studio-data/twin/launchd.log` say why. The first run may ask macOS for **Local Network** access for `node`: allow it.
+
+---
+
+## If the card dies
+
+Geoff kept the card he has and accepted the risk (2026-11-13). If it dies, the Picade is rebuilt from the mini's hourly copy. What comes back, and what doesn't (D355):
+- **Back exactly as they were at the last backup:** every game and every version, with its maker and its lineage (which game it changed, its line); the makers list; the coin pot (it's worked out from the coin history, which comes back line for line); play, make and screening logs; downloaded games.
+- **Lost:** anything after the last backup, normally under an hour of use. A make that was running when the card died is never collected, and its cost isn't recorded, so the pot may show a coin or two more than it really had.
+- **Made fresh by the new card, as at the first flash:** the Picade's key and identity, the Manager pairing (`node scripts/coin.mjs pair`), the welcome screens, which show once more.
+
+**Steps** (the reflashing itself is the update worker's part, below; the data part is this):
+1. **If the Picade still boots**, even badly: run one more backup first, `node scripts/twin-backup/run.mjs`, so the last hour isn't lost.
+2. **Check the copy:** in the Manager, "Last backup" should name the time and the number of games you expect. `ls ~/game-studio-data/twin/backup/carts` lists them.
+3. **Write a new card from the copy:** the usual `flash.mjs --disk …` with **`--from-backup`**. It takes the games from the mini's backup of the Picade, not from the virtual cabinet, which may hold test games of its own (D354). Everything else about the flash is as in Part B.
+4. **First boot** puts the games in place before the starter games, as in E1. **Look for:** the kids' games on the shelf with their names, and the same coins as the Manager showed before.
+5. After that, the hourly backup simply carries on.
+
+<!-- The update worker's reflash steps (new card, Wi-Fi, identity) go here. -->
+
 ---
 
 ## What Claude has checked before the hardware

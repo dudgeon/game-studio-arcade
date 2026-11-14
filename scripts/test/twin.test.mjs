@@ -8,6 +8,9 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { bootEnd, folderEnd, seed, status, sync } from "../twin.mjs";
 
+// The lock and backup record live in a throwaway folder, never the mini's own (D352).
+process.env.GSA_TWIN_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "twin-home-"));
+
 const TWIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../twin.mjs");
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "twin-test-"));
