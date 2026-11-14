@@ -211,6 +211,32 @@ test("config.txt: one block of ours under [all], the key map of D82, and the sto
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("config.txt: our block is replaced where it stands, so the boot slot's block stays last; unchanged means no write", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-config-inplace-"));
+  const file = path.join(dir, "config.txt");
+  const flag = path.join(dir, "reboot");
+  const run = () => profileBash(`REBOOT_FLAG=${JSON.stringify(flag)}; step_config_txt ${JSON.stringify(file)}`);
+  fs.copyFileSync(path.join(HERE, "fixtures/config.txt"), file);
+  run();
+  const slot = "# BEGIN arcade boot slot (D336)\n[all]\nos_prefix=arcade-20261114145434/\n# END arcade boot slot (D336)\n";
+  fs.appendFileSync(file, slot);
+  fs.rmSync(flag);
+  const before = fs.readFileSync(file, "utf8");
+  const old = new Date("2026-01-01T00:00:00Z");
+  fs.utimesSync(file, old, old);
+  run();
+  assert.equal(fs.readFileSync(file, "utf8"), before, "the same text");
+  assert.equal(fs.statSync(file).mtimeMs, old.getTime(), "not written at all");
+  assert.ok(!fs.existsSync(flag), "no restart wanted");
+  // An older block (a line missing) is brought up to date in place, ahead of the slot block.
+  fs.writeFileSync(file, before.replace("usb_max_current_enable=1\n", ""));
+  run();
+  assert.equal(fs.readFileSync(file, "utf8"), before);
+  assert.ok(fs.existsSync(flag), "a real change asks for the restart");
+  assert.ok(fs.readFileSync(file, "utf8").endsWith(slot), "the slot block stays last");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("hardening: a capped persistent journal, cloud-init off, each once; the gadget overlay only in our block (D395, D396)", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "card-harden-"));
   const env = { HARDEN_ETC: dir, HARDEN_TEST: "1" };
