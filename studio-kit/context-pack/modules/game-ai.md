@@ -1,8 +1,8 @@
 # AI in a game: `g.ai`
 
-A game can get made-up lines (a new joke each crossing) and choices (how the boss acts next) from a small model while it's played. The cabinet makes the call; the game never waits and never needs the network.
+A game can get made-up lines (a new joke each crossing), choices (how the boss acts next) and spoken commands from a small model while it's played. The cabinet makes the call; the game never waits and never needs the network.
 
-**Use it only when it's a strong fit:** the player asked for something that should be new or surprising each time (jokes, taunts, a character's mood, a narrator). Don't add it to a game that doesn't need it, and don't push it. If it fits and they didn't ask, offer it once as a question tile ("Should the duck make up new jokes each time?"); never by default.
+**Use it only when it's a strong fit:** the player asked for something new each time (jokes, taunts, a character's mood) or to talk to the game. Don't add it to a game that doesn't need it, and don't push it. If it fits and they didn't ask, offer it once as a question tile ("Should the duck make up new jokes each time?"); never by default.
 
 ```js
 init(g) {
@@ -28,6 +28,8 @@ update(g, s) {
 - `choice` has 2 to 8 `options`, plain words of at most 24 characters. `g.ai.pick(name, facts?)` returns one at once. `facts` are numbers, true/false, or one of the options, at most 8. The answer to these facts comes back for the next `pick`, so write the ask about "next".
 - Write game code for the options, not for what a line says: a line is only text to show.
 - `g.ai` has its own random stream; using it doesn't change `g.rand`.
+
+**Talking to the game:** `g.ai.voice("spell", { ask: "The player says which spell to cast.", actions: ["fire", "ice", "heal"], hold: "y" })` in `init`. While the player holds that button (`a b x y`) the cabinet listens; `g.ai.heard("spell")` in `update` gives the action they meant, once, or `null`. The game never gets the words. Give every action a button too: in a playtest, and with no microphone, nothing is ever heard, so checks use the buttons. Say on screen which button to hold. One voice ask per button.
 
 **Showing a line:** a screen line holds `g.W / 6` characters at scale 1. Wrap by words into rows, and give the line time to be read (about 3 seconds). Keep `max` to what your rows can hold.
 

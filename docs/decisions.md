@@ -2203,3 +2203,12 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 - **`cancel()`**, and `POST /api/speech/cancel` from the page, drop a hold: the recorder stops, the audio is wiped, and nothing is transcribed or sent anywhere. It's logged as `result: "cancelled"`. Before this, a cancelled talk screen called stop and paid for a Groq request (10 s minimum) whose words nobody read. The launcher's cancel now uses it.
 - **Live words (D454) will be opt-in** with `start({ live: true })` from the talk screens. A game's `start()` streams nothing, so many short holds a minute are fine; a test runs 20 in a row.
 
+
+- **Voice actions, as built** *(Claude; the AI worker's numbers end at D489, so this is part of it)*:
+  - `g.ai.voice(name, { ask, actions, hold })` in `init`, and `g.ai.heard(name)` gives the action once, or null. The talk button is A, B, X or Y, one voice ask per button.
+  - The runtime host, not the cart, turns the mic on while player 1 holds that button, and the launcher shows its own "● LISTENING" sign over the game. A hold under 0.3 s is thrown away untranscribed. A game that ends mid-hold turns the mic off.
+  - The hold ends in the service (`POST /api/game-ai/voice`): Moonshine first through the speech worker's `stop({ fast: true })`, and a tap through their `cancel()` (D491). The words never go back to the page; only the action does.
+  - The word list (D271) is on the kid's words before anything is sent; a hit is no call and no action, with no scolding. The model can only answer one of the game's actions or "none", so nothing unscripted comes back.
+  - With no model (offline, an error, off, the guard), an action's own word counts if it's the only one said.
+  - **Every hold's words are kept on the cabinet** in `logs/game_talk.jsonl` with the action and outcome, and listed in the Manager under "Said to games". Geoff's "Everything" was about chat; I've applied it to voice too, since both are a kid talking to a game. The cost log still holds no words (D482). Chat turns will use the same log.
+  - In a playtest nothing is ever heard, so the guide requires a button for every action.

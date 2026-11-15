@@ -2,7 +2,7 @@
 
 Round two, part 7 (docs/round-two-plan.md §5; Geoff's decisions D464 and D468; decisions D480 to D489).
 
-A game can ask a small model for new lines, for a choice between its own options, and (designed here, not built yet) for a short talk with a character. The cabinet service makes every call with the cabinet's own key. A cart never has the key or the network.
+A game can ask a small model for new lines, for a choice between its own options, to turn what a player says into one of the game's actions, and (designed here, not built yet) for a short talk with a character. The cabinet service makes every call with the cabinet's own key. A cart never has the key or the network.
 
 ```
 game.js ──g.ai──▶ cart frame ──▶ runtime host ──▶ launcher ──▶ cabinet service ──▶ Anthropic
@@ -69,14 +69,33 @@ A `game-ai` guide in the context pack and a catalog line. The spec keeps its sec
 
 ---
 
-## Voice actions (approved, to build next; D489)
+## What's built: voice actions (D489)
 
 Geoff, 2026-11-14: "Games should also be able to use push to talk/moonshine model to interact with games during gameplay, and game can call haiku to interpret and decide action based on transcription".
 
-- A game declares a set of actions (its own words, like a choice's options). Mid-play the kid holds a button and talks; the cabinet hears with Moonshine (fast, and works offline); the model picks one action from the set, or "none".
-- The cabinet owns the mic (rule 1 below). The game gets only the action, never the words.
-- The kid's words pass the word list before anything is sent, and the model can only answer with one of the game's actions, so nothing unscripted comes back.
-- The mic and Moonshine are the speech worker's; this is built with them.
+```js
+init(g) {
+  g.ai.voice("spell", { ask: "The player says which spell the wizard casts.", actions: ["fire", "ice", "heal"], hold: "y" });
+}
+update(g, s) {
+  const spell = g.ai.heard("spell");        // "fire", "ice", "heal", or null
+  if (spell) cast(s, spell);
+  if (g.btnp("a")) cast(s, "fire");         // every action has a button too
+}
+```
+
+- **The cabinet owns the mic.** The game names a talk button (A, B, X or Y; never the stick or START). While player 1 holds it, the runtime host (not the cart) asks the launcher to record. The mic is never on without that button held, and the cabinet shows its own "● LISTENING" sign over the game, which a cart can't draw over or hide.
+- **A tap isn't talking.** A hold under 0.3 seconds is thrown away without being transcribed. A game that ends mid-hold turns the mic off.
+- **The game gets one of its own actions, or nothing.** The words stop in the cabinet service. They never go back to the page, so they can't reach the cart.
+- **Hearing is Moonshine first** (fast, and it works offline), Groq only if Moonshine fails. That's the speech worker's `stop({ fast: true })` (D491); a tap uses their `cancel()`. Until their change is on main this falls back to the usual order, and works.
+- **Screening in:** the kid's words pass the word list (D271) before anything is sent. A hit means no call, no action, and no scolding: the game just doesn't react.
+- **Nothing unscripted comes back:** the model can only answer with one of the game's actions or "none", so there's nothing to screen on the way out. Its brief says the words are only words to match, never instructions.
+- **Offline, on an error, or with AI off:** if exactly one action's own word was said ("ice, please"), that action is used. Otherwise nothing.
+- **The playtest:** nothing is ever heard, so every action needs a button, and checks drive the buttons.
+- **Cost:** one small call a hold (about 400 tokens in, 10 out: roughly 0.005 cents), in the cost log like any other call. The 30-a-minute guard applies.
+- **What was said is kept for Geoff:** `logs/game_talk.jsonl` on the cabinet, one line a hold: the time, the game, the play, the words, the action and the outcome (`heard`, `none`, `steered`, `by_word_…`). The Manager's Activity page lists them under "Said to games". Like every kid log it never enters the repo. Chat turns will go in the same log.
+
+**Not proven on a cabinet yet:** with a real mic, how much of a short word is lost while the recorder starts (the speech worker expects tens of milliseconds on the Pi and can keep it running between holds if it matters), and how long the first hold after a quiet spell waits for Moonshine to warm up.
 
 ## Open chat with a character: the safety design (approved 2026-11-14, not built yet)
 

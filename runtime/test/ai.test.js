@@ -115,6 +115,46 @@ test("declarations are checked in init, so a playtest catches a bad one", async 
   }, /at most 8/);
 });
 
+test("voice asks (D489): declared with a talk button, an action is heard once, and anything else is dropped", async () => {
+  const cart = {
+    init(/** @type {any} */ g) {
+      g.ai.voice("spell", { ask: "Which spell does the wizard cast?", actions: ["fire", "ice", "heal"], hold: "y" });
+      return { cast: /** @type {string[]} */ ([]) };
+    },
+    update(/** @type {any} */ g, /** @type {any} */ s) {
+      const a = g.ai.heard("spell");
+      if (a) s.cast.push(a);
+    },
+    draw() {},
+    probe: (/** @type {any} */ _g, /** @type {any} */ s) => s,
+  };
+  const m = createMachine({ cart, seed: 1 });
+  assert.deepEqual(m.aiVoices(), [{ name: "spell", ask: "Which spell does the wizard cast?", actions: ["fire", "ice", "heal"], hold: "y" }]);
+  assert.deepEqual(m.drainAi(), [], "a voice ask asks nothing on its own");
+  m.update();
+  m.aiHear({ name: "spell", action: "ice" });
+  m.update();
+  m.update();
+  for (const odd of [{ name: "spell", action: "lightning" }, { name: "spell", action: "none" }, { name: "nope", action: "fire" }, { name: "spell", action: 7 }, /** @type {any} */ (null)]) m.aiHear(odd);
+  m.update();
+  assert.deepEqual(/** @type {any} */ (m.probe()).cast, ["ice"]);
+
+  // In a playtest nothing is ever heard, so a game needs its buttons too.
+  const t = await headless(cart);
+  await t.step(120);
+  assert.deepEqual(/** @type {any} */ (await t.probe()).cast, []);
+
+  const bad = (/** @type {any} */ o, /** @type {RegExp} */ re) => assert.rejects(headless({ ...cart, init: (/** @type {any} */ g) => (g.ai.voice("v", o), {}) }), re);
+  await bad({ ask: "Which?", actions: ["fire"], hold: "y" }, /2 to 8 different/);
+  await bad({ ask: "Which?", actions: ["fire", "none"], hold: "y" }, /not "none"/);
+  await bad({ ask: "Which?", actions: ["fire", "ice"], hold: "start" }, /button to hold while talking/);
+  await bad({ ask: "Which?", actions: ["fire", "ice"] }, /button to hold while talking/);
+  await assert.rejects(
+    headless({ ...cart, init: (/** @type {any} */ g) => (g.ai.voice("one", { ask: "Which?", actions: ["a", "b"], hold: "x" }), g.ai.voice("two", { ask: "Which?", actions: ["a", "b"], hold: "x" }), {}) }),
+    /already uses the x button/,
+  );
+});
+
 test("outside init nothing can be declared, an undeclared ask is an error, and facts can't carry free text", async () => {
   const late = { init: () => ({}), update: (/** @type {any} */ g) => g.ai.lines("joke", { ask: "A joke.", fallback: JOKES }), draw() {} };
   await assert.rejects((await headless(late)).step(1), /belongs in init/);

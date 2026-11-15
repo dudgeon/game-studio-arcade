@@ -20,6 +20,7 @@
 //   POST /api/studio/stop        the kid chose to stop this make (D188)
 //   POST /api/studio/notice-seen {id}: the kid has read a message (D188, D189)
 //   POST /api/game-ai            {cart_id, play_id, kind, name, ask, …}: a game's g.ai ask (D480, src/game-ai.js)
+//   POST /api/game-ai/voice      {cart_id, play_id, name, ask, actions}: ends a hold-to-talk in a game; one action back (D489)
 //   POST /api/speech/start, stop hold-to-talk (D87, D184)
 //   POST /api/speech/feed        {text} or {wav}: the stub only
 //   GET  /api/guests, POST /api/guest-plays  guest games (D230-D232, src/guests.js)
@@ -56,7 +57,7 @@ import { serveMcpHttp } from "./arcade-mcp.js";
 import { listCarts, readCart } from "@game-studio-arcade/player/src/library.js";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { gameLines } from "./shelf-marks.js";
-import { readAsk, summarizeGameAi } from "./game-ai.js";
+import { readAsk, readVoice, summarizeGameAi } from "./game-ai.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -212,6 +213,22 @@ export function createServiceHandler(o) {
       if (o.plays && o.plays.what() !== cart.id) return json(res, 200, { ok: false, why: "not_playing" });
       return json(res, 200, await o.gameAi.ask({ cart, playId: typeof body.play_id === "string" ? body.play_id.slice(0, 80) : null, ask: readAsk(body) }));
     }
+    if (pathname === "/api/game-ai/voice") {
+      // D489: the end of a hold-to-talk in a game. The words stop here: only one of the game's own actions goes back.
+      // The speech worker's D491: cancel() throws a hold away without transcribing it, and stop({ fast: true })
+      // puts Moonshine first (speed, and offline). A Speech without them yet (the stub, an older build) still works.
+      const speech = /** @type {any} */ (o.speech);
+      if (body.cancel === true) {
+        await (typeof speech.cancel === "function" ? speech.cancel() : speech.stop());
+        return json(res, 200, { ok: true, action: null });
+      }
+      const { text } = await speech.stop({ fast: true });
+      if (!o.gameAi) return json(res, 200, { ok: false, action: null });
+      const cart = readCart(o.libraryDir, String(body.cart_id ?? ""));
+      if (!cart) throw new HttpError(404, "no such game");
+      if (o.plays && o.plays.what() !== cart.id) return json(res, 200, { ok: false, action: null });
+      return json(res, 200, await o.gameAi.voice({ cart, playId: typeof body.play_id === "string" ? body.play_id.slice(0, 80) : null, ask: readVoice(body), text }));
+    }
     if (pathname === "/api/arcade/launch/answer") {
       o.launches?.answer(String(body.launch ?? ""), body.ok === true, typeof body.why === "string" ? body.why : undefined);
       return json(res, 200, { ok: true });
@@ -346,7 +363,7 @@ export function createServiceHandler(o) {
     throw new HttpError(404, "no such endpoint");
   };
 
-  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume", "/api/game-ai", "/api/speech/cancel"]);
+  const OURS = new Set(["/api/wifi", "/api/wifi/scan", "/api/wifi/join", "/api/config", "/api/makers", "/api/studio", "/api/studio/events", "/api/studio/start", "/api/studio/answer", "/api/studio/result-seen", "/api/studio/still-here", "/api/arcade/playing", "/api/studio/stop", "/api/studio/notice-seen", "/api/speech/start", "/api/speech/stop", "/api/speech/feed", "/api/pot", "/api/boot", "/api/boot/seen", "/api/arcade/launch", "/api/arcade/launch/answer", "/api/arcade/volume", "/api/game-ai", "/api/speech/cancel", "/api/game-ai/voice"]);
 
   return (/** @type {http.IncomingMessage} */ req, /** @type {http.ServerResponse} */ res) => {
     let pathname;

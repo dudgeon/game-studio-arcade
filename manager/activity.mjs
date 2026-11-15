@@ -4,7 +4,7 @@ const coinsOf = (/** @type {number} */ cents) => Math.sign(cents) * Math.round(M
 
 /**
  * @param {Record<string, any[]>} files  each log file's records, by name (studio_session, coin_ledger, …)
- * @returns {{ makes: any[], plays: any[], screened: any[], coins: any[], gates: any[] }}
+ * @returns {{ makes: any[], plays: any[], screened: any[], coins: any[], gates: any[], talk: any[] }}
  */
 export function activity(files) {
   const ledger = files.coin_ledger ?? [];
@@ -83,8 +83,11 @@ export function activity(files) {
   // Downloaded games' smoke checks, and every gate run, newest first (D310).
   const gates = (files.publish_gate ?? []).map((g) => ({ at: g.at, kind: g.kind, what: g.what, ...gateOf(g) }));
 
+  // What was said to games (D489): voice actions and chat turns, every one, for Geoff to read.
+  const talk = (files.game_talk ?? []).map((t) => ({ at: t.at ?? null, game: t.cart_id ?? null, version: t.cart_version ?? null, kind: t.kind ?? null, ask: t.name ?? null, said: t.said ?? null, action: t.action ?? null, reply: t.reply ?? null, outcome: t.outcome ?? null }));
+
   const newest = (/** @type {any} */ a, /** @type {any} */ b) => String(b.at ?? "").localeCompare(String(a.at ?? ""));
-  return { makes: makes.sort(newest), plays: plays.sort(newest), screened: screened.sort(newest), coins: coins.sort(newest), gates: gates.sort(newest) };
+  return { talk: talk.sort(newest), makes: makes.sort(newest), plays: plays.sort(newest), screened: screened.sort(newest), coins: coins.sort(newest), gates: gates.sort(newest) };
 }
 
 /** A publish-gate run, for a person (D310). @param {any} g */
