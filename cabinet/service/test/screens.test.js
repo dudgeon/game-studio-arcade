@@ -492,3 +492,31 @@ test("the name question is the question board with D as You pick; every other qu
   draw(p, q);
   assert.equal(text("q-d"), "Make it now");
 });
+
+test("D492: a long wait for the words shows its seconds; a short one doesn't", () => {
+  const now = 1_000_000;
+  const at = (/** @type {number} */ s) => {
+    const p = new Painter();
+    draw(p, { screen: "say", phase: "hearing", purpose: "idea", hearingSince: now - s * 1000, now, sel: 0 });
+    assert.deepEqual(check(p.boxes), []);
+    return p.boxes.find((b) => b.id === "say-message")?.text;
+  };
+  assert.equal(at(1), "Stopped listening. Writing that down...");
+  assert.equal(at(47), "Stopped listening. Writing that down... 0:47");
+  assert.equal(at(125), "Stopped listening. Writing that down... 2:05");
+});
+
+test("D492: live words while listening, dimmer, the last three lines; a stopped mic says so", () => {
+  const words = Array.from({ length: 60 }, (_, i) => `word${i}`).join(" ");
+  const p = new Painter();
+  draw(p, { screen: "say", phase: "listening", purpose: "idea", live: { listening: true, seconds: 72, words, stopped: false }, sel: 0 });
+  assert.deepEqual(check(p.boxes), []);
+  assert.equal(p.boxes.find((b) => b.id === "say-message")?.text, "Listening 1:12. Let go when you're done.");
+  const live = /** @type {any} */ (p.boxes.find((b) => b.id === "say-live"));
+  assert.ok(live.lines.length <= 3 && live.lines.length > 0);
+  assert.match(live.lines.at(-1).text, /word59$/, "the newest words are the ones shown");
+  const q = new Painter();
+  draw(q, { screen: "say", phase: "listening", purpose: "idea", live: { listening: true, seconds: 5, words, stopped: true }, sel: 0 });
+  assert.equal(q.boxes.find((b) => b.id === "say-message")?.text, "The mic stopped hearing you. Let go and try again.");
+  assert.equal(q.boxes.find((b) => b.id === "say-live"), undefined);
+});

@@ -39,6 +39,7 @@ import { WIFI_HINT, asEnt, createWifiFlow } from "./wifi-flow.js";
 import { openKeys, sayKey } from "./say-keys.js";
 import { listenForVolume } from "./volume.js";
 import { seenAll, turnPage } from "./pages.js";
+import { pollLive } from "./live-words.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -905,12 +906,15 @@ function onBack() {
 /** @param {any} v */
 async function beginTalk(v) {
   v.phase = "listening";
-  v.talking = post("/api/speech/start").catch(() => {});
+  v.live = null;
+  v.talking = post("/api/speech/start", { live: true }).catch(() => {});
+  pollLive(v, () => view === v && v.phase === "listening", get); // D492: words while talking
 }
 
 /** @param {any} v */
 async function endTalk(v) {
   v.phase = "hearing";
+  v.hearingSince = Date.now(); // D492: a long wait shows its seconds
   await v.talking;
   let text = "";
   try {

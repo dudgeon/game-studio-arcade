@@ -227,10 +227,33 @@ function fakeHelper(dir, { fail = false } = {}) {
     `${fail ? 'console.log(JSON.stringify({ error: "no model" })); process.exit(1);' : ""}
 console.log(JSON.stringify({ ready: true, load_ms: 5 }));
 let buf = Buffer.alloc(0);
+let streamed = 0;
 process.stdin.on("data", (d) => {
   buf = Buffer.concat([buf, d]);
   while (buf.length >= 4) {
     const n = buf.readUInt32LE(0);
+    // D492's stream: begin, audio (with its own length), end. The words are how many bytes it has had.
+    if (n === 0xfffffffe) {
+      buf = buf.subarray(4);
+      streamed = 0;
+      console.log(JSON.stringify({ live: "begun" }));
+      continue;
+    }
+    if (n === 0xfffffffd) {
+      if (buf.length < 8) return;
+      const len = buf.readUInt32LE(4);
+      if (buf.length < 8 + len) return;
+      buf = buf.subarray(8 + len);
+      streamed += len;
+      console.log(JSON.stringify({ live: "heard " + streamed }));
+      continue;
+    }
+    if (n === 0xfffffffc) {
+      buf = buf.subarray(4);
+      require("fs").appendFileSync(${JSON.stringify(path.join(dir, "ended"))}, "e");
+      console.log(JSON.stringify({ live: "final " + streamed, done: true }));
+      continue;
+    }
     if (n === 0xffffffff) {
       buf = buf.subarray(4);
       require("fs").appendFileSync(${JSON.stringify(path.join(dir, "warmed"))}, "w");
@@ -438,4 +461,161 @@ test("D491: cancel() transcribes nothing, sends nothing, wipes the audio, and th
     else assert.equal((await s2.stop({ fast: true })).text, "jump");
   }
   assert.equal(rec2.started, 20);
+});
+
+// ---------- D492: live words while talking ----------
+
+/** A recorder whose audio arrives when the test says, as a mic's would. */
+function liveRecorder() {
+  /** @type {Buffer[]} */
+  let got = [];
+  /** @type {((b: Buffer) => void) | null} */
+  let listener = null;
+  let alive = false;
+  const r = {
+    started: 0,
+    start() {
+      r.started++;
+      got = [];
+      alive = true;
+    },
+    async stop() {
+      listener = null;
+      alive = false;
+      return Buffer.concat(got);
+    },
+    /** @param {((b: Buffer) => void) | null} fn */
+    onData(fn) {
+      listener = fn;
+    },
+    alive: () => alive,
+    /** @param {number} seconds */
+    speak(seconds) {
+      const b = speechLike(seconds);
+      got.push(b);
+      listener?.(b);
+    },
+    micGone() {
+      alive = false;
+    },
+  };
+  return r;
+}
+
+/** Two fake helpers in their own folders: the main Moonshine and the live-words one. */
+function twoMoonshines() {
+  const mainDir = tmp();
+  const liveDir = tmp();
+  const main = moonshineEngine({ python: process.execPath, helper: fakeHelper(mainDir), modelDir: "/m", arch: "medium-streaming" });
+  const liveWords = moonshineEngine({ python: process.execPath, helper: fakeHelper(liveDir), modelDir: "/t", arch: "tiny-streaming" });
+  let mainCalls = 0;
+  const transcribe = main.transcribe;
+  main.transcribe = (p) => (mainCalls++, transcribe(p));
+  return { main, liveWords, liveDir, mainCalls: () => mainCalls, close: () => (main.close?.(), liveWords.close?.()) };
+}
+
+test("D492: live words while the button is down; Groq writes the final words; the stream is ended", async () => {
+  const t = twoMoonshines();
+  const rec = liveRecorder();
+  const s = /** @type {any} */ (liveSpeech({ recorder: rec, engines: [engine("groq", async () => "the final words"), t.main], liveWords: t.liveWords }));
+  assert.equal(s.live().listening, false);
+  s.start({ live: true });
+  rec.speak(1);
+  await settle(300);
+  assert.equal(s.live().listening, true);
+  assert.equal(s.live().words, `heard ${RATE * 2}`, "a second of audio reached the live stream");
+  rec.speak(2);
+  await settle(300);
+  assert.equal(s.live().words, `heard ${RATE * 2 * 3}`);
+  assert.equal((await s.stop()).text, "the final words");
+  assert.equal(t.mainCalls(), 0, "Groq answered; the main Moonshine wasn't asked");
+  await settle(200);
+  assert.equal(fs.readFileSync(path.join(t.liveDir, "ended"), "utf8"), "e", "the live stream was ended");
+  assert.equal(s.live().listening, false);
+  t.close();
+});
+
+test("D492: with no Groq, the main Moonshine writes the final words in one pass, without waiting for the stream", async () => {
+  const t = twoMoonshines();
+  // A live-words engine that has fallen far behind: its end never comes.
+  const stuck = { name: "moonshine", transcribe: async () => "", live: { begin: async () => {}, add: async () => "slow", end: () => new Promise(() => {}) } };
+  const rec = liveRecorder();
+  const s = /** @type {any} */ (liveSpeech({ recorder: rec, engines: [t.main], liveWords: /** @type {any} */ (stuck) }));
+  s.start({ live: true });
+  rec.speak(1.7);
+  await settle(200);
+  assert.equal((await s.stop()).text, `bytes ${Math.round(1.7 * RATE) * 2}`, "every byte reached the main Moonshine");
+  assert.equal(t.mainCalls(), 1);
+  t.close();
+});
+
+test("D492: when Groq fails, the main Moonshine answers", async () => {
+  const t = twoMoonshines();
+  const rec = liveRecorder();
+  const s = /** @type {any} */ (liveSpeech({ recorder: rec, engines: [engine("groq", async () => Promise.reject(new Error("Groq answered 503"))), t.main], liveWords: t.liveWords }));
+  s.start({ live: true });
+  rec.speak(2);
+  await settle(300);
+  assert.equal((await s.stop()).text, `bytes ${RATE * 2 * 2}`);
+  t.close();
+});
+
+test("D492: the mic going quiet while the button is down says so; a plain start has no live words; no live engine, no words", async () => {
+  const t = twoMoonshines();
+  const rec = liveRecorder();
+  const s = /** @type {any} */ (liveSpeech({ recorder: rec, engines: [t.main], liveWords: t.liveWords }));
+  s.start({ live: true });
+  rec.speak(1);
+  await settle(200);
+  assert.equal(s.live().stopped, false);
+  rec.micGone();
+  assert.equal(s.live().stopped, true);
+  s.cancel();
+  await settle(200);
+  fs.rmSync(path.join(t.liveDir, "ended"), { force: true });
+  // A game's hold, or any plain start(): no stream at all.
+  s.start();
+  rec.speak(1);
+  await settle(200);
+  assert.equal(s.live().words, null);
+  await s.stop();
+  await settle(100);
+  assert.equal(fs.existsSync(path.join(t.liveDir, "ended")), false, "no stream was begun or ended");
+  // A cabinet without the live model: the talk screen just has no words.
+  const s2 = /** @type {any} */ (liveSpeech({ recorder: liveRecorder(), engines: [t.main] }));
+  s2.start({ live: true });
+  assert.equal(s2.live().words, null);
+  s2.cancel();
+  t.close();
+});
+
+test("D492: a fed clip reaches the live words a step at a time, as it would from the mic", async () => {
+  const t = twoMoonshines();
+  const dir = tmp();
+  const wav = path.join(dir, "clip.wav");
+  fs.writeFileSync(wav, wavOf(speechLike(3)));
+  const s = /** @type {any} */ (liveSpeech({ recorder: liveRecorder(), engines: [t.main], liveWords: t.liveWords }));
+  s.feed({ wav });
+  s.start({ live: true });
+  /** @type {number[]} */
+  const seen = [];
+  for (let i = 0; i < 8; i++) {
+    await settle(100);
+    const w = s.live().words;
+    if (w) seen.push(Number(w.split(" ")[1]));
+  }
+  assert.ok(seen.length >= 2 && (seen.at(-1) ?? 0) > seen[0], `the words grew: ${seen.join(", ")}`);
+  assert.equal((await s.stop()).text, `bytes ${RATE * 2 * 3}`);
+  t.close();
+});
+
+test("D492: cabinetSpeech starts the live-words Moonshine only when provisioning installed its model", () => {
+  const dir = tmp();
+  const file = path.join(dir, "speech.json");
+  fs.writeFileSync(file, JSON.stringify({ python: process.execPath, helper: fakeHelper(dir), model_dir: "/m", arch: "medium-streaming", live_model_dir: "/t", live_arch: "tiny-streaming" }));
+  const a = /** @type {any} */ (cabinetSpeech({ config: {}, speechFile: file, logsDir: dir }));
+  a.start({ live: true });
+  assert.notEqual(a.live().words, undefined);
+  a.cancel();
+  a.close();
 });
