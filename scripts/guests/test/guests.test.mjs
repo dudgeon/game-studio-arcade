@@ -149,3 +149,16 @@ test("PICO-8 (D386): without Geoff's PICO-8 on the mini the tool stops and says 
   const tracked = spawnSync("git", ["ls-files"], { cwd: REPO, encoding: "utf8" }).stdout.split("\n");
   assert.deepEqual(tracked.filter((f) => /pico8(_dyn|_64)?$|pico8\.dat$|PICO-8\.app|pico-8.*\.zip$/i.test(f)), []);
 });
+
+test("PICO-8's exported page is made fit for the cabinet: starts by itself, no menus, our keys first; another shell is refused (D389)", async () => {
+  const { pico8Page } = await import("../build.mjs");
+  const shell = '﻿<html><head>\n<title>PICO-8 Cartridge</title>\nvar p8_allow_mobile_menu = true;\nvar p8_autoplay = false;\ne.src = "game.js";\n</head><body></body></html>';
+  const page = pico8Page(shell, "Space <Cat>");
+  assert.match(page, /^<html><head><script src="cabinet-keys\.js"><\/script>/, "our keys before anything of PICO-8's");
+  assert.match(page, /var p8_autoplay = true;/);
+  assert.match(page, /var p8_allow_mobile_menu = false;/);
+  assert.match(page, /<title>Space Cat><\/title>/);
+  assert.match(page, /#p8_start_button,#p8_menu_buttons,#p8_menu_buttons_touch\{display:none!important\}/);
+  assert.throws(() => pico8Page(shell.replace("var p8_autoplay = false;", ""), "x"), /no p8_autoplay to change/);
+  assert.throws(() => pico8Page(shell.replace('"game.js"', '"other.js"'), "x"), /doesn't load game\.js/);
+});

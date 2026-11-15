@@ -102,12 +102,42 @@ export function findPico8() {
 }
 
 /**
- * A PICO-8 cart as a web player: PICO-8's own HTML export, run headless (its manual: "-export").
- * NOT RUN YET (D386): no PICO-8 was on the mini when this was written. The first real export
- * must be checked in a browser, with scripts/guests/pico8/index.html, before a PICO-8 guest ships.
- * @param {string} cart @param {string} outJs
+ * PICO-8's own exported page, made fit for the cabinet (D389): it starts the cart at once (the kiosk lets
+ * sound start without a press), hides PICO-8's start button and its on-screen menu buttons, and fills the
+ * screen. Each change is checked, so a different PICO-8 shell fails here rather than on a cabinet.
+ * @param {string} html @param {string} title
  */
-function pico8Export(cart, outJs) {
+export function pico8Page(html, title) {
+  /** @type {[RegExp, string, string][]} */
+  const edits = [
+    [/var p8_autoplay = false;/, "var p8_autoplay = true;", "p8_autoplay"],
+    [/var p8_allow_mobile_menu = true;/, "var p8_allow_mobile_menu = false;", "p8_allow_mobile_menu"],
+    [/<title>[^<]*<\/title>/, `<title>${title.replace(/[<&]/g, "")}</title>`, "the title"],
+    [/<head>/i, '<head><script src="cabinet-keys.js"></script>', "<head>"],
+    [
+      /<\/head>/i,
+      "<style>/* the cabinet (D389) */ html,body,#p8_frame_0,#p8_frame,#p8_container,#p8_playarea{background:#000!important} html,body{margin:0;overflow:hidden;cursor:none}" +
+        " #p8_start_button,#p8_menu_buttons,#p8_menu_buttons_touch{display:none!important}" +
+        " #p8_frame_0,#p8_frame{max-width:none!important;width:100vw!important;max-height:none!important;height:100vh!important}</style></head>",
+      "</head>",
+    ],
+  ];
+  let out = html.replace(/^\uFEFF/, "");
+  for (const [find, put, what] of edits) {
+    if (!find.test(out)) throw new Error(`PICO-8's exported page has no ${what} to change: is this a different PICO-8?`);
+    out = out.replace(find, put);
+  }
+  if (!out.includes('src = "game.js"')) throw new Error("PICO-8's exported page doesn't load game.js");
+  return out;
+}
+
+/**
+ * A PICO-8 cart as a web player: PICO-8's own HTML export, run headless on the mini ("-export", D389).
+ * Writes play/game.js (the cart and PICO-8's web player, one file) and play/index.html (its page, made
+ * fit by pico8Page). PICO-8 won't export a cart without a label image.
+ * @param {string} cart @param {string} play @param {string} title
+ */
+function pico8Export(cart, play, title) {
   const pico8 = findPico8();
   if (!pico8) {
     throw new Error(
@@ -116,14 +146,17 @@ function pico8Export(cart, outJs) {
   }
   const work = join(CACHE, `pico8-export-${process.pid}`);
   rmSync(work, { recursive: true, force: true });
-  mkdirSync(work, { recursive: true });
+  mkdirSync(join(work, "home"), { recursive: true });
   try {
     const name = /\.p8\.png$/.test(cart) ? "cart.p8.png" : "cart.p8";
     copyFileSync(cart, join(work, name));
-    execFileSync(pico8, ["-home", work, "-root_path", work, join(work, name), "-export", "game.js"], { cwd: work, stdio: "inherit", timeout: 120000 });
-    const made = [join(work, "game.js"), join(work, "carts", "game.js")].find((f) => existsSync(f));
-    if (!made) throw new Error(`PICO-8 ran but wrote no game.js in ${work}`);
-    copyFileSync(made, outJs);
+    const out = execFileSync(pico8, ["-home", join(work, "home"), "-root_path", work, name, "-export", "game.html"], { cwd: work, encoding: "utf8", timeout: 120000 });
+    if (!existsSync(join(work, "game.js")) || !existsSync(join(work, "game.html"))) {
+      const why = /capture a label/.test(out) ? ": the cart has no label image (PICO-8 asks for one before it exports)" : `: ${out.trim().split("\n").at(-1)}`;
+      throw new Error(`PICO-8 didn't export ${basename(cart)}${why}`);
+    }
+    copyFileSync(join(work, "game.js"), join(play, "game.js"));
+    writeFileSync(join(play, "index.html"), pico8Page(readFileSync(join(work, "game.html"), "utf8"), title));
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -213,7 +246,7 @@ export function build(dir, o = {}) {
     else copyFileSync(join(shim, name), join(play, name));
   }
   if (p.name === "tic80") copyFileSync(src, join(play, "cart.tic"));
-  else if (p.name === "pico8") pico8Export(src, join(play, "game.js"));
+  else if (p.name === "pico8") pico8Export(src, play, String(meta.title));
   else {
     const system = extname(meta.upstream.file.name).slice(1).toLowerCase();
     if (!LOCK.retroarch.cores[p.core].plays.includes(system)) throw new Error(`the ${p.core} core doesn't play .${system}`);

@@ -1,6 +1,6 @@
 # Guest players: the shortlist for Geoff
 
-TIC-80 carts and homebrew console games now play from the shelf, as web players in the kiosk (D380–D387). Which games go on the day-one shelf is Geoff's call. These eight are built, licence-checked and waiting in `guest-shortlist/`; none is on the shelf.
+TIC-80 carts and homebrew console games play from the shelf, as web players in the kiosk (D380–D389). Geoff picked six (2026-11-14, D388): **8 Bit Panda, Cauliflower Power, Grow Quickly, Tobu Tobu Girl Deluxe, The Hat Chooses the Wizard and Zooming Secretary** are now in `guests/`. Dunkman and Libbet wait in `guest-shortlist/`.
 
 **To put one on the shelf:** `git mv guest-shortlist/ID guests/ID`, commit, update the cabinet. It gets a "free game" row like teti's.
 
@@ -38,9 +38,7 @@ Two more passed the licence check and aren't built: **Retro Gunner** (a shoot-'e
 
 ## PICO-8
 
-Designed, waiting for Geoff's copy (D386). A PICO-8 cart comes in as PICO-8's own web export, made on the mini, so the PICO-8 program never goes on a cabinet.
-
-**What's needed from Geoff:** the **macOS** build of PICO-8 from his Lexaloffle account, unzipped so that `~/game-studio-data/pico8/PICO-8.app` exists. The Raspberry Pi build isn't needed. Then one cart is exported and checked in a browser, and after that PICO-8 carts are built the same way as the others.
+Works, with no game yet (D389). Geoff's PICO-8 0.2.7 for macOS is on the mini; `build.mjs` exports a cart with it and the result plays from the shelf with the cabinet's buttons (A and X are PICO-8's O, B and Y its X). A PICO-8 game goes on the shelf once Geoff picks a cart whose licence allows it.
 
 ## The shelf with all eight, in the test VM
 

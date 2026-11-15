@@ -49,7 +49,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 - **Logging**: required from day one. Every kid–Studio turn, attributed to the cart it produced, plus play telemetry, so we can see which prompts led to which games and whether those games get played.
 - **Building blocks**: a tested starter library and a lean context pack, so common mechanics (collision, which object destroys which) aren't re-derived every build. Don't overspecify; the joy is in totally different game ideas.
 - **Speech**: not on the Mac mini; low latency is critical. Primary: Groq Whisper Large v3 Turbo. Backup and offline: Moonshine on the Pi 5. Test both with the kids' voices before committing.
-- **Runtime**: house JavaScript console. Guest players: TIC-80, PICO-8, RetroArch for homebrew, each as a web player in the kiosk (D380–D387; TIC-80 and RetroArch built, PICO-8 designed; the shortlist is in [guest-players.md](guest-players.md)). MakeCode is out.
+- **Runtime**: house JavaScript console. Guest players: TIC-80, PICO-8, RetroArch for homebrew, each as a web player in the kiosk (D380–D389; TIC-80 and RetroArch built with six games on the shelf, PICO-8 proven; the shortlist is in [guest-players.md](guest-players.md)). MakeCode is out.
 - **Game sources**: homebrew and fantasy-console games, plus kid-built "inspired-by" games. Alina asked for Tetris; it becomes her own falling-blocks game, with no Tetris name or look.
 - **Approval**: no approval loop. Kid-made games go straight to the shelf. May revisit.
 - **Network**: the cabinet works on the existing home mesh Wi-Fi. No Ethernet and no console-specific network gear.

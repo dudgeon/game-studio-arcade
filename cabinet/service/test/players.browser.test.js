@@ -184,3 +184,63 @@ test("a homebrew ROM in RetroArch: on the shelf, draws, START reaches the game, 
     await g.stop();
   }
 });
+
+// PICO-8 (D389): built here from this repo's own key-test cart by Geoff's PICO-8, where it's installed.
+const { build: buildGuest, findPico8 } = await import("../../../scripts/guests/build.mjs");
+const KEYTEST = path.resolve(import.meta.dirname, "../../../scripts/guests/test/fixtures/keytest.p8");
+const noPico8 = !findPico8() && "Geoff's PICO-8 isn't on this Mac (D386)";
+
+test("a PICO-8 cart, exported by PICO-8: on the shelf, starts by itself, the cabinet's keys are its buttons, Escape back, play logged (D389)", { skip: skip || noPico8 || false, timeout: 180_000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-p8-"));
+  fs.mkdirSync(path.join(dir, "keytest"));
+  const sha = (await import("node:crypto")).createHash("sha256").update(fs.readFileSync(KEYTEST)).digest("hex");
+  fs.writeFileSync(
+    path.join(dir, "keytest", "guest.json"),
+    JSON.stringify({ id: "keytest", title: "PICO Key Test", by: "this repo", version: "1", kind: "web", entry: "index.html", players: 1, player: { name: "pico8" }, upstream: { licence: "this repo's", file: { name: "keytest.p8", sha256: sha } }, howToPlay: { goal: "Press the buttons.", controls: ["Stick and buttons"] } }),
+  );
+  buildGuest(path.join(dir, "keytest"), { file: KEYTEST });
+  const g = await playGuest(dir, "PICO Key Test");
+  try {
+    /** @type {number[]} */
+    let c = [];
+    let before = "";
+    await until(
+      g.page,
+      async () => {
+        c = await colours(g.page);
+        const same = JSON.stringify(c) === before;
+        before = JSON.stringify(c);
+        await g.page.waitForTimeout(300);
+        return same && c.length === 3; // black around it, the cart's background and its bar: no start button
+      },
+      "PICO-8 to start the cart by itself",
+    );
+    const none = JSON.stringify(c);
+    /** @param {string} key */
+    const held = async (key) => {
+      await g.page.keyboard.down(key);
+      await g.page.waitForTimeout(400);
+      const k = JSON.stringify(await colours(g.page));
+      await g.page.keyboard.up(key);
+      await g.page.waitForTimeout(250);
+      return k;
+    };
+    // The stick: each direction its own button. PICO-8 has two buttons: A and X are O (Z, C), B and Y are X (X, V).
+    const dirs = new Set([none]);
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+      const k = await held(key);
+      assert.ok(!dirs.has(k), `${key} is a button of its own`);
+      dirs.add(k);
+    }
+    const o = await held("z");
+    const x = await held("x");
+    assert.ok(o !== none && x !== none && o !== x && !dirs.has(o) && !dirs.has(x), "A and B are PICO-8's O and X");
+    assert.equal(await held("c"), o, "X is O too");
+    assert.equal(await held("v"), x, "Y is X too");
+    for (const key of ["a", "s", "n", "m", "p", "F1"]) assert.equal(await held(key), none, `${key} does nothing`);
+    await g.leave("keytest");
+    assert.deepEqual(g.problems, []);
+  } finally {
+    await g.stop();
+  }
+});

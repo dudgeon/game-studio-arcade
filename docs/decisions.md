@@ -2441,7 +2441,7 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 - Checked with real Claude Code (`claude -p --plugin-dir`): the file was found from a subfolder with no variable set, and the variable still wins when it is set.
 - **For the director:** when starting a desk session for the Picade, write `real` into its folder's `.arcade-cabinet` first.
 
-## 2026-11-14 — Guest players: TIC-80, RetroArch homebrew, PICO-8 (D380–D387)
+## 2026-11-14 — Guest players: TIC-80, RetroArch homebrew, PICO-8 (D380–D389)
 
 The brief's locked "guest players TIC-80, PICO-8, RetroArch homebrew", built on D230–D236. The shortlist, licences and captures: [docs/guest-players.md](guest-players.md). Code: `scripts/guests/`, `guest-shortlist/`.
 
@@ -2490,10 +2490,22 @@ The brief's locked "guest players TIC-80, PICO-8, RetroArch homebrew", built on 
 - **Switches on by itself:** `build.mjs` with `"player": { "name": "pico8" }` looks for that app (or `PICO8`). Without it, it stops and says what to put where.
 - **Keys (D82):** PICO-8 already reads Z and C as O and X and V as X, so A and X are O, B and Y are X. START (Enter) opens PICO-8's own pause menu. Other keys are dropped.
 - **Carts:** a cart's licence is its author's. The BBS marks carts whose authors chose CC BY-NC-SA 4.0; that one is non-commercial, so it's for Geoff to accept for home use, per cart. A cart with no licence isn't redistributable.
-- **Open, for the director and Geoff:** whether an exported `game.js` (the cart plus PICO-8's web player) may be committed to this repo like other guests, as Lexaloffle's terms allow, or must stay in the mini's data and reach a cabinet's `<data>/guests/` another way. Committing is the simple route and is what the tool does now.
-- **Not run:** the export command, and `scripts/guests/pico8/index.html`, which was written from PICO-8's export template from memory. The first real export has to be checked in a browser before any PICO-8 guest ships.
+- **Answered (director, 2026-11-14):** an exported `game.js` (the cart plus PICO-8's web player) may be committed as a guest, as Lexaloffle allows, for carts whose licence allows it.
+- **Since run:** see D389. The hand-written page this first design had is gone; PICO-8's own exported page is used instead.
 
 **D387. What's tested, and what isn't.** *(Claude.)*
 - `cabinet/service/test/players.browser.test.js`, real service and headless Chromium: a TIC-80 cart is on the shelf, draws, each of the stick's directions and Z X C V lights its own button, A, S, F1, Enter and backquote do nothing, Escape goes back and the play is logged. A homebrew ROM in RetroArch draws, ignores F1 and P, takes START, and Escape goes back with the play logged.
 - `scripts/guests/test/guests.test.mjs`: the lock, the key maps, every candidate's licence fields and file hashes, the rebuild, a wrong file refused, PICO-8's message.
 - **Not tested:** any game played through; sound; saves; two-player carts (all candidates are one player).
+
+**D388. Geoff's six picks are on the shelf.** *(Geoff, 2026-11-14: "Add its six picks".)*
+- TIC-80: **8 Bit Panda**, **Cauliflower Power**, **Grow Quickly**. Homebrew: **Tobu Tobu Girl Deluxe** (Game Boy Color), **The Hat Chooses the Wizard** (Game Boy Advance), **Zooming Secretary** (NES).
+- Moved with `git mv` from `guest-shortlist/` to `guests/`, unchanged, so their history shows where they came from. Dunkman and Libbet stay in the shortlist.
+- They pass the gate on the next start of each cabinet after its update, and appear on the shelf as they pass (D312).
+- teti's two browser tests now start the service with the teti family alone: with six more guests, Geoff's teti is below the shelf's first screen.
+
+**D389. PICO-8's export, proven: PICO-8's own page, made fit for the cabinet.** *(Claude, 2026-11-15, with Geoff's PICO-8 0.2.7 for macOS.)*
+- **The export runs headless on the mini:** `pico8 -home H -root_path R cart.p8 -export game.html` writes `game.html` and `game.js` (1.6 MB: the cart and PICO-8's player). PICO-8 refuses a cart with no label image ("please capture a label first"); `build.mjs` says so.
+- **The page is PICO-8's own exported page** (its 0.2.6 shell), not one of ours: it sets up what the player reads (`pico8_buttons`, `pico8_state`, `codo_textarea` and more), which a hand-written page would have to copy. `pico8Page()` makes five checked edits: start at once (`p8_autoplay`), no touch menu, our title, `cabinet-keys.js` first in `<head>`, and CSS that hides the start and menu buttons and fills the screen in black. A shell without those lines is refused rather than shipped.
+- **Proven in headless Chromium through the guest server and the launcher** (`players.browser.test.js`, which builds this repo's own key-test cart `scripts/guests/test/fixtures/keytest.p8` and skips where PICO-8 isn't installed): it starts with no press; each stick direction is its own button; Z and C are O, X and V are X; A, S, N, M, P and F1 do nothing; Escape goes back with the play logged.
+- **No PICO-8 game is on the shelf yet.** That needs a cart Geoff picks, with a licence that allows redistribution.
