@@ -148,6 +148,25 @@ export function readVoice(b) {
 }
 
 /**
+ * Words about hurting themselves (rule 9). Kept short and literal, like D271's list: it is the net that
+ * works with no model. Being hurt by someone else is left to the character and the judge, since
+ * "the dragon hits me" is game talk.
+ */
+export const SELF_HARM = /\b((kill|hurt|harm|cut|cutting|hurting|killing)\s+my\s?self|want\s+to\s+die|wanna\s+die|suicide|end\s+my\s+life)\b/i;
+
+/**
+ * A reply that fits: as it is, or cut back to its last whole sentence within max. Null if no sentence fits.
+ * @param {string} s @param {number} max
+ */
+export function fitLine(s, max) {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t || null;
+  const cut = t.slice(0, max + 1);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return end >= 15 ? cut.slice(0, end + 1) : null;
+}
+
+/**
  * A game's chat ask, checked (D489). @param {any} b
  */
 export function readChat(b) {
@@ -278,6 +297,14 @@ export function createGameAi(o) {
         talkLog({ ...base, said, reply: null, outcome, ...extra });
         return { ok: true, fallback: true, ...(echo ? { said } : {}) };
       };
+      // Rule 9: a kid who sounds like they need a grown-up gets one plain line, out of character, and the turn is flagged.
+      const worried = (/** @type {string} */ why, /** @type {string | null} */ heldReply = null) => {
+        talkLog({ ...base, said, reply: WORRIED_LINE, outcome: "flagged", ...(heldReply ? { held_reply: heldReply } : {}), why });
+        return { ok: true, reply: WORRIED_LINE.slice(0, ask.max), said };
+      };
+      // Words about hurting themselves get that line whatever else happens: with no network, no model, and before the
+      // word list. A short list on the cabinet, like D271's; the character and the judge catch what it can't.
+      if (SELF_HARM.test(said)) return worried("the kid's own words (the cabinet's list)");
       // Rule 3: off-limits words go nowhere, and aren't echoed on screen. No scolding: the character changes the subject.
       if (!listCheck(said).ok) return own("steered", {}, false);
       const chat = o.chat;
@@ -303,32 +330,35 @@ export function createGameAi(o) {
         failed("reply", e, t0);
         return own("reply_failed");
       }
-      // Rule 4, first half: the reply must be a plain line that passes the word list.
-      if (!r.say || !lineOk(r.say, ask.max)) return own("held", { held_reply: r.say ?? null, why: r.say ? "not a plain, clean line" : "no reply" });
+      // The character itself saw a worried kid: that comes before anything about its line. (Found live, 2026-11-15:
+      // a reply a few characters too long was held before this was looked at, and the kid got a game line.)
+      if (r.worried) return worried("the character saw it", r.say);
+      // Rule 4, first half: the reply must be a plain line that passes the word list. A model overshoots a length
+      // by a little, so a long reply is cut back to its last whole sentence that fits rather than thrown away.
+      const line = r.say ? fitLine(r.say, ask.max) : null;
+      const usable = Boolean(line && lineOk(line, ask.max));
 
-      // Rule 4, second half, and rule 5: a judge reads the pair, and no verdict means no line.
+      // Rule 4, second half, and rule 5: a judge reads the pair, and no verdict means no line. It reads the kid's
+      // words even when the character's line can't be used, because it is the second look for a worried kid.
       no = admit(base);
       if (no) return own("judge_failed", { held_reply: r.say, why: `no judge: ${no}` });
       t0 = now();
       let j;
       try {
-        j = await chat.judge({ who: ask.who, said, reply: r.say });
+        j = await chat.judge({ who: ask.who, said, reply: line ?? r.say ?? "(the character had no line)" });
         cost("judge", j, t0, j.verdict ?? "no_answer");
       } catch (e) {
         failed("judge", e, t0);
         return own("judge_failed", { held_reply: r.say, why: "the judge didn't answer" });
       }
       if (!j.verdict) return own("judge_failed", { held_reply: r.say, why: "the judge gave no verdict" });
-      // Rule 9: a kid who sounds like they need a grown-up gets one plain line, and the turn is flagged.
-      if (j.verdict === "worried" || r.worried) {
-        talkLog({ ...base, said, reply: WORRIED_LINE, outcome: "flagged", held_reply: r.say, why: j.why || "the kid sounded worried" });
-        return { ok: true, reply: WORRIED_LINE.slice(0, ask.max), said };
-      }
+      if (j.verdict === "worried") return worried(j.why || "the judge saw it", r.say);
+      if (!usable || !line) return own("held", { held_reply: r.say ?? null, why: r.say ? "not a plain, clean line" : "no reply" });
       if (j.verdict === "hold") return own("held", { held_reply: r.say, why: j.why || "held by the judge" });
 
-      memory.set(key, [...history, { said, reply: r.say }].slice(-MEMORY_TURNS));
-      talkLog({ ...base, said, reply: r.say, outcome: "said" });
-      return { ok: true, reply: r.say, said };
+      memory.set(key, [...history, { said, reply: line }].slice(-MEMORY_TURNS));
+      talkLog({ ...base, said, reply: line, outcome: "said" });
+      return { ok: true, reply: line, said };
     },
     /**
      * A voice ask (D489): the words the cabinet heard, matched to one of the game's own actions. The game

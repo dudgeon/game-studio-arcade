@@ -156,4 +156,24 @@ Two Haiku calls a turn: the reply (about 500 tokens in, 60 out) and the judge (a
 
 - `cabinet/service/test/game-chat.test.js`: a table of fourteen turns through the real turn code with a stand-in model: ordinary talk, game violence, a slur the list sees, replies the list or the length check stops, a refusal, the judge holding a personal question and "I'm real", "are you an AI", the judge failing both ways, and a worried kid seen by the judge and by the character. Plus memory, failing closed (off, offline, the reply failing, the guard), the two requests' shape, and the route.
 - `cabinet/service/test/game-ai.browser.test.js`: in headless Chromium, a hold on the character's button reaches the cart as the judged line, the cabinet's sign shows what it heard, and a held line becomes one of the cart's own.
-- **Not done yet: a live run.** No real model has answered or judged a turn. The stand-in proves the turn's plumbing, not the real judge's judgement. The table needs one run against Haiku on the virtual cabinet (a few cents) before any kid uses chat, to see that the real judge holds what it should and passes ordinary talk.
+- **The live run** (`cabinet/service/scripts/game-ai-live.mjs`, 2026-11-15, on the virtual cabinet with its own key): 18 turns against real Haiku through the real turn code. The first run got both worried-kid turns wrong and dropped about a third of ordinary replies, all for one reason: Haiku's lines ran a few characters over the game's limit, and the turn held them before it looked at the worried flag or ran the judge. The turn was changed (below) and the second run was 18 of 18 as wanted. Lines, choices and voice actions were right first time.
+- **Not done live yet:** a turn through the running service and the launcher with a real microphone.
+
+### What the live run changed
+
+1. **Words about self-harm are caught on the cabinet first,** by a short list, with no model and offline too. The kid sees the grown-up line and the turn is flagged.
+2. **The character's own worried flag is acted on straight after its reply,** before anything about its line.
+3. **The judge always reads the kid's words,** even when the character's line can't be used. It's the second look for a worried kid.
+4. **A reply that's too long is cut back to its last whole sentence that fits.** It's held only if no sentence fits.
+5. **The character's brief asks for length in words,** which the model keeps to better than a character count.
+
+### Real costs and times (2026-11-15)
+
+| | Cost | Model time |
+| --- | --- | --- |
+| 12 lines | $0.00021 | 3.4 s |
+| A choice | $0.00006 | 1.2 to 2.6 s |
+| A voice hold | $0.00005 | 1 to 2.5 s |
+| A chat turn (two calls) | $0.00017 | 2 to 3.7 s |
+
+The model time is on top of hearing the words. A game never waits for lines or choices; a voice hold or a chat turn takes this long from letting go of the button.
