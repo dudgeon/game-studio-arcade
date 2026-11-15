@@ -215,9 +215,10 @@ declare namespace Arcade {
     clip(x?: number, y?: number, w?: number, h?: number): void;
     /**
      * Glide (D476): from the next draw, positions keep their fractions instead of being floored, so slow
-     * movement and scrolling slide by a quarter of a pixel on the cabinet instead of stepping a whole one.
-     * The art stays the same chunky pixels. Call it once in `init`. It changes only what the screen shows:
-     * `pget`, checks and saved frames still see whole pixels.
+     * movement and scrolling slide by half a pixel on the cabinet instead of stepping a whole one.
+     * The art stays the same chunky pixels. Call it once in `init`, or with `on` per screen. It changes only
+     * what the screen shows: `pget`, checks and saved frames still see whole pixels. It costs about 3 ms a
+     * frame on the cabinet (D518), so turn it off (`g.glide(false)`) on screens where nothing moves slowly.
      */
     glide(on?: boolean): void;
     /**

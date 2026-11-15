@@ -62,7 +62,7 @@ export function cabinetProfile(file = "/etc/arcade/cabinet.conf") {
  *   ok: boolean, kind: "cart" | "guest", what: string, host: string, driver: string, fallback: string | null,
  *   failing: GateCheck[], seconds: number, waited_s: number, restarts: number,
  *   budget_ms?: number, cpu_factor?: number, frame_time?: any, report?: any, error?: string,
- *   advisory?: GateCheck[], frame_time_blocks?: boolean,
+ *   advisory?: GateCheck[], frame_time_blocks?: boolean, glide?: any,
  * }} GateResult
  */
 
@@ -170,6 +170,10 @@ export function createGate(o) {
           // A guessed budget is advice, not a gate (D311).
           const advisory = s.frameTimeBlocks ? [] : failing.filter((f) => f.id === "generic:frame-time");
           const blocking = failing.filter((f) => !advisory.includes(f));
+          // Glide (D519): inside the budget, but taking a big share of the frame on this cabinet. A warning, never a block.
+          // When glide is what takes it over the budget, the frame-time check's own reason says so.
+          const gl = report.glide;
+          if (gl?.warning === "heavy") advisory.push({ id: "glide", passed: false, reason: `glide takes about ${gl.costMs} ms of each frame here (${gl.p95Ms} ms at the slowest 5% with it, ${gl.plainP95Ms} ms without; the budget is ${s.budgetMs} ms)` });
           return record({
             ...base,
             ok: blocking.length === 0,
@@ -182,6 +186,7 @@ export function createGate(o) {
             waited_s: a.waited_s,
             restarts: a.restarts,
             frame_time: { ...report.frameTime, host: s.host },
+            ...(gl ? { glide: gl } : {}),
             report: { ...report, frameTime: { ...report.frameTime, host: s.host } },
           });
         } catch (e) {

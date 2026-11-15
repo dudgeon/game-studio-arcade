@@ -123,7 +123,7 @@ export async function playtest(cartDir, opts = {}) {
     const where = job.kind === "check" ? job.id : job.kind === "soak" ? job.name : "load";
     /** @param {string} w @param {number | null} frame @param {string} message */
     const addError = (w, frame, message) => errors.push({ job: index, seq: seq++, where: w, frame, message });
-    const session = browser ? await browser.session(seed, (e) => addError(where, e.frame, `page error: ${e.message}`)) : null;
+    const session = browser ? await browser.session(seed, (e) => addError(where, e.frame, `page error: ${e.message}`), job.kind === "soak" ? job.query : undefined) : null;
     const worker = new Worker(WORKER, {
       workerData: {
         job,
@@ -206,6 +206,15 @@ export async function playtest(cartDir, opts = {}) {
         }
       }),
     );
+    // A cart that glides (D476) is run twice more with glide off, so the report can say what glide
+    // costs on this machine (D519). One at a time: nothing else is running, so the two are comparable.
+    const seen = results.get("soak")?.screen ?? results.get("idle")?.screen;
+    if (browser && seen?.glides && seen.fine > 1) {
+      for (const name of ["soak", "idle"]) {
+        const job = /** @type {any} */ (jobs.find((j) => j.name === name)).job;
+        results.set(`${name}-plain`, await runJob(jobs.length, { ...job, name: `${name}-plain`, keyframes: false, query: "&glide=0" }, soakTimeoutMs));
+      }
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (host) await host.close().catch(() => {});
@@ -272,7 +281,36 @@ export async function playtest(cartDir, opts = {}) {
   // machine warming up, not the game's frame rate. They don't count toward frame time (D479).
   const times = [soakA, soakB, idleA, idleB].flatMap((r) => (r.times ?? []).slice(WARMUP_FRAMES));
   const frameTime = frameStats(times, budgetMs);
-  g("frame-time", times.length > 0 && frameTime.p95Ms <= budgetMs, times.length === 0 ? "no soak frames ran, so there's nothing to time" : `95% of frames should take at most ${budgetMs} ms for update+draw; the slowest 5% took ${frameTime.p95Ms} ms or more (max ${frameTime.maxMs} ms)`);
+  // What glide costs here (D519): the same two runs with glide off, against the two with it on.
+  /** @type {Report["glide"]} */
+  let glide = null;
+  const seen = soakA.screen ?? idleA.screen;
+  const plainTimes = [results.get("soak-plain"), results.get("idle-plain")].flatMap((r) => (r?.times ?? []).slice(WARMUP_FRAMES));
+  if (seen?.glides && seen.fine > 1 && plainTimes.length) {
+    const on = frameStats([soakA, idleA].flatMap((r) => (r.times ?? []).slice(WARMUP_FRAMES)), budgetMs);
+    const off = frameStats(plainTimes, budgetMs);
+    const r2 = (/** @type {number} */ v) => Math.round(v * 100) / 100;
+    const costMs = r2(Math.max(0, on.p50Ms - off.p50Ms));
+    const over = on.p95Ms > budgetMs;
+    glide = {
+      fine: seen.fine,
+      path: seen.path,
+      p50Ms: on.p50Ms,
+      p95Ms: on.p95Ms,
+      plainP50Ms: off.p50Ms,
+      plainP95Ms: off.p95Ms,
+      costMs,
+      // "over": glide is why it's too slow. "heavy": inside the budget, but glide takes more than a third of it.
+      warning: over && off.p95Ms <= budgetMs ? "over" : !over && costMs > budgetMs / 3 ? "heavy" : null,
+    };
+  }
+  const glideWhy =
+    glide && glide.warning === "over"
+      ? ` This game glides, and that is what makes it slow here: with glide off the slowest 5% took ${glide.plainP95Ms} ms. Call g.glide() only on the screens that need it (g.glide(false) on the others), or leave it out.`
+      : glide
+        ? ` (This game glides; with glide off the slowest 5% took ${glide.plainP95Ms} ms.)`
+        : "";
+  g("frame-time", times.length > 0 && frameTime.p95Ms <= budgetMs, times.length === 0 ? "no soak frames ran, so there's nothing to time" : `95% of frames should take at most ${budgetMs} ms for update+draw; the slowest 5% took ${frameTime.p95Ms} ms or more (max ${frameTime.maxMs} ms).${glideWhy}`);
 
   /**
    * How two runs with the same seed and input differ, or null. The frame goes in
@@ -312,6 +350,7 @@ export async function playtest(cartDir, opts = {}) {
     coverage: coverage.map((c) => ({ rule: c.rule ?? null, message: c.message })),
     generic,
     frameTime,
+    glide,
     errors: errorList,
     warnings,
     frames,
@@ -342,12 +381,12 @@ function withPassed(r) {
 
 /**
  * The part of a report that must be identical on every machine (D62):
- * everything but `env`, the timing numbers, the frame-time verdict and the
- * frame where two runs of a random cart first differed (D65).
+ * everything but `env`, the timing numbers, the frame-time verdict, what glide
+ * costs (only the browser driver shows the glide picture) and the frame where two runs of a random cart first differed (D65).
  * @param {Report} report
  */
 export function comparable(report) {
-  const { env, frameTime, ...rest } = report;
+  const { env, frameTime, glide, ...rest } = report;
   return {
     ...rest,
     generic: rest.generic.filter((x) => x.id !== "frame-time").map(({ frame, ...x }) => x),

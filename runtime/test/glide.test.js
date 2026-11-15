@@ -208,7 +208,8 @@ test("a reset keeps the glide buffer, and setFine resizes or drops it", async ()
 });
 
 test("the glide buffer's size follows the screen's scale", () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(fineForScale), [1, 1, 2, 3, 4, 5, 6, 1, 4, 3, 5, 1, 6]);
+  // D518: at most 2, and always a whole divisor of the scale. The Picade's 4 glides at 2.
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(fineForScale), [1, 1, 2, 3, 2, 1, 2, 1, 2, 1, 2, 1, 2]);
   assert.deepEqual([undefined, 0, 1, 2, 4.9, 8, 9, "x"].map(fineFactor), [1, 1, 1, 2, 4, 8, 1, 1]);
 });
 

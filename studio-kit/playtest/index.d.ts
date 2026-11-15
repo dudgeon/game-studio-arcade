@@ -48,6 +48,14 @@ export interface Report {
   coverage: { rule: string | null; message: string }[];
   generic: GenericResult[];
   frameTime: FrameTime;
+  /**
+   * What glide costs on this machine (D519), for a cart that glides, from the browser driver: null otherwise.
+   * `fine` is display pixels per game pixel; `path` how the picture reached the screen; the frame times are
+   * the random-input and no-input runs with glide on, and the same two with it off (`plain`); `costMs` is the
+   * difference of the medians. `warning` is "over" when glide is what takes the slowest frames past the budget,
+   * "heavy" when it's inside the budget but takes more than a third of it, else null.
+   */
+  glide: { fine: number; path: "gpu" | "2d" | null; p50Ms: number; p95Ms: number; plainP50Ms: number; plainP95Ms: number; costMs: number; warning: "over" | "heavy" | null } | null;
   errors: { where: string; frame: number | null; message: string }[];
   /** Runtime dev warnings (t.warnings()), each message once. Color warnings fail the palette check. */
   warnings: { where: string; frame: number | null; message: string }[];
@@ -98,7 +106,7 @@ export const GENERIC: readonly string[];
 export class HarnessError extends Error {}
 export function playtest(cartDir: string, opts?: PlaytestOptions): Promise<Report>;
 /** The machine-independent part of a report (D62). */
-export function comparable(report: Report): Omit<Report, "env" | "frameTime" | "generic"> & { generic: Omit<GenericResult, "frame">[]; frameTime: { frames: number; budgetMs: number } };
+export function comparable(report: Report): Omit<Report, "env" | "frameTime" | "generic" | "glide"> & { generic: Omit<GenericResult, "frame">[]; frameTime: { frames: number; budgetMs: number } };
 export function encodePng(frame: { width: number; height: number; pixels: ArrayLike<number> }, palette: readonly string[]): Buffer;
 export function soakScript(frames: number, seed: number): Arcade.InputStep[];
 export function frameStats(times: number[], budgetMs: number): FrameTime;

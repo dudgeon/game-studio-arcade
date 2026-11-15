@@ -13,7 +13,8 @@ import { soakScript } from "./soak.js";
 import { withBot } from "../../../runtime/lib/bot.js";
 
 /**
- * @typedef {{ kind: "load" } | { kind: "check", id: string } | { kind: "soak", name: string, frames: number, inputSeed: number | null, sampleEvery: number, keyEvery: number, keyframes: boolean }} Job
+ * @typedef {{ kind: "load" } | { kind: "check", id: string } | { kind: "soak", name: string, frames: number, inputSeed: number | null, sampleEvery: number, keyEvery: number, keyframes: boolean, query?: string }} Job
+ *   query: added to the host page's URL for this job (browser driver), such as "&glide=0" (D519).
  * @typedef {{ job: Job, gameUrl: string, checksUrl: string | null, seed: number, driver: "node" | "browser", runtimeUrl: string, maxFrames: number }} WorkerData
  */
 
@@ -213,7 +214,10 @@ async function run() {
           }
         }
       }
-      return { status: "pass", reason: null, frames: job.frames, times, hashes, paletteBad };
+      // How the picture reached the screen (browser driver, D517, D519): does the cart glide, and by which path.
+      let screen = null;
+      if (data.driver === "browser") screen = await rpc("screen", []).catch(() => null);
+      return { status: "pass", reason: null, frames: job.frames, times, hashes, paletteBad, screen };
     } catch (e) {
       if (job.keyframes) {
         try {

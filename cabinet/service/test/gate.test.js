@@ -193,6 +193,23 @@ test("before calibration a slow frame time is logged, never blocking; once calib
   assert.deepEqual(r.failing.map((f) => f.id), ["generic:frame-time"]);
 });
 
+test("a gliding game's cost is kept with its result, and heavy glide is a warning that never blocks (D519)", async () => {
+  const glide = (warning) => ({ fine: 4, path: "gpu", p50Ms: 7, p95Ms: 9, plainP50Ms: 1, plainP95Ms: 2, costMs: 6, warning });
+  for (const calibrated of [false, true]) {
+    const settings = gateSettings({ profile: "picade", gate: { calibrated } });
+    const heavy = await createGate({ settings, playing: () => false, logsDir: tmp(), run: async () => ({ driver: "browser", fallback: null, report: { ...report(true), glide: glide("heavy") } }) }).cart("/a");
+    assert.equal(heavy.ok, true, "a warning, not a block");
+    assert.deepEqual(heavy.advisory?.map((f) => f.id), ["glide"]);
+    assert.match(heavy.advisory?.[0].reason ?? "", /glide takes about 6 ms of each frame here \(9 ms at the slowest 5% with it, 2 ms without; the budget is 16\.7 ms\)/);
+    assert.equal(heavy.glide.costMs, 6);
+    const light = await createGate({ settings, playing: () => false, logsDir: tmp(), run: async () => ({ driver: "browser", fallback: null, report: { ...report(true), glide: glide(null) } }) }).cart("/a");
+    assert.equal(light.advisory, undefined);
+    assert.equal(light.glide.path, "gpu");
+    const plain = await createGate({ settings, playing: () => false, logsDir: tmp(), run: async () => ({ driver: "browser", fallback: null, report: { ...report(true), glide: null } }) }).cart("/a");
+    assert.equal("glide" in plain, false);
+  }
+});
+
 test("real Chromium: a game started mid-test stops the run and its Chromium; it runs again after (D310)", { skip: noChromium, timeout: 180000 }, async () => {
   let playing = false;
   /** @type {() => void} */

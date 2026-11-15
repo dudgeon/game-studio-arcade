@@ -33,4 +33,4 @@ One of `floor` or `raycast` fills the screen, so use one per scene. All of them 
 
 ## Keeping it fast
 
-Drawing is cheap, but not free: one `floor` or `raycast` a frame, at most a few dozen `stack`s, and skip what's off screen (`camera.view`). Make sprites, textures and maps once in `init`, never in `draw`. The playtest's `frame-time` check says if a frame takes too long.
+Drawing is cheap, but not free: one `floor` or `raycast` a frame, at most a few dozen `stack`s, and skip what's off screen (`camera.view`). Glide costs about 3 ms of the cabinet's 16.7 ms frame: on a busy screen with nothing slow-moving, `g.glide(false)`, and `g.glide(true)` again where it matters. Make sprites, textures and maps once in `init`, never in `draw`. The playtest's `frame-time` check says if a frame takes too long.

@@ -71,6 +71,12 @@ try {
     for (const x of report.generic) console.log(`  ${x.status === "pass" ? "PASS" : "FAIL"}      ${x.id}${x.reason ? `: ${x.reason}` : ""}${x.frame !== undefined ? ` (first at frame ${x.frame})` : ""}`);
     const f = report.frameTime;
     console.log(`  frame time: mean ${f.meanMs} ms, p95 ${f.p95Ms} ms, max ${f.maxMs} ms over ${f.frames} frames (budget ${f.budgetMs} ms)`);
+    const gl = report.glide;
+    if (gl) {
+      console.log(`  glide: x${gl.fine} by ${gl.path === "gpu" ? "the GPU" : "the 2D canvas"}; median ${gl.p50Ms} ms and p95 ${gl.p95Ms} ms with it, ${gl.plainP50Ms} and ${gl.plainP95Ms} ms without: about ${gl.costMs} ms a frame`);
+      if (gl.warning === "over") console.log("  WARNING   glide takes this game's slowest frames over the budget here");
+      if (gl.warning === "heavy") console.log(`  WARNING   glide takes more than a third of the ${f.budgetMs} ms frame budget here`);
+    }
   }
   process.exit(report.ok ? 0 : 1);
 } catch (e) {
