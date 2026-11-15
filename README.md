@@ -478,7 +478,7 @@ For example, `echo real > .arcade-cabinet` makes the project folder use the real
 
 ### Licences
 
-**This repo's own code:** <!-- TODO(Geoff): choose a licence for this repo's own code and add a LICENSE file. --> not yet chosen. Until a licence is added, no licence is granted.
+**This repo's own code:** MIT, see [LICENSE](LICENSE). It covers this repo's own code and docs, not the bundled third-party games below.
 
 **Bundled third-party games** (`guests/`). Each folder's `guest.json` and `NOTICE.md` give the source, credits and the full licence details. These licences cover those games only, not this repo.
 
