@@ -6,7 +6,7 @@
 #   drive down KEY            press and keep held, until `drive up KEY`
 #   drive up KEY
 #   drive type TEXT           type any printable ASCII, US layout
-#   drive screenshot FILE     save the 1024x768 screen as a PNG; checks its size
+#   drive screenshot FILE     save the screen as a PNG; checks it is one, at least 1024x768, and notes a larger screen
 #   drive playtest            run the harness on the cabinet's carts, labelled virtual (D128)
 #   drive apt-lock            print apt.lock with the versions the cabinet has now
 #   drive status              services, screen mode, provisioned version
@@ -153,11 +153,17 @@ case "$cmd" in
     out="$1"
     grab() { ARCADE_SSH_TIMEOUT_S=60 cabinet sudo arcade-screenshot > "$out.tmp"; }
     ride grab
+    # The launcher's picture is 1024x768 (D81). A screen whose output mode is larger shows it in the middle with a
+    # border, as the Picade's 1152x864 did (D419): that's a real grab, kept as it is, with a note. Anything that
+    # isn't a PNG, or is too small to hold the launcher, is still refused.
     size="$(file -b "$out.tmp")"
-    case "$size" in
-      *"PNG image data, 1024 x 768"*) mv "$out.tmp" "$out"; echo "$out" ;;
-      *) echo "not a 1024x768 PNG: $size (kept as $out.tmp)" >&2; exit 1 ;;
-    esac
+    dims="$(printf '%s' "$size" | sed -n 's/^PNG image data, \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')"
+    read -r w h <<<"${dims:-0 0}"
+    if [ "$w" -lt 1024 ] || [ "$h" -lt 768 ]; then
+      echo "not a PNG of at least 1024x768: $size (kept as $out.tmp)" >&2; exit 1
+    fi
+    [ "$w x $h" = "1024 x 768" ] || echo "note: the cabinet's screen is ${w}x${h}, not 1024x768: the launcher sits in the middle of it" >&2
+    mv "$out.tmp" "$out"; echo "$out"
     ;;
   playtest) cabinet sudo -u arcade node /opt/arcade/current/cabinet/vm/guest/playtest-virtual.mjs ;;
   apt-lock)
