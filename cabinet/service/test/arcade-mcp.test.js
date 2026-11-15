@@ -304,3 +304,30 @@ test("/mcp: the Manager's token, no browsers, JSON-RPC over POST; the launch str
     await s.close();
   }
 });
+
+test("publish_cart: a maker's own next version can have a name; a bad or used one is refused with the reason (D472, D473)", async () => {
+  const { call, paths } = cabinet();
+  const change = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n"), parent: "penguin-catch", maker: "alina", summary: "Faster fish.", ...extra });
+  // Refused before anything is written: too long, the game's title, and a name on someone else's own version.
+  assert.match((await change({ version_name: "the one where every fish is faster" })).content[0].text, /at most 16 characters/);
+  assert.match((await change({ version_name: "penguin catch" })).content[0].text, /already used by this game/);
+  assert.match((await change({ maker: "owen", version_name: "Faster fish" })).content[0].text, /go by their title/);
+  assert.match((await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "New.", version_name: "Faster fish" })).content[0].text, /go by their title/);
+  assert.ok(!fs.existsSync(path.join(paths.carts, "penguin-catch-v2")));
+
+  const own = (await change({ version_name: " faster fish. " })).structuredContent;
+  assert.deepEqual([own.cart_id, own.version, own.version_name], ["penguin-catch-v2", 2, "Faster fish"]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(paths.carts, "penguin-catch-v2", "cart.json"), "utf8")).version_name, "Faster fish");
+  assert.match(fs.readFileSync(path.join(paths.carts, "penguin-catch-v2", "spec.md"), "utf8"), /^- v2 "Faster fish": faster fish$/m);
+  const v = readLog(path.join(paths.logs, "cart_version.jsonl")).at(-1);
+  assert.deepEqual([v.version_name, v.named_by, v.name_picked], ["Faster fish", "alina", "desktop"]);
+  // The list says what each version is called; one with no name says null, and goes by its number.
+  const list = (await call("list_carts")).structuredContent.carts;
+  assert.equal(list.find((/** @type {any} */ c) => c.id === "penguin-catch-v2").version_name, "Faster fish");
+  assert.equal(list.find((/** @type {any} */ c) => c.id === "penguin-catch").version_name, null);
+  // The next version can't take the same name, and one with no name is still fine.
+  const again = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n- v3: more fish\n"), parent: "penguin-catch-v2", maker: "alina", summary: "More fish.", ...extra });
+  assert.match((await again({ version_name: "FASTER FISH" })).content[0].text, /already used by this game/);
+  const third = (await again({})).structuredContent;
+  assert.deepEqual([third.version, third.version_name], [3, null]);
+});

@@ -144,18 +144,39 @@ async function loadActivity() {
     $("#screened").innerHTML = a.screened.length
       ? a.screened.map((s) => `<div class="make"><div class="top"><span class="who">${esc(s.who)}</span><span class="hint">${when(s.at)}</span><span class="tag">${esc(s.verdict ?? s.log)}</span></div><div class="said">“${esc(s.said)}”</div>${s.offered ? `<div class="hint">Offered instead: ${esc(s.offered)}</div>` : ""}</div>`).join("")
       : "<p class=hint>None. (Screening's log appears here when the cabinet has one.)</p>";
+    $("#gameai").innerHTML = gameAi(a.ai);
+    $("#gametalk").innerHTML = gameTalk(a.talk ?? []);
     $("#plays").innerHTML = `<tr><th>When</th><th>Game</th><th>Made by</th><th class=n>Seconds</th><th class=n>Score</th><th>Ended</th></tr>` +
-      a.plays.slice(0, 100).map((p) => `<tr><td>${when(p.at)}</td><td>${esc(p.game)} <span class=hint>v${esc(p.version)}${p.guest ? " · guest" : ""}</span></td><td>${esc(p.made_by ?? "")}</td><td class=n>${esc(p.seconds)}</td><td class=n>${esc(p.score ?? "")}</td><td>${esc(p.ended ?? "")}${p.errors ? ` <span class=bad>${esc(p.errors)} errors</span>` : ""}</td></tr>`).join("");
+      a.plays.slice(0, 100).map((p) => `<tr><td>${when(p.at)}</td><td>${esc(p.game)} <span class=hint>${versionLabel(p)}${p.guest ? " · guest" : ""}</span></td><td>${esc(p.made_by ?? "")}</td><td class=n>${esc(p.seconds)}</td><td class=n>${esc(p.score ?? "")}</td><td>${esc(p.ended ?? "")}${p.errors ? ` <span class=bad>${esc(p.errors)} errors</span>` : ""}</td></tr>`).join("");
   } catch (e) {
     $("#actnote").innerHTML = `<span class=bad>${esc(e.message)}</span>`;
   }
+}
+// AI in games (D488): paid outside the coin pot with no cap, so this is where its cost shows. Sums are the cabinet's.
+function gameAi(ai) {
+  if (!ai) return "<p class=hint>This cabinet's software doesn't have AI in games yet.</p>";
+  const usd = (n) => (n > 0 && n < 0.01 ? "under $0.01" : `$${Number(n ?? 0).toFixed(2)}`);
+  const head = `<p>${esc(ai.month)}: <b>${usd(ai.month_cost_usd)}</b> for ${esc(ai.month_calls)} calls. All time: ${usd(ai.cost_usd)} for ${esc(ai.calls)} calls. <span class=hint>Outside the coin pot, no cap.${ai.on ? "" : " Switched off, or no key: games use their own lines."}</span></p>`;
+  const trips = ai.trips.length ? `<p class=bad>The loop guard stopped a game ${ai.trips.length} time${ai.trips.length === 1 ? "" : "s"}: ${ai.trips.slice(-5).map((t) => `${esc(t.game)} (${when(t.at)})`).join(", ")}</p>` : "";
+  if (!ai.games.length) return `${head}<p class=hint>No game has asked yet.</p>`;
+  return `${head}${trips}<table><tr><th>Game</th><th class=n>Calls this month</th><th class=n>Cost this month</th><th class=n>Calls ever</th><th class=n>Cost ever</th><th>Last</th><th></th></tr>${ai.games.map((g) => `<tr><td>${esc(g.game)}</td><td class=n>${esc(g.month_calls)}</td><td class=n>${usd(g.month_cost_usd)}</td><td class=n>${esc(g.calls)}</td><td class=n>${usd(g.cost_usd)}</td><td>${when(g.last)}</td><td>${g.errors ? `<span class=hint>${esc(g.errors)} failed</span> ` : ""}${g.dropped ? `<span class=hint>${esc(g.dropped)} lines dropped</span> ` : ""}${g.trips ? `<span class=bad>guard ×${esc(g.trips)}</span>` : ""}</td></tr>`).join("")}</table>`;
+}
+// What was said into the mic during games (D489): every voice action and chat turn, newest first.
+const TALK_OUTCOME = { heard: "", none: "no action fitted", steered: "off-limits words: nothing sent on", held: "the reply was held back", flagged: "flagged: worth a look" };
+function gameTalk(rows) {
+  if (!rows.length) return "<p class=hint>Nothing yet. Every voice action and chat turn in a game shows here.</p>";
+  return rows.slice(0, 200).map((t) => {
+    const how = t.outcome?.startsWith("by_word") ? "matched by word, no model" : (TALK_OUTCOME[t.outcome] ?? t.outcome ?? "");
+    const loud = t.outcome === "steered" || t.outcome === "held" || t.outcome === "flagged";
+    return `<div class="make"><div class="top"><span class="who">${esc(t.game)}</span><span class="hint">v${esc(t.version)} · ${when(t.at)}</span><span class="tag">${esc(t.kind)}${t.ask ? `: ${esc(t.ask)}` : ""}</span>${how ? `<span class="${loud ? "bad" : "hint"}">${esc(how)}</span>` : ""}</div><div class="said">“${esc(t.said)}”</div>${t.reply ? `<div class="hint">The character said: ${esc(t.reply)}</div>` : ""}${t.action ? `<div class="hint">The game did: ${esc(t.action)}</div>` : ""}</div>`;
+  }).join("");
 }
 function make(m) {
   const ok = m.outcome === "committed";
   const answers = m.answers.map((t) => `<li>${esc(t.question)} <span class=hint>A: ${esc(t.a)} · B: ${esc(t.b)}</span> → <span class=pick>${esc(t.choice)}${t.choice === "A" ? ` (${esc(t.a)})` : t.choice === "B" ? ` (${esc(t.b)})` : t.choice === "D" ? " (Make it now)" : ""}${t.said ? `: “${esc(t.said)}”` : ""}</span></li>`).join("");
   // A desktop publish (D343, D345): made in Claude Code at the desk, no coins, and its line is Geoff's summary, not a kid's words.
   const desk = m.origin === "desktop";
-  return `<div class="make"><div class="top"><span class="who">${esc(m.who)}${m.with ? ` with ${esc(m.with)}` : ""}</span>${desk ? `<span class="tag">made at the desk</span>` : ""}<span class="tag">${m.kind === "change" ? `change of ${esc(m.parent)}` : "new game"}</span><span class="hint">${when(m.at)}${m.minutes != null ? ` · ${m.minutes} min` : ""}</span><span class="tag ${ok ? "ok" : "no"}">${esc(m.kid_outcome ?? m.outcome)}</span>${m.cart ? `<span class="hint">${esc(m.cart.id)} v${esc(m.cart.version)}</span>` : ""}<span>${desk ? "no coins (Claude Code on the mini)" : `${m.coins != null ? `${m.coins} coin${m.coins === 1 ? "" : "s"}` : ""} · ${dollars(m.cents)}${m.charged ? "" : " <span class=hint>(not charged)</span>"}`}</span></div><div class="said">${desk ? `Summary: ${esc(m.said)}` : `“${esc(m.said)}”`}</div>${answers ? `<ol>${answers}</ol>` : ""}<div class="hint">Ended by ${esc(m.ended_by ?? "?")}${m.errors ? ` · <span class=bad>${m.errors} errors</span>` : ""}${m.plays ? ` · played ${m.plays}×` : ""}${m.restarted ? " · survived a service restart and was collected after it" : ""}${gateLine(m.gate)}${m.corrections.filter((c) => !(m.restarted && /restart/.test(c.why ?? ""))).map((c) => ` · ${esc(c.why)}`).join("")}</div></div>`;
+  return `<div class="make"><div class="top"><span class="who">${esc(m.who)}${m.with ? ` with ${esc(m.with)}` : ""}</span>${desk ? `<span class="tag">made at the desk</span>` : ""}<span class="tag">${m.kind === "change" ? `change of ${esc(m.parent)}` : "new game"}</span><span class="hint">${when(m.at)}${m.minutes != null ? ` · ${m.minutes} min` : ""}</span><span class="tag ${ok ? "ok" : "no"}">${esc(m.kid_outcome ?? m.outcome)}</span>${m.cart ? `<span class="hint">${esc(m.cart.id)} ${versionLabel(m.cart)}</span>` : ""}<span>${desk ? "no coins (Claude Code on the mini)" : `${m.coins != null ? `${m.coins} coin${m.coins === 1 ? "" : "s"}` : ""} · ${dollars(m.cents)}${m.charged ? "" : " <span class=hint>(not charged)</span>"}`}</span></div><div class="said">${desk ? `Summary: ${esc(m.said)}` : `“${esc(m.said)}”`}</div>${answers ? `<ol>${answers}</ol>` : ""}<div class="hint">Ended by ${esc(m.ended_by ?? "?")}${m.errors ? ` · <span class=bad>${m.errors} errors</span>` : ""}${m.plays ? ` · played ${m.plays}×` : ""}${m.restarted ? " · survived a service restart and was collected after it" : ""}${gateLine(m.gate)}${m.corrections.filter((c) => !(m.restarted && /restart/.test(c.why ?? ""))).map((c) => ` · ${esc(c.why)}`).join("")}</div></div>`;
 }
 $("#reload").addEventListener("click", loadActivity);
 
@@ -265,6 +286,9 @@ $("#update").addEventListener("submit", async (e) => {
 });
 
 // ---- Games and makers: off the shelf, kept in the records (D360-D364) ----
+// A version by its name with its number, or just the number for one with no name (D474): "Faster logs (v3)", "v2".
+const versionLabel = (c) => (c.version_name ? `${esc(c.version_name)} (v${esc(c.version)})` : `v${esc(c.version)}`);
+
 let confirmRemove = null;
 async function loadGames() {
   $("#gamesnote").textContent = "Reading the cabinet's library…";
@@ -281,7 +305,7 @@ async function loadGames() {
             ? `<button class="danger" data-act="remove" data-id="${esc(x.id)}">Remove ${x.versions > 1 ? `all ${x.versions} versions` : "it"}</button> <button data-act="cancel">Keep</button>`
             : `<button data-act="ask" data-id="${esc(x.id)}">Remove from shelf</button>`
           : `<button data-act="restore" data-id="${esc(x.id)}">Put back</button>`;
-        return `<tr><td><b>${esc(x.title)}</b> <span class=hint>${esc(x.id)}</span>${from}</td><td>${esc(x.maker_name ?? "starter")}</td><td class=n>${esc(x.versions)}</td><td>${x.last_played ? `${when(x.last_played)} <span class=hint>(${esc(x.plays)}×)</span>` : "<span class=hint>never</span>"}</td><td>${state}</td><td>${action}</td></tr>`;
+        return `<tr><td><b>${esc(x.title)}</b> <span class=hint>${esc(x.id)}</span>${from}</td><td>${esc(x.maker_name ?? "starter")}</td><td class=n>${esc(x.versions)}${x.newest?.version_name ? `<div class=hint>newest: ${versionLabel(x.newest)}</div>` : ""}</td><td>${x.last_played ? `${when(x.last_played)} <span class=hint>(${esc(x.plays)}×)</span>` : "<span class=hint>never</span>"}</td><td>${state}</td><td>${action}</td></tr>`;
       }).join("");
     $("#makerlist").innerHTML = `<tr><th>Name</th><th>On the list</th><th></th></tr>` +
       m.makers.map((x) => {

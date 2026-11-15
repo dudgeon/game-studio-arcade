@@ -106,6 +106,23 @@ export function fit(text, cols, rows) {
 }
 
 /**
+ * Text in pages of `rows - 1` lines, the last row kept for the page count (D453).
+ * @param {string} text cleaned text
+ * @param {number} cols
+ * @param {number} rows
+ * @param {number} page wanted; clamped
+ * @returns {{ lines: string[], pages: number, page: number, label: string }}
+ */
+export function paginate(text, cols, rows, page) {
+  const all = wrap(text, cols);
+  const per = Math.max(1, rows - 1);
+  const pages = Math.max(1, Math.ceil(all.length / per));
+  const p = Math.max(0, Math.min(pages - 1, page));
+  const label = `${p > 0 ? "< " : ""}${p + 1} of ${pages}${p < pages - 1 ? " >" : ""}`;
+  return { lines: all.slice(p * per, p * per + per), pages, page: p, label };
+}
+
+/**
  * @typedef {{
  *   id: string, text: string,
  *   x: number, y: number, w: number, h: number,
@@ -113,9 +130,11 @@ export function fit(text, cols, rows) {
  *   cut: boolean,
  *   onCut: "reader" | "ok" | "never",
  *   readable: boolean,
+ *   pages?: number, page?: number,
  * }} BoxRecord
  *   onCut: what a cut means (D181): "reader", the kid must be able to read the
  *     rest; "ok", a label or passing line; "never", our own fixed words. readable: the reader holds these words.
+ *   pages, page: a box read in pages (D453) has nothing cut; it shows page `page` (from 0) of `pages`.
  */
 
 /**

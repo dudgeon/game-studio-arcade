@@ -4,7 +4,9 @@
 // string to any screen with no browser. All words go through Painter.box (D181).
 import { Framebuffer } from "../../../runtime/src/gfx.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
-import { ADVANCE, GLYPH_H, H, LINE_H, W, clean, colsFor, fit, heightOf, rowsFor, widthOf, wrap } from "./text.js";
+import { ADVANCE, GLYPH_H, H, LINE_H, W, clean, colsFor, fit, heightOf, paginate, rowsFor, widthOf, wrap } from "./text.js";
+import { pageOf, seenAll } from "./pages.js";
+import { YOU_PICK } from "./version-name.js";
 
 /** @typedef {import("./text.js").BoxRecord} BoxRecord */
 
@@ -20,6 +22,7 @@ const BIG_ROWS = 3;
 
 const CHOOSE = "Stick to choose, any button to pick";
 const READ_MORE = "Right: read it all. Up/down: choose.";
+const PAGES = "Left/right: pages. Up/down: choose.";
 const ROWS = { question: 6, option: 3, transcript: 11, rule: 9, progress: 5, failure: 10 };
 
 export class Painter {
@@ -41,13 +44,15 @@ export class Painter {
   /**
    * The one way words reach the screen (D181).
    * @param {{ id: string, text: unknown, x: number, y: number, w: number, h: number, color?: number, scale?: number,
-   *   align?: "left" | "center" | "right", onCut?: "reader" | "ok" | "never", readable?: boolean, keepLines?: boolean }} o
+   *   align?: "left" | "center" | "right", onCut?: "reader" | "ok" | "never", readable?: boolean, keepLines?: boolean, page?: number }} o
+   *   page: read in pages when it doesn't fit, showing this one (D453); the last row says "2 of 3"
    */
   box(o) {
     const scale = o.scale ?? 1;
     const text = clean(o.text, { keepLines: o.keepLines });
     const cols = colsFor(Math.floor(o.w / scale));
     const rows = rowsFor(Math.floor(o.h / scale));
+    if (o.page != null && rows > 1 && wrap(text, cols).length > rows) return this.pagedBox(o, text, cols, rows);
     const { lines, cut, total } = fit(text, cols, rows);
     const color = o.color ?? C.white;
     /** @type {BoxRecord["lines"]} */
@@ -63,6 +68,28 @@ export class Painter {
     // flow up under short text; check() still holds it to its limit via fit().
     this.boxes.push({ id: o.id, text, x: o.x, y: o.y, w: o.w, h: heightOf(lines.length) * scale, lines: drawn, cut, onCut: o.onCut ?? "ok", readable: !!o.readable });
     return { rows: lines.length, cut, total };
+  }
+
+  /**
+   * A box read in pages (D453): one page of lines, and "< 2 of 3 >" right-aligned on its last row.
+   * @param {any} o @param {string} text @param {number} cols @param {number} rows
+   */
+  pagedBox(o, text, cols, rows) {
+    const scale = o.scale ?? 1;
+    const { lines, pages, page, label } = paginate(text, cols, rows, o.page);
+    /** @type {BoxRecord["lines"]} */
+    const drawn = [];
+    lines.forEach((line, i) => {
+      const ly = o.y + i * LINE_H * scale;
+      this.fb.text(line, o.x, ly, o.color ?? C.white, { scale });
+      if (line) drawn.push({ text: line, x: o.x, y: ly, scale });
+    });
+    const lw = widthOf(label) * scale;
+    const ly = o.y + (rows - 1) * LINE_H * scale;
+    this.fb.text(label, o.x + o.w - lw, ly, C.yellow, { scale });
+    drawn.push({ text: label, x: o.x + o.w - lw, y: ly, scale });
+    this.boxes.push({ id: o.id, text, x: o.x, y: o.y, w: o.w, h: heightOf(rows) * scale, lines: drawn, cut: false, onCut: o.onCut ?? "ok", readable: !!o.readable, pages, page });
+    return { rows, cut: false, total: wrap(text, cols).length, pages, page };
   }
 
   /** @param {string} title @param {string} [right] */
@@ -223,12 +250,15 @@ function say(p, v) {
     /** @type {string[]} */
     const tiles = v.confirmTiles ?? (v.purpose === "name" ? ["Yes, that's me", "Type it again"] : ["Yes! That's it", "Say it again", "Add more"]);
     const tilesY = HINT_Y - tiles.length * (heightOf(1) + TILE_PAD * 2 + TILE_GAP) - 2;
-    const r = p.box({ id: "say-transcript", text: v.added ? `${v.added} ${v.transcript}` : v.transcript, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.transcript), tilesY - y - 2), onCut: "reader", readable: true });
+    const heard = v.added ? `${v.added} ${v.transcript}` : v.transcript;
+    const r = p.box({ id: "say-transcript", text: heard, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.transcript), tilesY - y - 2), onCut: "reader", readable: true, page: pageOf(v, heard) });
+    // D453: "Yes" waits until the last page has been on screen; until then it turns the page.
+    const unseen = !seenAll(v, p.boxes);
     let ty = tilesY;
     tiles.forEach((t, i) => {
-      ty = p.tile({ id: ["say-yes", "say-again", v.purpose === "name" ? "say-type" : "say-more"][i], text: t, y: ty, rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : C.blue }).y;
+      ty = p.tile({ id: ["say-yes", "say-again", v.purpose === "name" ? "say-type" : "say-more"][i], text: i === 0 && unseen ? "Read it all first" : t, y: ty, rows: 1, lit: v.sel === i, hue: i === 0 ? (unseen ? C.gray : C.green) : C.blue }).y;
     });
-    p.hint(r.cut ? READ_MORE : CHOOSE);
+    p.hint(r.pages ? PAGES : r.cut ? READ_MORE : CHOOSE);
     return;
   }
   if (v.phase === "typing") {
@@ -279,15 +309,16 @@ function question(p, v) {
   // Double size when it fits: most questions are short, and easier to read big.
   const big = wrap(words.question, colsFor(Math.floor(INNER / 2))).length <= BIG_ROWS;
   const scale = big ? 2 : 1;
-  const r = p.box({ id: "q-question", text: words.question, x: M, y: BODY_Y + 1, w: INNER, h: heightOf(big ? BIG_ROWS : ROWS.question) * scale, scale, onCut: "reader", readable: true });
+  const r = p.box({ id: "q-question", text: words.question, x: M, y: BODY_Y + 1, w: INNER, h: heightOf(big ? BIG_ROWS : ROWS.question) * scale, scale, onCut: "reader", readable: true, page: pageOf(v, words.question) });
   // Tiles sit at the bottom, by the hint, wherever the question ends.
   const tilesH = tileHeight(words.a, ROWS.option) + tileHeight(words.b, ROWS.option) + 2 * tileHeight("x", 1) + 4 * TILE_GAP;
   const y = Math.max(BODY_Y + 1 + heightOf(Math.max(1, r.rows)) * scale + 4, HINT_Y - 2 - tilesH);
   const a = p.tile({ id: "q-a", letter: "A", text: words.a, y, rows: ROWS.option, lit: v.sel === 0, onCut: "reader", readable: true });
   const b = p.tile({ id: "q-b", letter: "B", text: words.b, y: a.y, rows: ROWS.option, lit: v.sel === 1, onCut: "reader", readable: true });
   const c = p.tile({ id: "q-c", letter: "C", text: "Something else", y: b.y, rows: 1, lit: v.sel === 2, hue: C.purple });
-  p.tile({ id: "q-d", letter: "D", text: "Make it now", y: c.y, rows: 1, lit: v.sel === 3, hue: C.green });
-  p.hint(r.cut || a.cut || b.cut ? READ_MORE : CHOOSE);
+  // The name question's D lets Claude choose (D471); any other question's D ends the questions.
+  p.tile({ id: "q-d", letter: "D", text: v.naming ? YOU_PICK : "Make it now", y: c.y, rows: 1, lit: v.sel === 3, hue: C.green });
+  p.hint(r.pages ? PAGES : r.cut || a.cut || b.cut ? READ_MORE : CHOOSE);
 }
 
 /** Height of a lettered, full-width tile. @param {unknown} text @param {number} rows */
@@ -408,11 +439,11 @@ function check(p, v) {
   const y = BODY_Y + 2 * LINE_H + 5;
   const tileH = heightOf(1) + TILE_PAD * 2;
   const tilesY = HINT_Y - CHECK_TILES.length * (tileH + TILE_GAP) - 1;
-  const r = p.box({ id: "check-rule", text: v.rule, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.rule), tilesY - y - 3), onCut: "reader", readable: true });
+  const r = p.box({ id: "check-rule", text: v.rule, x: M, y, w: INNER, h: Math.min(heightOf(ROWS.rule), tilesY - y - 3), onCut: "reader", readable: true, page: pageOf(v, v.rule) });
   CHECK_TILES.forEach((t, i) => {
     p.tile({ id: `check-${i}`, text: t, y: tilesY + i * (tileH + TILE_GAP), rows: 1, lit: v.sel === i, hue: i === 0 ? C.green : i === 1 ? C.red : C.blue });
   });
-  p.hint(r.cut ? READ_MORE : CHOOSE);
+  p.hint(r.pages ? PAGES : r.cut ? READ_MORE : CHOOSE);
 }
 
 /** @param {Painter} p @param {any} v */

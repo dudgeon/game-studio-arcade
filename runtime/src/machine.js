@@ -6,6 +6,7 @@ import { Framebuffer, H, W, hashPixels, makeSprite } from "./gfx.js";
 import { textWidth } from "./font.js";
 import { BIT, MAX_PLAYERS, checkPlayers } from "./input.js";
 import { COLORS, PALETTE, colorIndex } from "./palette.js";
+import { createAi } from "./ai.js";
 import { createRng } from "./rng.js";
 import { SFX, Voices, toneToSegment } from "./sound.js";
 
@@ -62,6 +63,9 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
   /** @type {{ frame: number, message: string }[]} */
   let warningsOut = [];
   const warned = new Set();
+  // g.ai (D480): declared in init, answered by a host when there is one, else by the cart's own fallbacks.
+  let booting = true;
+  const ai = createAi({ seed, frame: () => frame, inInit: () => booting });
 
   /** Colors outside 0..31 still wrap (a kid's game shouldn't crash over it), but each kind is reported once. */
   const col = (c, fn) => {
@@ -108,6 +112,7 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
     colors: COLORS,
     palette: PALETTE,
     lib,
+    ai: ai.api,
 
     players: nPlayers,
 
@@ -184,6 +189,7 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
   Object.freeze(g);
 
   const state = cart.init(g) ?? {};
+  booting = false;
   fb.reset();
   cart.draw(g, state);
 
@@ -238,6 +244,14 @@ export function createMachine({ cart, seed = 1, save = null, players }) {
       audioOut = [];
       return out;
     },
+    /** g.ai asks since the last call, for a host that can answer them (D480). */
+    drainAi: () => ai.drain(),
+    /** A host's answer to a g.ai ask. @param {import("./ai.js").AiReply} r */
+    aiDeliver: (r) => ai.deliver(r),
+    /** The voice asks the cart declared (D489), and what the cabinet heard for one. */
+    aiVoices: () => ai.voices(),
+    /** @param {{ name?: unknown, action?: unknown }} v */
+    aiHear: (v) => ai.hear(v),
     /** Scores reported since the last call (D215). */
     drainScores() {
       const out = scoresOut;

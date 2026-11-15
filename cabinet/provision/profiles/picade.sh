@@ -198,9 +198,14 @@ service_args_without_key() {
   echo "--offline"
 }
 
+# D419: the panel names no preferred mode, so the kernel picks its largest, 1152x864, and the panel shrinks the
+# picture onto its 1024x768 glass, with a border. The session asks for the panel's own 1024x768 instead, which
+# the launcher fills at exactly 4x (D81). ARCADE_OUTPUT stays empty: the session uses whichever screen is
+# plugged in, so either of the Pi's HDMI ports works.
 kiosk_env() {
   cat <<'ENV'
 ARCADE_OUTPUT=
+ARCADE_MODE=1024x768
 CHROMIUM_EXTRA=
 ENV
 }

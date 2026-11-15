@@ -135,6 +135,66 @@ test("the driver reaches the Picade with the Picade's own key and known_hosts, n
   assert.doesNotMatch(rehearsal, /ProxyCommand/);
 });
 
+test("drive screenshot keeps the Picade's real grab: 1152x864 with a note, 1024x768 quietly; refuses what isn't a screen (D419)", async () => {
+  const { encodePng } = await import("../../../studio-kit/playtest/src/png.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drive-shot-"));
+  const png = (/** @type {number} */ w, /** @type {number} */ h) => {
+    const file = path.join(dir, `${w}x${h}.png`);
+    fs.writeFileSync(file, encodePng({ width: w, height: h, pixels: new Uint8Array(w * h) }, ["#000000"]));
+    return file;
+  };
+  // A stand-in ssh: whatever is asked, it answers with the file named in SHOT.
+  fs.writeFileSync(path.join(dir, "ssh"), '#!/bin/bash\ncat "$SHOT"\n', { mode: 0o755 });
+  const shot = (/** @type {string} */ from, /** @type {string} */ name) => {
+    const out = path.join(dir, name);
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/vm/drive"), "screenshot", out], { encoding: "utf8", env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, GSA_CABINET_DIR: path.join(dir, "picade"), CABINET: "real", ARCADE_RIDE_S: "1", SHOT: from } });
+    return { ...r, out };
+  };
+  const picade = shot(png(1152, 864), "picade.png");
+  assert.equal(picade.status, 0, picade.stderr);
+  assert.equal(picade.stdout.trim(), picade.out);
+  assert.match(picade.stderr, /the cabinet's screen is 1152x864, not 1024x768/);
+  assert.ok(fs.existsSync(picade.out) && !fs.existsSync(`${picade.out}.tmp`));
+  const exact = shot(png(1024, 768), "exact.png");
+  assert.equal(exact.status, 0);
+  assert.equal(exact.stderr, "");
+  const small = shot(png(640, 480), "small.png");
+  assert.equal(small.status, 1);
+  assert.match(small.stderr, /not a PNG of at least 1024x768/);
+  assert.ok(!fs.existsSync(small.out) && fs.existsSync(`${small.out}.tmp`), "what came back is kept beside, for a look");
+  const text = path.join(dir, "words.txt");
+  fs.writeFileSync(text, "sudo: arcade-screenshot: command not found\n");
+  assert.equal(shot(text, "words.png").status, 1);
+});
+
+test("the Picade's kiosk asks for the panel's own 1024x768, on whichever screen is plugged in; the virtual cabinet's is unchanged (D419)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "arcade-session-"));
+  const log = path.join(dir, "calls");
+  // Stand-ins: wlr-randr lists the Picade's screen as the real one does, and records what it's asked; chromium just ends.
+  fs.writeFileSync(
+    path.join(dir, "wlr-randr"),
+    `#!/bin/bash\nif [ $# = 0 ]; then printf 'HDMI-A-1 "Pico Technology Inc. 0x0001 (HDMI-A-1)"\\n  Make: Pico Technology Inc.\\n  Modes:\\n    1152x864 px, 75.000000 Hz (current)\\n    1024x768 px, 60.004002 Hz\\n'; exit 0; fi\necho "$*" >> "${log}"\n[ -z "\${RANDR_FAILS:-}" ]\n`,
+    { mode: 0o755 },
+  );
+  fs.writeFileSync(path.join(dir, "chromium"), `#!/bin/bash\necho chromium >> "${log}"\n`, { mode: 0o755 });
+  const session = (/** @type {string} */ envText, extra = {}) => {
+    fs.rmSync(log, { force: true });
+    const env = Object.fromEntries(envText.split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+    const r = spawnSync("/bin/bash", [path.join(REPO, "cabinet/provision/files/arcade-session")], { encoding: "utf8", env: { PATH: `${dir}:/usr/bin:/bin`, ...env, ...extra } });
+    return { ...r, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n") : [] };
+  };
+  const profile = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `log() { :; }; . "${path.join(REPO, "cabinet/provision/profiles", name)}"; kiosk_env`], { encoding: "utf8" });
+  const picade = session(profile("picade.sh"));
+  assert.deepEqual(picade.calls, ["--output HDMI-A-1 --mode 1024x768", "chromium"]);
+  assert.match(picade.stdout, /HDMI-A-1 at 1024x768/);
+  // A mode the screen refuses doesn't stop the kiosk.
+  const refused = session(profile("picade.sh"), { RANDR_FAILS: "1" });
+  assert.deepEqual(refused.calls, ["--output HDMI-A-1 --mode 1024x768", "chromium"]);
+  assert.match(refused.stderr, /could not set HDMI-A-1 to 1024x768/);
+  const virtual = session(profile("virtual.sh"));
+  assert.deepEqual(virtual.calls, ["--output HEADLESS-1 --custom-mode 1024x768", "chromium"]);
+});
+
 /** A function of wifi.sh's, run in bash. */
 const fn = (/** @type {string} */ name) => execFileSync("/bin/bash", ["-c", `. "${WIFI_SH}"; ${name}`], { encoding: "utf8" });
 

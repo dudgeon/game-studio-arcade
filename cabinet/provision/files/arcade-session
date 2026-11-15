@@ -1,7 +1,17 @@
 #!/bin/bash
 # Runs inside the compositor: fix the screen size if the backend needs it, then the kiosk.
 set -u
-if [ -n "${ARCADE_OUTPUT:-}" ]; then
+if [ -n "${ARCADE_MODE:-}" ]; then
+  # A real panel (D419): one of the modes it lists itself, on the named screen or the first one plugged in.
+  # If it can't be set the kiosk still starts, at whatever mode the screen came up in.
+  out="${ARCADE_OUTPUT:-$(wlr-randr | sed -n 's/^\([^ ][^ ]*\) .*/\1/p' | head -1)}"
+  if [ -n "$out" ] && wlr-randr --output "$out" --mode "$ARCADE_MODE"; then
+    echo "arcade-session: $out at $ARCADE_MODE"
+  else
+    echo "arcade-session: could not set ${out:-the screen} to $ARCADE_MODE" >&2
+  fi
+elif [ -n "${ARCADE_OUTPUT:-}" ]; then
+  # The virtual cabinet's headless screen has no modes of its own.
   wlr-randr --output "$ARCADE_OUTPUT" --custom-mode 1024x768 || echo "arcade-session: could not set 1024x768" >&2
 fi
 # The profile stays on the card: it holds the games' saves (the runtime's g.save(), in localStorage). Its disk cache,

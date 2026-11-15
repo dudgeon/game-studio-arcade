@@ -88,7 +88,7 @@ test("the first question checks the idea was heard right, every time, for new ga
 const toolFiles = fs.readdirSync(path.join(root, "agents/tools")).filter((f) => f.endsWith(".json"));
 
 test("custom tools are valid and allowed names", () => {
-  assert.deepEqual(toolFiles.sort(), ["ask_player.json", "show_plan.json", "tell_player.json"]);
+  assert.deepEqual(toolFiles.sort(), ["ask_player.json", "name_version.json", "show_plan.json", "tell_player.json"]);
   for (const f of toolFiles) {
     const tool = JSON.parse(read(`agents/tools/${f}`));
     assert.equal(tool.type, "custom");
@@ -105,6 +105,19 @@ test("ask_player matches HANDOFF §9.1", () => {
   assert.deepEqual(t.input_schema.required, ["question", "option_a", "option_b"]);
   for (const choice of ['{\\"choice\\":\\"A\\"}', '{\\"choice\\":\\"D\\"}', '\\"said\\"']) {
     assert.ok(JSON.stringify(t.description).includes(choice), `description documents ${choice}`);
+  }
+});
+
+test("name_version: two names, Claude's pick, and the name comes back (D471)", () => {
+  const t = JSON.parse(read("agents/tools/name_version.json"));
+  assert.deepEqual(t.input_schema.required, ["option_a", "option_b", "pick"]);
+  assert.deepEqual(t.input_schema.properties.pick.enum, ["A", "B"]);
+  for (const needle of ["You pick", "Something else", "at most 16 characters", '{\\"choice\\":\\"A\\",\\"name\\":']) {
+    assert.ok(JSON.stringify(t.description).includes(needle), `description documents ${needle}`);
+  }
+  const { body } = frontmatter(read("agents/studio.md"));
+  for (const needle of ["**A version's name (D471).**", "as soon as the player says build on the plan", '`- v3 "Faster logs": The logs move faster.`', '`"version_name": "Faster logs"`', "Never call `name_version` for a new game"]) {
+    assert.ok(body.includes(needle), `prompt says: ${needle}`);
   }
 });
 

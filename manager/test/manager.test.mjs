@@ -233,6 +233,18 @@ test("activity joins sessions, charges, plays and screened requests (D283)", () 
   assert.deepEqual(a.plays.map((p) => [p.game, p.guest, p.made_by]), [["rock", false, "tester"], ["teti", true, null]]);
   assert.deepEqual([a.screened[0].said, a.screened[0].verdict, a.screened[0].offered], ["something rude", "redirected", "something kind"]);
   assert.equal(a.coins[0].kind, "topup");
+  assert.deepEqual(a.talk, []);
+});
+
+test("activity lists what was said to games, newest first, and it isn't mixed into screened requests (D489)", () => {
+  const a = activity({
+    game_talk: [
+      { type: "game_talk", at: "2026-11-14T10:00:00Z", cart_id: "wizard-bridge", cart_version: 2, play_id: "pl_1", name: "spell", kind: "voice", said: "burn it", action: "fire", outcome: "heard" },
+      { type: "game_talk", at: "2026-11-14T10:01:00Z", cart_id: "wizard-bridge", cart_version: 2, play_id: "pl_1", name: "spell", kind: "voice", said: "something rude", action: null, outcome: "steered" },
+    ],
+  });
+  assert.deepEqual(a.talk.map((t) => [t.game, t.version, t.kind, t.ask, t.said, t.action, t.outcome]), [["wizard-bridge", 2, "voice", "spell", "something rude", null, "steered"], ["wizard-bridge", 2, "voice", "spell", "burn it", "fire", "heard"]]);
+  assert.deepEqual(a.screened, []);
 });
 
 test("key names map to Linux codes; unknown keys are refused", () => {
@@ -382,4 +394,17 @@ test("Games: the list, Remove from shelf and Put back, hiding a maker, all asked
     assert.equal(posts[0].body.reason, "test game");
     assert.match(posts[0].body.by, /in the Manager$/);
   });
+});
+
+test("activity says what a version is called, from the cart_version log, and leaves unnamed ones alone (D474)", () => {
+  const a = activity({
+    studio_session: [
+      { id: "s1", maker: "tester", request: "faster logs", kind: "change", parent: "log-hopper@2", turns: [], outcome: "committed", cart_id: "log-hopper-v3", cart_version: 3, version_name: "Faster logs", started_at: "2026-11-14T10:00:00Z", errors: [] },
+      { id: "s0", maker: "tester", request: "a frog game", kind: "new", parent: null, turns: [], outcome: "committed", cart_id: "log-hopper", cart_version: 1, started_at: "2026-11-10T10:00:00Z", errors: [] },
+    ],
+    cart_version: [{ cart_id: "log-hopper", version: 1 }, { cart_id: "log-hopper-v3", version: 3, version_name: "Faster logs", named_by: "tester", name_picked: "tile" }],
+    play: [{ cart_id: "log-hopper-v3", cart_version: "3", session_id: "s1", started_at: "2026-11-14T10:10:00Z", duration_s: 30 }, { cart_id: "log-hopper", cart_version: 1, session_id: "s0", started_at: "2026-11-10T10:10:00Z", duration_s: 30 }],
+  });
+  assert.deepEqual(a.makes.map((m) => [m.cart.id, m.cart.version, m.cart.version_name]), [["log-hopper-v3", 3, "Faster logs"], ["log-hopper", 1, null]]);
+  assert.deepEqual(a.plays.map((p) => [p.game, p.version_name]), [["log-hopper-v3", "Faster logs"], ["log-hopper", null]]);
 });

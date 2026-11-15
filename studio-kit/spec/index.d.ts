@@ -8,6 +8,8 @@ export interface Issue {
 }
 export interface Rule { id: string; n: number; kind: 'auto' | 'you-check'; text: string; line: number }
 export interface Item { id: string; n: number; text: string; line: number }
+/** A Changelog line. `name` is the version's name, when it has one (D472). */
+export interface Change extends Item { name?: string }
 export interface Section { heading: string; line: number; body?: string; items?: (Rule | Item)[] }
 export interface Spec {
   title: string | null;
@@ -15,7 +17,7 @@ export interface Spec {
   sections: Section[];
   rules: Rule[];
   assumptions: Item[];
-  changelog: Item[];
+  changelog: Change[];
   errors: Issue[];
   warnings: Issue[];
 }
@@ -27,6 +29,13 @@ export interface CoverageReport {
   warnings: Issue[];
 }
 export const SECTIONS: readonly string[];
+export const VERSION_NAME_MAX: number;
+export function cleanVersionName(raw: unknown, o?: { cut?: boolean }): string | null;
+export function sameVersionName(a: unknown, b: unknown): boolean;
+export function versionNameTaken(name: string, taken: readonly unknown[]): boolean;
+export function isVersionName(v: unknown): boolean;
+export function versionLabel(c: { version?: number | null; version_name?: string | null }): string;
+export function nameChangelogLine(specText: string, version: number, name: string): string;
 export const BYLINE_KEYS: readonly string[];
 export function parseSpec(text: string): Spec;
 export function formatSpec(spec: Spec): string;

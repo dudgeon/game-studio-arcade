@@ -155,7 +155,19 @@ test("the capture device is the first one ALSA lists", () => {
 /**
  * A stand-in for arecord: -l lists a device; recording writes samples until SIGINT. burst: that many seconds of
  * "speech" at once (2 s loud, 0.3 s quiet, over and over), as if held that long, then nothing until SIGINT.
+ * It leaves a "wrote" file once its samples are in the pipe, so a test waits on that, not on the clock: under
+ * a full test run's load, starting a Node process can take longer than any fixed sleep.
  */
+/** Until the fake arecord has written its samples (its "wrote" file), then clears it for the next hold. @param {string} dir */
+async function wrote(dir) {
+  const f = path.join(dir, "wrote");
+  for (let t = 0; !fs.existsSync(f); t += 20) {
+    if (t > 60_000) throw new Error("the fake arecord never wrote");
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  fs.rmSync(f);
+}
+
 function fakeArecord(dir, { device = true, burst = 0 } = {}) {
   const bin = path.join(dir, "arecord");
   fs.writeFileSync(
@@ -169,10 +181,12 @@ if (${burst}) {
   const b = Buffer.alloc(n * 2);
   for (let i = 0; i < n; i++) b.writeInt16LE(i % 36800 < 32000 ? (i % 2 ? 3000 : -3000) : 0, i * 2);
   for (let at = 0; at < b.length; at += 65536) process.stdout.write(b.subarray(at, at + 65536));
-  process.on("SIGINT", () => process.exit(0));
+  process.stdout.write("", () => require("fs").writeFileSync(${JSON.stringify(path.join(dir, "wrote"))}, ""));
+  process.on("SIGINT", () => process.stdout.write("", () => process.exit(0)));
   setInterval(() => {}, 1000);
 } else {
-const t = setInterval(() => process.stdout.write(Buffer.alloc(3200, 7)), 20);
+let n = 0;
+const t = setInterval(() => process.stdout.write(Buffer.alloc(3200, 7), () => { if (++n === 3) require("fs").writeFileSync(${JSON.stringify(path.join(dir, "wrote"))}, ""); }), 20);
 process.on("SIGINT", () => { clearInterval(t); process.stdout.write(Buffer.alloc(3200, 7), () => process.exit(0)); });
 }
 `,
@@ -185,7 +199,7 @@ test("arecord into memory: the device found, raw 16 kHz mono on stdout, nothing 
   const dir = tmp();
   const rec = alsaRecorder({ arecord: fakeArecord(dir) });
   rec.start();
-  await new Promise((r) => setTimeout(r, 300));
+  await wrote(dir);
   const pcm = await rec.stop();
   assert.ok(pcm.length >= 3200 * 3, `got ${pcm.length} bytes`);
   const args = JSON.parse(fs.readFileSync(path.join(dir, "args"), "utf8"));
@@ -325,7 +339,7 @@ test("a 3-minute hold: arecord keeps it all, Groq gets it whole, and Moonshine f
   const s = liveSpeech({ recorder: rec, engines: [groq, m], logFile });
 
   s.start();
-  await settle(1500); // the fake writes all 3 minutes at once
+  await wrote(dir); // the fake writes all 3 minutes at once
   let out = await s.stop();
   assert.equal(out.text, "heard 180 seconds", "all 180 s reached Groq, in one piece");
   assert.deepEqual(groqSizes, [44 + 180 * RATE * 2]);
@@ -333,7 +347,7 @@ test("a 3-minute hold: arecord keeps it all, Groq gets it whole, and Moonshine f
 
   groqUp = false;
   s.start();
-  await settle(1500);
+  await wrote(dir);
   out = await s.stop();
   const pieces = [...out.text.matchAll(/bytes (\d+)/g)].map((x) => Number(x[1]));
   assert.ok(pieces.length >= 6, `Moonshine got ${pieces.length} pieces`);
@@ -367,7 +381,7 @@ test("a 25-minute hold: arecord keeps every second, Groq gets it in pieces under
   const logFile = path.join(dir, "speech.jsonl");
   const s = liveSpeech({ recorder: alsaRecorder({ arecord: fakeArecord(dir, { burst: 25 * 60 }) }), engines: [groq], logFile });
   s.start();
-  await settle(4000); // the fake writes all 25 minutes at once
+  await wrote(dir); // the fake writes all 25 minutes at once
   const { text } = await s.stop();
   assert.equal(text, "piece1 piece2 piece3");
   const entry = JSON.parse(fs.readFileSync(logFile, "utf8").trim());
@@ -376,4 +390,52 @@ test("a 25-minute hold: arecord keeps every second, Groq gets it in pieces under
   assert.equal(sizes.length, 3);
   for (const n of sizes) assert.ok(n <= 44 + GROQ_CHUNK_SECONDS * RATE * 2 && n < 25 * 1000 * 1000, `a piece of ${n} bytes`);
   assert.equal(most, 2);
+});
+
+// ---------- D491: fast holds and cancelled holds (a game's voice actions) ----------
+
+test("D491: stop({ fast }) asks Moonshine first and Groq only if it fails; the log says fast", async () => {
+  const dir = tmp();
+  const logFile = path.join(dir, "speech.jsonl");
+  const groq = engine("groq", async () => "from groq");
+  let moonUp = true;
+  const moon = engine("moonshine", async () => (moonUp ? "from moonshine" : Promise.reject(new Error("down"))));
+  const s = liveSpeech({ recorder: fakeRecorder(second()), engines: [groq, moon], logFile });
+  s.start();
+  assert.equal((await s.stop({ fast: true })).text, "from moonshine");
+  assert.equal(groq.calls, 0);
+  moonUp = false;
+  s.start();
+  assert.equal((await s.stop({ fast: true })).text, "from groq", "Groq when Moonshine fails");
+  s.start();
+  assert.equal((await s.stop()).text, "from groq", "a talk screen's hold is Groq first, as before");
+  const lines = fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => [l.engine, l.fast ?? false]), [["moonshine", true], ["groq", true], ["groq", false]]);
+});
+
+test("D491: cancel() transcribes nothing, sends nothing, wipes the audio, and the next hold is clean", async () => {
+  const dir = tmp();
+  const logFile = path.join(dir, "speech.jsonl");
+  const pcm = second();
+  const rec = fakeRecorder(pcm);
+  const e = engine("groq", async () => "never");
+  const s = liveSpeech({ recorder: rec, engines: [e], logFile });
+  s.start();
+  s.cancel?.();
+  await settle(20);
+  assert.equal(e.calls, 0);
+  assert.ok(pcm.every((b) => b === 0), "the audio is wiped");
+  assert.equal(rec.stopped, 1, "the recorder stopped");
+  assert.match(fs.readFileSync(logFile, "utf8"), /"result":"cancelled"/);
+  assert.deepEqual(await s.stop(), { text: "" }, "nothing is left open");
+  s.cancel?.(); // cancelling with nothing held is harmless
+  // Many short holds in a row, as a game makes: each starts and ends its own recording.
+  const rec2 = fakeRecorder(second());
+  const s2 = liveSpeech({ recorder: rec2, engines: [engine("moonshine", async () => "jump")] });
+  for (let i = 0; i < 20; i++) {
+    s2.start();
+    if (i % 2) s2.cancel?.();
+    else assert.equal((await s2.stop({ fast: true })).text, "jump");
+  }
+  assert.equal(rec2.started, 20);
 });

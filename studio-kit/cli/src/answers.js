@@ -1,6 +1,6 @@
 // Where answers come from: a person at the terminal, or a recorded file (D43).
 import fs from "node:fs";
-import { formatPlan, formatQuestion, parseChoice } from "./tiles.js";
+import { formatNameQuestion, formatPlan, formatQuestion, parseChoice } from "./tiles.js";
 
 /**
  * @typedef {{choice: "A"|"B"|"C"|"D", said?: string}} QuestionAnswer
@@ -8,12 +8,13 @@ import { formatPlan, formatQuestion, parseChoice } from "./tiles.js";
  * @typedef {object} Answerer
  * @property {(q: {question: string, option_a: string, option_b: string}) => Promise<QuestionAnswer>} question
  * @property {(p: {summary: string, rules: any[]}) => Promise<PlanAnswer>} plan
+ * @property {(q: {option_a: string, option_b: string, pick: "A"|"B"}) => Promise<QuestionAnswer>} [name]   the name question (D471): C is the player's own name, D is "You pick". Left out, the answer is D.
  * @property {() => string[]} [notes]   things to log, e.g. replay_unmatched
  * @property {() => any[]} [replayLog]   each replayed question: asked, matched, reply (D47)
  *
  * Recorded answers file:
  *   {"request": "...", "maker": "A", "questions": [{"choice":"A"}, {"choice":"C","said":"..."}],
- *    "plan": [{"choice":"build"}]}
+ *    "plan": [{"choice":"build"}], "name": {"choice":"A"}}
  */
 
 /**
@@ -38,6 +39,15 @@ export function liveAnswerer(io) {
         const c = parseChoice(await io.prompt("Pick A or B: "));
         if (c === "A") return { choice: "build" };
         if (c === "B") return { choice: "change", said: await askUntilSaid(io, "What should change? ") };
+      }
+    },
+    async name(q) {
+      io.print(formatNameQuestion(q));
+      for (;;) {
+        const choice = parseChoice(await io.prompt("Pick A, B, C or D: "));
+        if (!choice) continue;
+        if (choice !== "C") return { choice };
+        return { choice, said: await askUntilSaid(io, "Say the name (type it): ") };
       }
     },
   };
@@ -95,7 +105,7 @@ function replyFor(rec, q) {
  * `unmatched: "A"` (D168) gets A and notes() reports replay_fallback. A file
  * with no questions in it replays by position. An extra plan gets build and
  * replay_replanned.
- * @param {{questions?: any[], plan?: PlanAnswer[]}} recorded
+ * @param {{questions?: any[], plan?: PlanAnswer[], name?: QuestionAnswer}} recorded
  * @param {{print?: (text: string) => void, unmatched?: "A"|"D"}} [io]
  * @returns {Answerer}
  */
@@ -155,6 +165,13 @@ export function replayAnswerer(recorded, io = {}) {
         print("(replay) build");
         return { choice: "build" };
       }
+      print(`(replay) ${a.choice}${a.said ? `: ${a.said}` : ""}`);
+      return a;
+    },
+    async name(q) {
+      print(formatNameQuestion(q));
+      /** @type {QuestionAnswer} */
+      const a = /** @type {any} */ (recorded).name ?? { choice: "D" };
       print(`(replay) ${a.choice}${a.said ? `: ${a.said}` : ""}`);
       return a;
     },
