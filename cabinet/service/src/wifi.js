@@ -345,31 +345,63 @@ export function createWifi(o = {}) {
 
 // ---------- the watch ----------
 
-/** Seconds the Wi-Fi may be down before each step, and how long before the heavier ones repeat. */
-export const WATCH = Object.freeze({ nudgeAfter: 30, nudgeEvery: 60, restartAfter: 180, driverAfter: 300, heavyEvery: 600 });
+/**
+ * Seconds the Wi-Fi may be down before each step, and how long before the heavier ones repeat.
+ *   stallMisses  rounds in a row the router may fail to answer, while "connected", before that counts as down (D510)
+ *   rebootAfter  with no working Wi-Fi this long, the cabinet restarts itself, if nobody is using it (D511)
+ *   rebootEvery  and at most this often
+ */
+export const WATCH = Object.freeze({ nudgeAfter: 30, nudgeEvery: 60, restartAfter: 180, driverAfter: 300, heavyEvery: 600, stallMisses: 4, rebootAfter: Number(process.env.ARCADE_WIFI_REBOOT_AFTER_S) || 900, rebootEvery: Number(process.env.ARCADE_WIFI_REBOOT_EVERY_S) || 3600, rebootAskEvery: 60 });
+// The two ARCADE_WIFI_REBOOT_* settings are for the rehearsal, which can't wait a quarter of an hour a go.
+
+/** @typedef {{ downSince: number | null, lastNudge: number, lastHeavy: number, heavy: number, misses?: number, stalled?: boolean, lastRebootAsk?: number }} WatchState */
+/** @returns {WatchState} */
+export const freshWatch = () => ({ downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0, misses: 0, stalled: false, lastRebootAsk: 0 });
 
 /**
  * What the watch does this round. Pure: what it saw goes in, what to do comes out.
  *   unblock   the radio is switched off or blocked (rfkill)
  *   nudge     look for networks and connect
+ *   rejoin    leave the network and join it again: for a Wi-Fi that says it's connected and carries nothing (D510)
  *   restart   restart NetworkManager; not while a cable carries the cabinet, which would cut a grown-up's session
  *   driver    reload the Wi-Fi chip's driver: only when the chip has gone from the system altogether. Never while
  *             a Wi-Fi device is there: on the Pi an unload and reload can leave the chip dead until a restart,
- *             turning a short outage into a lasting one (D412).
- * @param {{ downSince: number | null, lastNudge: number, lastHeavy: number, heavy: number }} st
- * @param {{ now: number, device: boolean, connected: boolean, radioOn: boolean, wired: boolean, saved: number }} obs times in seconds
+ *             turning a short outage into a lasting one (D512).
+ *   reboot    the last resort (D511): asked for once the Wi-Fi has been down rebootAfter seconds, at most every
+ *             rebootEvery, never under a cable. Whether the cabinet is in use is the round's to check.
+ * "Connected" isn't taken on trust (D510): `reaches` is whether the router answered. After stallMisses rounds
+ * without an answer the Wi-Fi counts as down, though NetworkManager still says connected.
+ * @param {WatchState} st
+ * @param {{ now: number, device: boolean, connected: boolean, reaches?: boolean, radioOn: boolean, wired: boolean, saved: number, lastReboot?: number }} obs times in seconds
  */
 export function watchStep(st, obs) {
-  /** @type {("unblock" | "nudge" | "restart" | "driver")[]} */
+  /** @type {("unblock" | "nudge" | "rejoin" | "restart" | "driver" | "reboot")[]} */
   const actions = [];
-  const next = { ...st };
+  /** @type {WatchState} */
+  const next = { ...freshWatch(), ...st };
   if (!obs.radioOn) actions.push("unblock");
-  if (obs.connected) return { actions, state: { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 } };
+  const reaches = obs.reaches !== false;
+  if (obs.connected && reaches) return { actions, state: freshWatch() };
+  if (obs.connected) {
+    // Connected, and the router doesn't answer. A few misses are a busy router; more is a stalled link.
+    next.misses = (next.misses ?? 0) + 1;
+    if (next.misses < WATCH.stallMisses) return { actions, state: next };
+    next.stalled = true;
+  } else {
+    next.misses = 0;
+    next.stalled = false;
+  }
   // Nothing to join: a cabinet that has never been on Wi-Fi isn't broken.
   if (!obs.saved) return { actions, state: { ...next, downSince: null } };
   next.downSince ??= obs.now;
   const down = obs.now - next.downSince;
-  if (obs.device && down >= WATCH.nudgeAfter && obs.now - next.lastNudge >= WATCH.nudgeEvery) {
+  if (next.stalled) {
+    // At once, then every minute: the cure for a stalled link is usually to join again.
+    if (obs.now - next.lastNudge >= WATCH.nudgeEvery) {
+      actions.push("rejoin");
+      next.lastNudge = obs.now;
+    }
+  } else if (obs.device && down >= WATCH.nudgeAfter && obs.now - next.lastNudge >= WATCH.nudgeEvery) {
     actions.push("nudge");
     next.lastNudge = obs.now;
   }
@@ -382,27 +414,54 @@ export function watchStep(st, obs) {
     next.heavy += 1;
     next.lastHeavy = obs.now;
   }
+  if (down >= WATCH.rebootAfter && !obs.wired && obs.now - (obs.lastReboot ?? 0) >= WATCH.rebootEvery && obs.now - (next.lastRebootAsk ?? 0) >= WATCH.rebootAskEvery) {
+    actions.push("reboot");
+    next.lastRebootAsk = obs.now;
+  }
   return { actions, state: next };
 }
 
+/** Where the update path's library is on the cabinet: its busy_reason says whether the cabinet is in use (D332). */
+export const UPDATE_LIB = "/usr/local/lib/arcade-update/update-lib.sh";
+
 /**
- * One round of the watch: put back lost networks, see where the Wi-Fi stands, do what watchStep says, and
- * leave the status where the cabinet service can read it.
+ * One round of the watch: put back lost networks, see where the Wi-Fi stands and whether the router answers,
+ * do what watchStep says, and leave the status where the cabinet service can read it.
  * @param {ReturnType<typeof createWifi>} wifi
- * @param {Parameters<typeof watchStep>[0]} st
- * @param {{ statusFile?: string, countryFile?: string, now?: () => number }} [o]
+ * @param {WatchState} st
+ * @param {{ statusFile?: string, countryFile?: string, now?: () => number, restartFile?: string, restartsLog?: string, updateLib?: string, ignoreCable?: boolean }} [o]
+ *   ignoreCable is for the rehearsal only, whose VM is always on a cable.
  */
 export async function watchRound(wifi, st, o = {}) {
   const now = Math.floor((o.now ?? Date.now)() / 1000);
   const { run, log } = wifi;
+  const restartFile = o.restartFile ?? path.join(STORE, "last-restart");
   await wifi.restore();
   const radio = await run("nmcli", ["-t", "-f", "WIFI", "radio"]);
   const blocked = await run("rfkill", ["list", "wifi"]);
   const radioOn = radio.code !== 0 || (/^enabled/m.test(radio.stdout) && !/blocked: yes/.test(blocked.stdout));
   const s = await wifi.status();
-  const { actions, state } = watchStep(st, { now, device: !!s.device, connected: s.connected, radioOn, wired: s.wired, saved: wifi.known().length });
+  // D510: does the router answer on the Wi-Fi itself? ARP, so a router that drops pings still counts. No gateway
+  // known (a network that gives none) is taken as fine.
+  let reaches = true;
+  if (s.connected && s.device) {
+    const gw = (await run("nmcli", ["-g", "IP4.GATEWAY", "device", "show", s.device])).stdout.trim().split("\n")[0];
+    if (/^\d+(\.\d+){3}$/.test(gw)) reaches = (await run("arping", ["-q", "-c", "2", "-w", "3", "-I", s.device, gw], { timeoutMs: 10_000 })).code === 0;
+  }
+  let lastReboot = 0;
+  try {
+    lastReboot = Number(fs.readFileSync(restartFile, "utf8").trim().split(/\s/)[0]) || 0;
+  } catch {
+    // Never restarted for this.
+  }
+  // A clock that went back (the Pi has no battery clock, and no Wi-Fi to set it by) mustn't hold a restart off for ever.
+  if (lastReboot > now) lastReboot = 0;
+  const wired = o.ignoreCable ? false : s.wired;
+  const { actions, state } = watchStep(st, { now, device: !!s.device, connected: s.connected, reaches, radioOn, wired, saved: wifi.known().length, lastReboot });
+  const downFor = state.downSince ? now - state.downSince : 0;
+  if (state.stalled && !st.stalled) log(`Wi-Fi says connected (${s.ssid ?? "?"}) but the router hasn't answered for ${WATCH.stallMisses} rounds: treating it as down (D510)`);
   for (const a of actions) {
-    log(`Wi-Fi ${s.connected ? "up" : `down ${st.downSince ? now - st.downSince : 0} s`}: ${a}`);
+    log(`Wi-Fi ${s.connected && !state.stalled ? "up" : `${state.stalled ? "stalled" : "down"} ${downFor} s`}: ${a}`);
     if (a === "unblock") {
       await run("rfkill", ["unblock", "wifi"]);
       await run("nmcli", ["radio", "wifi", "on"]);
@@ -416,18 +475,39 @@ export async function watchRound(wifi, st, o = {}) {
     } else if (a === "nudge" && s.device) {
       await run("nmcli", ["device", "wifi", "rescan", "ifname", s.device], { timeoutMs: 20_000 });
       await run("nmcli", ["-w", "30", "device", "connect", s.device], { timeoutMs: 45_000 });
+    } else if (a === "rejoin" && s.device) {
+      await run("nmcli", ["device", "disconnect", s.device], { timeoutMs: 20_000 });
+      await run("nmcli", ["-w", "30", "device", "connect", s.device], { timeoutMs: 45_000 });
     } else if (a === "restart") {
       await run("systemctl", ["restart", "wpa_supplicant.service", "NetworkManager.service"], { timeoutMs: 60_000 });
     } else if (a === "driver") {
       await run("modprobe", ["-r", "brcmfmac_wcc", "brcmfmac"], { timeoutMs: 30_000 });
       await run("modprobe", ["brcmfmac"], { timeoutMs: 30_000 });
+    } else if (a === "reboot") {
+      // D511: only when nobody is playing or making a game, by the update path's own test (D332).
+      const busy = (await run("bash", ["-c", `. "${o.updateLib ?? UPDATE_LIB}" && busy_reason`], { timeoutMs: 30_000 })).stdout.trim();
+      if (busy) {
+        log(`no working Wi-Fi for ${downFor} s, but not restarting the cabinet: ${busy}`);
+        continue;
+      }
+      const why = `no working Wi-Fi for ${downFor} s (${state.stalled ? "connected, but the router doesn't answer" : s.device ? "not connected" : "no Wi-Fi device"})`;
+      log(`restarting the cabinet as a last resort: ${why} (D511)`);
+      try {
+        writeDurable(restartFile, `${now} ${new Date(now * 1000).toISOString()} ${why}\n`, 0o644);
+        fs.appendFileSync(o.restartsLog ?? path.join(STORE, "restarts.log"), `${new Date(now * 1000).toISOString()} ${why}\n`);
+      } catch {
+        // Not being able to note it doesn't stop it; the journal has the line above.
+      }
+      await run("systemctl", ["reboot"], { timeoutMs: 30_000 });
     }
   }
+  const up = s.connected && !state.stalled;
   const wasDown = st.downSince != null;
-  if (s.connected && wasDown) log(`Wi-Fi back after ${now - /** @type {number} */ (st.downSince)} s (${s.address ?? "no address yet"})`);
+  if (up && wasDown) log(`Wi-Fi back after ${now - /** @type {number} */ (st.downSince)} s (${s.address ?? "no address yet"})`);
   if (!s.connected && !wasDown && state.downSince != null) log("Wi-Fi down");
   try {
-    writeDurable(o.statusFile ?? STATUS_FILE, `${JSON.stringify({ at: now, connected: s.connected, ssid: s.ssid, signal: s.signal, address: s.address, wired: s.wired, device: !!s.device, down_s: state.downSince ? now - state.downSince : 0 })}\n`, 0o644);
+    // For the shelf, a stalled Wi-Fi is no Wi-Fi: it says so, and tells a grown-up how to fix it (D415).
+    writeDurable(o.statusFile ?? STATUS_FILE, `${JSON.stringify({ at: now, connected: up, stalled: !!state.stalled, ssid: s.ssid, signal: s.signal, address: s.address, wired: s.wired, device: !!s.device, down_s: downFor })}\n`, 0o644);
   } catch {
     // The status is a convenience; the watch carries on without it.
   }

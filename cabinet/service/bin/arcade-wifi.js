@@ -11,7 +11,7 @@
 // A request is one line of JSON: {"op":"status"}, {"op":"scan"}, or {"op":"join","ssid":"...","password":"...",
 // "security":"WPA2"}. A password is never logged.
 import readline from "node:readline";
-import { createWifi, watchRound } from "../src/wifi.js";
+import { createWifi, freshWatch, watchRound } from "../src/wifi.js";
 
 const log = (/** @type {string} */ m) => console.error(`arcade-wifi ${m}`);
 const wifi = createWifi({ log });
@@ -20,11 +20,12 @@ const cmd = process.argv[2];
 if (cmd === "watch") {
   const every = Number(process.env.ARCADE_WIFI_EVERY_S ?? 15) * 1000;
   /** @type {Parameters<typeof watchRound>[1]} */
-  let state = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
+  let state = freshWatch();
   log("watching");
   for (;;) {
     try {
-      state = await watchRound(wifi, state);
+      // ARCADE_WIFI_IGNORE_CABLE is for the rehearsal only, whose VM is always on a cable (D511).
+      state = await watchRound(wifi, state, { ignoreCable: process.env.ARCADE_WIFI_IGNORE_CABLE === "1" });
     } catch (e) {
       log(`round failed: ${/** @type {Error} */ (e).message}`);
     }

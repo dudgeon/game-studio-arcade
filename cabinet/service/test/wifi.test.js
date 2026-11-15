@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { WATCH, createWifi, idFor, keyfile, parseScan, readKeyfile, securityKind, splitTerse, validPassword, watchRound, watchStep, whyFailed } from "../src/wifi.js";
+import { WATCH, createWifi, freshWatch, idFor, keyfile, parseScan, readKeyfile, securityKind, splitTerse, validPassword, watchRound, watchStep, whyFailed } from "../src/wifi.js";
 import { demoWifi } from "../src/wifi-client.js";
 import { Painter, draw } from "../launcher/screens.js";
 import { check } from "../launcher/text.js";
@@ -66,7 +66,7 @@ test("why a join failed, in a grown-up's words", () => {
 });
 
 /** A pretend nmcli: one Wi-Fi device, and a list of what was asked. */
-function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, device?: boolean, status?: string, route?: string, radio?: boolean, others?: string, secrets?: string }} */ f = {}) {
+function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, device?: boolean, status?: string, route?: string, routerSilent?: boolean, busy?: string, radio?: boolean, others?: string, secrets?: string }} */ f = {}) {
   /** @type {string[][]} */
   const calls = [];
   const state = { connected: f.connected ?? null, ...f };
@@ -76,10 +76,13 @@ function fakeNm(/** @type {{ connected?: string | null, upFails?: boolean, devic
     const a = args.join(" ");
     const ok = (/** @type {string} */ stdout = "") => ({ code: 0, stdout, stderr: "" });
     if (cmd === "ip") return ok(f.route ?? "");
+    if (cmd === "arping") return { code: state.routerSilent ? 1 : 0, stdout: "", stderr: "" };
+    if (cmd === "bash") return ok(state.busy ?? "");
     if (cmd !== "nmcli") return ok(cmd === "rfkill" && args[0] === "list" ? "0: phy0: Wireless LAN\n\tSoft blocked: no\n" : "");
     if (a.includes("device status") && f.status) return ok(f.status);
     if (a.includes("device status")) return ok(f.device === false ? "lo:loopback:connected (externally):lo\n" : `wlan0:wifi:${state.connected ? "connected" : "disconnected"}:${state.connected ?? ""}\nlo:loopback:connected (externally):lo\n`);
     if (a.includes("device wifi list")) return ok(`${state.connected ? "*" : " "}:Home:80:WPA2\n :Guest:60:WPA2\n`);
+    if (a.includes("IP4.GATEWAY")) return ok("192.168.86.1\n");
     if (a.includes("IP4.ADDRESS")) return ok("192.168.86.123/24\n");
     if (a.includes("-f WIFI radio")) return ok(f.radio === false ? "disabled\n" : "enabled\n");
     if (a.includes("connection up")) {
@@ -171,8 +174,9 @@ test("the card's network, which came through netplan, is kept as one of ours (D4
 
 test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 and 5 min, then every 10; never the driver while a Wi-Fi device is there", () => {
   /** @type {Parameters<typeof watchStep>[0]} */
-  let st = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
-  const obs = { device: true, connected: false, radioOn: true, wired: false, saved: 1 };
+  let st = freshWatch();
+  // The last-resort restart has its own test: here it has just happened, so it is not asked for again.
+  const obs = { device: true, connected: false, radioOn: true, wired: false, saved: 1, lastReboot: 1e9 };
   /** @type {Record<number, string[]>} */
   const did = {};
   for (let t = 1000; t <= 1000 + 1500; t += 15) {
@@ -189,9 +193,9 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 and
   // On the Pi an unload and reload of the chip's driver can leave it dead until a restart: never with a device there.
   assert.ok(!Object.values(did).flat().includes("driver"));
   // Back up: the count starts over.
-  assert.deepEqual(watchStep(st, { ...obs, connected: true, now: 5000 }), { actions: [], state: { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 } });
+  assert.deepEqual(watchStep(st, { ...obs, connected: true, now: 5000 }), { actions: [], state: freshWatch() });
   // A cable carrying the cabinet: NetworkManager is never restarted under a grown-up's session.
-  let wired = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
+  let wired = freshWatch();
   const acts = [];
   for (let t = 0; t <= 1500; t += 15) {
     const r = watchStep(/** @type {any} */ (wired), { ...obs, wired: true, now: 10_000 + t });
@@ -201,10 +205,10 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 and
   assert.deepEqual([...new Set(acts)], ["nudge"]);
   // A cabinet that knows no network isn't broken; a switched-off radio is switched on at once.
   assert.deepEqual(watchStep(st, { ...obs, saved: 0, now: 9000 }).actions, []);
-  assert.deepEqual(watchStep({ downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, radioOn: false, now: 1 }).actions, ["unblock"]);
+  assert.deepEqual(watchStep(freshWatch(), { ...obs, radioOn: false, now: 1 }).actions, ["unblock"]);
   // The Wi-Fi chip gone from the system: NetworkManager after a minute, then the driver, alternating. No nudges:
   // there's nothing to nudge.
-  let gone = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
+  let gone = freshWatch();
   /** @type {Record<number, string[]>} */
   const goneDid = {};
   for (let t = 0; t <= 1500; t += 15) {
@@ -214,6 +218,105 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 and
   }
   assert.deepEqual(goneDid, { 60: ["restart"], 180: ["driver"], 780: ["restart"], 1380: ["driver"] });
   assert.deepEqual(watchStep({ downSince: 0, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, device: false, now: 60 }).actions, ["restart"]);
+});
+
+test("connected isn't taken on trust (D510): four rounds with no answer from the router is a stalled Wi-Fi, rejoined at once and then every minute", () => {
+  let st = freshWatch();
+  const obs = { device: true, connected: true, reaches: false, radioOn: true, wired: false, saved: 1 };
+  /** @type {Record<number, string[]>} */
+  const did = {};
+  for (let t = 0; t <= 400; t += 15) {
+    const r = watchStep(st, { ...obs, now: 30_000 + t });
+    st = r.state;
+    if (r.actions.length) did[t] = r.actions;
+  }
+  // Rounds at 0, 15 and 30 s are a busy router; the fourth, at 45 s, is a stall.
+  assert.deepEqual(did[45], ["rejoin"]);
+  assert.deepEqual(did[105], ["rejoin"]);
+  assert.equal(st.stalled, true);
+  // The ladder runs from the moment it was called a stall: NetworkManager 3 and 5 minutes after.
+  assert.ok(did[45 + WATCH.restartAfter]?.includes("restart"));
+  assert.ok(did[45 + WATCH.driverAfter]?.includes("restart"));
+  assert.ok(!Object.values(did).flat().includes("driver") && !Object.values(did).flat().includes("nudge"));
+  // One answer and everything starts over; a miss or two never does anything.
+  assert.deepEqual(watchStep(st, { ...obs, reaches: true, now: 31_000 }), { actions: [], state: freshWatch() });
+  let blip = freshWatch();
+  for (const reaches of [false, false, false, true, false, false, false, true]) {
+    const r = watchStep(blip, { ...obs, reaches, now: 40_000 });
+    assert.deepEqual(r.actions, []);
+    blip = r.state;
+  }
+});
+
+test("the last resort (D511): asked for after 15 minutes down, at most once an hour, never under a cable", () => {
+  const down = { device: true, connected: false, radioOn: true, wired: false, saved: 1 };
+  const asks = (/** @type {object} */ extra, from = 50_000, to = from + 2 * 3600) => {
+    let st = freshWatch();
+    /** @type {number[]} */
+    const at = [];
+    for (let t = from; t <= to; t += 15) {
+      const r = watchStep(st, { ...down, ...extra, now: t });
+      st = r.state;
+      if (r.actions.includes("reboot")) at.push(t - from);
+    }
+    return at;
+  };
+  // Nothing has restarted it before: asked at 15 minutes, then every minute while it's refused (someone playing).
+  assert.deepEqual(asks({}).slice(0, 3), [WATCH.rebootAfter, WATCH.rebootAfter + 60, WATCH.rebootAfter + 120]);
+  // It restarted itself 20 minutes ago: not again until the hour is up.
+  assert.equal(asks({ lastReboot: 50_000 - 1200 })[0], 3600 - 1200);
+  // A stalled Wi-Fi and a vanished chip count as no working Wi-Fi too.
+  assert.ok(asks({ connected: true, reaches: false })[0] <= WATCH.rebootAfter + 60);
+  assert.equal(asks({ device: false })[0], WATCH.rebootAfter);
+  // Never under a cable that carries the cabinet, never while the Wi-Fi works, never with no network saved.
+  assert.deepEqual(asks({ wired: true }), []);
+  assert.deepEqual(asks({ connected: true, reaches: true }), []);
+  assert.deepEqual(asks({ saved: 0 }), []);
+});
+
+test("a round restarts the cabinet only when nobody is using it, and writes down that it did (D511)", async () => {
+  const d = dirs();
+  const restartFile = path.join(d.store, "last-restart");
+  const restartsLog = path.join(d.store, "restarts.log");
+  /** @type {string[]} */
+  const said = [];
+  const nm = fakeNm({ connected: idFor("Home"), routerSilent: true });
+  const wifi = createWifi({ run: nm.run, ...d, log: (m) => said.push(m) });
+  await wifi.join({ ssid: "Home", password: "correct horse", security: "WPA2" });
+  nm.calls.length = 0;
+  let st = freshWatch();
+  let clock = 60_000_000;
+  const round = async () => {
+    st = await watchRound(wifi, st, { ...d, restartFile, restartsLog, updateLib: "/nowhere/update-lib.sh", now: () => clock });
+    clock += 15_000;
+  };
+  // Connected, the router silent: a stall after four rounds, a rejoin, and the status says not connected.
+  for (let i = 0; i < 4; i++) await round();
+  assert.ok(said.some((m) => /says connected \(Home\) but the router hasn't answered/.test(m)), said.join("\n"));
+  assert.ok(nm.calls.some((c) => c.join(" ") === "nmcli device disconnect wlan0"));
+  assert.deepEqual((({ connected, stalled }) => ({ connected, stalled }))(JSON.parse(fs.readFileSync(d.statusFile, "utf8"))), { connected: false, stalled: true });
+  // A quarter of an hour on, with a game being played: held, and said why.
+  nm.state.busy = "a game is being played (teti)";
+  clock += 900_000;
+  await round();
+  assert.ok(said.some((m) => /not restarting the cabinet: a game is being played \(teti\)/.test(m)));
+  assert.ok(!nm.calls.some((c) => c.join(" ") === "systemctl reboot"));
+  assert.ok(!fs.existsSync(restartFile));
+  // The game ends: at the next ask, a minute later, it restarts, and the file and the log say when and why.
+  nm.state.busy = "";
+  clock += 60_000;
+  await round();
+  assert.ok(nm.calls.some((c) => c.join(" ") === "systemctl reboot"));
+  assert.ok(nm.calls.some((c) => c[0] === "bash" && c.join(" ").includes("busy_reason")));
+  assert.match(fs.readFileSync(restartFile, "utf8"), /^\d+ \S+ no working Wi-Fi for \d+ s \(connected, but the router doesn't answer\)\n$/);
+  assert.equal(fs.readFileSync(restartsLog, "utf8").split("\n").filter(Boolean).length, 1);
+  assert.ok(said.some((m) => /restarting the cabinet as a last resort: no working Wi-Fi for \d+ s/.test(m)));
+  // After that restart, still no Wi-Fi a quarter of an hour into the new boot: not again within the hour.
+  nm.calls.length = 0;
+  st = freshWatch();
+  clock += 20 * 60_000;
+  for (let i = 0; i < 70; i++) await round();
+  assert.ok(!nm.calls.some((c) => c.join(" ") === "systemctl reboot"), "at most once an hour");
 });
 
 test("a cable counts only when it carries the default route: the Picade's eth0 and USB port say connected with nothing plugged in", async () => {
@@ -231,7 +334,7 @@ test("a watch round unblocks the radio with the country, and leaves the status f
   fs.writeFileSync(d.countryFile, "US\n");
   const nm = fakeNm({ radio: false, connected: idFor("Home") });
   const wifi = createWifi({ run: nm.run, ...d });
-  const st = await watchRound(wifi, { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...d, now: () => 50_000_000 });
+  const st = await watchRound(wifi, freshWatch(), { ...d, now: () => 50_000_000 });
   assert.equal(st.downSince, null);
   const said = nm.calls.map((c) => c.join(" "));
   assert.ok(said.includes("rfkill unblock wifi") && said.includes("nmcli radio wifi on") && said.includes("iw reg set US"));
