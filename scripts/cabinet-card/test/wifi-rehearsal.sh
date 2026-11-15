@@ -71,8 +71,9 @@ ap() { # DEV NET SSID PASS
   printf 'interface=%s\ndriver=nl80211\nssid=%s\nhw_mode=g\nchannel=%s\nwpa=2\nwpa_key_mgmt=WPA-PSK\nrsn_pairwise=CCMP\nwpa_passphrase=%s\n' "\$1" "\$3" "\$5" "\$4" > "/run/ap-\$1.conf"
   ip addr flush dev "\$1"; ip addr add "10.77.\$2.1/24" dev "\$1"
   hostapd -B "/run/ap-\$1.conf"
-  # Addresses only: no router and no DNS offered, so the VM's own network stays its way out.
-  dnsmasq --interface="\$1" --bind-interfaces --except-interface=lo --port=0 --dhcp-range="10.77.\$2.50,10.77.\$2.150,1h" --dhcp-option=3 --dhcp-option=6 --pid-file="/run/dnsmasq-\$1.pid" --dhcp-leasefile="/run/dnsmasq-\$1.leases"
+  # An address and itself as the router (the watch asks the router for an answer, D510); no DNS. The VM's own
+  # cable keeps the default route: it has the lower metric.
+  dnsmasq --interface="\$1" --bind-interfaces --except-interface=lo --port=0 --dhcp-range="10.77.\$2.50,10.77.\$2.150,1h" --dhcp-option=3,10.77.\$2.1 --dhcp-option=6 --pid-file="/run/dnsmasq-\$1.pid" --dhcp-leasefile="/run/dnsmasq-\$1.leases"
 }
 ap wlan1 1 '$HOME_SSID' '$HOME_PASS' 1
 ap wlan2 2 '$GUEST_SSID' '$GUEST_PASS' 6
