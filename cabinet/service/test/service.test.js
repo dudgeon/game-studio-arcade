@@ -30,6 +30,16 @@ const failing = {
 };
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-svc-"));
+const logged = (/** @type {any} */ paths, type = "studio_session") => readLog(path.join(paths.logs, `${type}.jsonl`));
+/**
+ * Until it's so, however long a busy mini takes: a test waits on the thing itself (a log line, a file), never on
+ * a sleep it hopes was long enough. The minute is the give-up for a thing that never comes, not a pace.
+ * @param {() => boolean} pred
+ */
+const eventually = async (pred, what = "never happened") => {
+  for (const end = Date.now() + 60_000; !pred() && Date.now() < end; ) await new Promise((r) => setTimeout(r, 10));
+  assert.ok(pred(), what);
+};
 
 /** @param {any} [o] */
 function setup(o = {}) {
@@ -242,8 +252,8 @@ test("a question nobody answers: a warning, then released, archived and logged; 
   studio.start({ maker: "alina", request: "another" });
   assert.equal(studio.state().phase, "running");
   assert.equal(studio.state().notice, undefined);
-  await new Promise((r) => setTimeout(r, 200));
-  const rec = readLog(path.join(paths.logs, "studio_session.jsonl")).find((r) => r.outcome === "abandoned");
+  await eventually(() => logged(paths).some((r) => r.outcome === "abandoned"), "the walked-away session is logged");
+  const rec = logged(paths).find((r) => r.outcome === "abandoned");
   assert.equal(rec.outcome, "abandoned");
   assert.equal(rec.ended_by, "timed_out");
   assert.equal(rec.id, "sesn_replay");
@@ -255,18 +265,29 @@ test("a question nobody answers: a warning, then released, archived and logged; 
   assert.ok(fs.existsSync(path.join(paths.sessions, "sesn_replay", "events.jsonl")), "its events are kept");
 });
 
-test("a key pressed resets the clock and clears the warning (D188)", async () => {
+test("a key pressed resets the clock and clears the warning (D188)", async (t) => {
   const { studio, until } = setup({ questionTimeoutMs: 200, warningMs: 100 });
+  // The walk-away clock is the test's to move: no real time passes, so a busy mini can't run a deadline out
+  // between two lines here.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const pass = (/** @type {number} */ ms) => t.mock.timers.tick(ms);
   studio.start({ maker: "alina", request: "a penguin game" });
   await until((x) => x.pending?.kind === "question");
-  await until((x) => x.pending?.warn === true);
+  pass(99);
+  assert.equal(studio.state().pending.warn, false, "not yet");
+  pass(1);
+  assert.equal(studio.state().pending.warn, true, "the warning, 100 ms before the end");
   studio.stillHere();
   assert.equal(studio.state().pending.warn, false);
-  await new Promise((r) => setTimeout(r, 150));
+  pass(150);
   studio.stillHere();
-  await new Promise((r) => setTimeout(r, 150));
+  pass(150);
   assert.equal(studio.state().phase, "running", "past the first deadline, and still waiting");
-  assert.ok(studio.state().pending);
+  assert.equal(studio.state().pending.warn, true, "warned again, 100 ms after the last key");
+  pass(49);
+  assert.equal(studio.state().phase, "running", "1 ms short of 200 since the last key");
+  pass(1);
+  assert.equal(studio.state().phase, "idle", "and released on it");
 });
 
 test("the kid chooses to stop: released, the idea kept for Make, and stop needs something waiting (D188, D315)", async () => {
@@ -281,10 +302,11 @@ test("the kid chooses to stop: released, the idea kept for Make, and stop needs 
   assert.equal(s.notice.kind, "stopped");
   assert.equal(s.notice.short, "Your idea is saved");
   assert.deepEqual(s.notice.retry, { maker: "alina", request: "a penguin game", kind: "new", parent: null });
-  await new Promise((r) => setTimeout(r, 100));
-  const [rec] = readLog(path.join(paths.logs, "studio_session.jsonl"));
+  await eventually(() => logged(paths).length > 0, "the stopped session is logged");
+  const [rec] = logged(paths);
   assert.equal(rec.outcome, "abandoned");
-  assert.equal(rec.ended_by, "stopped");});
+  assert.equal(rec.ended_by, "stopped");
+});
 
 test("an archive that's refused interrupts and tries again; one that fails is logged and Make stays free (D188)", async () => {
   const once = replayApi({ dir: FIXTURE, archiveRefusals: 1 });
@@ -292,8 +314,8 @@ test("an archive that's refused interrupts and tries again; one that fails is lo
   a.studio.start({ maker: "alina", request: "x" });
   await a.until((x) => x.pending?.kind === "question");
   a.studio.stop();
-  await new Promise((r) => setTimeout(r, 200));
-  assert.deepEqual(readLog(path.join(a.paths.logs, "studio_session.jsonl"))[0].archive, { ok: true });
+  await eventually(() => logged(a.paths).length > 0, "logged once the second try archives");
+  assert.deepEqual(logged(a.paths)[0].archive, { ok: true });
   assert.ok(once.mock.sent.some((e) => e.type === "user.interrupt"));
 
   const never = replayApi({ dir: FIXTURE, archiveRefusals: 9 });
@@ -302,8 +324,8 @@ test("an archive that's refused interrupts and tries again; one that fails is lo
   await b.until((x) => x.pending?.kind === "question");
   b.studio.stop();
   assert.equal(b.studio.state().phase, "idle");
-  await new Promise((r) => setTimeout(r, 200));
-  const rec = readLog(path.join(b.paths.logs, "studio_session.jsonl"))[0];
+  await eventually(() => logged(b.paths).length > 0, "logged once the archive gives up");
+  const rec = logged(b.paths)[0];
   assert.equal(rec.archive.ok, false);
   assert.match(rec.archive.error, /can't be archived/);
 });
@@ -316,12 +338,6 @@ const leaveJournal = (paths, journal) => {
 /** @param {any} paths @param {any} api @param {any} [extra] */
 const reboot = (paths, api, extra = {}) =>
   createStudio({ paths, api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "f", hash: "h" }), checker: passing, titleOf: () => "Penguin Catch", recheckMs: 20, ...extra });
-const logged = (/** @type {any} */ paths, type = "studio_session") => readLog(path.join(paths.logs, `${type}.jsonl`));
-/** @param {() => boolean} pred */
-const eventually = async (pred) => {
-  for (let i = 0; i < 400 && !pred(); i++) await new Promise((r) => setTimeout(r, 25));
-  assert.ok(pred(), "never happened");
-};
 
 test("a restart mid-question: logged, told, archived, since nobody can answer it (D189, D191)", async () => {
   const a = setup();
@@ -540,8 +556,7 @@ test("a make that ends normally leaves no journal (D189)", async () => {
   const p = await until((x) => x.pending?.kind === "plan");
   studio.answer({ id: p.pending.id, choice: "build" });
   await until((x) => x.results?.length);
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(fs.existsSync(journal), false);
+  await eventually(() => !fs.existsSync(journal), "the journal goes");
 });
 
 test("budget reached and a refusal get their own words", () => {
@@ -718,10 +733,20 @@ test("the volume stream: each level arcade-volkey writes reaches the launcher, a
     await until(/listening/);
     assert.doesNotMatch(text, /data:/, "no file yet: nothing to show");
     fs.mkdirSync(path.dirname(volumeFile));
-    fs.writeFileSync(volumeFile, JSON.stringify({ percent: 40, cap: 60, at: 1 }));
-    await until(/data: \{"percent":40,"cap":60\}/);
-    await new Promise((r) => setTimeout(r, 20));
-    fs.writeFileSync(volumeFile, JSON.stringify({ percent: 50, cap: 60, at: 2 }));
+    // The service starts watching by taking a first look at the file, a moment after "listening" goes out, and
+    // nothing tells us when it has. A press written before that look is what the watch starts from, not a
+    // change, and is never sent. So the first level is pressed again until it shows: the first one written after
+    // the look is the one that arrives. From then on the watch is running, and one write is one event.
+    let at = 0;
+    const press = (/** @type {number} */ percent) => fs.writeFileSync(volumeFile, JSON.stringify({ percent, cap: 60, at: ++at }));
+    press(40);
+    const again = setInterval(() => press(40), 250);
+    try {
+      await until(/data: \{"percent":40,"cap":60\}/);
+    } finally {
+      clearInterval(again);
+    }
+    press(50);
     await until(/data: \{"percent":50,"cap":60\}/);
   } finally {
     stop.abort();

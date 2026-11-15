@@ -143,7 +143,8 @@ test("a viewer that goes away lets go of what it held (D282)", async () => {
     assert.equal(stream.status, 200);
     await post(base, cookie, "/api/c/virtual/keys", { how: "down", codes: ["F1"], viewer: "v2" });
     ac.abort();
-    for (let i = 0; i < 40 && cab.pressed.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
+    // Until the key is let go, however long a busy mini takes; the count is the give-up (a minute), not a pace.
+    for (let i = 0; i < 2400 && cab.pressed.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
     assert.deepEqual(cab.pressed, ["down 59", "up 59"]);
   });
 });

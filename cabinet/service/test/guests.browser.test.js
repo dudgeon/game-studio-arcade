@@ -19,8 +19,12 @@ try {
   skip = `no headless Chromium: ${String(/** @type {Error} */ (e).message).split("\n")[0]}`;
 }
 
-/** @param {any} page @param {() => Promise<boolean>} ok @param {string} what */
-async function until(page, ok, what, ms = 20_000) {
+/**
+ * Until it's so. The time is the give-up for a thing that never comes, not a pace: this runs beside everything
+ * else on a busy mini, where a screen can take many times longer to come than it does alone.
+ * @param {any} page @param {() => Promise<boolean>} ok @param {string} what
+ */
+async function until(page, ok, what, ms = 120_000) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (await ok().catch(() => false)) return;
@@ -28,6 +32,26 @@ async function until(page, ok, what, ms = 20_000) {
   }
   throw new Error(`timed out waiting for ${what}`);
 }
+
+/**
+ * Until the publish gate has checked every guest (D310). A guest joins the shelf only once its smoke check has
+ * passed, one guest at a time in a browser of the gate's own, so how long that takes is the mini's load, not
+ * something to guess at. The service says how many are still being checked; the test waits for none.
+ * @param {string} url the service's @param {string[]} ids the guests that should be on the shelf after
+ */
+async function guestsChecked(url, ids) {
+  const end = Date.now() + 600_000; // the gate's own limit for one check
+  for (;;) {
+    const body = await fetch(`${url}/api/guests`).then((r) => r.json()).catch(() => null);
+    const on = (body?.guests ?? []).map((/** @type {any} */ g) => g.id);
+    if (body && body.checking === 0) return assert.deepEqual(ids.filter((id) => !on.includes(id)), [], "every guest passed its check");
+    if (Date.now() > end) throw new Error(`the gate is still checking ${body?.checking} guests`);
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+/** Until the round has begun: teti takes no keys through its ready-set-go. @param {any} page @param {() => any} frame the game's frame, or a promise of it */
+const started = (page, frame) => until(page, async () => !!(await (await frame())?.evaluate(() => /** @type {any} */ (window).Game.started)), "ready, set, go");
 
 /** @param {any} page @param {string} key */
 async function press(page, key) {
@@ -37,7 +61,7 @@ async function press(page, key) {
   await page.waitForTimeout(120);
 }
 
-test("teti: on the shelf, played with the stick and buttons, Escape back to the shelf, play logged", { skip: skip || false, timeout: 120_000 }, async () => {
+test("teti: on the shelf, played with the stick and buttons, Escape back to the shelf, play logged", { skip: skip || false, timeout: 900_000 }, async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guest-flow-"));
   plantSeed(data, { state: "seen" }); // past the first-ever boot's screens (B2, B3)
   const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10 }));
@@ -45,6 +69,7 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
   const launcher = (/** @type {string} */ f) => page.evaluate((/** @type {string} */ f) => /** @type {any} */ (window).launcher[f](), f);
   try {
     await until(page, async () => (await launcher("screen")) === "shelf", "the shelf");
+    await guestsChecked(service.url, ["teti"]);
     // The shelf: the Make tile, then teti (a fresh cabinet has no carts).
     const titles = () => page.evaluate(() => /** @type {any} */ (window).launcher.boxes().filter((/** @type {any} */ b) => /^shelf-title-/.test(b.id)).map((/** @type {any} */ b) => b.lines.map((/** @type {any} */ l) => l.text).join(" ")));
     await until(page, async () => (await titles()).some((/** @type {string} */ t) => /teti/.test(t)), "teti on the shelf");
@@ -65,7 +90,8 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
     // G0 from guest.json, then the game.
     await press(page, "z");
     await until(page, async () => (await launcher("board")) === "G0", "how to play (G0)");
-    assert.ok((await boxText(/^howto-goal/)).some((/** @type {string} */ t) => /rows/.test(t)), "the goal from guest.json");
+    // A board is named a frame before it is drawn, so its words are waited for, not read at once.
+    await until(page, async () => (await boxText(/^howto-goal/)).some((/** @type {string} */ t) => /rows/.test(t)), "the goal from guest.json");
     await press(page, "z");
     await until(page, async () => (await launcher("screen")) === "play", "play");
     const frame = async () => page.frames().find((/** @type {any} */ f) => f.url().includes("/teti/"));
@@ -77,17 +103,18 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
     // Marathon, then a few moves: keys reach the game.
     await press(page, "z");
     await until(page, async () => (await state()).kind === "playing", "Marathon to start");
-    await page.waitForTimeout(1500); // ready, set, go
+    await started(page, frame);
     await press(page, "ArrowLeft");
     await press(page, "x");
     await press(page, "ArrowUp");
     await until(page, async () => (await state()).score > 0, "a hard drop to score");
     await press(page, "Enter");
-    assert.equal((await state()).kind, "pause", "START pauses");
+    await until(page, async () => (await state()).kind === "pause", "START to pause");
 
     // Escape: never the game's. The guest post-game: Play again or Back to the shelf, no coins.
     await press(page, "Escape");
     await until(page, async () => (await launcher("board")) === "G6", "the guest post-game board");
+    await until(page, async () => /Play again/.test((await boxText(/tile/)).join(" | ")), "G6's tiles to be drawn");
     assert.equal(await frame(), undefined, "the game is gone");
     const tiles = (await boxText(/tile/)).join(" | ");
     assert.match(tiles, /Play again/);
@@ -108,7 +135,7 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
   }
 });
 
-test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and the best; the original still shows none (D234-D236)", { skip: skip || false, timeout: 240_000 }, async () => {
+test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and the best; the original still shows none (D234-D236)", { skip: skip || false, timeout: 1_800_000 }, async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guest-score-"));
   plantSeed(data, { state: "seen" });
   const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10 }));
@@ -136,13 +163,15 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     const state = () => frameOf(id)?.evaluate(() => /** @type {any} */ (window).cabinetState());
     await press(page, "z"); // Marathon
     await until(page, async () => (await state()).kind === "playing", "Marathon");
-    await page.waitForTimeout(1500); // ready, set, go
-    for (let i = 0; i < 80 && (await state()).kind !== "over"; i++) await press(page, "ArrowUp");
-    assert.equal((await state()).kind, "over", "topped out");
+    await started(page, () => frameOf(id));
+    // Hard drops down the middle until it tops out: as many as it takes. A drop the game was too busy to take
+    // costs nothing, where a fixed number of them could run out.
+    await until(page, async () => (await state()).kind === "over" || (await press(page, "ArrowUp"), false), "the stack to top out", 300_000);
     return frameOf(id)?.evaluate(() => /** @type {any} */ (window).Game.stats.score);
   };
   try {
     await until(page, async () => (await launcher("screen")) === "shelf", "the shelf");
+    await guestsChecked(service.url, ["teti", "teti-geoff"]);
     await until(page, async () => (await boxText(/^shelf-by-/)).some((t) => /by Geoff/.test(t)), "Geoff's row");
 
     // The shelf: the original, and Geoff's version indented under it.
@@ -154,7 +183,7 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     // Geoff's version: G0, then Marathon to game over. Escape: G6 with the score.
     await press(page, "z");
     await until(page, async () => (await launcher("board")) === "G0", "G0");
-    assert.ok((await boxText(/^howto-goal/)).some((t) => /keep your score/.test(t)));
+    await until(page, async () => (await boxText(/^howto-goal/)).some((t) => /keep your score/.test(t)), "G0's goal: it keeps your score");
     await press(page, "z");
     const s1 = await marathonToGameOver("teti-geoff");
     assert.ok(Number.isInteger(s1) && s1 > 0, `a score: ${s1}`);
@@ -174,6 +203,7 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
 
     // Both plays logged with their scores. The service wrote no makers: "by Geoff" came from guest.json (D236).
     const log = () => fs.readFileSync(path.join(data, "logs", "guest_play.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    await until(page, async () => log().length === 2, "the second play in the log"); // the launcher posts it as G6 comes up
     assert.deepEqual(log().map((r) => [r.guest_id, r.scores]), [["teti-geoff", [s1]], ["teti-geoff", [s2]]]);
     const makersFile = path.join(data, "makers.json");
     assert.ok(!fs.existsSync(makersFile) || !JSON.parse(fs.readFileSync(makersFile, "utf8")).some((/** @type {any} */ m) => m.id === "geoff"), "the service never adds a maker itself");
@@ -188,7 +218,8 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     await marathonToGameOver("teti");
     await press(page, "Escape");
     await until(page, async () => (await launcher("board")) === "G6", "G6 for the original");
-    await page.waitForTimeout(500);
+    // The launcher posts the play, scores and all, as it puts G6 up: once that's in the log, G6 has what it will show.
+    await until(page, async () => log().length === 3, "the original's play in the log");
     assert.doesNotMatch(await words(), /Score/);
     const last = log().at(-1);
     assert.deepEqual([last.guest_id, last.scores], ["teti", undefined]);
