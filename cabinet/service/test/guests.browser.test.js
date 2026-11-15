@@ -198,8 +198,12 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     await press(page, "z");
     const s2 = await marathonToGameOver("teti-geoff");
     await press(page, "Escape");
-    await until(page, async () => (await launcher("board")) === "G6" && /Score:/.test(await words()), "G6 again");
-    assert.match(await words(), s2 > s1 ? new RegExp(`Score: ${s2}\\. A new best!`) : new RegExp(`Score: ${s2}\\. Best: ${s1}\\.`));
+    // A board is named a frame before it is drawn, and nothing is drawn during a game: until this G6 is, the
+    // words are still the last G6's, with the first round's score. So this round's line is waited for by what
+    // it says; if it never comes, the assert below shows what was there.
+    const second = s2 > s1 ? new RegExp(`Score: ${s2}\\. A new best!`) : new RegExp(`Score: ${s2}\\. Best: ${s1}\\.`);
+    await until(page, async () => (await launcher("board")) === "G6" && second.test(await words()), "G6 again").catch(() => {});
+    assert.match(await words(), second);
 
     // Both plays logged with their scores. The service wrote no makers: "by Geoff" came from guest.json (D236).
     const log = () => fs.readFileSync(path.join(data, "logs", "guest_play.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
@@ -217,7 +221,7 @@ test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and
     await press(page, "z");
     await marathonToGameOver("teti");
     await press(page, "Escape");
-    await until(page, async () => (await launcher("board")) === "G6", "G6 for the original");
+    await until(page, async () => (await launcher("board")) === "G6" && /Play again/.test(await words()), "G6 for the original, drawn");
     // The launcher posts the play, scores and all, as it puts G6 up: once that's in the log, G6 has what it will show.
     await until(page, async () => log().length === 3, "the original's play in the log");
     assert.doesNotMatch(await words(), /Score/);
