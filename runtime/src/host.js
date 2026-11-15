@@ -23,6 +23,7 @@ export const VOICE_MIN_MS = 300;
  *   players?: number,
  *   keymap?: typeof DEFAULT_KEYMAP,
  *   glide?: boolean,
+ *   gpu?: boolean,
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
  *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
@@ -38,6 +39,7 @@ export const VOICE_MIN_MS = 300;
  *     holds an ask's button, `stop` on release (the action heard, if any, goes to the cart) and `cancel` for a
  *     tap. Without it, and on a test host, a cart never hears anything.
  *   glide: false never shows a cart's glide picture (D476); play.html takes `?glide=0`.
+ *   gpu: false shows a glide picture through the 2D canvas, not the GPU (D517); play.html takes `?gpu=0`.
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
@@ -195,6 +197,12 @@ export function createHost(opts) {
     /** @type {{ frame: number, message: string }[]} */
     warnings: [],
     test: testHandle,
+    /**
+     * What the cart's screen is doing (D517): `glides` (the cart called g.glide()), `fine` (display pixels per
+     * game pixel it's drawn at, 1 for no glide) and `path`: "gpu", "2d" or null while nothing glides.
+     * @returns {Promise<{ glides: boolean, fine: number, path: "gpu" | "2d" | null }>}
+     */
+    screen: () => call("screen", []),
     iframe,
     /** Controllers this console has (g.players in the cart). */
     players,
@@ -332,7 +340,7 @@ export function createHost(opts) {
 
   iframe.addEventListener("load", () => {
     bootFine = arcade.fine;
-    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players, fine: arcade.fine });
+    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players, fine: arcade.fine, gpu: opts.gpu !== false });
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).

@@ -1,5 +1,5 @@
 // Runs inside the sandboxed cart frame (D13, D21). The host page drives it:
-//   host -> frame: { type: "boot", cartUrl, seed, save, players, fine }
+//   host -> frame: { type: "boot", cartUrl, seed, save, players, fine, gpu }
 //                  { type: "fine", k }                   the screen's scale changed (D476)
 //                  { type: "tick", n, masks }            run n updates, then draw (one mask per controller)
 //                  { type: "call", id, method, args }    test handle call
@@ -8,6 +8,7 @@
 //   frame -> host: { type: "ready", voices } | { type: "out", audio, save, scores, ai }
 //                  { type: "error", error } | { type: "result", id, value?, error? }
 //                  { type: "key", code, down }           keys pressed while the frame has focus
+import { createBlit } from "./glblit.js";
 import { H, W } from "./gfx.js";
 import { checkCart } from "./machine.js";
 import { rgbaTable } from "./palette.js";
@@ -30,12 +31,38 @@ const errorInfo = (e, where = "frame", frame = t ? t.machine().frame : 0) => {
   return { message: err?.message ?? String(e), stack: err?.stack ?? "", where, frame };
 };
 
-// A gliding cart (D476) is shown from its glide buffer, on a canvas of that size; any other cart
-// from the framebuffer, as ever.
+// How a gliding cart's picture gets to the screen (D517): "gpu" through glblit.js, "2d" when there's no
+// WebGL here, null while nothing glides.
+const glideCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById("glide"));
+/** @type {ReturnType<typeof createBlit> | undefined} undefined until a cart first glides */
+let blit;
+/** @type {"gpu" | "2d" | null} */
+let glidePath = null;
+let showingGlide = false;
+/** Which of the two canvases is on screen. */
+function surface(glide) {
+  if (glide === showingGlide) return;
+  showingGlide = glide;
+  glideCanvas.style.display = glide ? "block" : "none";
+  canvas.style.display = glide ? "none" : "block";
+}
+
+// A gliding cart (D476) is shown from its glide buffer: by the GPU when it can be (D517), or else on
+// the 2D canvas at that size. Any other cart is shown from the framebuffer, as ever.
 function render() {
   if (!t) return;
   const m = t.machine();
   const fine = m.fine;
+  if (fine && !noGpu) {
+    if (blit === undefined) blit = createBlit(glideCanvas, RGBA);
+    if (blit && blit.show(fine.pixels, fine.width, fine.height)) {
+      glidePath = "gpu";
+      return surface(true);
+    }
+    blit = null; // no WebGL, or it was lost: the 2D path from here on
+  }
+  glidePath = fine ? "2d" : null;
+  surface(false);
   const w = fine ? fine.width : W;
   const h = fine ? fine.height : H;
   if (image.width !== w || image.height !== h) {
@@ -77,7 +104,11 @@ function flush() {
   if (audio.length || save !== undefined || warnings.length || scores.length || ai.length) post({ type: "out", audio, save, warnings, scores, ai });
 }
 
-async function boot({ cartUrl, seed, save, players, fine }) {
+// The host can ask for the 2D path (`gpu: false`), to compare the two and to test the fallback.
+let noGpu = false;
+
+async function boot({ cartUrl, seed, save, players, fine, gpu }) {
+  noGpu = gpu === false;
   try {
     const url = new URL(cartUrl, location.href);
     const mod = await import(url.href);
@@ -120,6 +151,8 @@ const METHODS = new Set(["step", "input", "probe", "poke", "frame", "sounds", "s
 async function call(id, method, args) {
   try {
     if (!t) throw new Error("the cart isn't loaded");
+    // Not a test method: what's on the screen, for the host (arcade.screen(), D517).
+    if (method === "screen") return post({ type: "result", id, value: { glides: t.machine().glides, fine: t.machine().fineK, path: glidePath } });
     if (!METHODS.has(method)) throw new Error(`unknown test method ${method}`);
     let value = await /** @type {any} */ (t)[method](...(args ?? []));
     if (method === "frame") value = { ...value, pixels: Array.from(value.pixels) };

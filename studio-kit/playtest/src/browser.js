@@ -109,15 +109,16 @@ export async function openBrowser({ host, headless = true }) {
     /**
      * @param {number} seed
      * @param {(err: { where: string, message: string, frame: number | null }) => void} onPageError
+     * @param {string} [query] added to the host page's URL, such as "&glide=0" (D519)
      */
-    async session(seed, onPageError) {
+    async session(seed, onPageError, query = "") {
       const context = await browser.newContext();
       const page = await context.newPage();
       page.on("pageerror", (e) => onPageError({ where: "page", message: e.message, frame: null }));
       /** @param {string} method @param {unknown[]} args */
       const call = async (method, args) => {
         if (method === "open") {
-          await page.goto(host.url(seed));
+          await page.goto(host.url(seed) + query);
           await page.waitForFunction(() => /** @type {any} */ (window).arcade);
           await page.evaluate(() => /** @type {any} */ (window).arcade.ready);
           return null;
@@ -134,6 +135,8 @@ export async function openBrowser({ host, headless = true }) {
               const f = await t.frame();
               return { ...f, pixels: Array.from(f.pixels) };
             }
+            // What the screen is doing (D517): null on a host page that can't say.
+            if (m === "screen") return /** @type {any} */ (window).arcade.screen ? /** @type {any} */ (window).arcade.screen() : null;
             return t[m](...a);
           },
           /** @type {[string, unknown[]]} */ ([method, args]),

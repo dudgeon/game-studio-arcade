@@ -250,12 +250,12 @@ export async function openChromiumBrowser({ host, executable, nice }) {
      * @param {number} seed
      * @param {(err: { where: string, message: string, frame: number | null }) => void} onPageError
      */
-    async session(seed, onPageError) {
+    async session(seed, onPageError, query = "") {
       const page = await openPage(chrome, { onException: (message) => onPageError({ where: "page", message, frame: null }) });
       /** @param {string} method @param {unknown[]} args */
       const call = async (method, args) => {
         if (method === "open") {
-          await page.goto(host.url(seed));
+          await page.goto(host.url(seed) + query);
           await page.waitFor("window.arcade");
           await page.evaluate("Promise.resolve(window.arcade.ready).then(() => null)");
           return null;
@@ -282,5 +282,6 @@ const PAGE_CALL = `async ([m, a]) => {
     const f = await t.frame();
     return { ...f, pixels: Array.from(f.pixels) };
   }
+  if (m === "screen") return window.arcade.screen ? window.arcade.screen() : null;
   return t[m](...a);
 }`;

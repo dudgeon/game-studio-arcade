@@ -252,6 +252,36 @@ test("real runtime: browser driver gives the same report as headless", { skip: b
   }
 });
 
+// D519: a cart that glides is also run with glide off, so the report says what glide costs here.
+test("real runtime: a gliding cart's report says what glide costs; a plain cart's and the node driver's don't", { skip: browserSkip, timeout: 180000 }, async () => {
+  const dir = await tmp();
+  try {
+    await cp(fixture("dot-catch"), dir, { recursive: true });
+    const src = await readFile(join(dir, "game.js"), "utf8");
+    assert.ok(src.includes("  init(g) {"), "the fixture still starts init this way");
+    await writeFile(join(dir, "game.js"), src.replace("  init(g) {", "  init(g) {\n    g.glide();"));
+    const node = await playtest(dir, { ...real, driver: "node" });
+    const browser = await playtest(dir, { ...real, driver: "browser" });
+    assert.equal(node.glide, null, "the node driver doesn't show a picture");
+    const gl = browser.glide;
+    assert.ok(gl, "the browser driver reports glide");
+    assert.ok(gl.fine >= 2 && (gl.path === "gpu" || gl.path === "2d"), JSON.stringify(gl));
+    for (const k of ["p50Ms", "p95Ms", "plainP50Ms", "plainP95Ms", "costMs"]) assert.ok(Number.isFinite(gl[k]) && gl[k] >= 0, `${k} ${gl[k]}`);
+    assert.ok([null, "heavy", "over"].includes(gl.warning));
+    assert.equal(browser.ok, true, "gliding changes nothing a rule sees");
+    assert.equal(browser.frameTime.frames, 2280, "the runs with glide off aren't counted in the game's frame time");
+    const a = comparable(node);
+    const b = comparable(browser);
+    a.frameTime.budgetMs = b.frameTime.budgetMs;
+    delete a.driver;
+    delete b.driver;
+    assert.deepEqual(b, a, "and the two drivers still agree");
+    assert.equal((await playtest(fixture("dot-catch"), { ...real, driver: "browser" })).glide, null, "a cart that doesn't glide has nothing to report");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 // The cabinet's gate (D310): a system Chromium over its DevTools pipe, no Playwright.
 // Here it's Playwright's own full Chromium if it's downloaded, else the machine's own.
 let pipeChromium = null;
