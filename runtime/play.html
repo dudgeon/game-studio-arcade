@@ -36,7 +36,7 @@
             save: q.has("save") ? JSON.parse(q.get("save")) : undefined,
             test: q.get("test") === "1",
             glide: q.get("glide") !== "0",
-            gpu: q.get("gpu") !== "0",
+            gpu: q.get("gpu") === "any" ? "any" : q.get("gpu") !== "0",
             onError: (e) => (err.textContent += `${e.message}\n`),
             onStar: () => console.log("[arcade] star"),
           });

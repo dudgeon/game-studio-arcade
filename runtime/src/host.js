@@ -23,7 +23,7 @@ export const VOICE_MIN_MS = 300;
  *   players?: number,
  *   keymap?: typeof DEFAULT_KEYMAP,
  *   glide?: boolean,
- *   gpu?: boolean,
+ *   gpu?: boolean | "any",
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
  *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
@@ -40,6 +40,7 @@ export const VOICE_MIN_MS = 300;
  *     tap. Without it, and on a test host, a cart never hears anything.
  *   glide: false never shows a cart's glide picture (D476); play.html takes `?glide=0`.
  *   gpu: false shows a glide picture through the 2D canvas, not the GPU (D517); play.html takes `?gpu=0`.
+ *     "any" takes the GPU path even on a software GL, for tests (`?gpu=any`).
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
@@ -48,16 +49,22 @@ export function integerScale(w, h, dpr = 1) {
   return Math.max(1, k);
 }
 
+/** The most glide buffer pixels per game pixel each way (D518). */
+export const MAX_GLIDE = 2;
+
 /**
- * The glide buffer's size for a screen scale (D476): one buffer pixel per display pixel, so a
- * gliding cart moves by display pixels and stays crisp. Above 6 it's the largest whole divisor,
- * to bound the work; a scale with none (7, 11) gets no glide and looks as it always did.
+ * The glide buffer's size for a screen scale (D476, D518): a whole divisor of the scale, so every buffer
+ * pixel is a whole block of display pixels and the picture stays crisp, and at most MAX_GLIDE. On the
+ * Picade's 4x that's 2: things move half a game pixel (2 display pixels) at a time. Glide at 4 moved a
+ * display pixel at a time, but on the Pi it cost 6.8 ms a frame in the gate, against 3.2 ms at 2 (D518).
+ * A scale of 3 keeps 3 (no smaller divisor); a scale with no divisor (5, 7) gets no glide and looks as
+ * it always did.
  */
 export function fineForScale(scale) {
   const k = Math.floor(scale);
   if (!(k >= 2)) return 1;
-  for (let d = Math.min(k, 6); d >= 2; d--) if (k % d === 0) return d;
-  return 1;
+  for (let d = Math.min(k, MAX_GLIDE); d >= 2; d--) if (k % d === 0) return d;
+  return k <= 3 ? k : 1;
 }
 
 /** @param {HostOptions} opts */
@@ -340,7 +347,7 @@ export function createHost(opts) {
 
   iframe.addEventListener("load", () => {
     bootFine = arcade.fine;
-    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players, fine: arcade.fine, gpu: opts.gpu !== false });
+    send({ type: "boot", cartUrl: new URL(opts.cartUrl, location.href).href, seed: opts.seed ?? 1, save: initialSave, players, fine: arcade.fine, gpu: opts.gpu === "any" ? "any" : opts.gpu !== false });
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).

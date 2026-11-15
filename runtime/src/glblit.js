@@ -25,12 +25,18 @@ void main() {
   gl_FragColor = texture2D(pal, vec2((i + 0.5) / 32.0, 0.5));
 }`;
 
+/** Is this WebGL renderer a CPU pretending to be a GPU? */
+export function isSoftware(/** @type {string} */ renderer) {
+  return /llvmpipe|softpipe|swiftshader|software|swrast/i.test(renderer);
+}
+
 /**
  * @param {HTMLCanvasElement} canvas a canvas with no other context
  * @param {Uint32Array} rgba the palette as little-endian RGBA, 32 entries (palette.js rgbaTable)
+ * @param {{ anyGl?: boolean }} [o] anyGl: use even a software GL (tests, to check the shader's colors)
  * @returns {{ show(pixels: Uint8Array, w: number, h: number): boolean, lost(): boolean } | null}
  */
-export function createBlit(canvas, rgba) {
+export function createBlit(canvas, rgba, o = {}) {
   /** @type {WebGLRenderingContext | null} */
   let gl = null;
   try {
@@ -41,6 +47,11 @@ export function createBlit(canvas, rgba) {
   }
   if (!gl) return null;
   const g = gl;
+  // A software GL (llvmpipe, SwiftShader) is slower than the 2D path, not faster: headless Chromium on
+  // the Pi only ever gets one of those (D517). Only a real GPU is worth it.
+  const dbg = g.getExtension("WEBGL_debug_renderer_info");
+  const renderer = String(dbg ? g.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER));
+  if (isSoftware(renderer) && !o.anyGl) return null;
   let dead = false;
   canvas.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();

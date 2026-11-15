@@ -54,7 +54,7 @@ function render() {
   const m = t.machine();
   const fine = m.fine;
   if (fine && !noGpu) {
-    if (blit === undefined) blit = createBlit(glideCanvas, RGBA);
+    if (blit === undefined) blit = createBlit(glideCanvas, RGBA, { anyGl: gpuMode === "any" });
     if (blit && blit.show(fine.pixels, fine.width, fine.height)) {
       glidePath = "gpu";
       return surface(true);
@@ -106,9 +106,12 @@ function flush() {
 
 // The host can ask for the 2D path (`gpu: false`), to compare the two and to test the fallback.
 let noGpu = false;
+/** "any": take the GPU path even on a software GL, so tests can check its colors where there's no GPU. */
+let gpuMode = "";
 
 async function boot({ cartUrl, seed, save, players, fine, gpu }) {
   noGpu = gpu === false;
+  gpuMode = gpu === "any" ? "any" : "";
   try {
     const url = new URL(cartUrl, location.href);
     const mod = await import(url.href);

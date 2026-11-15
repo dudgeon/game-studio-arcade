@@ -98,12 +98,13 @@ async function shot(name, query = "", viewport = { width: 1024, height: 768 }) {
 test("a gliding cart is drawn at the display's size, by the GPU where there is one", { skip }, async () => {
   const { screen } = await shot("glides");
   assert.equal(screen.glides, true);
-  assert.deepEqual([screen.scale, screen.fine], [4, 4]);
+  assert.deepEqual([screen.scale, screen.fine], [4, 2], "the Picade's 4x glides at 2 (D518)");
   assert.ok(screen.path === "gpu" || screen.path === "2d", `path ${screen.path}`);
 });
 
 test("the GPU path and the 2D path put exactly the same pixels on the screen", { skip }, async (t) => {
-  const gpu = await shot("glides");
+  // gpu=any: a software GL is enough to check the shader's colors, though the real path refuses it.
+  const gpu = await shot("glides", "&gpu=any");
   const flat = await shot("glides", "&gpu=0");
   assert.equal(flat.screen.path, "2d");
   assert.equal(gpu.screen.hash, flat.screen.hash);
@@ -122,7 +123,13 @@ test("glide really moves things by less than a game pixel, and ?glide=0 is the o
   assert.equal(on.screen.hash, plain.screen.hash, "and the framebuffer a check sees is the same either way");
 });
 
-test("at a scale with no glide (7) the cart is shown the old way", { skip }, async () => {
-  const { screen } = await shot("glides", "", { width: 256 * 7, height: 192 * 7 });
-  assert.deepEqual([screen.scale, screen.fine, screen.path], [7, 1, null]);
+test("at a scale with no glide (5) the cart is shown the old way", { skip }, async () => {
+  const { screen } = await shot("glides", "", { width: 256 * 5, height: 192 * 5 });
+  assert.deepEqual([screen.scale, screen.fine, screen.path], [5, 1, null]);
+});
+
+test("a software GL never takes the GPU path (D517)", async () => {
+  const { isSoftware } = await import("../src/glblit.js");
+  for (const r of ["ANGLE (Mesa, llvmpipe (LLVM 19.1.7 128 bits), OpenGL ES 3.2)", "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 16.0.0) (0x0000C0DE)), SwiftShader driver)", "softpipe"]) assert.equal(isSoftware(r), true, r);
+  for (const r of ["V3D 7.1.7.0", "ANGLE (Broadcom, V3D 7.1.7.0, OpenGL ES 3.1 Mesa 25.0.7)", "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"]) assert.equal(isSoftware(r), false, r);
 });

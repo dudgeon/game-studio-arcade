@@ -2440,3 +2440,41 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
   - Every arcade result carries `cabinet` (for example "real: Real cabinet (Picade) (arcade.local)"), and an error names it too, so a wrong cabinet shows at once.
 - Checked with real Claude Code (`claude -p --plugin-dir`): the file was found from a subfolder with no variable set, and the variable still wins when it is set.
 - **For the director:** when starting a desk session for the Picade, write `real` into its folder's `.arcade-cabinet` first.
+
+## 2026-11-15 — Glide on the Pi (D517-D519, motion worker)
+
+The first gliding game through the Picade's gate (Saltwhistle Salvage, gliding everywhere) took 9.5 ms a frame at the median and 18.4 ms at the 95th percentile, over the 16.7 ms frame; the mini and the virtual cabinet showed under 1 ms. D479 had guessed 2 to 4 ms. These three are the fix and the guard. Measured on the Picade (release 0.1.0-a6e5cff97ccf) with throwaway pages and playtests run from `/tmp` in headless Chromium while it was idle, then removed.
+
+**What glide cost on the Pi, and where** *(measured; Claude)*:
+- **Through the gate, at 4×:** Saltwhistle Salvage gliding everywhere, median 9.3 ms and 95th 18.2 ms; the same runs with glide off, 2.5 and 6.2 ms. So glide was 6.8 ms a frame, matching the showcase worker's 6.6.
+- **Drawing everything twice** is the small part: in Node on the Pi, the cart's draw is 0.43 ms alone, 1.04 ms with a glide buffer at 2×, 1.23 ms at 4×.
+- **Putting the picture on the canvas** costs more: converting 786,000 palette indices to RGBA and `putImageData` at 1024×768 is 1.8 ms median and 5.1 ms at the 95th percentile, against 0.7 ms at 512×384 and 0.1 ms at 256×192.
+- **The rest is headless Chromium compositing the bigger canvas in software**, and it lands on whichever step it happens to coincide with, which is why the 95th percentile rose far more than the median. It grows with the canvas's size.
+- **Headless Chromium on the Pi never gets the Pi's GPU:** with no flags it has no WebGL at all; with `--use-gl=angle --use-angle=gles-egl` it's llvmpipe, and with `--enable-unsafe-swiftshader` SwiftShader, both on the CPU. The `cabinet` user isn't in the `render` group. The kiosk is a different case (D517).
+
+**D517. A gliding cart's picture goes to the GPU as palette indices, when there's a real GPU.** *(The director's brief, "consider WebGL for the final blit only"; Claude.)*
+- `runtime/src/glblit.js`: the glide buffer is uploaded as a one-byte-a-pixel texture and a small shader looks up the 32 colors, in one quad. That replaces the RGBA conversion in JavaScript and the 3 MB `putImageData`. Nothing else is WebGL: the drawing is the same software drawing as ever.
+- **Only on a real GPU.** A software GL (llvmpipe, SwiftShader) would be slower than the 2D path, so `createBlit` refuses one by its renderer's name and the frame uses the 2D path. So the gate, in headless Chromium, always times the 2D path; only the kiosk can take the GPU path.
+- **Same pixels either way:** a real-page test screenshots one gliding cart through both paths and compares them byte for byte (`?gpu=any` lets a test use a software GL to check the shader). If WebGL is lost mid-game, the frame falls back to the 2D path.
+- `arcade.screen()` on the host page says whether the cart glides, at what size, and by which path. `play.html?gpu=0` forces the 2D path.
+- **Not yet proven on the kiosk:** whether its Chromium (`--use-angle=gles`, Wayland) gets WebGL on the Pi's V3D and takes the GPU path. That needs a gliding game on the cabinet's screen; `arcade.screen()` answers it. The showcase worker's `top` samples (the renderer at 32% of a core gliding at 4× in the dive, against 15% to 23% without glide) suggest glide on the screen cost about 1.5 to 3 ms a frame even before this change, well under what the gate showed.
+
+**D518. Glide draws at 2× on the Picade, not 4×: half a game pixel, not a quarter.** *(Claude; a change to D476's "one buffer pixel per display pixel".)*
+- `MAX_GLIDE = 2` in `runtime/src/host.js`: the glide buffer is the largest whole divisor of the screen's scale up to 2. On the Picade's 4× that's 2, so a moving thing steps by 2 display pixels instead of 1, and every glide pixel is still a whole 2×2 block of display pixels. A scale of 3 keeps 3; 5 and 7 have no glide. A game pixel is still a 4×4 block on screen, and the colors are the same 32.
+- **What it saves, through the Picade's gate:**
+
+| Cart (gliding everywhere) | Median frame | 95th percentile | Glide's cost (medians) |
+| --- | --- | --- | --- |
+| Saltwhistle Salvage at 4× (before) | 9.3 ms | 18.2 ms | 6.8 ms |
+| Saltwhistle Salvage at 2× | 5.8 ms | 14.5 ms | 3.2 ms |
+| The motion showcase at 2× | 4.6 ms | 11.9 ms | 2.6 ms |
+| The racer template at 2× | 4.1 ms | 10.2 ms | 2.4 ms |
+
+- All three pass inside 16.7 ms. Saltwhistle's tail is still close (its own 95th percentile without glide is 6.1 ms), so the guide now says glide costs about 3 ms of the frame and to turn it off on screens where nothing moves slowly, as Saltwhistle already does outside the dive.
+- Half-pixel steps are still twice as smooth as no glide, which is what makes scrolling stop looking steppy.
+
+**D519. The gate says what glide costs, and warns when it's too much.** *(The director's brief; Claude.)*
+- **The playtest:** for a cart that glides, the browser driver (so the gate) runs the random-input and no-input soaks a second time with glide off (`&glide=0`) and puts the difference in the report as `glide`: the size, the path, the median and 95th percentile with and without, and `costMs`. Those extra runs don't count in the game's own frame time. Carts that don't glide, and the node driver, get `glide: null`.
+- **When glide is what takes the game over budget** (over with it, inside without), the frame-time check's reason says so and says what to do: "Call g.glide() only on the screens that need it (g.glide(false) on the others), or leave it out."
+- **When it's inside the budget but takes more than a third of it,** `glide.warning` is `"heavy"`, and the gate adds a warning that never blocks, `glide`, alongside D311's frame-time advisory. The Manager shows it with the gate's result. The record keeps `glide` either way.
+- **What it can't see:** the gate measures headless Chromium, which composites in software and never has the GPU path (D517), so on the Pi its glide figures are an upper bound on what the screen costs. A measurement in the kiosk during play is the next step if Geoff wants the real figure.
