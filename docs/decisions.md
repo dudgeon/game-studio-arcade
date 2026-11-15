@@ -2125,7 +2125,7 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - Not done: sweeping the network for the Pi when every way fails. The cabinet's own Wi-Fi screen shows its address (D414).
 
 **D417. Why the Picade lost its Wi-Fi on flash day: not proven. What was ruled out, and what the evidence fits.** *(The card worker's capture over a direct cable, 2026-11-14 09:32; the Wi-Fi worker's reading.)*
-- **What happened:** first boot and its one restart were on Wi-Fi (`Dudginsen`, 192.168.86.123, `arcade.local` resolving). After Geoff power-cycled it to fix the joystick plug, the shelf said "No Wi-Fi" at every start, a clean restart included, and the mini's pings failed.
+- **What happened:** first boot and its one restart were on Wi-Fi (the home network, 192.168.86.123, `arcade.local` resolving). After Geoff power-cycled it to fix the joystick plug, the shelf said "No Wi-Fi" at every start, a clean restart included, and the mini's pings failed.
 - **Ruled out, by looking:**
   - a lost or damaged network: `/etc/netplan/90-NM-*.yaml` was whole and parsed, with the key;
   - a cut-off update: the OS update never started (a game was being played), and `dpkg --audit` was clean;
