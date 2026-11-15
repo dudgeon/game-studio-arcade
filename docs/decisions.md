@@ -357,8 +357,8 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 
 **D84. Open, for Geoff: second player, the MAKE button, and the mic.** *(Claude raised these; the decisions are Geoff's. HANDOFF §3.3.)* **Answered 2026-11-08:** players by D85, MAKE by D86. The mic is a USB mic that Geoff is choosing (D89).
 - **Second player.** The cabinet has one player's controls. Options:
-  1. One player at the cabinet. Two-player games take turns on the same controls. No hardware. Alina's "can Owen play too" becomes a turns game at the cabinet, and side-by-side games only work at the desktop.
-  2. Add a USB gamepad as player 2 (wired through the back panel, or wireless with a dongle). The runtime already reads a second gamepad; the cabinet needs a small input change (the first gamepad becomes P2, since the Picade is P1). Owen gets his own side.
+  1. One player at the cabinet. Two-player games take turns on the same controls. No hardware. Ivy's "can Milo play too" becomes a turns game at the cabinet, and side-by-side games only work at the desktop.
+  2. Add a USB gamepad as player 2 (wired through the back panel, or wireless with a dongle). The runtime already reads a second gamepad; the cabinet needs a small input change (the first gamepad becomes P2, since the Picade is P1). Milo gets his own side.
   3. Add a second joystick and buttons to the cabinet. The X HAT has only two spare button inputs, so this needs a USB encoder and new holes in the panel. Most work.
 - **MAKE (★).** The plan had one MAKE button per side; now there is one side. Options:
   1. Use one of the existing front utility buttons as ★, with a sticker. No drilling.
@@ -370,7 +370,7 @@ Specs were checked live on 2026-11-07. Sources and details are in [platform-note
 **D85. Games default to single player; turns are well supported; the number of controllers is a setting.** *(Geoff; answers D84 "second player", changes HANDOFF §4, §7 and §10.)*
 - Geoff: "Default to single player games; optional mechanic well supported in library for turn based games, address ext controllers later. Make number of controllers a configuration setting to anticipate arbitrary numbers of controllers in the future."
 - A new game is single player unless the kid asks for more. When a kid wants someone else to play too, at the cabinet that means **taking turns** on the one set of controls.
-- The starter library gets a well-tested turn-taking helper (whose turn, handing over, per-player scores and lives), so "can Owen play too" doesn't get re-derived each build. The helper ships in the library, not as a rule every cart must follow.
+- The starter library gets a well-tested turn-taking helper (whose turn, handing over, per-player scores and lives), so "can Milo play too" doesn't get re-derived each build. The helper ships in the library, not as a rule every cart must follow.
 - **How many controllers there are is a configuration setting**, not a fixed two. The cabinet is set to 1 today. The runtime and carts must not assume exactly one or exactly two, so that adding controllers later is a config change. (Implementation is with the runtime worker, routed by the director.)
 - External controllers (a USB gamepad and so on) come later. Nothing is bought or wired for them now.
 - The desktop simulator can still be set to more than one controller, for testing and for desktop play.
@@ -691,10 +691,10 @@ Geoff, after the Penguin Catch cost breakdown: "have a medium weight model (like
 
 ## 2026-11-08 — Studio screens on the launcher
 
-Geoff: "Next time I want you to fully run a game build, once the stack is ready, fully from the simulated interface; this will let you pressure test the ui that Alina will be looking at, see text field overruns, pressure test that the studio s output works there". The first slice of the cabinet service and the launcher's Studio flow. Implementation is in [cabinet/service/](../cabinet/service/README.md).
+Geoff: "Next time I want you to fully run a game build, once the stack is ready, fully from the simulated interface; this will let you pressure test the ui that Ivy will be looking at, see text field overruns, pressure test that the studio s output works there". The first slice of the cabinet service and the launcher's Studio flow. Implementation is in [cabinet/service/](../cabinet/service/README.md).
 
 **D180. The launcher draws on the 256×192 console, not as a host page.** *(Claude; the brief left this to the worker. Extends D81.)*
-- It uses the runtime's own `Framebuffer`, font and palette, on a canvas the same size as a cart's, shown at the largest whole multiple (4× on 1024×768). So what Alina sees between games is the same chunky pixels as the games, and there's no jump in look or scale.
+- It uses the runtime's own `Framebuffer`, font and palette, on a canvas the same size as a cart's, shown at the largest whole multiple (4× on 1024×768). So what Ivy sees between games is the same chunky pixels as the games, and there's no jump in look or scale.
 - It's the deciding reason for text fitting, too: a fixed font on a fixed grid makes a string's size pure arithmetic. A test can prove what fits without a browser, with no font-loading or HTML reflow to go wrong. Every Studio string has 40 columns by 21 rows at most, so overruns are real and worth the care (D181).
 - It isn't a cart. A cart can't reach the network (D13), and the launcher must reach the service. It's the trusted host page; carts still run in the sandboxed frame inside it, through the runtime's `createHost`.
 - Not chosen: an HTML page at 1024×768, which has room for four times the text but looks like a web page around the games, and whose fit depends on layout we'd have to measure in a browser only.
@@ -767,7 +767,7 @@ Geoff: "Next time I want you to fully run a game build, once the stack is ready,
 
 **D192. How a make ended is its own shelf entry; Make stays Make.** *(Director's instruction; Claude. Changes D187's tile.)*
 - A make that has ended no longer holds Make's place, so the next kid doesn't see someone else's result in its way. The shelf is Make, then any results not yet viewed, then the games. Only a make still running takes Make's place, as "Back to your game" (D183: one session at a time).
-- An entry shows its maker's name: "New game ready!" with "by Alina - Penguin Catch", or "A new game didn't finish" with "by Alina". Opening it shows the result screen, and leaving that screen marks it viewed, whoever opened it.
+- An entry shows its maker's name: "New game ready!" with "by Ivy - Penguin Catch", or "A new game didn't finish" with "by Ivy". Opening it shows the result screen, and leaving that screen marks it viewed, whoever opened it.
 - A kid following their own make still goes straight to the result, and an entry they've seen doesn't appear.
 - Entries live in `studio-results.json` next to the library, so they survive a restart. Viewing one stamps `viewed_at` and nothing is removed.
 
@@ -1022,7 +1022,7 @@ From Geoff's answers to the director, 2026-11-11: top-ups before the Manager exi
   - The shelf takes his name from the version's `guest.json`, so his row reads "by Geoff" whether or not he's in `makers.json`.
   - The entry is there so the logs can name him.
 - Playing a guest stays free: no coins, no Studio session.
-- **Note, 2026-11-14 (director's ask): a kid maker from the mini, too.** `node scripts/maker.mjs add Alina` adds a regular kid maker: the same entry the cabinet's "Someone new" makes (D87), from the cabinet's own new-name slot, after checking the Manager's token. It's for a kid's game made on the mini (desktop-initiated) while the cabinet's name screen can't be used. A name already there is left as is. `--cabinet real` (or `ARCADE_CABINET=real`) reaches the Picade with its own key and token, as the Manager does (D369), for `list` and `add-grown-up` too. Alina was added on the Picade this way, so her game reads "by Alina" and she's on its "Who's making?" list like any kid.
+- **Note, 2026-11-14 (director's ask): a kid maker from the mini, too.** `node scripts/maker.mjs add Ivy` adds a regular kid maker: the same entry the cabinet's "Someone new" makes (D87), from the cabinet's own new-name slot, after checking the Manager's token. It's for a kid's game made on the mini (desktop-initiated) while the cabinet's name screen can't be used. A name already there is left as is. `--cabinet real` (or `ARCADE_CABINET=real`) reaches the Picade with its own key and token, as the Manager does (D369), for `list` and `add-grown-up` too. Ivy was added on the Picade this way, so her game reads "by Ivy" and she's on its "Who's making?" list like any kid.
 
 **D240. Why the virtual cabinet drops off: the mini's own Wi-Fi bridge, not the network.** *(Claude; the finding, 2026-11-11.)* Today it dropped three times (about 07:55, 09:38 and 10:40 local), each time until a restart. The evidence so far:
 - **Not the mini's Wi-Fi.** Its log has no roam, disassociation, link-down or DHCP renewal at any of the three times, and its signal held at about -45 dBm. The only `en1` flag changes (08:18, 09:55, 10:44) are the restarts reattaching the bridge.
@@ -1367,7 +1367,7 @@ From docs/validation-virtual.md, on the director's list.
 ## 2026-11-12 — Claude checks it heard the idea right (D308)
 
 **D308. Claude's first question always restates the idea, as an A/B.** *(Claude's idea from the end-to-end run, the director's go.)*
-- In the run, speech-to-text turned "happy when you clear lines" into "after every 20 lines" and "Owen" into "oh and", and the mishearing became a question's option A. "Is this right?" shows the transcript, but a kid skims it.
+- In the run, speech-to-text turned "happy when you clear lines" into "after every 20 lines" and "Milo" into "oh and", and the mishearing became a question's option A. "Is this right?" shows the transcript, but a kid skims it.
 - **So the first `ask_player` is one short line saying the idea back,** in Claude's words, with any number or name the kid said: "A falling-candy game with a cat who's happy when you clear a line?" A is "Yes, that's it"; B is "Something else".
   - **Always, once:** even when the idea seems clear. It costs one question, and kids like being understood.
   - **B or C means Claude misheard.** C carries the fix in the kid's words; after B, Claude asks what it got wrong. Either way, before any other question.
@@ -1764,7 +1764,7 @@ Geoff, 2026-11-13, on the card: "you'd better have a plan to push updates to the
 - **Before that, on a local copy of the service** with the real gate: the same flow on `penguin-catch`, in 16 turns for $0.47.
 - **Tests:** the cabinet side's `test/arcade-mcp.test.js`, the plugin's `game-studio/test/`, and the Manager's desktop row. `claude plugin validate` passes for the plugin and the marketplace.
 - **Not proven:**
-  - With a kid at the desk, interactively. That's §14's first joint game with Owen.
+  - With a kid at the desk, interactively. That's §14's first joint game with Milo.
   - On the Picade, which isn't built.
   - The plugin installed from the marketplace rather than `--plugin-dir`. That's Geoff's install.
 
@@ -2216,7 +2216,7 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **Left as it is:** a second player's keys (W A S D) exist only on a keyboard; the Picade has one player's controls and the controller count defaults to 1 (D85). Guest players read the same keys the Picade sends (D82) and their own menus aren't opened from the cabinet.
 
 **D433. ENT is F13, not F1: no key at the cabinet is one Chromium acts on.** *(Geoff, 2026-11-14: "you need to prevent this from happening in the future". The director's brief; Claude.)*
-- **What happened:** Alina pressed ENT after a game. ENT was F1 (D82), and Chromium opened its Help page over the kiosk, which nothing at the cabinet could close; the kiosk had to be restarted. The launcher stopped F1 on its own screens, but not while a game was up.
+- **What happened:** Ivy pressed ENT after a game. ENT was F1 (D82), and Chromium opened its Help page over the kiosk, which nothing at the cabinet could close; the kiosk had to be restarted. The launcher stopped F1 on its own screens, but not while a game was up.
 - **The key:** the overlay's `enter` is now 183 (KEY_F13), in `picade.sh`'s block of `config.txt`. It takes effect at the next restart; until then the old F1 still works, since the launcher takes either. Checked on the virtual cabinet (trixie, Chromium 156, the same packages): F13 tapped twice on the shelf through a uinput keyboard leaves the screen pixel for pixel the same. xkb calls the key XF86Tools, which Chromium has no shortcut for.
 - **Every other Picade key, against Chromium's shortcuts:** F1 Help, F3 find, F5 reload, F6 the address bar, F7 caret browsing, F10 the menu, F11 full screen, F12 DevTools; everything else needs Ctrl, Alt, Shift, Super, Tab, Backspace or Space. The Picade sends none of them: arrows, Z X C V Q E, Enter, Escape, F13, and F2 for COIN, which Chromium does nothing on. A test holds the block to that list.
 - **Who reads ENT:** the launcher reads F13 as F1 at the door (`asEnt`, `wifi-flow.js`), so typing, the volume chord and the Wi-Fi hold (ENT and COIN) are unchanged, and the virtual cabinet's F1 works as before. `arcade-volkey` takes F13 or F1 as the held key. The driver keyboard (`arcade-keyd`) can press 183; `drive press ent` sends it, and the Manager's on-screen button is now "ENT" and sends it too. F1 on Geoff's own keyboard through the Manager is still F1.
@@ -2487,7 +2487,7 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 
 ## 2026-11-15 — The desktop flow, fixed from real use (D513-D516)
 
-*(Worker, at the director's ask. Real use found it twice: Alina's Taco Cat ended up as two copies, and the showcase game hit it again.)*
+*(Worker, at the director's ask. Real use found it twice: Ivy's Taco Cat ended up as two copies, and the showcase game hit it again.)*
 
 **D513. A publish never waits in one call: it's a job, and callers wait for it a little at a time.** *(Claude.)*
 - **Found:** `publish_cart` held one HTTP request open for the whole publish. The gate never interrupts a game being played (D310), and once waited 335 s. Node's fetch gives up on a request with no answer after 300 s, so the bridge reported "fetch failed" or a timeout. The publish still landed, and a caller who tried again made a second cart.
@@ -2511,7 +2511,7 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 - Each refusal adds "Don't drive it there with the cabinet's keys: from the shelf, the first press opens Make." The tool's description and the skill say the same.
 
 **D516. Which cabinet a desktop session reaches: the environment, else the project's `.arcade-cabinet`, else virtual; and every result says which.** *(Claude.)*
-- **Found:** alina-game was a background session started by Duo, and `duo2 session new` can't set an environment variable. So `ARCADE_CABINET` was unset, and the plugin's `.mcp.json` (`${ARCADE_CABINET:-virtual}`) gave the bridge the virtual cabinet while everyone meant the Picade. Setting the variable inside the session can't reach an MCP server that's already running.
+- **Found:** ivy-game was a background session started by Duo, and `duo2 session new` can't set an environment variable. So `ARCADE_CABINET` was unset, and the plugin's `.mcp.json` (`${ARCADE_CABINET:-virtual}`) gave the bridge the virtual cabinet while everyone meant the Picade. Setting the variable inside the session can't reach an MCP server that's already running.
 - **Now:**
   - `.mcp.json` no longer sets the variable; plugin servers inherit Claude Code's environment.
   - The bridge takes `ARCADE_CABINET` if set, else the first word of a `.arcade-cabinet` file in the project folder or any folder above it, else `virtual`.

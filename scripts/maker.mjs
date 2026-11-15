@@ -52,7 +52,7 @@ export async function main(argv, io = {}) {
   const log = io.log ?? ((/** @type {string} */ s) => console.log(s));
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { url: { type: "string" }, "token-file": { type: "string" }, cabinet: { type: "string" } } });
   const [cmd, ...rest] = positionals;
-  if ((cmd === "add" || cmd === "add-grown-up") && !rest.join(" ").trim()) throw new Error(`${cmd} needs a first name: ${cmd} ${cmd === "add" ? "Alina" : "Geoff"}`);
+  if ((cmd === "add" || cmd === "add-grown-up") && !rest.join(" ").trim()) throw new Error(`${cmd} needs a first name: ${cmd} ${cmd === "add" ? "Ivy" : "Geoff"}`);
   const c = await link(values);
   const check = (/** @type {{status: number, body: any}} */ r) => {
     if (r.status === 200) return r.body;

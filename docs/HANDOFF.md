@@ -8,7 +8,7 @@ Written Nov 7, 2026 from two planning sessions (text and voice) between Geoff an
 
 A small arcade cabinet in Geoff's basement that builds its own games. **The Studio makes the games; the Arcade plays them.**
 
-Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say who's making, hold a button and say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
+Milo and Ivy walk up, pick "Make a new game" on the game shelf, say who's making, hold a button and say what they want to play, and answer Claude's questions with the joystick. A few minutes later a new game is on the shelf. They can fork any game ("change this") to make a new version. Bigger projects happen at the Mac mini in a normal Claude Code session with Geoff, then get published to the same cabinet.
 
 **Learning goal.** Not teaching the kids to code. Teaching them to work with an agent: state intent, define requirements, check that the agent met them, then change the approach or change the requirement. Kid-editable code (blocks, MakeCode) is explicitly not a goal.
 
@@ -50,7 +50,7 @@ Owen (13) and Alina (10) walk up, pick "Make a new game" on the game shelf, say 
 - **Building blocks**: a tested starter library and a lean context pack, so common mechanics (collision, which object destroys which) aren't re-derived every build. Don't overspecify; the joy is in totally different game ideas.
 - **Speech**: not on the Mac mini; low latency is critical. Primary: Groq Whisper Large v3 Turbo. Backup and offline: Moonshine on the Pi 5. Test both with the kids' voices before committing.
 - **Runtime**: house JavaScript console. Guest players: TIC-80, PICO-8, RetroArch for homebrew, each as a web player in the kiosk (D380–D389; TIC-80 and RetroArch built with six games on the shelf, PICO-8 proven; the shortlist is in [guest-players.md](guest-players.md)). MakeCode is out.
-- **Game sources**: homebrew and fantasy-console games, plus kid-built "inspired-by" games. Alina asked for Tetris; it becomes her own falling-blocks game, with no Tetris name or look.
+- **Game sources**: homebrew and fantasy-console games, plus kid-built "inspired-by" games. Ivy asked for Tetris; it becomes her own falling-blocks game, with no Tetris name or look.
 - **Approval**: no approval loop. Kid-made games go straight to the shelf. May revisit.
 - **Network**: the cabinet works on the existing home mesh Wi-Fi. No Ethernet and no console-specific network gear.
 - **Console name**: configurable and not critical path. Placeholder: Quarter Deck.
@@ -274,7 +274,7 @@ Context pack (D160–D166): a short catalog the agent always reads, modules and 
 
 - Disclose AI on the first make screen ("I'm Claude, an AI").
 - Studio sessions: one cart in scope, web tools disabled, no network, a spending cap per build.
-- Kid brief in the agent's system prompt: audience ages 10 and 13, content rules, plain voice.
+- Kid brief in the agent's system prompt: audience the two kids, content rules, plain voice.
 - Screen each request before starting a session; redirect off-limits ideas with a friendly alternative.
 - Keys (Anthropic, Groq) live only in the cabinet service's config. Never in the launcher, carts, logs or git.
 - No approval loop, by decision. The activity log is the oversight mechanism.
@@ -282,7 +282,7 @@ Context pack (D160–D166): a short catalog the agent always reads, modules and 
 
 ## 12. Day-one library
 
-PICO-8 community carts, TIC-80 Surf mode, and freely distributable homebrew under RetroArch. Famous 8-bit games become first build prompts: falling blocks (Alina's), a platformer, an aim-and-shoot, a top-down adventure.
+PICO-8 community carts, TIC-80 Surf mode, and freely distributable homebrew under RetroArch. Famous 8-bit games become first build prompts: falling blocks (Ivy's), a platformer, an aim-and-shoot, a top-down adventure.
 
 ## 13. Hardware (prices checked live Nov 7, 2026)
 
@@ -314,7 +314,7 @@ Dropped: Ourcades (its two-player cabinet now lists at $2,149). Either way, add 
 
 **Phase 3 — voice and kid builds (2 weekends).** Groq vs Moonshine bake-off with both kids' recordings; guardrails; first real cabinet-initiated builds and forks.
 
-**Phase 4 — desktop flow (ongoing).** `game-studio` plugin, asset import, publish gate; first joint game with Owen.
+**Phase 4 — desktop flow (ongoing).** `game-studio` plugin, asset import, publish gate; first joint game with Milo.
 
 **Later.** Kid-friendly spec view, checkpoint browser, a browser front end for the Studio, optional approval toggle, per-cart tuning knobs.
 

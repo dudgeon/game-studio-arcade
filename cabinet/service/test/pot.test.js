@@ -36,11 +36,11 @@ function clock(iso = "2026-11-11T12:00:00") {
   return { now: () => new Date(t), set: (/** @type {string} */ s) => (t = new Date(s).getTime()), tick: (ms = 1000) => (t += ms) };
 }
 
-/** A pot holding `cents`, by charging Owen the rest of 100 coins. @param {number} cents */
+/** A pot holding `cents`, by charging Milo the rest of 100 coins. @param {number} cents */
 function potAt(cents, c = clock()) {
   const logs = tmp();
   const pot = potStore({ logsDir: logs, now: c.now });
-  pot.charge({ maker: "owen", what: "new", session_id: "sesn_seed", cost_cents: 1000 - cents, outcome: "on the shelf" });
+  pot.charge({ maker: "milo", what: "new", session_id: "sesn_seed", cost_cents: 1000 - cents, outcome: "on the shelf" });
   return { pot, logs, c };
 }
 
@@ -55,7 +55,7 @@ test("1 coin = 10 cents; screens round to nearest, ledger keeps exact cents (D20
   assert.equal(coinsOf(-56), -6, "the same either side of zero");
   assert.equal(coinsOf(0), 0);
   const { pot } = potAt(1000);
-  const e = pot.charge({ maker: "alina", what: "new", session_id: "s1", cost_cents: 56, outcome: "on the shelf" });
+  const e = pot.charge({ maker: "ivy", what: "new", session_id: "s1", cost_cents: 56, outcome: "on the shelf" });
   assert.equal(e?.cost_cents, 56, "exact cents in the ledger");
   assert.equal(e?.coins, 6);
   assert.equal(pot.state().cents, 944);
@@ -89,7 +89,7 @@ test("start gate: 6 for a new game, 2 for a change (D214); with 5 coins a change
 test("usual costs are settings, not constants (D203)", () => {
   const logs = tmp();
   const pot = potStore({ logsDir: logs, now: clock().now, settings: { usual_cost_new: 8, usual_cost_change: 4 } });
-  pot.charge({ maker: "owen", what: "new", session_id: "x", cost_cents: 930, outcome: "on the shelf" });
+  pot.charge({ maker: "milo", what: "new", session_id: "x", cost_cents: 930, outcome: "on the shelf" });
   assert.equal(pot.state().coins, 7);
   assert.equal(pot.gate("new").ok, false);
   assert.equal(pot.gate("change").ok, true);
@@ -100,19 +100,19 @@ test("usual costs are settings, not constants (D203)", () => {
 
 test("a charge is once per session, whatever asks twice (a restart can't charge again)", () => {
   const { pot } = potAt(1000);
-  assert.ok(pot.charge({ maker: "alina", what: "new", session_id: "s1", cost_cents: 40, outcome: "on the shelf" }));
-  assert.equal(pot.charge({ maker: "alina", what: "new", session_id: "s1", cost_cents: 40, outcome: "on the shelf" }), null);
+  assert.ok(pot.charge({ maker: "ivy", what: "new", session_id: "s1", cost_cents: 40, outcome: "on the shelf" }));
+  assert.equal(pot.charge({ maker: "ivy", what: "new", session_id: "s1", cost_cents: 40, outcome: "on the shelf" }), null);
   assert.equal(pot.state().cents, 960);
 });
 
 test("per-maker totals: this month's coins and cents for each maker, most first, friends included", () => {
   const { pot } = potAt(1000);
-  pot.charge({ maker: "alina", what: "new", session_id: "a1", cost_cents: 56, outcome: "on the shelf" });
+  pot.charge({ maker: "ivy", what: "new", session_id: "a1", cost_cents: 56, outcome: "on the shelf" });
   pot.charge({ maker: "sam", what: "change", session_id: "s1", cost_cents: 31, outcome: "on the shelf" });
-  pot.charge({ maker: "alina", what: "change", session_id: "a2", cost_cents: 30, outcome: "didn't finish" });
-  const ms = pot.state().makers.filter((m) => m.maker !== "owen");
+  pot.charge({ maker: "ivy", what: "change", session_id: "a2", cost_cents: 30, outcome: "didn't finish" });
+  const ms = pot.state().makers.filter((m) => m.maker !== "milo");
   assert.deepEqual(ms, [
-    { maker: "alina", cents: 86, makes: 2, coins: 9 },
+    { maker: "ivy", cents: 86, makes: 2, coins: 9 },
     { maker: "sam", cents: 31, makes: 1, coins: 3 },
   ]);
 });
@@ -126,7 +126,7 @@ test("refill: on the 1st the pot is set to 100, leftovers gone and a negative wi
   assert.equal(s.coins, 100, "a negative balance is wiped");
   assert.equal(s.month, "2026-12");
   assert.equal(s.last_month?.ended_coins, -12);
-  assert.equal(s.last_month?.makers[0].maker, "owen");
+  assert.equal(s.last_month?.makers[0].maker, "milo");
   assert.deepEqual(s.makers, [], "this month's totals start empty");
   const refill = pot.history()[0];
   assert.equal(refill.kind, "refill");
@@ -134,7 +134,7 @@ test("refill: on the 1st the pot is set to 100, leftovers gone and a negative wi
   assert.match(String(refill.reason), /went over/);
   // Leftovers too.
   c.set("2026-12-20T09:00:00");
-  pot.charge({ maker: "alina", what: "new", session_id: "dec", cost_cents: 50, outcome: "on the shelf" });
+  pot.charge({ maker: "ivy", what: "new", session_id: "dec", cost_cents: 50, outcome: "on the shelf" });
   c.set("2027-01-01T08:00:00");
   assert.equal(pot.state().coins, 100, "leftovers don't carry over");
   assert.equal(pot.history().filter((e) => e.kind === "refill").length, 3, "once a month, however often it's read");
@@ -180,7 +180,7 @@ function studioWith(o = {}) {
   const c = o.clock ?? clock();
   const paths = dataPaths(tmp());
   const pot = potStore({ logsDir: paths.logs, now: c.now });
-  if (o.potCents != null) pot.charge({ maker: "owen", what: "new", session_id: "sesn_seed", cost_cents: 1000 - o.potCents, outcome: "on the shelf" });
+  if (o.potCents != null) pot.charge({ maker: "milo", what: "new", session_id: "sesn_seed", cost_cents: 1000 - o.potCents, outcome: "on the shelf" });
   const cabinet = cabinetState({ root: paths.root, now: c.now });
   /** @type {Map<string, any>} */
   const carts = new Map();
@@ -222,13 +222,13 @@ function studioWith(o = {}) {
 
 test("a make is charged its real cost at the end: the session's list cost, in cents (D202)", async () => {
   const { studio, runThrough, pot, paths } = studioWith();
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const r = await runThrough();
   assert.equal(r.ok, true);
   assert.equal(r.cost_cents, 68, "what the recorded session cost");
   assert.equal(r.coins, 7);
   assert.equal(r.pot_after_cents, 932);
-  assert.equal(pot.state().makers[0].maker, "alina");
+  assert.equal(pot.state().makers[0].maker, "ivy");
   const [e] = readLog(path.join(paths.logs, "coin_ledger.jsonl")).filter((x) => x.kind === "charge");
   assert.equal(e.session_id, "sesn_replay", "joins the studio_session record (§9.5)");
   assert.equal(e.outcome, "on the shelf");
@@ -240,7 +240,7 @@ test("a make is charged its real cost at the end: the session's list cost, in ce
 test("every finished session is archived at Anthropic, a game on the shelf too, and the archive logged (D301)", async () => {
   const made = replayApi({ dir: MAKE, usage: usageOf(MAKE) });
   const { studio, runThrough, paths } = studioWith({ api: made.api });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const r = await runThrough();
   assert.equal(r.ok, true);
   for (let i = 0; i < 100 && !made.mock.calls.includes("archiveSession"); i++) await new Promise((res) => setTimeout(res, 10));
@@ -257,7 +257,7 @@ test("the coins used so far count up during the build, from the session's usage 
   studio.subscribe((s) => {
     if (s.phase === "running" && seen.at(-1) !== s.used_cents) seen.push(s.used_cents);
   });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   await runThrough();
   assert.ok(seen.length >= 4, `counted up: ${seen}`);
   assert.deepEqual([...seen].sort((a, b) => a - b), seen, "never backwards");
@@ -267,15 +267,15 @@ test("the coins used so far count up during the build, from the session's usage 
 
 test("the gate refuses a new game under 6 coins, before anything starts or is spent (D203)", async () => {
   const { studio, pot } = studioWith({ potCents: 50 });
-  assert.throws(() => studio.start({ maker: "alina", request: "x" }), (e) => e instanceof StudioRefused && e.why === "low");
+  assert.throws(() => studio.start({ maker: "ivy", request: "x" }), (e) => e instanceof StudioRefused && e.why === "low");
   assert.equal(studio.state().phase, "idle");
   assert.equal(pot.history().filter((e) => e.kind === "charge").length, 1, "only the seed");
 });
 
 test("with 5 coins a change starts: the maker's own change is version 2 of the same game (D203, D206)", async () => {
   const { studio, runThrough, carts, paths, pot } = studioWith({ potCents: 50 });
-  carts.set("penguin-catch", { id: "penguin-catch", dir: path.join(MAKE, "cart"), version: 1, maker: "alina", title: "Penguin Catch", session_id: null });
-  studio.start({ maker: "alina", request: "make the logs float a bit faster", parent: "penguin-catch" });
+  carts.set("penguin-catch", { id: "penguin-catch", dir: path.join(MAKE, "cart"), version: 1, maker: "ivy", title: "Penguin Catch", session_id: null });
+  studio.start({ maker: "ivy", request: "make the logs float a bit faster", parent: "penguin-catch" });
   assert.equal(studio.state().kind, "change");
   const r = await runThrough();
   assert.equal(r.ok, true);
@@ -287,7 +287,7 @@ test("with 5 coins a change starts: the maker's own change is version 2 of the s
   assert.equal(cart.parent, "penguin-catch@1");
   assert.equal(cart.family, "penguin-catch");
   assert.equal(cart.branch, "penguin-catch");
-  assert.equal(cart.maker, "alina");
+  assert.equal(cart.maker, "ivy");
   assert.equal(pot.state().cents, 50 - 14);
   const charge = pot.history().find((e) => e.session_id === "sesn_replay");
   assert.equal(charge?.what, "change");
@@ -300,23 +300,23 @@ test("someone else's change is their own version: a new line, version 1, the ori
   const parentDir = path.join(paths.carts, "penguin-catch");
   fs.cpSync(path.join(MAKE, "cart"), parentDir, { recursive: true });
   const before = fs.readFileSync(path.join(parentDir, "spec.md"), "utf8");
-  carts.set("penguin-catch", { id: "penguin-catch", dir: parentDir, version: 1, maker: "alina", title: "Penguin Catch", session_id: null });
-  studio.start({ maker: "owen", request: "make the logs float a bit faster", parent: "penguin-catch" });
+  carts.set("penguin-catch", { id: "penguin-catch", dir: parentDir, version: 1, maker: "ivy", title: "Penguin Catch", session_id: null });
+  studio.start({ maker: "milo", request: "make the logs float a bit faster", parent: "penguin-catch" });
   const r = await runThrough();
   assert.equal(r.version, 1);
   const cart = JSON.parse(fs.readFileSync(path.join(paths.carts, r.cart_id, "cart.json"), "utf8"));
-  assert.equal(cart.maker, "owen");
+  assert.equal(cart.maker, "milo");
   assert.equal(cart.parent, "penguin-catch@1");
   assert.equal(cart.family, "penguin-catch");
   assert.equal(cart.branch, undefined, "its own line starts with itself");
-  assert.equal(r.parent?.maker_name, "Alina", "R8 names whose game stays the same (D302)");
+  assert.equal(r.parent?.maker_name, "Ivy", "R8 names whose game stays the same (D302)");
   assert.notEqual(r.cart_id, "penguin-catch");
   assert.equal(fs.readFileSync(path.join(parentDir, "spec.md"), "utf8"), before);
 });
 
 test("no refunds: a make that fails is charged what it cost (D202)", async () => {
   const { studio, runThrough, pot } = studioWith({ noCart: true });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const r = await runThrough();
   assert.equal(r.ok, false);
   assert.equal(r.failed, true);
@@ -331,7 +331,7 @@ test("a make that fails on the cabinet's side after its session ran is charged a
   // As the live change did: the session ends, then bringing it home fails.
   made.api.listOutputs = async () => Promise.reject(new Error("400 file_not_downloadable"));
   const { studio, runThrough, pot, paths } = studioWith({ api: made.api });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const r = await runThrough();
   assert.equal(r.ok, false);
   assert.equal(r.cost_cents, 68, "charged what it cost (D202)");
@@ -344,7 +344,7 @@ test("a make that fails on the cabinet's side after its session ran is charged a
 
 test("no refunds: a make stopped at a question is charged what it used (D202, E8)", async () => {
   const { studio, until, pot } = studioWith({ usage: { list_cost: { amount: "11", currency: "USD" } } });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   await until((s) => s.pending?.kind === "question");
   studio.stop();
   // Until the charge is in, however long a busy mini takes; the count is the give-up (a minute), not a pace.
@@ -357,7 +357,7 @@ test("no refunds: a make stopped at a question is charged what it used (D202, E8
 test("an overrun finishes and leaves the pot negative until the 1st (D203, L3)", async () => {
   const c = clock();
   const { studio, runThrough, pot, clock: k } = studioWith({ potCents: 60, usage: { list_cost: { amount: "140", currency: "USD" } }, clock: c });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const r = await runThrough();
   assert.equal(r.ok, true, "it finished");
   assert.equal(r.cost_cents, 140);
@@ -376,12 +376,12 @@ test("the workspace's real limit refusing a session: the Studio rests until the 
   const api = replayApi({ dir: MAKE }).api;
   api.createSession = async () => Promise.reject(new Error("400 invalid_request_error: this workspace has reached its spend limit"));
   const { studio, until, pot, cabinet, clock: c } = studioWith({ api });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const s = /** @type {any} */ (await until((x) => x.results?.length));
   assert.equal(s.results[0].resting, true);
   assert.equal(cabinet.resting(), true);
   assert.equal(studio.state().resting, true);
-  assert.throws(() => studio.start({ maker: "alina", request: "again" }), (e) => e instanceof StudioRefused && e.why === "resting");
+  assert.throws(() => studio.start({ maker: "ivy", request: "again" }), (e) => e instanceof StudioRefused && e.why === "resting");
   assert.equal(pot.history().filter((e) => e.kind === "charge").length, 0);
   c.set("2026-12-01T09:00:00");
   assert.equal(cabinet.resting(), false, "making comes back on the 1st");
@@ -429,13 +429,13 @@ test("a Manager top-up, with its reason, shows in the coin history the launcher 
 test("the start endpoint says why the pot refused, so the launcher can show L1 or L2", async () => {
   const paths = dataPaths(tmp());
   const pot = potStore({ logsDir: paths.logs });
-  pot.charge({ maker: "owen", what: "new", session_id: "x", cost_cents: 960, outcome: "on the shelf" });
+  pot.charge({ maker: "milo", what: "new", session_id: "x", cost_cents: 960, outcome: "on the shelf" });
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("alina");
+  makers.add("ivy");
   const studio = createStudio({ paths, api: async () => replayApi({ dir: MAKE }).api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "", hash: "" }), checker: passing, pot });
   const s = await startService({ studio, makers, speech: stubSpeech(), libraryDir: paths.carts, logsDir: paths.logs, pot, port: 0 });
   try {
-    const r = await fetch(`${s.url}/api/studio/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maker: "alina", request: "a game" }) });
+    const r = await fetch(`${s.url}/api/studio/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maker: "ivy", request: "a game" }) });
     assert.equal(r.status, 409);
     assert.equal((await r.json()).why, "low");
   } finally {

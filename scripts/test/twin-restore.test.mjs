@@ -46,28 +46,28 @@ function livedInPicade() {
   const at = (/** @type {string} */ iso) => () => new Date(iso);
   const makers = makersStore({ file: path.join(d, "makers.json"), now: at("2026-11-14T16:00:00Z") });
   makers.add("Tester");
-  makers.add("Owen");
-  makers.add("Alina");
+  makers.add("Milo");
+  makers.add("Ivy");
   makers.ensureGrownUp("Geoff");
   put(d, "twin-seed.json", JSON.stringify({ seeded_at: "2026-11-13T12:00:00Z", carts: ["rock-rain"], makers: ["tester"] }));
   makeCart(d, "rock-rain", { title: "Rock Rain", version: 1, maker: "tester", session: "sesn_virtual_1", at: "2026-11-11" });
-  makeCart(d, "rock-rain-v2", { title: "Rock Rain", version: 2, maker: "owen", parent: "rock-rain", family: "rock-rain", session: "sesn_picade_1", at: "2026-11-14" });
-  makeCart(d, "star-hop", { title: "Star Hop", version: 1, maker: "alina", session: "sesn_picade_2", at: "2026-11-15" });
-  makeCart(d, "star-hop-v2", { title: "Star Hop", version: 2, maker: "alina", parent: "star-hop", family: "star-hop", session: "sesn_picade_3", at: "2026-11-16" });
+  makeCart(d, "rock-rain-v2", { title: "Rock Rain", version: 2, maker: "milo", parent: "rock-rain", family: "rock-rain", session: "sesn_picade_1", at: "2026-11-14" });
+  makeCart(d, "star-hop", { title: "Star Hop", version: 1, maker: "ivy", session: "sesn_picade_2", at: "2026-11-15" });
+  makeCart(d, "star-hop-v2", { title: "Star Hop", version: 2, maker: "ivy", parent: "star-hop", family: "star-hop", session: "sesn_picade_3", at: "2026-11-16" });
   // The pot, written by the service's own code: October, then November with charges, a top-up and a reset.
   let t = "2026-10-20T15:00:00Z";
   const pot = potStore({ logsDir: path.join(d, "logs"), now: () => new Date(t) });
   pot.charge({ maker: "tester", what: "new", session_id: "sesn_virtual_1", cost_cents: 19, outcome: "on the shelf", cart_id: "rock-rain", cart_version: 1 });
   t = "2026-11-14T16:00:00Z";
-  pot.charge({ maker: "owen", what: "change", session_id: "sesn_picade_1", cost_cents: 14, outcome: "on the shelf", cart_id: "rock-rain-v2", cart_version: 2 });
-  pot.topUp({ coins: 20, reason: "Owen helped clean the basement", by: "Geoff" });
+  pot.charge({ maker: "milo", what: "change", session_id: "sesn_picade_1", cost_cents: 14, outcome: "on the shelf", cart_id: "rock-rain-v2", cart_version: 2 });
+  pot.topUp({ coins: 20, reason: "Milo helped clean the basement", by: "Geoff" });
   t = "2026-11-15T16:00:00Z";
-  pot.charge({ maker: "alina", what: "new", session_id: "sesn_picade_2", cost_cents: 31, outcome: "on the shelf", cart_id: "star-hop", cart_version: 1 });
-  pot.charge({ maker: "alina", what: "new", session_id: "sesn_picade_x", cost_cents: 8, outcome: "didn't pass its tests" });
+  pot.charge({ maker: "ivy", what: "new", session_id: "sesn_picade_2", cost_cents: 31, outcome: "on the shelf", cart_id: "star-hop", cart_version: 1 });
+  pot.charge({ maker: "ivy", what: "new", session_id: "sesn_picade_x", cost_cents: 8, outcome: "didn't pass its tests" });
   t = "2026-11-16T16:00:00Z";
-  pot.charge({ maker: "alina", what: "change", session_id: "sesn_picade_3", cost_cents: 12, outcome: "on the shelf", cart_id: "star-hop-v2", cart_version: 2 });
+  pot.charge({ maker: "ivy", what: "change", session_id: "sesn_picade_3", cost_cents: 12, outcome: "on the shelf", cart_id: "star-hop-v2", cart_version: 2 });
   for (const s of ["sesn_picade_1", "sesn_picade_2", "sesn_picade_3"]) put(d, `sessions/${s}/events.jsonl`, `{"type":"session.status_idle","id":"${s}"}\n`);
-  put(d, "logs/studio_session.jsonl", ['{"id":"sesn_picade_1","maker":"owen"}', '{"id":"sesn_picade_2","maker":"alina"}', '{"id":"sesn_picade_3","maker":"alina"}'].join("\n") + "\n");
+  put(d, "logs/studio_session.jsonl", ['{"id":"sesn_picade_1","maker":"milo"}', '{"id":"sesn_picade_2","maker":"ivy"}', '{"id":"sesn_picade_3","maker":"ivy"}'].join("\n") + "\n");
   put(d, "logs/play.jsonl", '{"cart":"rock-rain-v2","duration_s":120}\n{"cart":"star-hop","duration_s":300,"scores":[41]}\n');
   put(d, "logs/screening.jsonl", '{"verdict":"ok"}\n');
   put(d, "guests/teti/guest.json", '{"title":"teti"}\n');
@@ -100,10 +100,10 @@ test("a dead card, rebuilt from the mini's backup alone: every version, maker, c
   const run = (/** @type {string} */ iso) => backup({ picade: () => folderEnd(picade), twin: null, isReachable: async () => true, now: new Date(iso) });
   assert.equal((await run("2026-11-16T17:00:00Z")).last_attempt.result, "ok");
   // An hour of use, a gc on the cabinet, the next backup.
-  makeCart(picade, "rock-rain-v3", { title: "Rock Rain", version: 3, maker: "alina", parent: "rock-rain-v2", family: "rock-rain", branch: "alina", session: "sesn_picade_4", at: "2026-11-16" });
+  makeCart(picade, "rock-rain-v3", { title: "Rock Rain", version: 3, maker: "ivy", parent: "rock-rain-v2", family: "rock-rain", branch: "ivy", session: "sesn_picade_4", at: "2026-11-16" });
   git(path.join(picade, "carts"), ["gc", "-q"]);
-  potStore({ logsDir: path.join(picade, "logs"), now: () => new Date("2026-11-16T17:30:00Z") }).charge({ maker: "alina", what: "change", session_id: "sesn_picade_4", cost_cents: 16, outcome: "on the shelf", cart_id: "rock-rain-v3", cart_version: 3 });
-  makersStore({ file: path.join(picade, "makers.json"), now: () => new Date("2026-11-16T17:30:00Z") }).touch("alina");
+  potStore({ logsDir: path.join(picade, "logs"), now: () => new Date("2026-11-16T17:30:00Z") }).charge({ maker: "ivy", what: "change", session_id: "sesn_picade_4", cost_cents: 16, outcome: "on the shelf", cart_id: "rock-rain-v3", cart_version: 3 });
+  makersStore({ file: path.join(picade, "makers.json"), now: () => new Date("2026-11-16T17:30:00Z") }).touch("ivy");
   fs.appendFileSync(path.join(picade, "logs/play.jsonl"), '{"cart":"rock-rain-v3","duration_s":60}\n');
   const last = await run("2026-11-16T18:00:00Z");
   assert.equal(last.last_attempt.result, "ok");
@@ -128,13 +128,13 @@ test("a dead card, rebuilt from the mini's backup alone: every version, maker, c
   const carts = path.join(data, "carts");
   git(carts, ["fsck", "--no-progress"]);
   assert.equal(git(carts, ["status", "--porcelain"]), "");
-  assert.deepEqual(git(carts, ["log", "--format=%s"]).trim().split("\n"), ["rock-rain-v3 v3 by alina", "star-hop-v2 v2 by alina", "star-hop v1 by alina", "rock-rain-v2 v2 by owen", "rock-rain v1 by tester"]);
+  assert.deepEqual(git(carts, ["log", "--format=%s"]).trim().split("\n"), ["rock-rain-v3 v3 by ivy", "star-hop-v2 v2 by ivy", "star-hop v1 by ivy", "rock-rain-v2 v2 by milo", "rock-rain v1 by tester"]);
 
   // Makers and lineage, as the shelf reads them.
   const shelf = (/** @type {string} */ root) => listCarts([{ root: path.join(root, "carts"), source: "library" }]).map((c) => ({ id: c.id, version: c.version, maker: c.maker, parent: c.parent, family: c.family, branch: c.branch, session: c.session_id })).sort((a, b) => a.id.localeCompare(b.id));
   const before = shelf(picade);
   assert.deepEqual(shelf(data), before);
-  assert.deepEqual(before.find((c) => c.id === "rock-rain-v3"), { id: "rock-rain-v3", version: 3, maker: "alina", parent: "rock-rain-v2", family: "rock-rain", branch: "alina", session: "sesn_picade_4" });
+  assert.deepEqual(before.find((c) => c.id === "rock-rain-v3"), { id: "rock-rain-v3", version: 3, maker: "ivy", parent: "rock-rain-v2", family: "rock-rain", branch: "ivy", session: "sesn_picade_4" });
   assert.deepEqual(makersStore({ file: path.join(data, "makers.json") }).read(), makersStore({ file: path.join(picade, "makers.json") }).read());
 
   // The coin pot: the same ledger, so the same pot, this month's makers and last month, as the service computes them.

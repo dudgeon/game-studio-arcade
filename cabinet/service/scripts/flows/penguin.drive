@@ -7,7 +7,7 @@ wait who
 shot who-nobody-yet
 press a
 wait say typing
-type alina
+type ivy
 shot new-name-typing
 press enter
 wait say confirm
@@ -96,6 +96,6 @@ shot shelf-with-new-game
 press up
 press a
 wait who
-shot who-knows-alina
+shot who-knows-ivy
 press esc
 wait shelf

@@ -1,5 +1,5 @@
 # Every printable character through `drive type`, on the Make flow's F1 typing screen (D184).
-# Needs a maker named Alina (penguin.drive makes one). Backs out before anything is made.
+# Needs a maker named Ivy (penguin.drive makes one). Backs out before anything is made.
 wait shelf
 press a
 wait who

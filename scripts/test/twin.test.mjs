@@ -130,12 +130,12 @@ test("sync: the real cabinet's new games, versions, sessions and log lines reach
   const real = tmp();
   seed(folderEnd(real), folderEnd(twin));
   // The kids use the real cabinet.
-  put(real, "carts/rock-rain-v2/cart.json", JSON.stringify({ title: "Rock Rain", maker: "owen" }));
+  put(real, "carts/rock-rain-v2/cart.json", JSON.stringify({ title: "Rock Rain", maker: "milo" }));
   put(real, "carts/rock-rain-v2/game.js", "// v2\n");
   put(real, "carts/.git/refs/heads/main", "bbbb\n");
-  put(real, "sessions/sesn_owen/events.jsonl", "{}\n");
-  fs.appendFileSync(path.join(real, "logs/coin_ledger.jsonl"), '{"kind":"make","maker":"owen","cents":30}\n');
-  put(real, "makers.json", JSON.stringify([{ id: "tester" }, { id: "owen" }]));
+  put(real, "sessions/sesn_milo/events.jsonl", "{}\n");
+  fs.appendFileSync(path.join(real, "logs/coin_ledger.jsonl"), '{"kind":"make","maker":"milo","cents":30}\n');
+  put(real, "makers.json", JSON.stringify([{ id: "tester" }, { id: "milo" }]));
   put(real, "logs/guest_play.jsonl", "{}\n");
   put(real, "kit-uploads.json", '{"file":"file_picade"}\n');
 
@@ -168,7 +168,7 @@ test("sync: what the twin made itself is set aside, never deleted, and never rea
   put(twin, "carts/.git/refs/heads/main", "cccc\n");
   fs.appendFileSync(path.join(twin, "logs/coin_ledger.jsonl"), '{"kind":"make","maker":"tester","cents":20}\n');
   // Meanwhile the real cabinet moves on too.
-  fs.appendFileSync(path.join(real, "logs/coin_ledger.jsonl"), '{"kind":"make","maker":"alina","cents":25}\n');
+  fs.appendFileSync(path.join(real, "logs/coin_ledger.jsonl"), '{"kind":"make","maker":"ivy","cents":25}\n');
   put(real, "carts/.git/refs/heads/main", "dddd\n");
 
   const s = status(folderEnd(real), folderEnd(twin));

@@ -5,7 +5,7 @@ aliases:
   - game-studio-arcade
   - Quarter Deck
 status: active
-goal: A basement arcade cabinet where Owen and Alina describe a game out loud, answer Claude's questions with the joystick, and play the new game minutes later
+goal: A basement arcade cabinet where Milo and Ivy describe a game out loud, answer Claude's questions with the joystick, and play the new game minutes later
 health: on-track — Phase 0 stack built and measured (agent v2 live; fetch on demand, templates, frozen checks); virtual cabinet booting; Studio screens in progress; Picade 10" ordered
 next: Finish the launcher Studio screens and virtual cabinet V0, then run a full build driven through the cabinet UI; task 10 (Falling Blocks with Geoff) after that
 created: 2026-11-07
@@ -16,15 +16,15 @@ repo: https://github.com/dudgeon/game-studio-arcade
 
 ## Why
 
-Teach Owen (13) and Alina (10) to work with an agent: state what they want, define requirements, check that the agent met them, then change the approach or the requirement. Learning to code isn't the goal. The arcade makes that loop fun and fast: pick Make on the shelf, say the idea, answer a few tile questions, and play your own game on the shelf. Bigger projects happen with Geoff at the Mac mini and publish to the same cabinet.
+Teach Milo and Ivy to work with an agent: state what they want, define requirements, check that the agent met them, then change the approach or the requirement. Learning to code isn't the goal. The arcade makes that loop fun and fast: pick Make on the shelf, say the idea, answer a few tile questions, and play your own game on the shelf. Bigger projects happen with Geoff at the Mac mini and publish to the same cabinet.
 
 ## Done when
 
-- [ ] Phase 0: Falling Blocks built by a Managed Agents session from Alina's request, all auto rules passing, playable in a browser; real cost per build measured; Sonnet 5.5 vs Opus 5.5 compared
+- [ ] Phase 0: Falling Blocks built by a Managed Agents session from Ivy's request, all auto rules passing, playable in a browser; real cost per build measured; Sonnet 5.5 vs Opus 5.5 compared
 - [ ] Phase 1: the cabinet service (launcher, cart library, tile relay, logs, MCP, Manager API) and Cabinet Manager v0 running on the mini
 - [ ] Phase 2: Picade 10" + Pi 5 built (hardware ordered 2026-11-07), provisioned from the script, mic fitted, Make entry in the launcher, day-one library on the shelf
 - [ ] Phase 3: speech bake-off (Groq vs Moonshine) with the kids' voices; first real kid builds and forks at the cabinet
-- [ ] Phase 4: `game-studio` plugin and the desktop flow; the first joint game with Owen published to the cabinet
+- [ ] Phase 4: `game-studio` plugin and the desktop flow; the first joint game with Milo published to the cabinet
 
 ## Notes
 
@@ -32,7 +32,7 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - Hardware: Pimoroni Picade with 10" display (1024×768, one player) + Raspberry Pi 5 8 GB, both ordered 2026-11-07 (D80). Still to sort: power supply, Active Cooler, microSD, mic. Single player by default with turns (D85); no physical MAKE button (D86).
 - The cabinet must work with the Mac mini off. Kid builds run in Claude Managed Agents; desktop builds use Geoff's Claude Code.
 - Phase 0 budget: $25 total, $3 cap per build.
-- Alina's Phase 0 request is a stand-in Claude wrote (docs/phase-0.md). Swap in her real words when we have them.
+- Ivy's Phase 0 request is a stand-in Claude wrote (docs/phase-0.md). Swap in her real words when we have them.
 
 ## Director
 
@@ -79,12 +79,12 @@ Teach Owen (13) and Alina (10) to work with an agent: state what they want, defi
 - 2026-11-08: checks are frozen once written from the spec: a failing check means fix the game; a check may change only after the spec rule or an Assumption changes first, shown in the plan and logged (Geoff, after the first live build bent its checks to fit the game)
 - 2026-11-08: virtual cabinet V0 approved: install UTM, download pinned Pi OS Lite and Debian arm64 images, one ~32 GB VM, headless; ask before any window (Geoff)
 - 2026-11-08: library direction: a medium model (Sonnet) fetches context from the library as needed; the library is built for expressiveness and token efficiency, grows over time (e.g. 3D navigation), and offers a few templates plus a start-from-scratch option. Measure the Penguin Catch build's tokens first, then redesign (Geoff)
-- 2026-11-08: the next game build runs fully from the virtual cabinet's own interface, once the stack is ready (Make tile, who's making, hold-to-talk, tiles, plan, progress, play, you-check), driven by Claude to pressure-test the UI Alina will see: text overruns, layout, and whether the Studio's output works there (Geoff)
+- 2026-11-08: the next game build runs fully from the virtual cabinet's own interface, once the stack is ready (Make tile, who's making, hold-to-talk, tiles, plan, progress, play, you-check), driven by Claude to pressure-test the UI Ivy will see: text overruns, layout, and whether the Studio's output works there (Geoff)
 - 2026-11-08: model comparison adds Haiku 5.5: run Opus and Haiku comparisons (Geoff, after the token breakdown put the same build at about 4.5c on Haiku vs 68c on Sonnet)
 - 2026-11-08: when a check contradicts the unchanged spec's own words (a check bug), the agent fixes the check, quoting the rule; it's logged as a check bug and shown in the build summary. Changing what a rule means still needs the spec changed first (Geoff)
 - 2026-11-08: a check-bug fix that tests less of its rule must say which words are no longer tested; such a rule is flagged in the build summary and becomes a you-check question on first play (Geoff)
 - 2026-11-08: Studio builds fetch modules on demand and start from a template when the kid's idea fits one, else from blank; templates get some visual polish (pop-ups, life icons) (Geoff, D166/D169)
 - 2026-11-08: virtual cabinet: its games move to the Picade's shelf when it arrives; it stays as a staging cabinet afterwards; bridged on home Wi-Fi; keyboard for now, with an arcade controller Geoff plans to buy usable for testing (Geoff)
-- 2026-11-08: Falling Blocks (task 10) keeps the stand-in request for Alina (Geoff)
+- 2026-11-08: Falling Blocks (task 10) keeps the stand-in request for Ivy (Geoff)
 - 2026-11-09: virtual cabinet Console setup: workspace `cabinet-virtual` capped at $10 a month; its key is a service account key if the Console offers them, otherwise a personal key linked to Geoff; never expires (Geoff)
 - 2026-11-09: the shelf keeps the three starter games but drops their "1 to check" label (Geoff)

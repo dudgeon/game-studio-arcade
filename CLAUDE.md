@@ -1,6 +1,6 @@
 # game-studio-arcade
 
-A basement arcade cabinet (Raspberry Pi 5) that builds its own games. **The Studio makes the games; the Arcade plays them.** Owen (13) and Alina (10) pick Make on the game shelf, say what they want, answer Claude's questions with the joystick, and a new game lands on the shelf. The learning goal is working with an agent (state intent, define requirements, check them, adjust), not learning to code.
+A basement arcade cabinet (Raspberry Pi 5) that builds its own games. **The Studio makes the games; the Arcade plays them.** Milo and Ivy pick Make on the game shelf, say what they want, answer Claude's questions with the joystick, and a new game lands on the shelf. The learning goal is working with an agent (state intent, define requirements, check them, adjust), not learning to code.
 
 Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brief): [docs/decisions.md](docs/decisions.md). Verified platform facts: [docs/platform-notes.md](docs/platform-notes.md). Current phase plan: [docs/phase-0.md](docs/phase-0.md).
 
@@ -37,7 +37,7 @@ Full brief: [docs/HANDOFF.md](docs/HANDOFF.md). Decision log (wins over the brie
 - Tested starter library + lean context pack. Don't overspecify.
 - Speech off the mini: Groq Whisper Large v3 Turbo primary, Moonshine on the Pi as backup/offline. Bake off with the kids' voices first.
 - House JS runtime; guest players TIC-80, PICO-8, RetroArch homebrew. No MakeCode.
-- Inspired-by games only (e.g. Alina's falling-blocks game: no Tetris name or look).
+- Inspired-by games only (e.g. Ivy's falling-blocks game: no Tetris name or look).
 - No approval loop; the activity log is the oversight.
 - Existing home mesh Wi-Fi; no Ethernet.
 - Hardware: prebuilt only if it ships with a Pi 5; otherwise DIY/kit.

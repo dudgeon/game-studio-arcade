@@ -131,7 +131,7 @@ So the mini can reach the cabinet from anywhere, even when `arcade.local` doesn'
 
 ## 8. The kids make a game
 
-**You, with Owen or Alina:**
+**You, with Milo or Ivy:**
 1. From the shelf: stick and **A** on **Make a new game**.
 2. Pick their name (or add it).
 3. **Hold a player button and talk**, and let go to send.

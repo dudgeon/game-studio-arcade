@@ -1,7 +1,7 @@
 {
   "makers": [
-    "Owen",
-    "Alina"
+    "Milo",
+    "Ivy"
   ],
   "state": "new-month",
   "ledger": [
@@ -11,13 +11,13 @@
     },
     {
       "kind": "charge",
-      "who": "owen",
+      "who": "milo",
       "cost_cents": 640,
       "last_month": true
     },
     {
       "kind": "charge",
-      "who": "alina",
+      "who": "ivy",
       "cost_cents": 412,
       "last_month": true
     }

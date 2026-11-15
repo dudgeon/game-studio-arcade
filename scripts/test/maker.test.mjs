@@ -23,7 +23,7 @@ async function cabinet() {
   const pot = potStore({ logsDir: paths.logs });
   const file = path.join(root, "makers.json");
   const makers = makersStore({ file });
-  makers.add("alina");
+  makers.add("ivy");
   const before = fs.readFileSync(file, "utf8");
   const studio = createStudio({ paths, api: async () => { throw new Error("no API here"); }, lock: () => ({ agentId: "a", environmentId: "e" }), kit: async () => ({ fileId: "", hash: "" }), checker: /** @type {any} */ ({}), pot });
   // The real guests, Geoff's version among them: the service starts with them and must not touch makers.json.
@@ -46,14 +46,14 @@ test("maker: add a grown-up once; the kids' list doesn't offer them; a cabinet n
     assert.equal(await c.run(["add-grown-up", "geoff"]), 0);
     assert.match(c.out.at(-1) ?? "", /Geoff \(geoff\) is already a maker, a grown-up\. Left as is\./);
     const all = JSON.parse(fs.readFileSync(c.file, "utf8"));
-    assert.deepEqual(all.map((/** @type {any} */ m) => [m.id, m.guest, m.grown_up ?? false]), [["alina", true, false], ["geoff", false, true]]);
-    // M1 (the kids' list) still offers only Alina; the Manager's list has both.
-    assert.deepEqual((await (await fetch(`${c.s.url}/api/makers`)).json()).makers.map((/** @type {any} */ m) => m.id), ["alina"]);
+    assert.deepEqual(all.map((/** @type {any} */ m) => [m.id, m.guest, m.grown_up ?? false]), [["ivy", true, false], ["geoff", false, true]]);
+    // M1 (the kids' list) still offers only Ivy; the Manager's list has both.
+    assert.deepEqual((await (await fetch(`${c.s.url}/api/makers`)).json()).makers.map((/** @type {any} */ m) => m.id), ["ivy"]);
     assert.equal(await c.run(["list"]), 0);
-    assert.match(c.out.at(-1) ?? "", /Alina \(alina\), added at the cabinet\n {2}Geoff \(geoff\), grown-up/);
+    assert.match(c.out.at(-1) ?? "", /Ivy \(ivy\), added at the cabinet\n {2}Geoff \(geoff\), grown-up/);
     // A kid's own name stays theirs.
-    assert.equal(await c.run(["add-grown-up", "Alina"]), 0);
-    assert.match(c.out.at(-1) ?? "", /Alina \(alina\) is already a maker, added at the cabinet\. Left as is\./);
+    assert.equal(await c.run(["add-grown-up", "Ivy"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Ivy \(ivy\) is already a maker, added at the cabinet\. Left as is\./);
     assert.equal(JSON.parse(fs.readFileSync(c.file, "utf8"))[0].guest, true);
   } finally {
     await c.s.close();
@@ -63,14 +63,14 @@ test("maker: add a grown-up once; the kids' list doesn't offer them; a cabinet n
 test("maker: add a kid from the mini, as 'Someone new' would; once; a grown-up's name is left as is (D236)", async () => {
   const c = await cabinet();
   try {
-    assert.equal(await c.run(["add", "owen"]), 0);
-    assert.match(c.out.at(-1) ?? "", /Added Owen \(owen\) as a maker, as "Someone new" at the cabinet would/);
+    assert.equal(await c.run(["add", "milo"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Added Milo \(milo\) as a maker, as "Someone new" at the cabinet would/);
     const all = JSON.parse(fs.readFileSync(c.file, "utf8"));
-    assert.deepEqual(all.map((/** @type {any} */ m) => [m.id, m.name, m.guest, m.grown_up ?? false]), [["alina", "Alina", true, false], ["owen", "Owen", true, false]]);
+    assert.deepEqual(all.map((/** @type {any} */ m) => [m.id, m.name, m.guest, m.grown_up ?? false]), [["ivy", "Ivy", true, false], ["milo", "Milo", true, false]]);
     // The kids' list offers them, as any kid.
-    assert.deepEqual((await (await fetch(`${c.s.url}/api/makers`)).json()).makers.map((/** @type {any} */ m) => m.id).sort(), ["alina", "owen"]);
-    assert.equal(await c.run(["add", "Owen"]), 0);
-    assert.match(c.out.at(-1) ?? "", /Owen \(owen\) is already a maker, added at the cabinet\. Left as is\./);
+    assert.deepEqual((await (await fetch(`${c.s.url}/api/makers`)).json()).makers.map((/** @type {any} */ m) => m.id).sort(), ["ivy", "milo"]);
+    assert.equal(await c.run(["add", "Milo"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Milo \(milo\) is already a maker, added at the cabinet\. Left as is\./);
     assert.equal(JSON.parse(fs.readFileSync(c.file, "utf8")).length, 2);
     await c.run(["add-grown-up", "Geoff"]);
     assert.equal(await c.run(["add", "Geoff"]), 0);

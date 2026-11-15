@@ -52,9 +52,9 @@ function heldGate() {
 function cabinet(checker) {
   const paths = dataPaths(fs.mkdtempSync(path.join(os.tmpdir(), "gsa-pub-")));
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("Alina");
-  makers.add("Owen");
-  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "alina" }, message: "make {id}" });
+  makers.add("Ivy");
+  makers.add("Milo");
+  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "ivy" }, message: "make {id}" });
   let playing = false;
   const server = (/** @type {any} */ ch) => createArcadeMcp({ paths, makers, checker: ch, plays: { playing: () => playing } });
   /** @param {ReturnType<typeof server>} s */
@@ -66,18 +66,18 @@ const bundle = (/** @type {string} */ extra = "") => ({ files: folderFiles(FIXTU
 
 test("the publish key: same files, parent, maker, with and name are the same publish; the summary isn't part of it", () => {
   const files = readBundle(bundle("\nx\n"));
-  const k = publishKey(files, { parent: "p", maker: "alina" });
-  assert.equal(k, publishKey(new Map([...files].reverse()), { parent: "p", maker: "alina" }), "file order doesn't matter");
-  assert.notEqual(k, publishKey(readBundle(bundle("\ny\n")), { parent: "p", maker: "alina" }));
-  assert.notEqual(k, publishKey(files, { parent: "p", maker: "owen" }));
-  assert.notEqual(k, publishKey(files, { parent: null, maker: "alina" }));
+  const k = publishKey(files, { parent: "p", maker: "ivy" });
+  assert.equal(k, publishKey(new Map([...files].reverse()), { parent: "p", maker: "ivy" }), "file order doesn't matter");
+  assert.notEqual(k, publishKey(readBundle(bundle("\ny\n")), { parent: "p", maker: "ivy" }));
+  assert.notEqual(k, publishKey(files, { parent: "p", maker: "milo" }));
+  assert.notEqual(k, publishKey(files, { parent: null, maker: "ivy" }));
 });
 
 test("pending while the gate waits; a retry joins the same publish; one cart, even after a restart (D513, D514)", async () => {
   const g = heldGate();
   const c = cabinet(g.checker);
   c.setPlaying(true);
-  const args = { bundle: bundle("\n- v2: x\n"), parent: "penguin-catch", maker: "alina", summary: "Faster." };
+  const args = { bundle: bundle("\n- v2: x\n"), parent: "penguin-catch", maker: "ivy", summary: "Faster." };
   const first = (await c.call("publish_cart", { ...args, wait_s: 0 })).structuredContent;
   assert.equal(first.status, "pending");
   assert.match(first.publish_id, /^pub_[0-9a-f]{20}$/);
@@ -122,10 +122,10 @@ test("refusals come back at once; a failed publish runs again when asked; an unk
   const bad = await c.call("publish_cart", { bundle: bundle(), maker: "zed", summary: "x", wait_s: 0 });
   assert.equal(bad.isError, true);
   assert.match(bad.content[0].text, /no maker "zed"/);
-  const f1 = await c.call("publish_cart", { bundle: bundle(), maker: "owen", summary: "x" });
+  const f1 = await c.call("publish_cart", { bundle: bundle(), maker: "milo", summary: "x" });
   assert.equal(f1.isError, true);
   assert.match(f1.structuredContent.publish_id, /^pub_/);
-  const f2 = await c.call("publish_cart", { bundle: bundle(), maker: "owen", summary: "x" });
+  const f2 = await c.call("publish_cart", { bundle: bundle(), maker: "milo", summary: "x" });
   assert.equal(f2.isError, true);
   assert.equal(readLog(path.join(c.paths.logs, "studio_session.jsonl")).filter((r) => r.outcome === "checks_failed").length, 2, "it ran again");
   const unknown = await c.call("publish_status", { publish_id: "pub_nope" });

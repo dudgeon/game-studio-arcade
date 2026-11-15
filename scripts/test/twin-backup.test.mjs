@@ -26,9 +26,9 @@ const fresh = () => {
 
 function picade() {
   const d = tmp();
-  put(d, "carts/rock-rain/cart.json", JSON.stringify({ maker: "owen" }));
+  put(d, "carts/rock-rain/cart.json", JSON.stringify({ maker: "milo" }));
   put(d, "logs/coin_ledger.jsonl", '{"kind":"refill"}\n');
-  put(d, "makers.json", '[{"id":"owen"}]');
+  put(d, "makers.json", '[{"id":"milo"}]');
   put(d, "kit-uploads.json", "{}");
   return d;
 }
@@ -51,14 +51,14 @@ test("the backup folder keeps every older copy the Picade replaced, not only the
   const p = picade();
   const at = (/** @type {string} */ t) => ({ picade: () => folderEnd(p), twin: null, isReachable: async () => true, now: new Date(t) });
   await backup(at("2026-11-14T10:00:00Z"));
-  put(p, "makers.json", '[{"id":"owen"},{"id":"alina"}]');
+  put(p, "makers.json", '[{"id":"milo"},{"id":"ivy"}]');
   fs.appendFileSync(path.join(p, "logs/coin_ledger.jsonl"), '{"kind":"make"}\n');
   const rec = await backup(at("2026-11-14T11:00:00Z"));
   assert.equal(rec.last_ok.kept_older, 1);
   assert.equal(rec.last_ok.grown, 1);
-  assert.equal(get(backupDir(), "makers.json"), '[{"id":"owen"},{"id":"alina"}]');
+  assert.equal(get(backupDir(), "makers.json"), '[{"id":"milo"},{"id":"ivy"}]');
   const aside = path.join(backupDir(), "twin-sync/set-aside/2026-11-14T11-00-00-000Z");
-  assert.equal(get(aside, "makers.json"), '[{"id":"owen"}]');
+  assert.equal(get(aside, "makers.json"), '[{"id":"milo"}]');
   assert.match(get(aside, "set-aside.jsonl"), /an older copy/);
 });
 

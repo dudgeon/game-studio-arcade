@@ -82,30 +82,28 @@ test("a new maker says their name; misheard, they type it with the stick; an ide
       up a
     `);
     assert.equal(await text("keys-field"), "", "the button that picked the tile, still held, types nothing");
-    // A-l-i-n-a with the stick: Q is lit. A is under it; L is the end of that row.
+    // I-v-y with the stick: Q is lit. Left wraps round to P, then O, then I; V is two rows under R.
     await run(`
-      press down
-      press a
+      press left
+      press left
       press left
       press a
-      press up
       press left
-      press a
+      press left
+      press left
+      press left
       press down
       press down
-      press left
       press a
       press a
       press b
       press up
-      press left
-      press left
-      press left
-      press left
-      press left
+      press up
+      press right
+      press right
       press a
     `);
-    assert.equal(await text("keys-field"), "Alina");
+    assert.equal(await text("keys-field"), "Ivy");
     assert.equal(await text("keys-for"), "Your first name");
     assert.deepEqual(await L("faults"), []);
     // 1UP is done; the name is checked like a spoken one, then it's on to the coin check.
@@ -113,12 +111,12 @@ test("a new maker says their name; misheard, they type it with the stick; an ide
       press start
       wait say confirm
     `);
-    assert.equal(await text("say-transcript"), "Alina");
+    assert.equal(await text("say-transcript"), "Ivy");
     await run(`
       press a
       wait M3
     `);
-    assert.deepEqual(makers(data), ["Alina"]);
+    assert.deepEqual(makers(data), ["Ivy"]);
     // The idea: ENT opens the keyboard on the talk screen; ESC goes back to the mic, ENT opens it again.
     await run(`
       press coin

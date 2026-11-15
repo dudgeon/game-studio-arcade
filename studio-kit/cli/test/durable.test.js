@@ -13,9 +13,9 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "durable-"));
 test("a durable write replaces the file whole and leaves no temp file behind", () => {
   const d = tmp();
   const f = path.join(d, "sub", "makers.json");
-  writeJsonDurable(f, [{ id: "alina" }]);
-  writeJsonDurable(f, [{ id: "alina" }, { id: "owen" }]);
-  assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")), [{ id: "alina" }, { id: "owen" }]);
+  writeJsonDurable(f, [{ id: "ivy" }]);
+  writeJsonDurable(f, [{ id: "ivy" }, { id: "milo" }]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f, "utf8")), [{ id: "ivy" }, { id: "milo" }]);
   assert.deepEqual(fs.readdirSync(path.dirname(f)), ["makers.json"]);
   writeFileDurable(path.join(d, "b.bin"), Buffer.from([1, 2, 3]));
   assert.deepEqual([...fs.readFileSync(path.join(d, "b.bin"))], [1, 2, 3]);

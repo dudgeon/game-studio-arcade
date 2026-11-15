@@ -29,10 +29,10 @@ const passing = {
   },
 };
 
-/** A Studio on the replay, with one game on the shelf: Alina's Penguin Catch. @param {{ names?: string[] }} [o] */
+/** A Studio on the replay, with one game on the shelf: Ivy's Penguin Catch. @param {{ names?: string[] }} [o] */
 function studioWith(o = {}) {
   const paths = dataPaths(fs.mkdtempSync(path.join(os.tmpdir(), "gsa-names-")));
-  const parent = { id: "penguin-catch", dir: path.join(MAKE, "cart"), version: 1, maker: "alina", title: "Penguin Catch", session_id: null, version_name: null, names: o.names ?? [] };
+  const parent = { id: "penguin-catch", dir: path.join(MAKE, "cart"), version: 1, maker: "ivy", title: "Penguin Catch", session_id: null, version_name: null, names: o.names ?? [] };
   const studio = createStudio({
     paths,
     api: async (/** @type {any} */ _r, /** @type {any} */ what) => replayApi({ dir: what?.kind === "change" ? CHANGE : MAKE }).api,
@@ -76,7 +76,7 @@ function studioWith(o = {}) {
 
 test("the name question comes on the question board after Build it!, and a tile's name is the version's (D471, D472)", async () => {
   const { studio, runThrough, cartOf, specOf, logged, paths } = studioWith();
-  studio.start({ maker: "alina", request: "make the logs float a bit faster", parent: "penguin-catch" });
+  studio.start({ maker: "ivy", request: "make the logs float a bit faster", parent: "penguin-catch" });
   const { result, asked } = await runThrough({ choice: "A" });
   // The board the kids know: Claude's two names as A and B; the launcher draws C and D.
   assert.equal(asked.kind, "question");
@@ -96,7 +96,7 @@ test("the name question comes on the question board after Build it!, and a tile'
   assert.equal(readCart(paths.carts, "penguin-catch-v2")?.version_name, "Faster logs");
   // The log says what it's called, who named it and how.
   const v = logged("cart_version").at(-1);
-  assert.deepEqual([v.cart_id, v.version, v.version_name, v.named_by, v.name_picked], ["penguin-catch-v2", 2, "Faster logs", "alina", "tile"]);
+  assert.deepEqual([v.cart_id, v.version, v.version_name, v.named_by, v.name_picked], ["penguin-catch-v2", 2, "Faster logs", "ivy", "tile"]);
   const session = logged("studio_session").at(-1);
   assert.equal(session.version_name, "Faster logs");
   assert.deepEqual(session.name_turn, { option_a: "Faster logs", option_b: "Turbo river", pick: "A", choice: "A", said: null, name: "Faster logs", picked: "tile" });
@@ -106,7 +106,7 @@ test("the name question comes on the question board after Build it!, and a tile'
 
 test("R7 says what's being made once the name is picked", async () => {
   const { studio, until } = studioWith();
-  studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+  studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
   for (;;) {
     const s = /** @type {any} */ (await until((x) => x.pending));
     assert.equal(s.version_name, undefined, "no name before it's picked");
@@ -121,14 +121,14 @@ test("R7 says what's being made once the name is picked", async () => {
 
 test("Something else: the maker's own name, tidied; You pick: Claude's choice (D471)", async () => {
   const said = studioWith();
-  said.studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+  said.studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
   const a = await said.runThrough({ choice: "C", said: "  turbo frog. " });
   assert.equal(a.result.version_name, "Turbo frog");
   assert.equal(said.logged("cart_version").at(-1).name_picked, "said");
   assert.equal(said.logged("studio_session").at(-1).name_turn.said, "turbo frog.");
 
   const pick = studioWith();
-  pick.studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+  pick.studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
   const b = await pick.runThrough({ choice: "D" });
   assert.equal(b.result.version_name, "Faster logs", "the recording's pick is A");
   assert.equal(pick.logged("cart_version").at(-1).name_picked, "claude");
@@ -137,7 +137,7 @@ test("Something else: the maker's own name, tidied; You pick: Claude's choice (D
 test("a name is the version's own: one the game has used, or its title, isn't taken again (D473)", async () => {
   // A used name on a tile: the cabinet gives none, and the version shows by its number, as before names.
   const used = studioWith({ names: ["faster LOGS"] });
-  used.studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+  used.studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
   const a = await used.runThrough({ choice: "A" });
   assert.equal(a.result.ok, true, "a name never stops a game");
   assert.equal(a.result.version_name, undefined);
@@ -145,19 +145,19 @@ test("a name is the version's own: one the game has used, or its title, isn't ta
   assert.equal(used.logged("cart_version").at(-1).version_name, undefined);
   // You pick skips a used name for Claude's other one.
   const other = studioWith({ names: ["Faster logs"] });
-  other.studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+  other.studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
   assert.equal((await other.runThrough({ choice: "D" })).result.version_name, "Turbo river");
   // The game's title isn't a version's name, and neither is something too long to show.
   for (const words of ["Penguin Catch", "the one where every log goes much faster"]) {
     const s = studioWith();
-    s.studio.start({ maker: "alina", request: "faster logs", parent: "penguin-catch" });
+    s.studio.start({ maker: "ivy", request: "faster logs", parent: "penguin-catch" });
     assert.equal((await s.runThrough({ choice: "C", said: words })).result.version_name, undefined, words);
   }
 });
 
 test("someone else's change takes the game's title: no name question, no name (D471)", async () => {
   const { studio, runThrough, cartOf, logged } = studioWith();
-  studio.start({ maker: "owen", request: "faster logs", parent: "penguin-catch" });
+  studio.start({ maker: "milo", request: "faster logs", parent: "penguin-catch" });
   const { result, asked } = await runThrough({ choice: "A" });
   assert.equal(asked, null, "the question board never asked for a name");
   assert.equal(result.version, 1);
@@ -181,18 +181,18 @@ test("what the screens call a version, named or not (D474)", () => {
   assert.deepEqual(readyWords({ version: 3, version_name: "Faster logs", parent: { version: 2, version_name: "Bigger frog" } }), { title: "Faster logs is ready!", saved: "Bigger frog is still saved." });
   assert.deepEqual(readyWords({ version: 3, version_name: "Faster logs", parent: { version: 2 } }), { title: "Faster logs is ready!", saved: "Version 2 is still saved." });
   assert.deepEqual(readyWords({ version: 2 }), { title: "Version 2 is ready!", saved: "Version 1 is still saved." });
-  assert.deepEqual(readyWords({ version: 1, parent: { maker_name: "Alina" } }), { title: "Your own version is ready!", saved: "Alina's game stays the same." });
+  assert.deepEqual(readyWords({ version: 1, parent: { maker_name: "Ivy" } }), { title: "Your own version is ready!", saved: "Ivy's game stays the same." });
   assert.equal(YOU_PICK, "You pick");
 });
 
 test("the shelf row, the versions list and the Manager's games show the name; old carts show as they did", () => {
-  const cart = (/** @type {any} */ o) => ({ title: "Log Hopper", maker: "alina", parent: null, family: "log-hopper", branch: "log-hopper", created: "2026-11-14T10:00:00Z", plays: 1, ...o });
+  const cart = (/** @type {any} */ o) => ({ title: "Log Hopper", maker: "ivy", parent: null, family: "log-hopper", branch: "log-hopper", created: "2026-11-14T10:00:00Z", plays: 1, ...o });
   const carts = [cart({ id: "log-hopper", version: 1, created: "2026-11-10T10:00:00Z" }), cart({ id: "log-hopper-v2", version: 2, parent: "log-hopper@1", created: "2026-11-12T10:00:00Z" }), cart({ id: "log-hopper-v3", version: 3, version_name: "Faster logs", parent: "log-hopper-v2@2" })];
-  const rows = gameRows(carts, () => "Alina");
+  const rows = gameRows(carts, () => "Ivy");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].version, "Faster logs");
-  assert.equal(gameRows(carts.slice(0, 2), () => "Alina")[0].version, "v2");
-  const card = cardView({ cart: carts[2], family: rows[0].family, line: rows[0].line, nameOf: () => "Alina", usual: { change: 2 } });
+  assert.equal(gameRows(carts.slice(0, 2), () => "Ivy")[0].version, "v2");
+  const card = cardView({ cart: carts[2], family: rows[0].family, line: rows[0].line, nameOf: () => "Ivy", usual: { change: 2 } });
   assert.deepEqual(card.rows.slice(0, 3).map((/** @type {any} */ r) => [r.text, r.note]), [["Faster logs (newest)", "v3 Nov 14"], ["Version 2", "Nov 12"], ["Version 1", "Nov 10"]]);
   const marks = shelfMarks({ logsDir: fs.mkdtempSync(path.join(os.tmpdir(), "gsa-names-marks-")) });
   const [line] = gameLines(carts, marks);

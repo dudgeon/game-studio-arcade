@@ -5,7 +5,7 @@ description: Make or change a game for the basement arcade cabinet, spec-first, 
 
 # Building a cart, spec-first
 
-A **cart** is one game: a folder with `spec.md` (the source of truth), `cart.json`, `game.js` (the house runtime's `init`/`update`/`draw`), `checks.js` (one check per `(auto)` rule) and `assets/`. Geoff and one of the kids (Owen, 13, or Alina, 10) are at the desk together. The kid decides what the game is. You help them say it clearly, check it, and adjust. They're learning to work with an agent, not to code, so ask them, show them, and let them choose.
+A **cart** is one game: a folder with `spec.md` (the source of truth), `cart.json`, `game.js` (the house runtime's `init`/`update`/`draw`), `checks.js` (one check per `(auto)` rule) and `assets/`. Geoff and one of the kids (Milo or Ivy) are at the desk together. The kid decides what the game is. You help them say it clearly, check it, and adjust. They're learning to work with an agent, not to code, so ask them, show them, and let them choose.
 
 **Which cabinet.** Every arcade result says which cabinet answered (`cabinet`). The real one, the Picade in the kitchen, is `real`; `virtual` is its twin on the mini. If it's the wrong one, `use_cabinet` switches for the rest of the session. A project folder's `.arcade-cabinet` file (one word) picks it from the start.
 

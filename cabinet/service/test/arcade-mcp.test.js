@@ -36,10 +36,10 @@ const failing = {
 function cabinet(o = {}) {
   const paths = dataPaths(fs.mkdtempSync(path.join(os.tmpdir(), "gsa-mcp-")));
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("Alina");
-  makers.add("Owen");
+  makers.add("Ivy");
+  makers.add("Milo");
   makers.ensureGrownUp("Geoff");
-  const first = commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "alina" }, message: "make {id}" });
+  const first = commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "ivy" }, message: "make {id}" });
   const launches = o.launches ?? launchRelay();
   let playing = false;
   /** @type {any} */
@@ -104,7 +104,7 @@ test("list_carts and get_cart: the library, now and at a commit", async () => {
   assert.equal(list.carts.length, 1);
   assert.equal(list.carts[0].id, "penguin-catch");
   assert.equal(list.carts[0].on_shelf, true);
-  assert.equal(list.carts[0].maker, "alina");
+  assert.equal(list.carts[0].maker, "ivy");
   assert.ok(list.makers.some((/** @type {any} */ m) => m.id === "geoff" && m.grown_up));
   const got = (await call("get_cart", { id: "penguin-catch" })).structuredContent;
   assert.deepEqual(
@@ -137,14 +137,14 @@ test("publish_cart: a new desktop game passes the gate, is committed with origin
   const b = bundle();
   const cj = b.files.find((f) => f.path === "cart.json");
   if (cj) cj.text = JSON.stringify({ id: "snow-penguin", title: "Snow Penguin", players: 1, origin: "cabinet", maker: "someone-else" });
-  const r = await call("publish_cart", { bundle: b, maker: "owen", with: "geoff", summary: "Owen and Geoff made a snowy penguin game at the desk." });
+  const r = await call("publish_cart", { bundle: b, maker: "milo", with: "geoff", summary: "Milo and Geoff made a snowy penguin game at the desk." });
   assert.equal(r.isError, false, r.content[0].text);
   const out = r.structuredContent;
   assert.equal(out.cart_id, "snow-penguin");
   assert.equal(out.version, 1);
   const meta = JSON.parse(fs.readFileSync(path.join(paths.carts, "snow-penguin", "cart.json"), "utf8"));
   assert.equal(meta.origin, "desktop");
-  assert.equal(meta.maker, "owen", "the cabinet writes provenance, whatever the bundle said");
+  assert.equal(meta.maker, "milo", "the cabinet writes provenance, whatever the bundle said");
   assert.equal(meta.with, "geoff");
   assert.equal(meta.parent, null);
   assert.equal(meta.session_id, out.session_id);
@@ -152,7 +152,7 @@ test("publish_cart: a new desktop game passes the gate, is committed with origin
   const session = readLog(path.join(paths.logs, "studio_session.jsonl")).at(-1);
   assert.equal(session.origin, "desktop");
   assert.equal(session.outcome, "committed");
-  assert.equal(session.summary, "Owen and Geoff made a snowy penguin game at the desk.");
+  assert.equal(session.summary, "Milo and Geoff made a snowy penguin game at the desk.");
   assert.equal(session.playtest.local.gate.seconds, 5.1);
   const version = readLog(path.join(paths.logs, "cart_version.jsonl")).at(-1);
   assert.equal(version.cart_id, "snow-penguin");
@@ -164,7 +164,7 @@ test("publish_cart: a change follows the cabinet's lines, and never touches the 
   const { call, paths } = cabinet();
   const before = fs.readFileSync(path.join(paths.carts, "penguin-catch", "spec.md"), "utf8");
   // The parent's maker: the next version of the same line.
-  const own = (await call("publish_cart", { bundle: bundle("\n- v2: faster fish\n"), parent: "penguin-catch", maker: "alina", with: "geoff", summary: "Faster fish." })).structuredContent;
+  const own = (await call("publish_cart", { bundle: bundle("\n- v2: faster fish\n"), parent: "penguin-catch", maker: "ivy", with: "geoff", summary: "Faster fish." })).structuredContent;
   assert.equal(own.cart_id, "penguin-catch-v2");
   assert.equal(own.version, 2);
   assert.equal(own.parent, "penguin-catch@1");
@@ -172,7 +172,7 @@ test("publish_cart: a change follows the cabinet's lines, and never touches the 
   assert.equal(ownMeta.branch, "penguin-catch");
   assert.equal(ownMeta.family, "penguin-catch");
   // Someone else: their own version, a new line in the same family.
-  const theirs = (await call("publish_cart", { bundle: bundle("\n- Owen's way\n"), parent: "penguin-catch", maker: "owen", summary: "Owen's own." })).structuredContent;
+  const theirs = (await call("publish_cart", { bundle: bundle("\n- Milo's way\n"), parent: "penguin-catch", maker: "milo", summary: "Milo's own." })).structuredContent;
   assert.equal(theirs.version, 1);
   assert.notEqual(theirs.cart_id, "penguin-catch");
   const theirMeta = JSON.parse(fs.readFileSync(path.join(paths.carts, theirs.cart_id, "cart.json"), "utf8"));
@@ -189,7 +189,7 @@ test("publish_cart: a change follows the cabinet's lines, and never touches the 
 
 test("publish_cart: a failing gate keeps it off the shelf, says why, and keeps the attempt", async () => {
   const { call, paths } = cabinet({ checker: failing });
-  const r = await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "Try." });
+  const r = await call("publish_cart", { bundle: bundle(), maker: "milo", summary: "Try." });
   assert.equal(r.isError, true);
   assert.match(r.content[0].text, /R2: the penguin never moved/);
   assert.equal(r.structuredContent.outcome, "checks_failed");
@@ -204,9 +204,9 @@ test("publish_cart: a failing gate keeps it off the shelf, says why, and keeps t
 test("publish_cart: unknown makers, a missing summary, and an unknown parent are refused before anything is written", async () => {
   const { call, paths } = cabinet();
   assert.match((await call("publish_cart", { bundle: bundle(), maker: "zed", summary: "x" })).content[0].text, /no maker "zed"/);
-  assert.match((await call("publish_cart", { bundle: bundle(), maker: "owen", with: "zed", summary: "x" })).content[0].text, /no maker "zed"/);
-  assert.match((await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "  " })).content[0].text, /summary/);
-  assert.match((await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "x", parent: "nope" })).content[0].text, /no cart "nope"/);
+  assert.match((await call("publish_cart", { bundle: bundle(), maker: "milo", with: "zed", summary: "x" })).content[0].text, /no maker "zed"/);
+  assert.match((await call("publish_cart", { bundle: bundle(), maker: "milo", summary: "  " })).content[0].text, /summary/);
+  assert.match((await call("publish_cart", { bundle: bundle(), maker: "milo", summary: "x", parent: "nope" })).content[0].text, /no cart "nope"/);
   assert.equal(fs.existsSync(paths.sessions), false);
 });
 
@@ -220,8 +220,8 @@ test("launch_on_cabinet: only when the launcher says yes from the shelf", async 
   c.setPlaying(true);
   assert.match((await c.call("launch_on_cabinet", { id: "penguin-catch" })).content[0].text, /someone is playing/);
   c.setPlaying(false);
-  c.setStudio({ phase: "running", maker_name: "Alina" });
-  assert.match((await c.call("launch_on_cabinet", { id: "penguin-catch" })).content[0].text, /Alina is making a game/);
+  c.setStudio({ phase: "running", maker_name: "Ivy" });
+  assert.match((await c.call("launch_on_cabinet", { id: "penguin-catch" })).content[0].text, /Ivy is making a game/);
   c.setStudio({ phase: "idle" });
   stop();
   const stop2 = c.launches.subscribe((m) => c.launches.answer(m.launch, false, "the cabinet is on another screen (M3)"));
@@ -234,7 +234,7 @@ test("launch_on_cabinet: only when the launcher says yes from the shelf", async 
 
 test("get_activity and cabinet_status", async () => {
   const { call, paths } = cabinet();
-  await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "One." });
+  await call("publish_cart", { bundle: bundle(), maker: "milo", summary: "One." });
   fs.appendFileSync(path.join(paths.logs, "play.jsonl"), JSON.stringify({ type: "play", cart_id: "penguin-catch", started_at: "2026-11-13T10:00:00Z", duration_s: 30 }) + "\n");
   const all = (await call("get_activity")).structuredContent;
   assert.ok(all.count >= 3);
@@ -247,9 +247,9 @@ test("get_activity and cabinet_status", async () => {
   assert.equal((await call("get_activity", { since: "2099-01-01T00:00:00Z" })).structuredContent.count, 0);
   assert.equal((await call("get_activity", { since: "soon" })).isError, true);
   // D348: a kid's words are left out unless asked for; a desktop summary (Geoff's) stays.
-  const kid = { type: "studio_session", id: "sesn_k", origin: "cabinet", maker: "alina", request: "a penguin that eats tacos", turns: [{ question: "Fast or slow?", option_a: "Fast", option_b: "Slow", choice: "C", said: "super duper fast" }], plan_turns: [{ choice: "change", said: "more tacos" }], started_at: "2026-11-13T09:00:00Z", outcome: "committed" };
+  const kid = { type: "studio_session", id: "sesn_k", origin: "cabinet", maker: "ivy", request: "a penguin that eats tacos", turns: [{ question: "Fast or slow?", option_a: "Fast", option_b: "Slow", choice: "C", said: "super duper fast" }], plan_turns: [{ choice: "change", said: "more tacos" }], started_at: "2026-11-13T09:00:00Z", outcome: "committed" };
   fs.appendFileSync(path.join(paths.logs, "studio_session.jsonl"), JSON.stringify(kid) + "\n");
-  fs.appendFileSync(path.join(paths.logs, "screening.jsonl"), JSON.stringify({ at: "2026-11-13T09:01:00Z", kind: "new", maker: "owen", said: "rude words", outcome: "redirected", alternative: "funny words", why: "it said rude words" }) + "\n");
+  fs.appendFileSync(path.join(paths.logs, "screening.jsonl"), JSON.stringify({ at: "2026-11-13T09:01:00Z", kind: "new", maker: "milo", said: "rude words", outcome: "redirected", alternative: "funny words", why: "it said rude words" }) + "\n");
   fs.appendFileSync(path.join(paths.logs, "you_check.jsonl"), JSON.stringify({ cart_id: "penguin-catch", answered_at: "2026-11-13T09:02:00Z", answers: [{ rule: "R12", text: "The penguin looks happy", answer: "no", said: "he looks grumpy" }] }) + "\n");
   const plain = (await call("get_activity")).structuredContent;
   assert.equal(plain.words, "left out");
@@ -307,12 +307,12 @@ test("/mcp: the Manager's token, no browsers, JSON-RPC over POST; the launch str
 
 test("publish_cart: a maker's own next version can have a name; a bad or used one is refused with the reason (D472, D473)", async () => {
   const { call, paths } = cabinet();
-  const change = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n"), parent: "penguin-catch", maker: "alina", summary: "Faster fish.", ...extra });
+  const change = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n"), parent: "penguin-catch", maker: "ivy", summary: "Faster fish.", ...extra });
   // Refused before anything is written: too long, the game's title, and a name on someone else's own version.
   assert.match((await change({ version_name: "the one where every fish is faster" })).content[0].text, /at most 16 characters/);
   assert.match((await change({ version_name: "penguin catch" })).content[0].text, /already used by this game/);
-  assert.match((await change({ maker: "owen", version_name: "Faster fish" })).content[0].text, /go by their title/);
-  assert.match((await call("publish_cart", { bundle: bundle(), maker: "owen", summary: "New.", version_name: "Faster fish" })).content[0].text, /go by their title/);
+  assert.match((await change({ maker: "milo", version_name: "Faster fish" })).content[0].text, /go by their title/);
+  assert.match((await call("publish_cart", { bundle: bundle(), maker: "milo", summary: "New.", version_name: "Faster fish" })).content[0].text, /go by their title/);
   assert.ok(!fs.existsSync(path.join(paths.carts, "penguin-catch-v2")));
 
   const own = (await change({ version_name: " faster fish. " })).structuredContent;
@@ -320,13 +320,13 @@ test("publish_cart: a maker's own next version can have a name; a bad or used on
   assert.equal(JSON.parse(fs.readFileSync(path.join(paths.carts, "penguin-catch-v2", "cart.json"), "utf8")).version_name, "Faster fish");
   assert.match(fs.readFileSync(path.join(paths.carts, "penguin-catch-v2", "spec.md"), "utf8"), /^- v2 "Faster fish": faster fish$/m);
   const v = readLog(path.join(paths.logs, "cart_version.jsonl")).at(-1);
-  assert.deepEqual([v.version_name, v.named_by, v.name_picked], ["Faster fish", "alina", "desktop"]);
+  assert.deepEqual([v.version_name, v.named_by, v.name_picked], ["Faster fish", "ivy", "desktop"]);
   // The list says what each version is called; one with no name says null, and goes by its number.
   const list = (await call("list_carts")).structuredContent.carts;
   assert.equal(list.find((/** @type {any} */ c) => c.id === "penguin-catch-v2").version_name, "Faster fish");
   assert.equal(list.find((/** @type {any} */ c) => c.id === "penguin-catch").version_name, null);
   // The next version can't take the same name, and one with no name is still fine.
-  const again = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n- v3: more fish\n"), parent: "penguin-catch-v2", maker: "alina", summary: "More fish.", ...extra });
+  const again = (/** @type {any} */ extra) => call("publish_cart", { bundle: bundle("\n- v2: faster fish\n- v3: more fish\n"), parent: "penguin-catch-v2", maker: "ivy", summary: "More fish.", ...extra });
   assert.match((await again({ version_name: "FASTER FISH" })).content[0].text, /already used by this game/);
   const third = (await again({})).structuredContent;
   assert.deepEqual([third.version, third.version_name], [3, null]);
