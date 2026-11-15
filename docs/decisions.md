@@ -1966,7 +1966,13 @@ The brief's locked "guest players TIC-80, PICO-8, RetroArch homebrew", built on 
 - The rehearsal VM (`scripts/cabinet-card/rehearse.mjs`, the Picade's card image) with its kiosk set to the virtual profile's: headless, pixman, `--disable-gpu` and the new flag.
 - All eight candidates passed the gate there in Debian's Chromium 156, 5.4 to 6 s each, with `draws`.
 - Grow Quickly (TIC-80) and Tobu Tobu Girl Deluxe (RetroArch, gambatte) were played from the shelf with the VM's keyboard: how-to-play, the game, buttons, Escape, the post-game board, back to the shelf. Both plays are in `logs/guest_play.jsonl`. Captures: `docs/guests/vm-*.png`.
-- **Not proven:** sound (the VM has none), the frame rate under software WebGL (not measured), the live virtual cabinet (needs the director's turn), and the Picade.
+- **Not proven then:** sound (the VM has none), the frame rate under software WebGL (not measured), the live virtual cabinet, and the Picade.
+- **The live virtual cabinet, 2026-11-15** (release 0.1.0-5ac7e5364f22, main 6c30a5b):
+  - The gate passed all eight guests, 5.4 to 6.8 s each, the six picks with `draws`.
+  - Grow Quickly (TIC-80) and Tobu Tobu Girl Deluxe (RetroArch) were played from the shelf with `drive` keys: how-to-play with the full credit, the game, its buttons, Escape, G6, back to the shelf. Both plays are in `guest_play.jsonl`, `ended: "star"`, no errors. Captures: `docs/guests/live-*.png`.
+- **The Picade, 2026-11-15, read-only, partly done:** its kiosk runs with no extra Chromium flags, `v3d` and `vc4` are loaded, and the kiosk log has no GPU errors since boot.
+  - A throwaway headless Chromium 156 on it, with the GPU enabled, gets WebGL 2 on the real GPU: "ANGLE (Broadcom, V3D 7.1.10.2, OpenGL ES 3.1)". With headless defaults it gets none, as on the virtual cabinet: so the gate's Chromium keeps `--enable-unsafe-swiftshader` on the Picade too.
+  - **Not yet seen:** a TIC-80 game drawing in the Picade's own kiosk. That needs a game opened there (keys) while nobody is playing. The check stopped when a play started on the Picade.
 
 **D385. The shortlist lives in `guest-shortlist/`, off the shelf and out of the bundle, until Geoff picks.** *(Claude; the day-one shelf is Geoff's call.)*
 - Eight candidates, built and licence-checked: four TIC-80 carts and four homebrew ROMs across all three cores. Each has `guest.json`, `play/`, `NOTICE.md` and, where the author's repo has one, the licence text.
