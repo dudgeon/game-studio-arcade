@@ -353,7 +353,9 @@ export const WATCH = Object.freeze({ nudgeAfter: 30, nudgeEvery: 60, restartAfte
  *   unblock   the radio is switched off or blocked (rfkill)
  *   nudge     look for networks and connect
  *   restart   restart NetworkManager; not while a cable carries the cabinet, which would cut a grown-up's session
- *   driver    reload the Wi-Fi chip's driver
+ *   driver    reload the Wi-Fi chip's driver: only when the chip has gone from the system altogether. Never while
+ *             a Wi-Fi device is there: on the Pi an unload and reload can leave the chip dead until a restart,
+ *             turning a short outage into a lasting one (D412).
  * @param {{ downSince: number | null, lastNudge: number, lastHeavy: number, heavy: number }} st
  * @param {{ now: number, device: boolean, connected: boolean, radioOn: boolean, wired: boolean, saved: number }} obs times in seconds
  */
@@ -373,9 +375,10 @@ export function watchStep(st, obs) {
   }
   const due = next.heavy === 0 ? down >= (obs.device ? WATCH.restartAfter : 60) : obs.now - next.lastHeavy >= (next.heavy === 1 ? WATCH.driverAfter - WATCH.restartAfter : WATCH.heavyEvery);
   if (due) {
-    // Alternate: NetworkManager, then the driver, then again every ten minutes.
-    const which = next.heavy % 2 === 0 && !obs.wired ? "restart" : "driver";
-    actions.push(which);
+    // With a Wi-Fi device there: NetworkManager again, every ten minutes (not under a cable's session). With the
+    // device gone: NetworkManager first, then the driver, alternating.
+    const which = !obs.device && next.heavy % 2 === 1 ? "driver" : obs.wired ? null : "restart";
+    if (which) actions.push(which);
     next.heavy += 1;
     next.lastHeavy = obs.now;
   }

@@ -169,7 +169,7 @@ test("the card's network, which came through netplan, is kept as one of ours (D4
   assert.equal(await wifi.adopt(), 0, "once");
 });
 
-test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 min; the driver at 5; then every 10", () => {
+test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 and 5 min, then every 10; never the driver while a Wi-Fi device is there", () => {
   /** @type {Parameters<typeof watchStep>[0]} */
   let st = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
   const obs = { device: true, connected: false, radioOn: true, wired: false, saved: 1 };
@@ -183,9 +183,11 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 min
   assert.deepEqual(did[30], ["nudge"]);
   assert.deepEqual(did[90], ["nudge"]);
   assert.deepEqual(did[WATCH.restartAfter], ["restart"]);
-  assert.deepEqual(did[WATCH.driverAfter], ["driver"]);
+  assert.deepEqual(did[WATCH.driverAfter], ["restart"]);
   assert.ok(did[WATCH.driverAfter + WATCH.heavyEvery]?.includes("restart"));
-  assert.ok(did[WATCH.driverAfter + 2 * WATCH.heavyEvery]?.includes("driver"));
+  assert.ok(did[WATCH.driverAfter + 2 * WATCH.heavyEvery]?.includes("restart"));
+  // On the Pi an unload and reload of the chip's driver can leave it dead until a restart: never with a device there.
+  assert.ok(!Object.values(did).flat().includes("driver"));
   // Back up: the count starts over.
   assert.deepEqual(watchStep(st, { ...obs, connected: true, now: 5000 }), { actions: [], state: { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 } });
   // A cable carrying the cabinet: NetworkManager is never restarted under a grown-up's session.
@@ -196,11 +198,21 @@ test("the watch: nothing while it's up; a nudge at 30 s; NetworkManager at 3 min
     wired = /** @type {any} */ (r.state);
     acts.push(...r.actions);
   }
-  assert.ok(!acts.includes("restart") && acts.includes("driver"));
+  assert.deepEqual([...new Set(acts)], ["nudge"]);
   // A cabinet that knows no network isn't broken; a switched-off radio is switched on at once.
   assert.deepEqual(watchStep(st, { ...obs, saved: 0, now: 9000 }).actions, []);
   assert.deepEqual(watchStep({ downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, radioOn: false, now: 1 }).actions, ["unblock"]);
-  // The Wi-Fi chip gone from the bus: the driver side is tried after a minute.
+  // The Wi-Fi chip gone from the system: NetworkManager after a minute, then the driver, alternating. No nudges:
+  // there's nothing to nudge.
+  let gone = { downSince: null, lastNudge: 0, lastHeavy: 0, heavy: 0 };
+  /** @type {Record<number, string[]>} */
+  const goneDid = {};
+  for (let t = 0; t <= 1500; t += 15) {
+    const r = watchStep(/** @type {any} */ (gone), { ...obs, device: false, now: 20_000 + t });
+    gone = /** @type {any} */ (r.state);
+    if (r.actions.length) goneDid[t] = r.actions;
+  }
+  assert.deepEqual(goneDid, { 60: ["restart"], 180: ["driver"], 780: ["restart"], 1380: ["driver"] });
   assert.deepEqual(watchStep({ downSince: 0, lastNudge: 0, lastHeavy: 0, heavy: 0 }, { ...obs, device: false, now: 60 }).actions, ["restart"]);
 });
 
