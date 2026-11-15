@@ -31,7 +31,7 @@ From any folder you want to work in:
 claude --plugin-dir ~/claude-home/game-studio-arcade/game-studio/plugin
 ```
 
-`ARCADE_CABINET=real` points it at the Picade. The default is the virtual cabinet.
+Which cabinet (D516): `ARCADE_CABINET` if Claude Code was started with it; else a `.arcade-cabinet` file (one word, such as `real`) in the project folder or above it; else the virtual cabinet. A session started by Duo can't set an environment variable, so put the file in its folder: `echo real > .arcade-cabinet`. In a session, `use_cabinet` switches. Every result names the cabinet that answered.
 
 ## Install it (Geoff's call)
 

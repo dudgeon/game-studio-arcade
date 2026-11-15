@@ -68,8 +68,13 @@ export function mcpServer(o) {
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${params.name}`);
       const args = params.arguments ?? {};
       if (typeof args !== "object" || Array.isArray(args)) return rpcError(id, -32602, "arguments must be an object");
+      // Progress for a long call (D513): sent only when the client asked for it with a progressToken, over a transport that can.
+      const token = params._meta?.progressToken;
+      const progress = (/** @type {number} */ p, /** @type {string} */ message) => {
+        if (token !== undefined && ctx.notify) ctx.notify({ jsonrpc: "2.0", method: "notifications/progress", params: { progressToken: token, progress: p, message } });
+      };
       try {
-        return done(toolResult(await tool.call(args, ctx)));
+        return done(toolResult(await tool.call(args, { ...ctx, progress })));
       } catch (/** @type {any} */ e) {
         return done(toolResult(e instanceof ToolError ? e.message : `${tool.name} failed: ${e?.message ?? e}`, true));
       }
@@ -81,7 +86,7 @@ export function mcpServer(o) {
 
 /**
  * Serve an MCP server over stdio: newline-delimited JSON-RPC on stdin and stdout, logs on stderr only.
- * @param {{ handle: (msg: any) => Promise<any | null> }} server
+ * @param {{ handle: (msg: any, ctx?: any) => Promise<any | null> }} server
  * @param {{ input?: NodeJS.ReadableStream, output?: NodeJS.WritableStream }} [io]
  */
 export function serveStdio(server, io = {}) {
@@ -106,7 +111,7 @@ export function serveStdio(server, io = {}) {
       }
       // Requests run concurrently; each answer goes out when it's ready, matched by id.
       const batch = Array.isArray(msg) ? msg : [msg];
-      for (const m of batch) server.handle(m).then(send, (e) => send({ jsonrpc: "2.0", id: m?.id ?? null, error: { code: -32603, message: String(e?.message ?? e) } }));
+      for (const m of batch) server.handle(m, { notify: send }).then(send, (e) => send({ jsonrpc: "2.0", id: m?.id ?? null, error: { code: -32603, message: String(e?.message ?? e) } }));
     }
   });
   return new Promise((resolve) => input.on("end", resolve));

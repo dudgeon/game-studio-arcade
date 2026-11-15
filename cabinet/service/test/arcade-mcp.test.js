@@ -89,7 +89,7 @@ test("arcade tools: the six from HANDOFF 9.2 and the shelf's two (D360), each wi
   const r = await mcp.handle({ jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: MODERN } });
   assert.deepEqual(
     r.result.tools.map((/** @type {any} */ t) => t.name),
-    ["list_carts", "get_cart", "publish_cart", "launch_on_cabinet", "get_activity", "remove_from_shelf", "restore_to_shelf", "cabinet_status"],
+    ["list_carts", "get_cart", "publish_cart", "publish_status", "launch_on_cabinet", "get_activity", "remove_from_shelf", "restore_to_shelf", "cabinet_status"],
   );
   for (const t of r.result.tools) {
     assert.equal(t.inputSchema.type, "object");
@@ -282,7 +282,7 @@ test("/mcp: the Manager's token, no browsers, JSON-RPC over POST; the launch str
     assert.equal((await post({ Authorization: `Bearer ${TOKEN}`, Origin: "http://evil.example" })).status, 403);
     const ok = await post({ Authorization: `Bearer ${TOKEN}` });
     assert.equal(ok.status, 200);
-    assert.equal((await ok.json()).result.tools.length, 8);
+    assert.equal((await ok.json()).result.tools.length, 9);
     const note = await post({ Authorization: `Bearer ${TOKEN}` }, JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
     assert.equal(note.status, 202);
     assert.equal((await fetch(`${s.url}/mcp`, { headers: { Authorization: `Bearer ${TOKEN}` } })).status, 405);
