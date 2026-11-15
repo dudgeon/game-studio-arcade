@@ -73,3 +73,15 @@ The Picade needs nothing more: plug a USB mic into the Pi.
 The first live hold was slow because the helper had gone cold while idle. Since then, the service warms Moonshine when a button goes down after 30 s idle, using two seconds of the package's own speech sample, so the warm-up finishes while the kid is still talking (D262).
 
 Junior is a novelty robot voice and Flo a synthetic one, so the natural voices are the better guide for adults. Kids' voices are the real test: that's the bake-off with Geoff (§3.1). Their clips stay on the cabinet or the mini, are deleted after, and never enter the repo.
+
+## Live words while talking (D492)
+
+Talk screens show the words heard so far, from a second Moonshine process with the light `tiny-streaming` model, while the button is down. The final words are still Groq's, or the main Moonshine's (medium) in one pass when offline; they never wait behind the live stream. `GET /api/speech/live` gives the words so far, the seconds held, `behind_s` and `stopped`.
+
+| Where | Live words: first / behind (median, max) | Final words, no Groq |
+|---|---|---|
+| Picade, 60 s of TTS at real time (2026-11-14; under-voltage, throttling) | 0.5 s / 0.3 s, 2 s | 46.8 s for 60 s, 8.7% WER |
+| Mac mini (load average 20), 20 s | 0.5 s / 0 s, 0.5 s | 4.5 s for 20 s |
+
+With Groq, the Picade's final words took 8.6 s for a 162 s hold. Offline stays on medium for accuracy, and the wait shows its seconds after 3 s.
+

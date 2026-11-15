@@ -289,9 +289,13 @@ function say(p, v) {
   p.fb.rectfill(W / 2 - 6, cy + 1, 13, 2, C.white);
   p.fb.rectfill(W / 2 - 1, cy + 3, 3, 5, C.white);
   p.fb.rectfill(W / 2 - 5, cy + 8, 11, 2, C.white);
-  const held = v.live?.seconds ?? 0;
-  const clock = `${Math.floor(held / 60)}:${String(held % 60).padStart(2, "0")}`;
-  const msg = lost ? "The mic stopped hearing you. Let go and try again." : listening ? `Listening ${clock}. Let go when you're done.` : hearing ? "Stopped listening. Writing that down..." : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : v.purpose === "name" ? "Hold any button and say your name" : "Hold any button and talk";
+  /** @param {number} s */
+  const clockOf = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const clock = clockOf(v.live?.seconds ?? 0);
+  // D492: offline, medium writes a long hold's words at about 0.8 s per second of talk on the Pi; after a few
+  // seconds the wait shows its own clock, so it reads as working, not stuck.
+  const waited = hearing && v.hearingSince ? Math.floor(((v.now ?? Date.now()) - v.hearingSince) / 1000) : 0;
+  const msg = lost ? "The mic stopped hearing you. Let go and try again." : listening ? `Listening ${clock}. Let go when you're done.` : hearing ? (waited >= 3 ? `Stopped listening. Writing that down... ${clockOf(waited)}` : "Stopped listening. Writing that down...") : v.phase === "silence" ? "I didn't hear anything. Hold a button the whole time you talk." : v.purpose === "name" ? "Hold any button and say your name" : "Hold any button and talk";
   p.box({ id: "say-message", text: msg, x: M, y: cy + 25, w: INNER, h: heightOf(2), color: lost ? C.yellow : listening ? C.pink : v.phase === "silence" ? C.yellow : C.white, align: "center", onCut: "never" });
   // D492: the last lines of what Moonshine hears so far, dimmer than final words: "what I'm hearing", not the record.
   if (listening && !lost && v.live?.words) {

@@ -914,6 +914,7 @@ async function beginTalk(v) {
 /** @param {any} v */
 async function endTalk(v) {
   v.phase = "hearing";
+  v.hearingSince = Date.now(); // D492: a long wait shows its seconds
   await v.talking;
   let text = "";
   try {
