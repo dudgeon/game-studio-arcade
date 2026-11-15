@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, statSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -70,13 +70,15 @@ for (const g of PLAYED) {
     for (const line of m.howToPlay.controls) assert.doesNotMatch(line, /\b(key|keyboard|press [zxcv]\b)/i, "controls in the cabinet's words");
     // The licence: named, with where the author states it, and a link to the source.
     assert.ok(m.upstream.licence && m.upstream.licence_source && m.upstream.source);
-    assert.doesNotMatch(m.upstream.licence, /NC|NonCommercial|proprietary|freeware/i, "freely redistributable");
+    // Redistributable: no non-commercial licence, except CC BY-NC-SA 4.0 on PICO-8 carts, for play at home (D386).
+    if (m.player.name === "pico8") assert.equal(m.upstream.licence, "CC BY-NC-SA 4.0");
+    else assert.doesNotMatch(m.upstream.licence, /NC|NonCommercial|proprietary|freeware/i, "freely redistributable");
+    assert.doesNotMatch(m.upstream.licence, /proprietary|freeware|all rights reserved/i);
     const noticeText = readFileSync(join(g.dir, "NOTICE.md"), "utf8");
     assert.equal(noticeText, notice(m, files(play)), "NOTICE.md is what the tool writes");
     assert.ok(noticeText.includes(m.upstream.file.sha256));
-    // The game's file is the pinned one, unchanged.
-    const game = m.player.name === "tic80" ? "cart.tic" : "rom.bin";
-    assert.equal(sha256(join(play, game)), m.upstream.file.sha256);
+    // The game's file is the pinned one, unchanged (a PICO-8 cart is inside PICO-8's export, game.js).
+    if (m.player.name !== "pico8") assert.equal(sha256(join(play, m.player.name === "tic80" ? "cart.tic" : "rom.bin")), m.upstream.file.sha256);
     // The page that starts it is this repo's, as scripts/guests has it.
     const shim = join(HERE, "..", m.player.name);
     for (const f of files(shim).filter((f) => f !== "index.html")) assert.equal(sha256(join(play, f)), sha256(join(shim, f)), f);
@@ -90,18 +92,26 @@ for (const g of PLAYED) {
       assert.equal(game.core, m.player.core);
       assert.ok(core.plays.includes(game.rom_name.split(".").pop()));
       assert.equal(game.keys.a, "z");
+    } else if (m.player.name === "pico8") {
+      const page = readFileSync(join(play, "index.html"), "utf8");
+      assert.match(page, /^<html><head><script src="\/?cabinet-keys\.js"><\/script>/i, "our keys first");
+      assert.match(page, /var p8_autoplay = true;/);
+      assert.match(page, /e\.src = "game\.js";/);
+      assert.ok(statSync(join(play, "game.js")).size > 1_000_000, "PICO-8's player and the cart");
     } else {
       assert.ok(existsSync(join(play, "tic80.js")));
       assert.ok(existsSync(join(play, `tic80${m.player.script}.wasm`)), "the player for the cart's language");
     }
-    // Nothing reaches out: the pages name no other host.
-    for (const f of ["index.html", ...files(shim).filter((f) => f.endsWith(".js"))]) assert.doesNotMatch(readFileSync(join(play, f), "utf8"), /https?:\/\//, f);
+    // Nothing reaches out: our pages name no other host. (PICO-8's own page has links in its comments; the
+    // smoke check is what proves it asks for nothing, D312.)
+    for (const f of [...(m.player.name === "pico8" ? [] : ["index.html"]), ...files(shim).filter((f) => f.endsWith(".js"))]) assert.doesNotMatch(readFileSync(join(play, f), "utf8"), /https?:\/\//, f);
   });
 }
 
-test("Geoff's six picks are on the shelf (D388): three TIC-80 carts and one game for each of the three cores", () => {
+test("Geoff's picks are on the shelf (D388, D386): three TIC-80 carts, one game for each of the three cores, five PICO-8 carts", () => {
   const picks = listGuests(SHELF).filter((g) => g.meta.player);
-  assert.deepEqual(picks.map((g) => g.id).sort(), ["8-bit-panda", "cauliflower-power", "grow-quickly", "hat-wizard", "tobu-tobu-girl-deluxe", "zooming-secretary"]);
+  assert.deepEqual(picks.map((g) => g.id).sort(), ["8-bit-panda", "cauliflower-power", "grow-quickly", "hat-wizard", "just-one-boss", "pizza-panda", "terra-nova-pinball", "tobu-tobu-girl-deluxe", "up-and-away", "zip-zapper", "zooming-secretary"]);
+  assert.equal(picks.filter((g) => g.meta.player.name === "pico8").length, 5);
   assert.deepEqual(picks.filter((g) => g.meta.player.name === "retroarch").map((g) => g.meta.player.core).sort(), ["gambatte", "mgba", "nestopia"]);
 });
 

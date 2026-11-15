@@ -1,0 +1,31 @@
+{
+  "id": "just-one-boss",
+  "title": "Just One Boss",
+  "by": "bridgs",
+  "version": "bbs-49232-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "pico8"
+  },
+  "upstream": {
+    "source": "https://www.lexaloffle.com/bbs/?tid=30767",
+    "licence": "CC BY-NC-SA 4.0",
+    "licence_source": "the cart's post on the Lexaloffle BBS, https://www.lexaloffle.com/bbs/?tid=30767: \"License: CC4-BY-NC-SA\" (https://creativecommons.org/licenses/by-nc-sa/4.0/).",
+    "licence_note": "Non-commercial, with credit, and a changed version stays under the same licence. The cabinet plays it at home, unchanged; only the page around PICO-8's player is ours.",
+    "file": {
+      "name": "49232.p8.png",
+      "url": "https://www.lexaloffle.com/bbs/cposts/4/49232.p8.png",
+      "sha256": "9604f3526726299b2a2862e38a49634ce1256207f871ad6fca8f26fa4e0625c9"
+    }
+  },
+  "howToPlay": {
+    "goal": "One big boss. Dodge its attacks and grab the glowing tiles to hurt it.",
+    "controls": [
+      "Stick: hop from tile to tile",
+      "That's all!"
+    ]
+  },
+  "credits": "Just One Boss by bridgs, CC BY-NC-SA 4.0, from the Lexaloffle BBS."
+}

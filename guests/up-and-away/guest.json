@@ -1,0 +1,31 @@
+{
+  "id": "up-and-away",
+  "title": "Up and Away",
+  "by": "Ross McCormick",
+  "version": "1.1-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "pico8"
+  },
+  "upstream": {
+    "source": "https://www.lexaloffle.com/bbs/?tid=142710",
+    "licence": "CC BY-NC-SA 4.0",
+    "licence_source": "the cart's post on the Lexaloffle BBS, https://www.lexaloffle.com/bbs/?tid=142710: \"License: CC4-BY-NC-SA\" (https://creativecommons.org/licenses/by-nc-sa/4.0/).",
+    "licence_note": "Non-commercial, with credit, and a changed version stays under the same licence. The cabinet plays it at home, unchanged; only the page around PICO-8's player is ours.",
+    "file": {
+      "name": "up_and_away-1.p8.png",
+      "url": "https://www.lexaloffle.com/bbs/cposts/up/up_and_away-1.p8.png",
+      "sha256": "6f64b0fe17f0b9c095c0744d073100e4611b3692be10b48a6aa0231971b5f950"
+    }
+  },
+  "howToPlay": {
+    "goal": "Ride the winds in a hot-air balloon, island to island, to visit Grandma.",
+    "controls": [
+      "Stick up and down: rise and sink",
+      "A and B: talk and choose"
+    ]
+  },
+  "credits": "Up and Away by Ross McCormick (rmcco on the BBS), CC BY-NC-SA 4.0, from the Lexaloffle BBS."
+}
