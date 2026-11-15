@@ -38,7 +38,7 @@ Two more passed the licence check and aren't built: **Retro Gunner** (a shoot-'e
 
 ## PICO-8
 
-The export works with Geoff's PICO-8 (D389). Five carts from the Lexaloffle BBS are exported, played with the cabinet's buttons and waiting in `guest-shortlist/` for Geoff's pick (A is PICO-8's O, B its X). Each is CC BY-NC-SA 4.0, set by its author on the cart's BBS post: fine at home, credited, never sold.
+The export works with Geoff's PICO-8 (D389). Geoff picked all five of these carts from the Lexaloffle BBS (2026-11-15); they're in `guests/` (A is PICO-8's O, B its X). Each is CC BY-NC-SA 4.0, set by its author on the cart's BBS post: fine at home, credited, never sold.
 
 | | Game | What it is | Licence |
 |---|---|---|---|
@@ -48,7 +48,7 @@ The export works with Geoff's PICO-8 (D389). Five carts from the Lexaloffle BBS 
 | ![](guests/up-and-away-2.png) | **Up and Away**, Ross McCormick. `up-and-away` | A hot-air balloon trip between islands to visit Grandma; no way to lose. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=142710)) |
 | ![](guests/just-one-boss-2.png) | **Just One Boss**, bridgs. `just-one-boss` | One boss fight on a grid of tiles, stick only. Hard. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=30767)) |
 
-**My pick of three:** Pizza Panda, Terra Nova Pinball, Zip Zapper. Up and Away is the calm swap; Just One Boss is a challenge for Owen.
+My pick was Pizza Panda, Terra Nova Pinball and Zip Zapper; Geoff took all five.
 
 ## The shelf with all eight, in the test VM
 

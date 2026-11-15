@@ -108,9 +108,10 @@ for (const g of PLAYED) {
   });
 }
 
-test("Geoff's six picks are on the shelf (D388): three TIC-80 carts and one game for each of the three cores", () => {
+test("Geoff's picks are on the shelf (D388, D386): three TIC-80 carts, one game for each of the three cores, five PICO-8 carts", () => {
   const picks = listGuests(SHELF).filter((g) => g.meta.player);
-  assert.deepEqual(picks.map((g) => g.id).sort(), ["8-bit-panda", "cauliflower-power", "grow-quickly", "hat-wizard", "tobu-tobu-girl-deluxe", "zooming-secretary"]);
+  assert.deepEqual(picks.map((g) => g.id).sort(), ["8-bit-panda", "cauliflower-power", "grow-quickly", "hat-wizard", "just-one-boss", "pizza-panda", "terra-nova-pinball", "tobu-tobu-girl-deluxe", "up-and-away", "zip-zapper", "zooming-secretary"]);
+  assert.equal(picks.filter((g) => g.meta.player.name === "pico8").length, 5);
   assert.deepEqual(picks.filter((g) => g.meta.player.name === "retroarch").map((g) => g.meta.player.core).sort(), ["gambatte", "mgba", "nestopia"]);
 });
 
