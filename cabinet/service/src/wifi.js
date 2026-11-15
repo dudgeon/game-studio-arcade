@@ -384,8 +384,11 @@ export function watchStep(st, obs) {
   if (obs.connected && reaches) return { actions, state: freshWatch() };
   if (obs.connected) {
     // Connected, and the router doesn't answer. A few misses are a busy router; more is a stalled link.
+    // Once it has been called down, a rejoin that connects and still gets no answer is no recovery: the stall
+    // stands at once, with no second wait (found in the rehearsal: it read as connected for three rounds after
+    // each rejoin).
     next.misses = (next.misses ?? 0) + 1;
-    if (next.misses < WATCH.stallMisses) return { actions, state: next };
+    if (next.downSince == null && next.misses < WATCH.stallMisses) return { actions, state: next };
     next.stalled = true;
   } else {
     next.misses = 0;

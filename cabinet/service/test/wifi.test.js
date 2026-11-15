@@ -238,6 +238,13 @@ test("connected isn't taken on trust (D510): four rounds with no answer from the
   assert.ok(did[45 + WATCH.restartAfter]?.includes("restart"));
   assert.ok(did[45 + WATCH.driverAfter]?.includes("restart"));
   assert.ok(!Object.values(did).flat().includes("driver") && !Object.values(did).flat().includes("nudge"));
+  // A rejoin drops the link for a round and brings it back still deaf: that's the same stall, at once, not a
+  // fresh wait (the rehearsal showed the status reading "connected" for three rounds after every rejoin).
+  const dropped = watchStep(st, { ...obs, connected: false, now: 30_420 });
+  assert.equal(dropped.state.stalled, false);
+  const deafAgain = watchStep(dropped.state, { ...obs, now: 30_435 });
+  assert.equal(deafAgain.state.stalled, true);
+  assert.equal(deafAgain.state.downSince, st.downSince, "the outage is counted from when it began");
   // One answer and everything starts over; a miss or two never does anything.
   assert.deepEqual(watchStep(st, { ...obs, reaches: true, now: 31_000 }), { actions: [], state: freshWatch() });
   let blip = freshWatch();

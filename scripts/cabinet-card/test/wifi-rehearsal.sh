@@ -77,6 +77,8 @@ ap() { # DEV NET SSID PASS
 }
 ap wlan1 1 '$HOME_SSID' '$HOME_PASS' 1
 ap wlan2 2 '$GUEST_SSID' '$GUEST_PASS' 6
+# One machine holds both ends here: let it answer ARP from its own addresses, as a separate router would (D510).
+for i in all wlan0 wlan1 wlan2; do /usr/sbin/sysctl -q -w net.ipv4.conf.\$i.accept_local=1 net.ipv4.conf.\$i.rp_filter=0; done
 AP
 look "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends hostapd dnsmasq-base >/dev/null 2>&1; sudo systemctl disable --now hostapd dnsmasq >/dev/null 2>&1
 printf '[keyfile]\nunmanaged-devices=interface-name:wlan1;interface-name:wlan2\n' | sudo tee /etc/NetworkManager/conf.d/rehearsal-aps.conf >/dev/null

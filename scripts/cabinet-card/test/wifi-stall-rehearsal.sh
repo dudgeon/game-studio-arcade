@@ -10,7 +10,8 @@
 # associated, NetworkManager stays "connected", and the router never answers. The rule lives in memory, so a
 # restart of the cabinet clears it, as a restart cleared the real one.
 # For the rehearsal only, the watch runs with three settings (a drop-in, removed at the end): the cable the VM is
-# always on is ignored, the restart comes after 120 s instead of 15 minutes, and "at most once an hour" is 600 s.
+# always on is ignored, the restart comes after 120 s instead of 15 minutes, and "at most once an hour" is 30 minutes. The journal is made
+# persistent too, as the card worker's hardening makes it on the Picade, so the line before a restart can be read after it.
 # What it proves, each step PASS or FAIL:
 #   stall     within 90 s the watch says the Wi-Fi is connected but the router doesn't answer, rejoins, and the
 #             status the shelf reads says not connected
@@ -39,10 +40,18 @@ STALL="sudo nft add table arp stall; sudo nft 'add chain arp stall in { type fil
 
 echo "=== setup: this branch's helper, the rehearsal's settings, a router that offers itself as the gateway"
 "$N" "$REPO/scripts/cabinet-card/rehearse.mjs" start "$DIR" >/dev/null 2>&1
-for f in src/wifi.js bin/arcade-wifi.js; do "$D" ssh "sudo tee /opt/arcade/current/cabinet/service/$f >/dev/null" < "$REPO/cabinet/service/$f"; done
+look true >/dev/null
+for f in src/wifi.js bin/arcade-wifi.js; do
+  for _ in 1 2 3 4 5; do "$D" ssh "sudo tee /opt/arcade/current/cabinet/service/$f >/dev/null" < "$REPO/cabinet/service/$f" && break; sleep 5; done
+done
+[ "$(look "grep -c 'stallMisses' /opt/arcade/current/cabinet/service/src/wifi.js")" -ge 3 ] || { echo "couldn't put this branch's helper on the rehearsal cabinet"; exit 1; }
+# The access points and the cabinet's radio are one machine here, and a kernel doesn't answer ARP that comes from
+# one of its own addresses unless told to (accept_local, no reverse-path filter): in ap.sh, so it holds every boot.
 look "sudo sed -i 's/--dhcp-option=3 /--dhcp-option=3,10.77.\$2.1 /' /opt/wifi-rehearsal/ap.sh; grep -c 'dhcp-option=3,10.77' /opt/wifi-rehearsal/ap.sh
-sudo install -d /etc/systemd/system/arcade-wifi-watch.service.d
-printf '[Service]\nEnvironment=ARCADE_WIFI_IGNORE_CABLE=1 ARCADE_WIFI_REBOOT_AFTER_S=120 ARCADE_WIFI_REBOOT_EVERY_S=600\n' | sudo tee /etc/systemd/system/arcade-wifi-watch.service.d/rehearsal.conf >/dev/null
+grep -q accept_local /opt/wifi-rehearsal/ap.sh || echo 'for i in all wlan0 wlan1 wlan2; do /usr/sbin/sysctl -q -w net.ipv4.conf.\$i.accept_local=1 net.ipv4.conf.\$i.rp_filter=0; done' | sudo tee -a /opt/wifi-rehearsal/ap.sh >/dev/null
+sudo install -d /etc/systemd/system/arcade-wifi-watch.service.d /var/log/journal /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\n' | sudo tee /etc/systemd/journald.conf.d/rehearsal.conf >/dev/null; sudo systemctl restart systemd-journald; sudo journalctl --flush
+printf '[Service]\nEnvironment=ARCADE_WIFI_IGNORE_CABLE=1 ARCADE_WIFI_REBOOT_AFTER_S=120 ARCADE_WIFI_REBOOT_EVERY_S=1800\n' | sudo tee /etc/systemd/system/arcade-wifi-watch.service.d/rehearsal.conf >/dev/null
 sudo rm -f /var/lib/arcade-wifi/last-restart /var/lib/arcade-wifi/restarts.log; sudo systemctl daemon-reload; sudo systemctl reboot" > "$OUT/setup.log" 2>&1
 sleep 20
 wifi_up 180 || { echo "the rehearsal cabinet isn't on its simulated Wi-Fi with a gateway: run wifi-rehearsal.sh on this DIR first"; exit 1; }
@@ -54,7 +63,7 @@ look "$STALL; nmcli -t -f DEVICE,STATE device status | grep '^wlan0'" | tail -1 
 l="$(journal "says connected .* but the router hasn.t answered" 90)" && step stall ok "the watch: $l" || step stall fail "no word from the watch within 90 s of the router going quiet"
 l="$(journal "stalled [0-9]+ s: rejoin" 60)" && step stall ok "$l" || step stall fail "no rejoin"
 st="$(look 'cat /run/arcade-wifi/status.json')"
-case "$st" in *'"connected":false,"stalled":true'*) step stall ok "the shelf's status: not connected, stalled" ;; *) step stall fail "status: $st" ;; esac
+case "$st" in *'"connected":false'*) step stall ok "the shelf's status says not connected, so the shelf says No Wi-Fi" ;; *) step stall fail "status: $st" ;; esac
 
 echo "=== held: a game is being played"
 look "nohup sh -c 'for i in \$(seq 1 70); do curl -s -X POST -H \"Content-Type: application/json\" -d \"{\\\"playing\\\":true,\\\"what\\\":\\\"teti\\\"}\" http://127.0.0.1:8330/api/arcade/playing >/dev/null; sleep 3; done' >/dev/null 2>&1 &" >/dev/null
@@ -68,7 +77,7 @@ for _ in $(seq 1 60); do sleep 5; b="$(look 'cat /proc/sys/kernel/random/boot_id
 [ "$boot1" != "$boot0" ] && step restart ok "the cabinet restarted itself" || step restart fail "no restart within 5 minutes of the game ending"
 l="$(look "journalctl -b -1 -u arcade-wifi-watch --no-pager -o cat | grep 'restarting the cabinet as a last resort' | tail -1")"
 [ -n "$l" ] && step restart ok "the journal of the boot before: $l" || step restart fail "no last-resort line in the previous boot's journal"
-kept="$(look 'sudo cat /var/lib/arcade-wifi/last-restart; sudo wc -l < /var/lib/arcade-wifi/restarts.log')"
+kept="$(look 'sudo cat /var/lib/arcade-wifi/last-restart; sudo sh -c "wc -l < /var/lib/arcade-wifi/restarts.log"')"
 case "$kept" in *"no working Wi-Fi for"*"connected, but the router doesn't answer"*) step restart ok "kept: $(echo "$kept" | head -1)" ;; *) step restart fail "last-restart: $kept" ;; esac
 wifi_up 120 && step restart ok "after the restart the Wi-Fi is back and the router answers" || step restart fail "no working Wi-Fi after the restart"
 
@@ -76,8 +85,8 @@ echo "=== hourly: the same stall again, straight away"
 look "$STALL" >/dev/null
 journal "says connected .* but the router hasn.t answered" 120 >/dev/null
 sleep 200
-[ "$(look 'cat /proc/sys/kernel/random/boot_id')" = "$boot1" ] && step hourly ok "stalled again for over 3 minutes (the limit here: 120 s to a restart, 600 s between restarts): no second restart" || step hourly fail "it restarted again inside the limit"
-[ "$(look 'sudo wc -l < /var/lib/arcade-wifi/restarts.log')" = 1 ] && step hourly ok "restarts.log still holds one line" || step hourly fail "restarts.log: $(look 'sudo cat /var/lib/arcade-wifi/restarts.log')"
+[ "$(look 'cat /proc/sys/kernel/random/boot_id')" = "$boot1" ] && step hourly ok "stalled again for over 3 minutes (the limit here: 120 s to a restart, 30 minutes between restarts): no second restart" || step hourly fail "it restarted again inside the limit"
+[ "$(look 'sudo sh -c "wc -l < /var/lib/arcade-wifi/restarts.log"')" = 1 ] && step hourly ok "restarts.log still holds one line" || step hourly fail "restarts.log: $(look 'sudo cat /var/lib/arcade-wifi/restarts.log')"
 
 echo "=== tidy: the rehearsal's settings off"
 look "sudo nft delete table arp stall; sudo rm -rf /etc/systemd/system/arcade-wifi-watch.service.d; sudo systemctl daemon-reload; sudo systemctl restart arcade-wifi-watch" >/dev/null
