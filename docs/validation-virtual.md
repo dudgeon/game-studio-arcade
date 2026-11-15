@@ -33,7 +33,7 @@ Geoff's goal (docs/validation-direction.md): one complete game generation, start
 2. **The request, by voice.**
    - The coin check said "A new game uses about 6 coins … The family pot has 84 coins". Pressing A did nothing there; COIN started it.
    - "Tell me your game idea" opened with "Hi! I'm Claude, an AI." Holding A while the clip played went to listening, then "Is this right? I heard:" with the transcript, and stick right showed it all.
-   - The transcript: "Can you make tetris buttway cuter? … he gets really happy when 20 when you clear lines … and can oh and play too, but not on my side." "Milo" came through as "oh and", and "but way" as "buttway".
+   - The transcript: "Can you make tetris buttway cuter? … he gets really happy when 20 when you clear lines … and can [a name] play too, but not on my side." The second kid's name was misheard as two short words.
    - Screening passed it (the Manager shows "pass").
 3. **Claude's questions (3).**
    - "Two players: how should they play?" → **A**, take turns.
@@ -97,7 +97,7 @@ All three were archived at Anthropic after they finished (D301; each has its "th
 
 ## Surprises and notes (nothing fixed mid-run)
 
-1. **The voice was misheard, and it carried into the game.** "happy when 20 when you clear lines" became a question offering "after every 20 lines". "can Milo play too" came through as "can oh and play too", though Claude still asked about two players. The C answer fixed the 20-lines error. The kids will need "Say it again" more than the planned run expects.
+1. **The voice was misheard, and it carried into the game.** "happy when 20 when you clear lines" became a question offering "after every 20 lines". "can [the other kid] play too" came through with the name misheard. The C answer fixed the 20-lines error. The kids will need "Say it again" more than the planned run expects.
 2. **The new game cost 109c**, about twice the usual 6 coins: Claude needed extra tries. That's the first make over 1.5 times its usual (L4) on this cabinet. The pot would cover about six of them a month.
 3. **"90 frames" on the plan screen.** The brief asks for plain words; a rule's number in frames slipped through.
 4. **The coin history shows "-0 coins (1c), stopped"** for a 1c stop (from an earlier test run). Less than a coin should read better than "-0".

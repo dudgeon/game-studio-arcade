@@ -1367,7 +1367,7 @@ From docs/validation-virtual.md, on the director's list.
 ## 2026-11-12 — Claude checks it heard the idea right (D308)
 
 **D308. Claude's first question always restates the idea, as an A/B.** *(Claude's idea from the end-to-end run, the director's go.)*
-- In the run, speech-to-text turned "happy when you clear lines" into "after every 20 lines" and "Milo" into "oh and", and the mishearing became a question's option A. "Is this right?" shows the transcript, but a kid skims it.
+- In the run, speech-to-text turned "happy when you clear lines" into "after every 20 lines" and a name into two short words, and the mishearing became a question's option A. "Is this right?" shows the transcript, but a kid skims it.
 - **So the first `ask_player` is one short line saying the idea back,** in Claude's words, with any number or name the kid said: "A falling-candy game with a cat who's happy when you clear a line?" A is "Yes, that's it"; B is "Something else".
   - **Always, once:** even when the idea seems clear. It costs one question, and kids like being understood.
   - **B or C means Claude misheard.** C carries the fix in the kid's words; after B, Claude asks what it got wrong. Either way, before any other question.
