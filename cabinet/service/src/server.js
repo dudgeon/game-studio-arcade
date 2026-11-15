@@ -57,7 +57,7 @@ import { serveMcpHttp } from "./arcade-mcp.js";
 import { listCarts, readCart } from "@game-studio-arcade/player/src/library.js";
 import { readLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { gameLines } from "./shelf-marks.js";
-import { readAsk, readVoice, summarizeGameAi } from "./game-ai.js";
+import { readAsk, readChat, readVoice, summarizeGameAi } from "./game-ai.js";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../launcher");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -227,7 +227,10 @@ export function createServiceHandler(o) {
       const cart = readCart(o.libraryDir, String(body.cart_id ?? ""));
       if (!cart) throw new HttpError(404, "no such game");
       if (o.plays && o.plays.what() !== cart.id) return json(res, 200, { ok: false, action: null });
-      return json(res, 200, await o.gameAi.voice({ cart, playId: typeof body.play_id === "string" ? body.play_id.slice(0, 80) : null, ask: readVoice(body), text }));
+      const playId = typeof body.play_id === "string" ? body.play_id.slice(0, 80) : null;
+      // A talk with a character: its line comes back, and the kid's words only for the cabinet's own sign.
+      if (body.kind === "chat") return json(res, 200, await o.gameAi.chat({ cart, playId, ask: readChat(body), text }));
+      return json(res, 200, await o.gameAi.voice({ cart, playId, ask: readVoice(body), text }));
     }
     if (pathname === "/api/arcade/launch/answer") {
       o.launches?.answer(String(body.launch ?? ""), body.ok === true, typeof body.why === "string" ? body.why : undefined);

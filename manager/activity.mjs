@@ -90,7 +90,7 @@ export function activity(files) {
   const gates = (files.publish_gate ?? []).map((g) => ({ at: g.at, kind: g.kind, what: g.what, ...gateOf(g) }));
 
   // What was said to games (D489): voice actions and chat turns, every one, for Geoff to read.
-  const talk = (files.game_talk ?? []).map((t) => ({ at: t.at ?? null, game: t.cart_id ?? null, version: t.cart_version ?? null, kind: t.kind ?? null, ask: t.name ?? null, said: t.said ?? null, action: t.action ?? null, reply: t.reply ?? null, outcome: t.outcome ?? null }));
+  const talk = (files.game_talk ?? []).map((t) => ({ at: t.at ?? null, game: t.cart_id ?? null, version: t.cart_version ?? null, kind: t.kind ?? null, ask: t.name ?? null, said: t.said ?? null, action: t.action ?? null, reply: t.reply ?? null, held: t.held_reply ?? null, why: t.why ?? null, outcome: t.outcome ?? null }));
 
   const newest = (/** @type {any} */ a, /** @type {any} */ b) => String(b.at ?? "").localeCompare(String(a.at ?? ""));
   return { talk: talk.sort(newest), makes: makes.sort(newest), plays: plays.sort(newest), screened: screened.sort(newest), coins: coins.sort(newest), gates: gates.sort(newest) };

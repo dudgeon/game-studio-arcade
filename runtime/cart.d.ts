@@ -133,6 +133,15 @@ declare namespace Arcade {
     voice(name: string, opts: { ask: string; actions: readonly string[]; hold: "a" | "b" | "x" | "y" }): void;
     /** The action the cabinet heard for a voice ask since the last call, or null. Each is given once. */
     heard(name: string): string | null;
+    /**
+     * Declare a character the player can talk to, in `init` (D489). While the player holds `hold` the
+     * cabinet listens, and the character answers in one short line. `who` describes the character;
+     * `fallback` is at least 3 lines it says when it can't answer; `max` is the longest line the
+     * game can show (40..160, default 120). The game never gets the player's words.
+     */
+    chat(name: string, opts: { who: string; fallback: readonly string[]; hold: "a" | "b" | "x" | "y"; max?: number }): void;
+    /** The character's newest line since the last call, or null. Each is given once. In a playtest it's always null. */
+    reply(name: string): string | null;
   }
 
   /** The console handle passed to every cart function. */

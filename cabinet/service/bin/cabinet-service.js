@@ -17,6 +17,7 @@ import { startService } from "../src/server.js";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
 import { createGameAi, gameAiModel } from "../src/game-ai.js";
+import { chatModel } from "../src/game-chat.js";
 import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
 import { shelfMarks } from "../src/shelf-marks.js";
 import { demoWifi, socketWifi } from "../src/wifi-client.js";
@@ -227,7 +228,9 @@ const mcp = createArcadeMcp({
 
 // AI in games (D480-D488): the cabinet's own key, outside the coin pot, every call's cost logged. Off when
 // replaying or with no key, and with "game_ai": false in the config; games then run on their own fallbacks.
-const gameAi = createGameAi({ logsDir: paths.logs, keepDir: path.join(paths.root, "game-ai"), model: client && !replaying && config.game_ai !== false ? gameAiModel(client) : null, online: () => online, perMinute: config.game_ai?.per_minute });
+// Open chat with a character (D489) is on with the rest (Geoff: "On straight away"); "game_ai": { "chat": false } turns only it off.
+const aiOn = Boolean(client) && !replaying && config.game_ai !== false;
+const gameAi = createGameAi({ logsDir: paths.logs, keepDir: path.join(paths.root, "game-ai"), model: aiOn && client ? gameAiModel(client) : null, chat: aiOn && client && config.game_ai?.chat !== false ? chatModel(client) : null, online: () => online, perMinute: config.game_ai?.per_minute });
 
 const s = await startService({
   gameAi,

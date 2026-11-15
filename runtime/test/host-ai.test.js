@@ -123,7 +123,31 @@ test("the mic is on only while the game's talk button is held, and the action he
   run(50);
   await settle();
   assert.deepEqual(m.calls, ["start spell", "stop spell"]);
-  assert.deepEqual(posted.filter((p) => p.type === "heard"), [{ type: "heard", name: "spell", action: "fire" }]);
+  assert.deepEqual(posted.filter((p) => p.type === "heard"), [{ type: "heard", name: "spell", action: "fire", reply: undefined, fallback: false }]);
+  host.destroy();
+});
+
+test("a chat hold: the character's line goes to the cart, or the sign to use one of its own; nothing at all sends nothing (D495)", async () => {
+  posted.length = 0;
+  const WIZARD = { kind: "chat", name: "wizard", who: "A grumpy wizard.", max: 80, hold: "x" };
+  /** @type {any[]} */
+  const answers = [{ reply: "Answer my riddle first!" }, { fallback: true }, {}];
+  /** @type {any[]} */
+  const stopped = [];
+  const host = createHost({ container, cartUrl: "/carts/x/game.js", persist: false, voice: { start() {}, stop: async (v) => (stopped.push(v), answers.shift()), cancel() {} } });
+  fromFrame({ type: "ready", voices: [WIZARD] });
+  for (let i = 0; i < 3; i++) {
+    key("keydown", "KeyC");
+    run(500);
+    key("keyup", "KeyC");
+    run(50);
+    await settle();
+  }
+  assert.deepEqual(stopped, [WIZARD, WIZARD, WIZARD], "the host hands the launcher the whole ask");
+  assert.deepEqual(posted.filter((p) => p.type === "heard"), [
+    { type: "heard", name: "wizard", action: undefined, reply: "Answer my riddle first!", fallback: false },
+    { type: "heard", name: "wizard", action: undefined, reply: undefined, fallback: true },
+  ]);
   host.destroy();
 });
 

@@ -30,17 +30,25 @@ export function voiceFor(cartId, playId, stage) {
       show("● LISTENING");
       started = postJson("/api/speech/start").catch(() => {});
     },
-    /** @param {{ name: string, ask: string, actions: string[] }} v */
+    /** @param {{ kind?: string, name: string, ask?: string, actions?: string[], who?: string, max?: number }} v */
     async stop(v) {
       show("...");
+      const chat = v.kind === "chat";
+      let heard = "";
       try {
         await started;
-        const j = await (await postJson("/api/game-ai/voice", { cart_id: cartId, play_id: playId, name: v.name, ask: v.ask, actions: v.actions })).json();
-        return { action: typeof j.action === "string" ? j.action : null };
+        const j = await (await postJson("/api/game-ai/voice", { cart_id: cartId, play_id: playId, kind: chat ? "chat" : "voice", name: v.name, ask: v.ask, actions: v.actions, who: v.who, max: v.max })).json();
+        // In a chat the cabinet shows what it heard, on its own sign; the cart only ever gets the character's line.
+        if (chat && typeof j.said === "string") heard = j.said;
+        return { action: typeof j.action === "string" ? j.action : null, reply: typeof j.reply === "string" ? j.reply : null, fallback: j.fallback === true };
       } catch {
-        return { action: null };
+        return { action: null, fallback: chat };
       } finally {
-        show(null);
+        show(heard ? `YOU: ${heard.length > 60 ? `${heard.slice(0, 57)}...` : heard}` : null);
+        if (heard) {
+          const mine = sign;
+          setTimeout(() => sign === mine && show(null), 3000);
+        }
       }
     },
     cancel() {

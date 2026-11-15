@@ -12,6 +12,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { appendLineDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 import { listCheck } from "./screening.js";
+import { MEMORY_TURNS, REPLY_MAX, WORRIED_LINE } from "./game-chat.js";
 
 export const GAME_AI_MODEL = "claude-haiku-5-5";
 /** List prices per million tokens for GAME_AI_MODEL, in dollars (Anthropic's model list, read 2026-11-14). */
@@ -147,12 +148,27 @@ export function readVoice(b) {
 }
 
 /**
+ * A game's chat ask, checked (D489). @param {any} b
+ */
+export function readChat(b) {
+  const bad = (/** @type {string} */ m) => Object.assign(new Error(m), { status: 400 });
+  if (typeof b?.name !== "string" || !NAME.test(b.name)) throw bad("a chat needs a name");
+  if (typeof b.who !== "string" || !b.who.trim() || b.who.length > 300 || !PLAIN.test(b.who)) throw bad("who is a plain sentence of at most 300 characters");
+  // The character's description is the cart's, written at build time; it still has to pass the word list (rule 6).
+  if (!listCheck(b.who).ok) throw bad("who isn't a character description");
+  const max = b.max ?? 120;
+  if (!Number.isInteger(max) || max < 40 || max > REPLY_MAX) throw bad(`max is 40 to ${REPLY_MAX}`);
+  return { name: b.name, who: b.who.trim(), max };
+}
+
+/**
  * keepDir is where each game's kept lines live (never in the logs). No model means off: switched off,
- * or no key (replaying, or a cabinet that isn't connected yet).
+ * or no key (replaying, or a cabinet that isn't connected yet). No chat model means chat is off.
  * @param {{
  *   logsDir: string,
  *   keepDir: string,
  *   model?: ReturnType<typeof gameAiModel> | null,
+ *   chat?: import("./game-chat.js").ChatModel | null,
  *   online?: () => boolean,
  *   perMinute?: number, restMs?: number,
  *   now?: () => number,
@@ -209,7 +225,7 @@ export function createGameAi(o) {
    * @returns {null | "off" | "rate" | "offline"}
    */
   const admit = (base) => {
-    if (!o.model) return "off";
+    if (!o.model && !o.chat) return "off";
     const t = now();
     const m = meters.get(base.cart_id) ?? { at: [], restUntil: 0 };
     meters.set(base.cart_id, m);
@@ -239,8 +255,81 @@ export function createGameAi(o) {
     appendLineDurable(path.join(o.logsDir, "game_talk.jsonl"), JSON.stringify({ type: "game_talk", at: new Date(now()).toISOString(), ...record }));
   };
 
+  /** This play's last turns with each character, for the model only. In memory, and dropped when another play starts (rule 10). @type {Map<string, import("./game-chat.js").Turn[]>} */
+  const memory = new Map();
+
   return {
     on: Boolean(o.model),
+    chatOn: Boolean(o.chat),
+    /**
+     * One chat turn (D489, docs/game-ai.md's twelve rules). The kid's words are screened in (the word list),
+     * the character replies, and a judge reads the pair before anything is shown. It fails closed: a line that
+     * can't be judged isn't shown, and the game's own fallback line is used instead (`fallback: true`).
+     * The cart gets `reply` or `fallback`; `said` is for the cabinet's own sign, never the cart.
+     * @param {{ cart: { id: string, version?: number | null }, playId?: string | null, ask: ReturnType<typeof readChat>, text: string }} a
+     * @returns {Promise<{ ok: boolean, reply?: string, fallback?: boolean, said?: string }>}
+     */
+    async chat({ cart, playId = null, ask, text }) {
+      const said = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, SAID_MAX);
+      if (!said) return { ok: true };
+      const base = { cart_id: cart.id, cart_version: cart.version ?? null, play_id: playId, name: ask.name, kind: "chat" };
+      /** The game's own line instead, and why, in the talk log. */
+      const own = (/** @type {string} */ outcome, /** @type {object} */ extra = {}, /** @type {boolean} */ echo = true) => {
+        talkLog({ ...base, said, reply: null, outcome, ...extra });
+        return { ok: true, fallback: true, ...(echo ? { said } : {}) };
+      };
+      // Rule 3: off-limits words go nowhere, and aren't echoed on screen. No scolding: the character changes the subject.
+      if (!listCheck(said).ok) return own("steered", {}, false);
+      const chat = o.chat;
+      if (!chat) return own("off");
+      const cost = (/** @type {string} */ call, /** @type {any} */ r, /** @type {number} */ t0, /** @type {string} */ outcome) => log({ ...base, call, outcome, model: GAME_AI_MODEL, tokens: r.tokens, cost_usd: Number(r.cost.toFixed(6)), ms: now() - t0 });
+      const failed = (/** @type {string} */ call, /** @type {any} */ e, /** @type {number} */ t0) => {
+        const name = String(e?.constructor?.name ?? "error");
+        log({ ...base, call, outcome: "error", error: name, ...(/timeout/i.test(`${name} ${e?.message ?? ""}`) ? { timed_out: true } : {}), cost_usd: 0, ms: now() - t0 });
+      };
+      // Another play's talk is forgotten the moment a new one talks (rule 10).
+      const key = `${cart.id}\n${playId}\n${ask.name}`;
+      for (const k of memory.keys()) if (!k.startsWith(`${cart.id}\n${playId}\n`)) memory.delete(k);
+      const history = memory.get(key) ?? [];
+
+      let no = admit(base);
+      if (no) return own(`no_model_${no}`);
+      let t0 = now();
+      let r;
+      try {
+        r = await chat.reply({ who: ask.who, max: ask.max, said, history });
+        cost("reply", r, t0, r.say ? "fresh" : "no_answer");
+      } catch (e) {
+        failed("reply", e, t0);
+        return own("reply_failed");
+      }
+      // Rule 4, first half: the reply must be a plain line that passes the word list.
+      if (!r.say || !lineOk(r.say, ask.max)) return own("held", { held_reply: r.say ?? null, why: r.say ? "not a plain, clean line" : "no reply" });
+
+      // Rule 4, second half, and rule 5: a judge reads the pair, and no verdict means no line.
+      no = admit(base);
+      if (no) return own("judge_failed", { held_reply: r.say, why: `no judge: ${no}` });
+      t0 = now();
+      let j;
+      try {
+        j = await chat.judge({ who: ask.who, said, reply: r.say });
+        cost("judge", j, t0, j.verdict ?? "no_answer");
+      } catch (e) {
+        failed("judge", e, t0);
+        return own("judge_failed", { held_reply: r.say, why: "the judge didn't answer" });
+      }
+      if (!j.verdict) return own("judge_failed", { held_reply: r.say, why: "the judge gave no verdict" });
+      // Rule 9: a kid who sounds like they need a grown-up gets one plain line, and the turn is flagged.
+      if (j.verdict === "worried" || r.worried) {
+        talkLog({ ...base, said, reply: WORRIED_LINE, outcome: "flagged", held_reply: r.say, why: j.why || "the kid sounded worried" });
+        return { ok: true, reply: WORRIED_LINE.slice(0, ask.max), said };
+      }
+      if (j.verdict === "hold") return own("held", { held_reply: r.say, why: j.why || "held by the judge" });
+
+      memory.set(key, [...history, { said, reply: r.say }].slice(-MEMORY_TURNS));
+      talkLog({ ...base, said, reply: r.say, outcome: "said" });
+      return { ok: true, reply: r.say, said };
+    },
     /**
      * A voice ask (D489): the words the cabinet heard, matched to one of the game's own actions. The game
      * gets the action or nothing; never the words. Off-limits words (the word list, D271) are never sent on.

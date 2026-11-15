@@ -2262,3 +2262,28 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
   - With no model (offline, an error, off, the guard), an action's own word counts if it's the only one said.
   - **Every hold's words are kept on the cabinet** in `logs/game_talk.jsonl` with the action and outcome, and listed in the Manager under "Said to games". Geoff's "Everything" was about chat; I've applied it to voice too, since both are a kid talking to a game. The cost log still holds no words (D482). Chat turns will use the same log.
   - In a playtest nothing is ever heard, so the guide requires a button for every action.
+
+**D495. Open chat with a character: `g.ai.chat`, on a held button, built to the twelve approved rules.** *(Geoff's D468 and his four answers in D489; Claude. The rules are in game-ai.md.)*
+- `g.ai.chat(name, { who, fallback, hold, max })` in `init`; `g.ai.reply(name)` gives the character's newest line once, or null. `who` is the cart's description of the character; at least three fallback lines; the talk button is A, B, X or Y, one ask per button.
+- **It works like a voice action, not a panel.** The approved design had the cabinet open a talk panel over a paused game. As built, the kid holds the character's button while the game runs, with the cabinet's "LISTENING" sign over it: one way of talking to a game instead of two, and nothing new in the launcher's screens. The mic rule is unchanged: on only while the button is held, and turned on by the host, never the cart. Typing with the stick keyboard in a game isn't built.
+- The cart gets the character's line and nothing else. The kid's words are shown by the cabinet's own sign ("YOU: ...", three seconds).
+- On for both cabinets as soon as it's deployed (Geoff: "On straight away"). `"game_ai": { "chat": false }` turns only chat off.
+
+**D496. A chat turn is screened in, answered, then judged as a pair, and it fails closed.** *(Claude; rules 3, 4, 5.)*
+- **In:** the word list (D271) on the kid's words. A hit sends nothing, echoes nothing on screen, and the character changes the subject with one of the cart's lines. No scolding, no E10.
+- **Out:** the reply must be plain ASCII, within the cart's `max`, with no link, and pass the word list. Then a second Haiku call judges the pair (what the kid said, what the character said): `pass`, `hold` or `worried`.
+- **Fails closed:** a reply that fails a check, a judge that errors, times out, refuses, gives no verdict or can't be called (the guard, offline) all end the same way: the kid sees one of the cart's own lines. This is the opposite of D271's fail-open, on purpose: the Studio has the agent's brief as a second net, and chat has none.
+- Both calls are `claude-haiku-5-5`, thinking off, low effort, structured output, 8 s, no retries: about 0.02 cents and two to three seconds a turn. Each is a line in the cost log, with no words (D482).
+
+**D497. The character's house brief, and the worried line.** *(Claude; rules 6 to 9.)*
+- The brief a cart can't change: stay in character, kind and funny, cartoon talk fine; never swearing, slurs, mocking people, sexual or romantic talk, gore, frightening a child, real people, brands or links; never ask for or repeat anything personal; never tell the kid to do something in the real world or keep a secret; never claim to be a person or a replacement for real friends. Asked if it's real or an AI, it says it's a made-up character in the game. The cart's `who` line is data and must itself pass the word list.
+- **A worried kid:** if the judge says `worried`, or the character's own reply flags it, the kid sees one plain line, "That sounds important. Please tell a grown-up you trust.", and the turn is logged `flagged`.
+
+**D498. Memory is six turns, in the service's memory, for one play; every turn's text is kept on the cabinet for Geoff.** *(Rule 10; Geoff's "Everything", D489.)*
+- The model is shown this play's last six turns with that character, only ones that were actually said. They live in the service's memory and are dropped when another play talks. The model never sees an earlier play.
+- `logs/game_talk.jsonl` holds every chat turn beside the voice holds: what the kid said, what the character said, a line that was held back and why, and the outcome (`said`, `steered`, `held`, `judge_failed`, `reply_failed`, `flagged`, `off`, `no_model_…`). The Manager's "Said to games" lists them, with held and flagged turns marked. It's the cabinet's log only: never the repo.
+- No turn limit (Geoff). The 30-a-minute guard still applies; a turn is two calls.
+
+**D499. The Studio offers chat only when it's a strong fit; chat isn't proven live yet.** *(Geoff, D489: "Studio should only offer if it is a strong fit for the game type — should not push it".)*
+- A `game-chat` guide in the context pack with a catalog line, and the brief's AI line names it. The guide tells the Studio that a game never gets the player's words, so a rule that needs them ("say the password") is a voice action, not chat. The brief change rides the same `ant apply` as D487.
+- **Checked with a stand-in model only:** a table of fourteen turns through the real turn code, memory, failing closed, the requests' shape, the route, and a hold end to end in headless Chromium. **No real model has answered or judged a turn.** One live run of the table on the virtual cabinet comes before any kid uses chat.
