@@ -124,8 +124,9 @@ async function watch(steps, { percent = 40 } = {}) {
   const child = spawn("python3", [VOLKEY], { env: { PATH: process.env.PATH, ARCADE_VOLUME_CMD: tool, ARCADE_VOLUME_SHOW: show, ARCADE_VOLKEY_DEVICES: dev }, stdio: ["ignore", "pipe", "inherit"] });
   let out = "";
   child.stdout.on("data", (d) => (out += d));
-  // It has read everything once it reports the file's end.
-  for (let i = 0; i < 100 && !out.includes("lost "); i++) await new Promise((r) => setTimeout(r, 50));
+  // It has read everything once it reports the file's end. The count is the give-up (a minute), not a pace:
+  // on a busy mini python3 alone can take seconds to start.
+  for (let i = 0; i < 1200 && !out.includes("lost "); i++) await new Promise((r) => setTimeout(r, 50));
   child.kill();
   assert.match(out, /lost /, "the watcher read the events");
   return { calls: fs.readFileSync(calls, "utf8").split("\n").filter(Boolean), shown: fs.existsSync(show) ? JSON.parse(fs.readFileSync(show, "utf8")) : null };

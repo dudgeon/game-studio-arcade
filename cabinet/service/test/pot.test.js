@@ -347,7 +347,8 @@ test("no refunds: a make stopped at a question is charged what it used (D202, E8
   studio.start({ maker: "alina", request: "a penguin game" });
   await until((s) => s.pending?.kind === "question");
   studio.stop();
-  for (let i = 0; i < 200 && !pot.history().some((e) => e.kind === "charge" && e.session_id === "sesn_replay"); i++) await new Promise((r) => setTimeout(r, 10));
+  // Until the charge is in, however long a busy mini takes; the count is the give-up (a minute), not a pace.
+  for (let i = 0; i < 6000 && !pot.history().some((e) => e.kind === "charge" && e.session_id === "sesn_replay"); i++) await new Promise((r) => setTimeout(r, 10));
   const e = pot.history().find((x) => x.session_id === "sesn_replay");
   assert.equal(e?.cost_cents, 11);
   assert.equal(e?.outcome, "stopped");

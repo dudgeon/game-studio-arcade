@@ -22,6 +22,11 @@ const FIXTURE = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtu
 const PT_FIXTURES = path.resolve(import.meta.dirname, "../../../studio-kit/playtest/test/fixtures");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-gate-"));
 const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+/** Until it's so, however long a busy mini takes. The time is the give-up for a thing that never comes, not a pace. @param {() => boolean} pred @param {string} what */
+const eventually = async (pred, what) => {
+  for (const end = Date.now() + 120_000; !pred() && Date.now() < end; ) await sleep(20);
+  assert.ok(pred(), what);
+};
 
 /** A Chromium to run real gates on: GSA_CHROMIUM, Playwright's full build, or the machine's own. */
 function chromium() {
@@ -111,21 +116,27 @@ test("a game started mid-test stops the test; it runs again when the game ends, 
     playing: () => playing,
     logsDir: logs,
     pollMs: 10,
+    // The first run is still going whenever the game starts: it ends only by being stopped. The run after it
+    // finishes. So the order is the test's, not the clock's.
     run: (_args, o) =>
       new Promise((resolve, reject) => {
         runs++;
-        const t = setTimeout(() => resolve({ driver: "browser", fallback: null, report: report(true) }), 150);
+        if (runs > 1) return resolve({ driver: "browser", fallback: null, report: report(true) });
         o.signal.addEventListener("abort", () => {
-          clearTimeout(t);
           reject(new Error("stopped: a game started"));
+          sayStopped();
         });
       }),
   });
+  /** @type {() => void} */
+  let sayStopped = () => {};
+  const stopped = new Promise((resolve) => (sayStopped = () => resolve(undefined)));
   const r = gate.cart("/carts/x", { what: "Penguin Catch" });
-  await sleep(40);
+  await eventually(() => runs === 1, "the test is running");
   playing = true;
-  await sleep(100);
-  assert.equal(runs, 1);
+  await stopped;
+  await sleep(50); // several of the gate's 10 ms looks at whether the game is still on
+  assert.equal(runs, 1, "and it doesn't run again while the game is on");
   playing = false;
   const done = await r;
   assert.equal(done.ok, true);
@@ -184,15 +195,19 @@ test("before calibration a slow frame time is logged, never blocking; once calib
 
 test("real Chromium: a game started mid-test stops the run and its Chromium; it runs again after (D310)", { skip: noChromium, timeout: 180000 }, async () => {
   let playing = false;
-  const gate = createGate({ settings: realSettings(), playing: () => playing, logsDir: tmp(), pollMs: 100 });
+  /** @type {() => void} */
+  let sayStopped = () => {};
+  const stopped = new Promise((resolve) => (sayStopped = () => resolve(undefined)));
+  const gate = createGate({ settings: realSettings(), playing: () => playing, logsDir: tmp(), pollMs: 100, log: (line) => /a game started/.test(line) && sayStopped() });
   const r = gate.cart(path.join(PT_FIXTURES, "dot-catch"));
   try {
-    await sleep(1500);
-    assert.equal(liveGateRuns(), 1, "the test is running");
+    // Each step waits on the gate itself, not on a guess at how long a busy mini takes to start a Chromium.
+    await eventually(() => liveGateRuns() === 1, "the test is running");
     playing = true;
-    await sleep(1500);
+    await stopped; // the gate says so as it goes back to waiting for the game to end
     // Its whole process group (gate-run and Chromium) was killed, not just asked.
-    assert.equal(liveGateRuns(), 0, "nothing of the gate runs while a game is being played");
+    await eventually(() => liveGateRuns() === 0, "nothing of the gate runs while a game is being played");
+    await sleep(1500); // the game is played this long, and the gate's wait is counted from when it stopped: waited_s below
   } finally {
     playing = false;
   }
