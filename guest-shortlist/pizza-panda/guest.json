@@ -1,0 +1,33 @@
+{
+  "id": "pizza-panda",
+  "title": "Pizza Panda",
+  "by": "Andrew Anderson",
+  "version": "bbs-2-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "pico8"
+  },
+  "upstream": {
+    "source": "https://www.lexaloffle.com/bbs/?tid=54289",
+    "licence": "CC BY-NC-SA 4.0",
+    "licence_source": "the cart's post on the Lexaloffle BBS, https://www.lexaloffle.com/bbs/?tid=54289: \"License: CC4-BY-NC-SA\" (https://creativecommons.org/licenses/by-nc-sa/4.0/). The author's own source is MIT too: https://github.com/andmatand/pizza-panda/blob/master/LICENSE.",
+    "licence_note": "Non-commercial, with credit, and a changed version stays under the same licence. The cabinet plays it at home, unchanged; only the page around PICO-8's player is ours.",
+    "file": {
+      "name": "pizza_panda-2.p8.png",
+      "url": "https://www.lexaloffle.com/bbs/cposts/pi/pizza_panda-2.p8.png",
+      "sha256": "f837b757d344a5ab259fc6dded967207bbff56e7a9bb49bb758c9d77538673a7"
+    }
+  },
+  "howToPlay": {
+    "goal": "Drive the pizza car to every house. Jump the gaps, mind the cats.",
+    "controls": [
+      "Stick: drive",
+      "A: jump",
+      "B: honk, and start a level",
+      "START: restart a level or go to the map"
+    ]
+  },
+  "credits": "Pizza Panda by Andrew Anderson (kittenm4ster on the BBS), CC BY-NC-SA 4.0 on the BBS, MIT in his own repo."
+}

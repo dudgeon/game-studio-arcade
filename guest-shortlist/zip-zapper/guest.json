@@ -1,0 +1,32 @@
+{
+  "id": "zip-zapper",
+  "title": "Zip Zapper",
+  "by": "ejreyes",
+  "version": "bbs-0-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "pico8"
+  },
+  "upstream": {
+    "source": "https://www.lexaloffle.com/bbs/?tid=53344",
+    "licence": "CC BY-NC-SA 4.0",
+    "licence_source": "the cart's post on the Lexaloffle BBS, https://www.lexaloffle.com/bbs/?tid=53344: \"License: CC4-BY-NC-SA\" (https://creativecommons.org/licenses/by-nc-sa/4.0/).",
+    "licence_note": "Non-commercial, with credit, and a changed version stays under the same licence. The cabinet plays it at home, unchanged; only the page around PICO-8's player is ours.",
+    "file": {
+      "name": "zipzapper-0.p8.png",
+      "url": "https://www.lexaloffle.com/bbs/cposts/zi/zipzapper-0.p8.png",
+      "sha256": "083508faf842d71b9836ae0a4f8676baf8ba851430e13aeadaf9724347b48570"
+    }
+  },
+  "howToPlay": {
+    "goal": "Help the little robot zap its way to the portal in each puzzle.",
+    "controls": [
+      "Stick: move",
+      "A: zap",
+      "B: go back"
+    ]
+  },
+  "credits": "Zip Zapper by ejreyes, CC BY-NC-SA 4.0, from the Lexaloffle BBS."
+}

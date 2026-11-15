@@ -1,0 +1,32 @@
+{
+  "id": "terra-nova-pinball",
+  "title": "Terra Nova Pinball",
+  "by": "Matt Sutton",
+  "version": "1.1.0-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "pico8"
+  },
+  "upstream": {
+    "source": "https://www.lexaloffle.com/bbs/?tid=49068",
+    "licence": "CC BY-NC-SA 4.0",
+    "licence_source": "the cart's post on the Lexaloffle BBS, https://www.lexaloffle.com/bbs/?tid=49068: \"License: CC4-BY-NC-SA\" (https://creativecommons.org/licenses/by-nc-sa/4.0/).",
+    "licence_note": "Non-commercial, with credit, and a changed version stays under the same licence. The cabinet plays it at home, unchanged; only the page around PICO-8's player is ours.",
+    "file": {
+      "name": "terra_nova_pinball-2.p8.png",
+      "url": "https://www.lexaloffle.com/bbs/cposts/te/terra_nova_pinball-2.p8.png",
+      "sha256": "e3a3f523c399745190b5060ddc331eb0aa883597305194494cc924779e5a194c"
+    }
+  },
+  "howToPlay": {
+    "goal": "Pinball on an alien world. Keep the ball in play and light the targets.",
+    "controls": [
+      "Stick left and right: the flippers",
+      "Stick up and down: launch power",
+      "A or B: launch the ball"
+    ]
+  },
+  "credits": "Terra Nova Pinball by Matt Sutton (xietanu on the BBS), CC BY-NC-SA 4.0, from the Lexaloffle BBS."
+}

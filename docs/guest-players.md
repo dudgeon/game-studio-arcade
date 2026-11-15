@@ -38,7 +38,17 @@ Two more passed the licence check and aren't built: **Retro Gunner** (a shoot-'e
 
 ## PICO-8
 
-Works, with no game yet (D389). Geoff's PICO-8 0.2.7 for macOS is on the mini; `build.mjs` exports a cart with it and the result plays from the shelf with the cabinet's buttons (A and X are PICO-8's O, B and Y its X). A PICO-8 game goes on the shelf once Geoff picks a cart whose licence allows it.
+The export works with Geoff's PICO-8 (D389). Five carts from the Lexaloffle BBS are exported, played with the cabinet's buttons and waiting in `guest-shortlist/` for Geoff's pick (A is PICO-8's O, B its X). Each is CC BY-NC-SA 4.0, set by its author on the cart's BBS post: fine at home, credited, never sold.
+
+| | Game | What it is | Licence |
+|---|---|---|---|
+| ![](guests/pizza-panda-2.png) | **Pizza Panda**, Andrew Anderson. `pizza-panda` | Drive the pizza car to every house; 20 short levels, no fighting. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=54289)); also MIT in [his repo](https://github.com/andmatand/pizza-panda) |
+| ![](guests/terra-nova-pinball-2.png) | **Terra Nova Pinball**, Matt Sutton. `terra-nova-pinball` | A full pinball table with a high-score table. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=49068)) |
+| ![](guests/zip-zapper-2.png) | **Zip Zapper**, ejreyes. `zip-zapper` | A robot zaps its way to the portal in short, calm puzzles. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=53344)) |
+| ![](guests/up-and-away-2.png) | **Up and Away**, Ross McCormick. `up-and-away` | A hot-air balloon trip between islands to visit Grandma; no way to lose. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=142710)) |
+| ![](guests/just-one-boss-2.png) | **Just One Boss**, bridgs. `just-one-boss` | One boss fight on a grid of tiles, stick only. Hard. | CC BY-NC-SA 4.0 ([post](https://www.lexaloffle.com/bbs/?tid=30767)) |
+
+**My pick of three:** Pizza Panda, Terra Nova Pinball, Zip Zapper. Up and Away is the calm swap; Just One Boss is a challenge for Owen.
 
 ## The shelf with all eight, in the test VM
 
