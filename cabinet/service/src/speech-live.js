@@ -59,7 +59,7 @@ const LIVE_STEP_BYTES = RATE / 2;
 /** The end of the live words is what's shown: three lines need far fewer than this. */
 const LIVE_TAIL = 400;
 /**
- * @typedef {{ listening: boolean, seconds: number, words: string | null, stopped: boolean }} LiveView
+ * @typedef {{ listening: boolean, seconds: number, words: string | null, stopped: boolean, behind_s: number | null }} LiveView
  *   words: null when live words aren't on (none asked, no Moonshine, or it fell behind and stopped);
  *   stopped: the mic went quiet for good while the button is still down
  */
@@ -443,7 +443,8 @@ export function groqEngine(o) {
 /**
  * Real speech: a recorder and engines tried in order (Groq, then Moonshine). Logs which engine
  * answered and how long it took, never what was said or the audio.
- * @param {{ recorder: Recorder, engines: Engine[], online?: () => boolean, logFile?: string, log?: (m: string) => void, now?: () => number }} o
+ * @param {{ recorder: Recorder, engines: Engine[], liveWords?: Engine, online?: () => boolean, logFile?: string, log?: (m: string) => void, now?: () => number }} o
+ *   liveWords: a Moonshine of its own, with a lighter streaming model, for words while talking (D492)
  * @returns {import("./speech.js").Speech & { close: () => void, live: () => LiveView }}
  */
 export function liveSpeech(o) {
@@ -455,12 +456,15 @@ export function liveSpeech(o) {
   const fedText = [];
   let startedAt = 0;
   const kind = o.engines.map((e) => e.name).join("+") || "none";
-  /** The engine whose live words show while the kid talks (D492): Moonshine on the cabinet. */
-  const liveEngine = o.engines.find((e) => e.live);
+  /**
+   * Live words come from their own Moonshine process, with a lighter model (D492), so the final words never
+   * wait behind the stream: those are Groq's, or the main Moonshine's in one pass.
+   */
+  const liveEngine = o.liveWords?.live ? o.liveWords : null;
 
   /**
    * The live words of the hold under way, if it asked for them (D492).
-   * @type {null | { words: string, sent: number, busy: Promise<void>, pending: Buffer[], pendingBytes: number,
+   * @type {null | { words: string, sent: number, heard: number, busy: Promise<void>, pending: Buffer[], pendingBytes: number,
    *   failed: boolean, feeder: NodeJS.Timeout | null, clip: Buffer | null }}
    */
   let live = null;
@@ -499,36 +503,27 @@ export function liveSpeech(o) {
   const take = (d) => {
     if (!live) return;
     const copy = Buffer.from(d); // the recorder wipes its own copy when the hold ends
+    live.heard += copy.length;
     live.pending.push(copy);
     live.pendingBytes += copy.length;
     pump();
   };
 
-  /**
-   * End the hold's live words: send what hasn't gone, then the stream's final words. Null if there were none.
-   * @param {Buffer | null} pcm  the whole hold, to send what the stream hasn't had
-   */
-  const endLive = async (pcm) => {
+  /** End the hold's live words. The stream's own end runs on in its process; nothing waits for it. */
+  const endLive = () => {
     const L = live;
     live = null;
-    if (!L || !liveEngine?.live) return null;
+    if (!L || !liveEngine?.live) return;
     if (L.feeder) clearInterval(L.feeder);
     o.recorder.onData?.(null);
-    await L.busy;
-    for (const b of L.pending) b.fill(0);
-    if (L.failed) {
-      liveEngine.live.end().catch(() => {});
-      return null;
-    }
-    const rest = pcm ? Buffer.from(pcm.subarray(L.sent)) : null;
-    try {
-      if (rest?.length) await liveEngine.live.add(rest);
-      return (await liveEngine.live.end()).trim();
-    } catch {
-      return null;
-    } finally {
-      rest?.fill(0);
-    }
+    const engine = liveEngine.live;
+    L.busy
+      .then(() => {
+        for (const b of L.pending) b.fill(0);
+        L.pending = [];
+        return L.failed ? undefined : engine.end();
+      })
+      .catch(() => {});
   };
 
   return {
@@ -541,7 +536,7 @@ export function liveSpeech(o) {
       if (!fedText.length) for (const e of o.engines) e.warm?.();
       if (!fed.length && !fedText.length) o.recorder.start();
       if (opts.live && liveEngine?.live && !fedText.length) {
-        live = { words: "", sent: 0, busy: Promise.resolve(), pending: [], pendingBytes: 0, failed: false, feeder: null, clip: null };
+        live = { words: "", sent: 0, heard: 0, busy: Promise.resolve(), pending: [], pendingBytes: 0, failed: false, feeder: null, clip: null };
         const L = live;
         L.busy = liveEngine.live.begin().catch((/** @type {any} */ e) => {
           L.failed = true;
@@ -563,7 +558,8 @@ export function liveSpeech(o) {
     live() {
       const L = live;
       const stopped = open && !fed.length && o.recorder.alive ? !o.recorder.alive() : false;
-      return { listening: open, seconds: open ? Math.floor((now() - startedAt) / 1000) : 0, words: L && !L.failed ? L.words.slice(-LIVE_TAIL) : null, stopped };
+      // behind_s: how much of what's been said the live words haven't caught up with yet.
+      return { listening: open, seconds: open ? Math.floor((now() - startedAt) / 1000) : 0, words: L && !L.failed ? L.words.slice(-LIVE_TAIL) : null, stopped, behind_s: L && !L.failed ? Math.round(((L.heard - L.sent) / 2 / RATE) * 10) / 10 : null };
     },
     async stop(opts = {}) {
       if (!open) return { text: "" };
@@ -572,13 +568,12 @@ export function liveSpeech(o) {
       // D491: a game's voice action wants speed: Moonshine first, Groq only if it fails.
       const engines = opts.fast ? [...o.engines].sort((a, b) => (a.name === "moonshine" ? -1 : b.name === "moonshine" ? 1 : 0)) : o.engines;
       let pcm = fed.length ? /** @type {Buffer} */ (fed.shift()) : await o.recorder.stop();
-      // The stream's final words are Moonshine's answer for this hold: it has heard it all already (D492).
-      const liveFinal = live ? endLive(pcm) : null;
+      const wasLive = live != null;
+      endLive();
       const heldMs = now() - startedAt;
       const audioMs = Math.round((pcm.length / 2 / RATE) * 1000);
       if (pcm.length < RATE * 2 * 0.2) {
         record({ engine: null, held_ms: heldMs, audio_ms: audioMs, ms: 0, result: "too short" });
-        await liveFinal;
         pcm.fill(0);
         return { text: "" };
       }
@@ -592,9 +587,8 @@ export function liveSpeech(o) {
           }
           const t = now();
           try {
-            const streamed = engine === liveEngine && liveFinal ? await liveFinal : null;
-            const text = streamed ?? (await engine.transcribe(pcm)).trim();
-            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(opts.fast ? { fast: true } : {}), ...(liveFinal ? { live: true } : {}), ...(streamed == null && pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
+            const text = (await engine.transcribe(pcm)).trim();
+            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(opts.fast ? { fast: true } : {}), ...(wasLive ? { live: true } : {}), ...(pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
             return { text };
           } catch (/** @type {any} */ e) {
             skipped.push(`${engine.name}: ${e.name === "TimeoutError" ? "timed out" : e.message}`);
@@ -604,7 +598,6 @@ export function liveSpeech(o) {
         o.log?.(`speech: no engine answered (${skipped.join("; ")})`);
         return { text: "" };
       } finally {
-        await liveFinal; // the stream has finished with the audio before it's wiped
         pcm.fill(0); // drop it: the audio is gone once the words are back
         pcm = Buffer.alloc(0);
       }
@@ -617,10 +610,9 @@ export function liveSpeech(o) {
         fedText.shift();
         return;
       }
-      const ending = live ? endLive(null) : null;
+      endLive();
       const from = fed.length ? Promise.resolve(/** @type {Buffer} */ (fed.shift())) : o.recorder.stop();
-      from.then(async (pcm) => {
-        await ending;
+      from.then((pcm) => {
         pcm.fill(0);
         record({ engine: null, held_ms: now() - startedAt, audio_ms: Math.round((pcm.length / 2 / RATE) * 1000), ms: 0, result: "cancelled" });
       }, () => {});
@@ -637,6 +629,7 @@ export function liveSpeech(o) {
     close() {
       o.recorder.close?.();
       for (const e of o.engines) e.close?.();
+      o.liveWords?.close?.();
     },
   };
 }
@@ -656,9 +649,12 @@ export function cabinetSpeech(o) {
   const engines = [];
   if (typeof o.config?.groq_api_key === "string" && o.config.groq_api_key) engines.push(groqEngine({ key: o.config.groq_api_key, timeoutMs: o.config.groq_timeout_ms }));
   engines.push(moonshineEngine({ python: s.python, helper: s.helper, modelDir: s.model_dir, arch: s.arch, log: o.log }));
+  // D492: words while talking, from a second Moonshine with the lighter streaming model, when provisioning installed it.
+  const liveWords = s.live_model_dir && o.config?.live_words !== false ? moonshineEngine({ python: s.python, helper: s.helper, modelDir: s.live_model_dir, arch: s.live_arch, log: o.log }) : undefined;
   return liveSpeech({
     recorder: alsaRecorder({ device: o.config?.mic_device ?? null, log: o.log }),
     engines,
+    liveWords,
     online: o.online,
     logFile: path.join(o.logsDir, "speech.jsonl"),
     log: o.log,

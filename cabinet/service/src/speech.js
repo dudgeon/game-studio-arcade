@@ -7,7 +7,7 @@ import fs from "node:fs";
  * @typedef {object} Speech
  * @property {string} kind
  * @property {(o?: { live?: boolean }) => void} start  live: words while the kid talks, for the talk screens (D492)
- * @property {() => { listening: boolean, seconds: number, words: string | null, stopped: boolean }} [live]  what the
+ * @property {() => { listening: boolean, seconds: number, words: string | null, stopped: boolean, behind_s?: number | null }} [live]  what the
  *   kid sees while holding the button (D492)
  * @property {(o?: { fast?: boolean }) => Promise<{ text: string }>} stop  fast: Moonshine first, for a game's
  *   voice actions, where speed matters more than the last word (D491); Groq only if Moonshine fails
