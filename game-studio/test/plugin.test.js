@@ -52,7 +52,7 @@ test("the plugin's manifest, MCP servers, skill and marketplace entry", () => {
   assert.match(skill, /^---\nname: build-cart\ndescription: .{40,}\n---\n/);
   // Every tool the skill names exists.
   const names = [...bridgeToolDefs().map((t) => t.name), ...createStudioServer().tools().map((t) => t.name)];
-  for (const m of skill.matchAll(/`([a-z_]+)`/g)) if (/_/.test(m[1]) && !["g.lib", "you_check", "include_words"].includes(m[1]) && !m[1].startsWith("math")) assert.ok(names.includes(m[1]), `the skill names ${m[1]}`);
+  for (const m of skill.matchAll(/`([a-z_]+)`/g)) if (/_/.test(m[1]) && !["g.lib", "you_check", "include_words", "version_name"].includes(m[1]) && !m[1].startsWith("math")) assert.ok(names.includes(m[1]), `the skill names ${m[1]}`);
   const market = JSON.parse(fs.readFileSync(path.join(REPO, ".claude-plugin/marketplace.json"), "utf8"));
   assert.equal(market.plugins[0].name, manifest.name);
   assert.ok(fs.existsSync(path.join(REPO, market.plugins[0].source, ".claude-plugin/plugin.json")));

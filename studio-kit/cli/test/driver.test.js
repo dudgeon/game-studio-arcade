@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mockApi } from "../test-support/mock-api.js";
-import { runSession } from "../src/driver.js";
+import { nameFor, runSession } from "../src/driver.js";
 import { replayAnswerer } from "../src/answers.js";
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures");
@@ -238,4 +238,77 @@ test("the first question checks Claude heard the idea right, and a spoken fix re
   assert.deepEqual(asked[0], restate, "the restated idea reaches the screen as Claude wrote it, with its two tiles");
   assert.deepEqual(r.turns[0].question, restate.question);
   assert.deepEqual([r.turns[0].choice, r.turns[0].said], ["C", "every time you clear a line he dances"], "the correction is on the record");
+});
+
+// ---------- the name question (D471) ----------
+
+const nameUse = (id, input = {}) => toolUse(id, "name_version", { option_a: "Faster logs", option_b: "Turbo river", pick: "B", ...input });
+const nameScript = (input) => mockApi({ steps: [{ await_message: true }, nameUse("n1", input), { await_result: "n1" }, idle("i", "end_turn")] });
+/** An answerer whose name question gets `a`. */
+const naming = (a, seen = []) => ({ ...replayAnswerer({}), name: async (q) => (seen.push(q), a) });
+
+test("name_version: a tile's name comes back as the name, and the turn is kept apart from the game's questions", async () => {
+  const m = nameScript();
+  const seen = [];
+  const named = [];
+  const { r } = await run(m.api, naming({ choice: "A" }, seen), { naming: { taken: [] }, ui: { progress: () => {}, named: (n) => named.push(n) } });
+  assert.deepEqual(seen, [{ option_a: "Faster logs", option_b: "Turbo river", pick: "B" }]);
+  assert.deepEqual(JSON.parse(m.results.get("n1")), { choice: "A", name: "Faster logs" });
+  assert.deepEqual(r.nameTurn, { option_a: "Faster logs", option_b: "Turbo river", pick: "B", choice: "A", said: null, name: "Faster logs", picked: "tile" });
+  assert.deepEqual(r.turns, []);
+  assert.equal(r.endedBy, "answers", "D on the name question isn't Make it now");
+  assert.deepEqual(named, ["Faster logs"]);
+});
+
+test("name_version: You pick is Claude's pick; Something else is the player's own words, tidied", async () => {
+  const d = nameScript();
+  const picked = await run(d.api, naming({ choice: "D" }), { naming: { taken: [] } });
+  assert.deepEqual(JSON.parse(d.results.get("n1")), { choice: "D", name: "Turbo river" });
+  assert.equal(picked.r.nameTurn?.picked, "claude");
+  assert.equal(picked.r.endedBy, "answers");
+
+  const c = nameScript();
+  const said = await run(c.api, naming({ choice: "C", said: " mega frog. " }), { naming: { taken: [] } });
+  assert.deepEqual(JSON.parse(c.results.get("n1")), { choice: "C", said: " mega frog. ", name: "Mega frog" });
+  assert.deepEqual([said.r.nameTurn?.name, said.r.nameTurn?.picked, said.r.nameTurn?.said], ["Mega frog", "said", " mega frog. "]);
+});
+
+test("name_version: the player's words are never cut; too long or already used goes back to Claude with no name", async () => {
+  for (const words of ["the one where every log goes much faster", "turbo RIVER"]) {
+    const m = nameScript();
+    const { r } = await run(m.api, naming({ choice: "C", said: words }), { naming: { taken: ["Turbo river"] } });
+    assert.deepEqual(JSON.parse(m.results.get("n1")), { choice: "C", said: words });
+    assert.equal(r.nameTurn?.name, null);
+  }
+});
+
+test("nameFor: Claude's own names are cut to fit, a used one is skipped on You pick", () => {
+  const q = { option_a: "Much much faster logs", option_b: "Turbo river", pick: "A" };
+  assert.deepEqual(nameFor(q, { choice: "A" }, []), { name: "Much much faster", picked: "tile" });
+  assert.deepEqual(nameFor(q, { choice: "D" }, ["much much faster"]), { name: "Turbo river", picked: "claude" });
+  assert.deepEqual(nameFor(q, { choice: "D" }, ["Much much faster", "Turbo river"]), { name: null, picked: "claude" });
+  assert.deepEqual(nameFor(q, { choice: "B" }, ["Turbo River"]), { name: null, picked: "tile" });
+});
+
+test("name_version: with no way to ask, it's You pick; for a version that takes its title, it's turned down and noted", async () => {
+  // A recording from before names, and an answerer with no name question at all (a session picked up after a restart).
+  const { name: _, ...noName } = replayAnswerer({});
+  for (const answerer of [replayAnswerer({}), noName]) {
+    const m = nameScript();
+    const { r } = await run(m.api, answerer, { naming: { taken: [] } });
+    assert.deepEqual(JSON.parse(m.results.get("n1")), { choice: "D", name: "Turbo river" });
+    assert.equal(r.nameTurn?.picked, "claude");
+  }
+
+  const off = nameScript();
+  const other = await run(off.api, naming({ choice: "A" }));
+  assert.match(off.results.get("n1"), /goes by the game's title/);
+  assert.equal(other.r.nameTurn, null);
+  assert.ok(other.r.notes.includes("named_a_version_that_takes_its_title"));
+});
+
+test("a replayed recording answers the name question with its recorded answer", async () => {
+  const m = nameScript();
+  const { r } = await run(m.api, replayAnswerer({ name: { choice: "A" } }), { naming: { taken: [] } });
+  assert.equal(r.nameTurn?.name, "Faster logs");
 });

@@ -3,8 +3,10 @@
 // makers' versions indented under the game they came from. Pure, so tests and the
 // page share it. A cart with no family is its own (every cart made before D209).
 
+import { shelfTag } from "./version-name.js";
+
 /**
- * @typedef {{ id: string, title: string, version: number, maker: string | null, parent: string | null,
+ * @typedef {{ id: string, title: string, version: number, version_name?: string | null, maker: string | null, parent: string | null,
  *   family?: string | null, branch?: string | null, created?: string | null, plays?: number,
  *   youCheck?: { id: string, text: string }[], answered?: any, pitch?: string | null, controls?: string[] }} Cart
  * @typedef {{ id: string, family: string, maker: string | null, carts: Cart[], newest: Cart }} Line
@@ -80,7 +82,7 @@ export function gameRows(carts, nameOf) {
   for (const f of families(carts)) {
     for (const [i, l] of [f.main, ...f.others].entries()) {
       const c = l.newest;
-      rows.push({ kind: /** @type {const} */ ("cart"), cart: c, line: l, family: f, indent: i ? 1 : 0, title: c.title, by: c.maker ? `by ${nameOf(c.maker)}` : "starter game", version: c.version > 1 ? `v${c.version}` : null, tags: tagsOf(c) });
+      rows.push({ kind: /** @type {const} */ ("cart"), cart: c, line: l, family: f, indent: i ? 1 : 0, title: c.title, by: c.maker ? `by ${nameOf(c.maker)}` : "starter game", version: shelfTag(c), tags: tagsOf(c) });
     }
   }
   return rows;

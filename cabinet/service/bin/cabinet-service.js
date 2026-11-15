@@ -16,6 +16,7 @@ import { createStudio, QUESTION_TIMEOUT_MS } from "../src/studio.js";
 import { startService } from "../src/server.js";
 import { createGuests, listGuests, startGuestServer } from "../src/guests.js";
 import { createScreener, modelCheck } from "../src/screening.js";
+import { createGameAi, gameAiModel } from "../src/game-ai.js";
 import { createArcadeMcp, launchRelay } from "../src/arcade-mcp.js";
 import { shelfMarks } from "../src/shelf-marks.js";
 import { demoWifi, socketWifi } from "../src/wifi-client.js";
@@ -148,8 +149,12 @@ const studio = createStudio({
   // No key and not replaying: the Picade before connect-picade.sh (D252). Its screens say so, not "No Wi-Fi".
   connected: replaying || Boolean(values.config),
   findCart: (id) => {
-    const c = listCarts(roots).find((x) => x.id === id);
-    return c ? { id: c.id, dir: c.dir, version: c.version, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id } : null;
+    const all = listCarts(roots);
+    const c = all.find((x) => x.id === id);
+    if (!c) return null;
+    // Every name this game's line has used, so a new version's is its own (D473).
+    const names = all.filter((x) => (x.branch ?? x.id) === (c.branch ?? c.id) && x.version_name).map((x) => /** @type {string} */ (x.version_name));
+    return { id: c.id, dir: c.dir, version: c.version, version_name: c.version_name, names, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id };
   },
   recheckMs: config.recheck_s ? config.recheck_s * 1000 : undefined,
   api: async (resume, what) => {
@@ -220,7 +225,12 @@ const mcp = createArcadeMcp({
   status: () => ({ console: config.console_name ?? "Quarter Deck", profile: values.profile ?? cabinetProfile(), release, replaying, gate: gate ? { host: gate.settings.host, budget_ms: gate.settings.budgetMs, cpu_factor: gate.settings.cpuFactor, frame_time_blocks: gate.settings.frameTimeBlocks } : null }),
 });
 
+// AI in games (D480-D488): the cabinet's own key, outside the coin pot, every call's cost logged. Off when
+// replaying or with no key, and with "game_ai": false in the config; games then run on their own fallbacks.
+const gameAi = createGameAi({ logsDir: paths.logs, keepDir: path.join(paths.root, "game-ai"), model: client && !replaying && config.game_ai !== false ? gameAiModel(client) : null, online: () => online, perMinute: config.game_ai?.per_minute });
+
 const s = await startService({
+  gameAi,
   mcp,
   launches,
   screen,

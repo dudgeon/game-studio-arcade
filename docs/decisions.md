@@ -2077,6 +2077,17 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **Still to do on the Picade:** the 10 power cycles (`wifi-proof.sh cycles 10`, with a person at the cabinet), and opening the Wi-Fi screens with the two buttons and joining a network from them, which nobody has done on the real cabinet yet.
 - **The Picade's proof:** `scripts/cabinet-card/wifi-proof.sh restarts 5` restarts the cabinet itself; `wifi-proof.sh cycles 10` counts ten power cycles a person does, and says when. Each boot's line is the seconds from power-on until NetworkManager had `wlan0` activated, read from the cabinet's own journal, so a cable being in doesn't mask it. A pass is 60 s or less. Results are kept in the Picade's folder on the mini.
 
+**D419. The Picade's screen runs at 1152x864, not the panel's 1024x768: found, not yet changed. `drive screenshot` takes the real grab.** *(Director's ask after the speech worker's finding, 2026-11-14; Claude. Read-only on the Picade.)*
+- **What's wrong:** the kiosk's output mode on the Picade is 1152x864 at 75 Hz (`wlr-randr`: "1152x864 px, 75.000000 Hz (current)"). It isn't how the grab is taken: the grab is the compositor's real output.
+- **Why:** the panel's EDID ("Pico Technology Inc. 0x0001", 160x120 mm) has no detailed timing and so no preferred mode. It only sets the standard-timing bits for 640x480, 800x600, 1024x768 at 60 Hz and 1152x870 at 75 Hz. With nothing preferred, the kernel takes the largest, and the picade profile leaves the mode alone (`ARCADE_OUTPUT=` is empty; only the virtual profile forces 1024x768).
+- **What it does to the picture:** the launcher draws 256x192 at exactly 4x, 1024x768 (D81), in the middle of 1152x864, with a 64 px border left and right and 48 px top and bottom. The panel's own controller then shrinks all of it by 8/9 onto its 1024x768 glass. So the games fill about 89% of the screen each way, and no game pixel lands on whole screen pixels. D81's "exactly 4x" doesn't hold on the real cabinet.
+- **The fix** *(the director's yes, 2026-11-14)*: the picade profile sets `ARCADE_MODE=1024x768`, and the session asks for that mode, one the panel lists itself, with `wlr-randr --output <screen> --mode 1024x768` (60 Hz). `ARCADE_OUTPUT` stays empty there, so the session uses whichever screen is plugged in and either HDMI port works. If the mode can't be set, the kiosk still starts at the mode the screen came up in. The virtual cabinet's headless screen keeps its custom mode.
+  - Not chosen: D253's `video=HDMI-A-1:1024x768@60D` on the kernel command line. It would also fix the first-boot console, but it edits the file the Pi boots from.
+- **Tried live first, 2026-11-14 16:1x, on the idle Picade:** `wlr-randr --output HDMI-A-1 --mode 1024x768` returned 0; the output went from "1152x864 px, 75 Hz" to "1024x768 px, 60.004 Hz"; the kiosk kept running in the same session (same process); and the grab is 1024x768 with the launcher filling it edge to edge. The live setting lasts until the kiosk next restarts; the provisioning change makes it stay.
+- **Geoff looked at the glass, 2026-11-14, through the director: "Looks right"** (full screen, no border, sharp). The live setting was left in place; the next update makes it stay.
+- **`drive screenshot` now** keeps any PNG of at least 1024x768 and notes a larger screen on stderr ("the cabinet's screen is 1152x864, not 1024x768: the launcher sits in the middle of it"). It still refuses what isn't a PNG or is too small to hold the launcher, keeping what came back beside the name asked for. Tested with a stand-in SSH, and run against the Picade (a 1152x864 PNG, with the note).
+- Until the mode is fixed, anything that compares a Picade grab with a 1024x768 one must crop the middle 1024x768 (offset 64, 48).
+
 **D420. Every card starts quiet: the speaker at 30%, stored, and a chosen level is never reset.** *(Geoff's ask, 2026-11-14: the X HAT's speaker is far too loud as it comes, and the screen's own volume buttons do nothing for it. Claude.)*
 - **One tool, `arcade-volume`** (`cabinet/provision/files/`, installed in `/usr/local/bin`, run as root): `get`, `default`, `set N` (0 to 100), `up` and `down`. It drives the softvol `PCM` control on card `sndrpihifiberry` (D253) and stores each change with `alsactl store`, as the Manager's slider does (D366).
 - **`default` sets 30% only when no level is stored** for the speaker's `PCM` control in `/var/lib/alsa/asound.state` (only the speaker's own block: the mic is a sound card too). A stored level is someone's choice, so it's kept.
@@ -2100,17 +2111,6 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 - **In the launcher** (`app.js`, a few lines): a pink pressed while ENT is held isn't a button. On the talk screen ENT now opens typing when it's let go, and not if a pink was pressed meanwhile; a tap works as before (D184).
 - **No clash with the Wi-Fi screen's ENT and COIN hold** (checked with the Wi-Fi worker, 2026-11-14): theirs needs both held for 3 s and any other key cancels it; here a pink does nothing while COIN is held.
 - **Tested:** the watcher against recorded key events, the stream in the service's test, and the chord and the bar in headless Chromium. **Not yet proven on the Picade:** the real buttons, the bar over a game, and whether 60% is the right cap by ear.
-
-**D419. The Picade's screen runs at 1152x864, not the panel's 1024x768: found, not yet changed. `drive screenshot` takes the real grab.** *(Director's ask after the speech worker's finding, 2026-11-14; Claude. Read-only on the Picade.)*
-- **What's wrong:** the kiosk's output mode on the Picade is 1152x864 at 75 Hz (`wlr-randr`: "1152x864 px, 75.000000 Hz (current)"). It isn't how the grab is taken: the grab is the compositor's real output.
-- **Why:** the panel's EDID ("Pico Technology Inc. 0x0001", 160x120 mm) has no detailed timing and so no preferred mode. It only sets the standard-timing bits for 640x480, 800x600, 1024x768 at 60 Hz and 1152x870 at 75 Hz. With nothing preferred, the kernel takes the largest, and the picade profile leaves the mode alone (`ARCADE_OUTPUT=` is empty; only the virtual profile forces 1024x768).
-- **What it does to the picture:** the launcher draws 256x192 at exactly 4x, 1024x768 (D81), in the middle of 1152x864, with a 64 px border left and right and 48 px top and bottom. The panel's own controller then shrinks all of it by 8/9 onto its 1024x768 glass. So the games fill about 89% of the screen each way, and no game pixel lands on whole screen pixels. D81's "exactly 4x" doesn't hold on the real cabinet.
-- **The fix** *(the director's yes, 2026-11-14)*: the picade profile sets `ARCADE_MODE=1024x768`, and the session asks for that mode, one the panel lists itself, with `wlr-randr --output <screen> --mode 1024x768` (60 Hz). `ARCADE_OUTPUT` stays empty there, so the session uses whichever screen is plugged in and either HDMI port works. If the mode can't be set, the kiosk still starts at the mode the screen came up in. The virtual cabinet's headless screen keeps its custom mode.
-  - Not chosen: D253's `video=HDMI-A-1:1024x768@60D` on the kernel command line. It would also fix the first-boot console, but it edits the file the Pi boots from.
-- **Tried live first, 2026-11-14 16:1x, on the idle Picade:** `wlr-randr --output HDMI-A-1 --mode 1024x768` returned 0; the output went from "1152x864 px, 75 Hz" to "1024x768 px, 60.004 Hz"; the kiosk kept running in the same session (same process); and the grab is 1024x768 with the launcher filling it edge to edge. The live setting lasts until the kiosk next restarts; the provisioning change makes it stay.
-- **Geoff looked at the glass, 2026-11-14, through the director: "Looks right"** (full screen, no border, sharp). The live setting was left in place; the next update makes it stay.
-- **`drive screenshot` now** keeps any PNG of at least 1024x768 and notes a larger screen on stderr ("the cabinet's screen is 1152x864, not 1024x768: the launcher sits in the middle of it"). It still refuses what isn't a PNG or is too small to hold the launcher, keeping what came back beside the name asked for. Tested with a stand-in SSH, and run against the Picade (a 1152x864 PNG, with the note).
-- Until the mode is fixed, anything that compares a Picade grab with a 1024x768 one must crop the middle 1024x768 (offset 64, 48).
 
 ## 2026-11-14 — Nothing at the cabinet needs a keyboard (D430-D439, name-entry worker)
 
@@ -2157,4 +2157,109 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **speech.jsonl** gains `pieces` when a hold was split.
 - **Tests:** a 3-minute and a 25-minute hold through a stand-in arecord (every second kept, Groq in 1 and 3 pieces, Moonshine in 30 s pieces), the splitter, and an hour's idea taken whole by the service.
 
-## 2026-11-14 — Security updates to pinned packages (D375)
+## 2026-11-14 — Version names (D471-D474, names worker)
+
+Geoff's decision on D456 (docs/round-two-plan.md §3 and its last section): a version gets a name on the question board, two names from Claude plus "say your own", or "You pick". The name replaces v2/v3 on the shelf, in the Manager and in the MCP list, and lineage stays intact. D457 and D458 were the plan's proposals for where the name lives and where it shows; D472 and D474 are those as built.
+
+**D471. A maker's own change gets a name, asked on the question board right after "Build it!".** *(Geoff chose the board, D456; Claude built it.)*
+- **Who gets one:** the next version of a game by its own maker (v2, v3...). A new game, and someone's own version of another maker's game, go by the game's title, as before (D206). The first screen of a change, "makes version 4", is unchanged: the name doesn't exist yet.
+- **The board** is the one the kids know: "What should this version be called?", A and B are Claude's two names, C "Something else" opens the mic for their own, and D reads **"You pick"**: Claude's choice of its two. D here isn't "Make it now"; it ends nothing.
+- **How Claude asks:** a fourth custom tool, `name_version` (`option_a`, `option_b`, `pick`), called once when the plan is agreed and before the checks are written. The cabinet answers with the name itself (`{"choice":"A","name":"Faster logs"}`), so the name Claude writes is the one the maker saw.
+- **The maker's own words are never cut.** A spoken name that fits is used as said (tidied: "turbo frog." is "Turbo frog"). One that's too long or already used comes back to Claude with no name, and Claude makes the closest short one from their words. Claude's own names are cut to fit.
+- **A name never stops a game.** If no usable name comes out of the make (a restart with nobody to ask is "You pick"; a name that breaks the rules is dropped), the version is saved with no name and shows by its number.
+- **Spoken names are screened** like any other answer (D270): the name question goes to the screener with the words.
+- **The agent's brief changed** (`agents/studio.md`, `agents/tools/name_version.json`), so each cabinet's workspace needs an `ant apply` before its next make: until then `studio check-brief` says the applied agent is stale and Make is refused (D173). The director runs it on both workspaces, with the update.
+- **The replay's change fixture** (`studio-kit/cli/fixtures/log-hopper-change`, recorded before names) has the name question added by hand, where the brief now asks it: two events in `events.jsonl` and `name` in `answers.json`. Nothing else in the recording changed.
+
+**D472. Where the name lives: the spec's Changelog, `cart.json`, and the logs. The number stays as the order.** *(The plan's D457, as built. Claude.)*
+- **Spec first:** the version's Changelog line carries it in quotes, `- v3 "Faster logs": The logs move faster.` The parser reads it as the entry's `name`; a line with no name is as it was.
+- **`cart.json`** gets `"version_name": "Faster logs"`, so the shelf never parses the spec. `validate-cart` knows the field and refuses one that wouldn't show; the cabinet tidies or drops a bad one before it validates, so a kid's game is never refused over a name (D197's rule for history).
+- **The cabinet is the authority:** when the cart comes home it writes the name from the name question into `cart.json` and onto the Changelog line if Claude left it off.
+- **`cart_version.jsonl`** records `version_name`, `named_by` (the maker) and `name_picked` (`tile`, `said`, `claude` for "You pick", or `desktop`). The make's `studio_session` record keeps the name question as asked and answered (`name_turn`), apart from the game's questions.
+- **Lineage is untouched:** ids, `version`, `parent`, `family` and `branch` are as before. The name is a label; nothing sorts or links by it.
+- **Never changed in place:** there's no rename. If one is ever wanted it's a new record, and the Manager is the place (not in this round).
+
+**D473. A name's rules.** *(The plan's rules; Claude.)*
+- At most 16 characters, the same as a maker's name (D87). Plain ASCII: the cabinet's font. No quotes (the Changelog quotes it), no full stop left by speech-to-text, single spaces, first letter a capital.
+- Not the game's title, and not a name another version on the same line has, whatever the capitals. Another maker's line can use the same name.
+- One place holds the rules: `studio-kit/spec/src/version-name.js`, shared by the sandbox's validator, the CLI, the service and the desktop tool.
+
+**D474. Where the name shows, and how old carts show.** *(The plan's D458, as built. Claude.)*
+- **Shelf (S1):** the tag that said "v3" says "Faster logs". Two tags share a column (the name over NEW), and the title now stops at the wider of the two.
+- **"See other versions" (S3):** "Faster logs (newest)" with "v3" small beside the day.
+- **Making (R7):** the header reads "Making Faster logs" once the name is picked.
+- **Result (R8):** "Faster logs is ready!" and "Bigger frog is still saved."
+- **The plan and the coin check (R6, R3):** "Bigger frog stays saved", when the version being changed has a name.
+- **Manager:** Games shows "newest: Faster logs (v3)" under the count; plays and makes show "Faster logs (v3)".
+- **MCP:** `list_carts` has `version_name` on every cart (null for none). `publish_cart` takes an optional `version_name` for a maker's own next version; a bad or used one is refused with the reason, since a grown-up is at the desk. The plugin's skill asks the maker for one.
+- **A version with no name** (every version made before today, any first version, and any make where no name came out) shows exactly as it did: "v2" on the shelf, "Version 2" in lists and sentences, "v2" in the Manager. Nothing was migrated and nothing needs to be.
+- **Not built:** naming a version that already exists, and names for downloaded (guest) games' versions.
+- **Tested:** the rules and the spec (`studio-kit/spec/test/version-name.test.js`); the tool relay (`studio-kit/cli/test/driver.test.js`); a whole change on the replay, each answer, the logs, and every screen's words (`cabinet/service/test/version-name.test.js`); every named screen at the widest name in the fit test; `publish_cart`; the Manager's activity. `scripts/flows/arcade.drive` walks it in headless Chromium. **Not yet proven:** a live make with the new brief (it needs the apply), and the kids saying a name at the Picade.
+
+## 2026-11-14 — AI in games (D480-D489, AI-in-games worker)
+
+Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's answers in the walkthrough: paid "outside the coin pot, uncapped, but log the cost" (D464), and lines, choices and open chat with a character (D468). The whole design, and the open-chat safety rules, are in [game-ai.md](game-ai.md).
+
+**D480. Games ask for made-up lines and choices through `g.ai`, and never wait.** *(Carries out D463. Claude.)*
+- `g.ai.lines(name, { ask, fallback, max })` and `g.ai.choice(name, { ask, options })` are declared in `init`, at most 8 a game. `g.ai.next(name)` and `g.ai.pick(name, facts)` answer in the same frame: a fresh answer if one has arrived, else the cart's own fallback line or a seeded-random option.
+- **The key never reaches a cart.** The cart frame queues the ask, the runtime host hands it to the launcher, the launcher posts it to the cabinet service (`POST /api/game-ai`), and only the service calls the model, with the cabinet's own key (D131). The sandboxed frame can't call the service itself (its origin is refused, as before).
+- One call brings 12 lines; the next goes out when three are left. A pick's facts are answered for the next pick. One call is in the air per ask, and a failed call waits 10 seconds before another.
+- `g.ai` has its own seeded random stream, so using it doesn't change what `g.rand` gives.
+- Guest games have no `g.ai`. The Manager's simulator and the desktop player have nobody to ask, so games there run on their fallbacks: the mini is never in the path.
+
+**D481. The model: Claude Haiku 5.5, thinking off, low effort, structured output.** *(Claude.)* `claude-haiku-5-5`, $0.10 per million tokens in and $0.50 out (Anthropic's current model list, read 2026-11-14; the same as D272 found). `thinking: disabled`, `effort: low`, a JSON schema (an array of lines, or an enum of the cart's options, so a choice can't come back as anything else), 8 s timeout, no retries. About 0.024 cents for 12 lines and 0.004 cents for a choice (the plan's estimate; each call's real cost is in its log line).
+
+**D482. Paid outside the coin pot, with no cap; every call's cost is logged, never its words.** *(Geoff, D464: "Outside the coin pot, uncapped, but log the cost". The log's shape is the director's default, 2026-11-14.)* `logs/game_ai.jsonl` on the cabinet, one line a call: time, game and version, play, the ask's name and kind, model, tokens in and out, cost in dollars, milliseconds, and the outcome (`fresh`, `no_answer`, `error`, `offline`, `rate_limited`), with how many lines were kept and dropped. No ask text and no answer text, the same rule as the speech log. This replaces the plan's "the ask, the answer" in the log.
+
+**D483. The runaway guard: 30 calls a minute per game, then that game's AI rests 5 minutes.** *(The director's default: a limit whose only job is to catch a loop. The numbers are Claude's.)*
+- Normal play is 2 to 6 calls a minute, so play never meets it. A game asking for a line every frame reaches it in about half a minute.
+- When it trips the game carries on with its fallbacks, the launcher stops asking for the rest of that play, and one flagged line goes in the log (`outcome: "rate_limited"`, `flag: "runaway"`), not one per refused call. The Manager shows it.
+- It isn't a budget: no cap per game, per day or per month. Worst case, a looping game left running all day: about 7,200 calls, roughly $1.70.
+- `"game_ai": { "per_minute": N }` in the cabinet's config changes the number.
+
+**D484. Safety for lines and choices: a house brief, the word list on every line, and no way for a player's words to get in.** *(Carries out D465. Claude.)*
+- The brief goes in front of every ask and a cart can't change it: for kids 8 to 13, kind and silly, cartoon action fine; no swearing, slurs, mocking people, grown-up or frightening content, real people, brands or links; no questions back to the player, nothing personal, no talk of being an AI; plain ASCII. The cart's ask is data inside tags.
+- Every line out must be plain ASCII, within the cart's `max`, have no link, and pass the word list (D271). A line that fails is dropped. A refusal is no lines.
+- A cart has no text input, and a pick's facts can only be numbers, true/false or one of that choice's own options. The service checks this again.
+- Only the game the launcher says is on screen may ask, and only a game in the cabinet's library.
+- No second model call judges each line (the plan's reasoning stands): the output is short, constrained and listed. Open chat is different (D489).
+- `"game_ai": false` in the cabinet's config turns it off.
+
+**D485. With no answer a game plays the same: fallbacks are required, and the cabinet keeps lines.** *(Claude.)* `lines` with fewer than three fallback lines is an error in `init`. The cabinet keeps each ask's newest 50 lines in `game-ai/<cart>.json` in its data folder (not a log); offline, or after an error, a game gets a shuffle of those before its built-in lines. A changed ask starts a new pile.
+
+**D486. The playtest and the publish gate never call the model.** *(Carries out D466. Claude.)* A headless run and a test host have nobody to ask, by construction: the machine only queues asks, and only a live host with an answerer passes them on. So tests see fallbacks and seeded picks, repeat exactly, and cost nothing. A bad declaration throws in `init`, so validate and the playtest catch it.
+
+**D487. The Studio learns it, and offers it only when it's a strong fit.** *(Carries out D467; Geoff, 2026-11-14: "Studio should only offer if it is a strong fit for the game type — should not push it".)* A `game-ai` guide in the context pack and a catalog line. The spec keeps its sections: each ask is listed under Assumptions with why it's there (no new "AI" section, so the spec format and its parser don't change). The agent's brief gets one line; that needs an `ant apply` in each cabinet's workspace, so it's its own commit (as D274).
+
+**D488. The Manager's Activity page shows what AI in games costs.** *(Claude.)* An "AI in games" block: this month's spend and calls, all time, a row per game, and the guard's trips. The sums are the cabinet's (`GET /api/manager/game-ai`, from its whole cost log), since the Manager's own log read is only each file's tail.
+
+**D489. Voice in games and open chat: approved to build, in that order.** *(Geoff, 2026-11-14, through the director.)*
+- **Open chat's twelve safety rules** (game-ai.md) are approved, with Geoff's changes: **every chat turn's text is kept on the cabinet** for him to read and shown in the Manager ("Everything"), in the cabinet's logs only; **no turn limit**; the Studio offers chat **only when it's a strong fit** and doesn't push it; **on straight away** on both cabinets.
+- **Voice actions are added,** in Geoff's words: "Games should also be able to use push to talk/moonshine model to interact with games during gameplay, and game can call haiku to interpret and decide action based on transcription". A game opens hold-to-talk mid-play (the cabinet owns the mic), the cabinet hears with Moonshine for speed and offline, and the model picks one action from a set the game declares. The same screening and safety rules apply. The mic and Moonshine are the speech worker's; this is built with them.
+- Order: lines and choices (D480 to D488, built), then voice actions, then open chat.
+
+## 2026-11-14 — Long words in pages (speech worker; D490–D494 are pages and live words)
+
+**D490. Long words on the review screens read in pages, in place, turned with the stick left and right. Nothing is cut with "..." (D453, Geoff 2026-11-14).** *(Geoff's choice; Claude's build.)*
+- **Where:** "Is this right? I heard:" (M6, ideas, answers and changes), Claude's question (M7), and a rule to check (G2). On each, when the words don't fit, the box shows one page, and its last row says "1 of 3 >" in yellow ("< 2 of 3 >" in the middle). The hint says "Left/right: pages. Up/down: choose."
+- **The page belongs to its words.** A new hold, a "Say it again" or the next question opens on page 1 without anything resetting it. Stick left at page 1 and right at the last page do what they did before. So on a question whose options are also cut, right on the last page still opens the reader for them.
+- **Nothing approved unseen.** On M6, "Yes! That's it" reads "Read it all first" (grey) until the last page has been on screen, and pressing it turns the page. Question tiles and rule checks don't wait: a choice there isn't approving the words.
+- **D455 goes with it.** After "Add more", the pages hold the earlier words and the new ones together, so the reader's bug of showing only the newest part can't happen on M6.
+- **Unchanged:** option tiles (A, B) still end in "..." with the reader one stick-right away. The plan (M9) keeps its rule list and reader.
+- **Code:** `launcher/pages.js` (the page state, pure), `Painter.box({ page })` and `paginate()` in `text.js`, and one line on each of the three stick cases and on M6's Yes in `app.js`.
+- **Tests:** a 400-word transcript read page by page (every word once, in order, nothing faulted, Yes waiting for the last page), Add more's pages, a long rule, and the stress flow in a real browser turning every page.
+
+**D491. The Speech interface gains a fast hold and a cancelled hold, for a game's voice actions (D489) and the talk screens.** *(Claude, agreed with the AI-in-games worker.)*
+- **`stop({ fast: true })`** asks Moonshine on the cabinet first, and Groq only if Moonshine fails. That's Geoff's choice for voice actions: speed and offline over the last word. A plain `stop()` keeps Groq first (D263). `speech.jsonl` marks a fast hold.
+- **`cancel()`**, and `POST /api/speech/cancel` from the page, drop a hold: the recorder stops, the audio is wiped, and nothing is transcribed or sent anywhere. It's logged as `result: "cancelled"`. Before this, a cancelled talk screen called stop and paid for a Groq request (10 s minimum) whose words nobody read. The launcher's cancel now uses it.
+- **Live words (D454) will be opt-in** with `start({ live: true })` from the talk screens. A game's `start()` streams nothing, so many short holds a minute are fine; a test runs 20 in a row.
+
+
+- **Voice actions, as built** *(Claude; the AI worker's numbers end at D489, so this is part of it)*:
+  - `g.ai.voice(name, { ask, actions, hold })` in `init`, and `g.ai.heard(name)` gives the action once, or null. The talk button is A, B, X or Y, one voice ask per button.
+  - The runtime host, not the cart, turns the mic on while player 1 holds that button, and the launcher shows its own "● LISTENING" sign over the game. A hold under 0.3 s is thrown away untranscribed. A game that ends mid-hold turns the mic off.
+  - The hold ends in the service (`POST /api/game-ai/voice`): Moonshine first through the speech worker's `stop({ fast: true })`, and a tap through their `cancel()` (D491). The words never go back to the page; only the action does.
+  - The word list (D271) is on the kid's words before anything is sent; a hit is no call and no action, with no scolding. The model can only answer one of the game's actions or "none", so nothing unscripted comes back.
+  - With no model (offline, an error, off, the guard), an action's own word counts if it's the only one said.
+  - **Every hold's words are kept on the cabinet** in `logs/game_talk.jsonl` with the action and outcome, and listed in the Manager under "Said to games". Geoff's "Everything" was about chat; I've applied it to voice too, since both are a kid talking to a game. The cost log still holds no words (D482). Chat turns will use the same log.
+  - In a playtest nothing is ever heard, so the guide requires a button for every action.

@@ -5,6 +5,7 @@
 // cabinet's keyboard and a script all drive it the same way. The boards are the
 // canvas's (D201, docs/design/arcade-ux-handoff.md); the board id is in each view.
 import { createHost, integerScale } from "../../../runtime/src/host.js";
+import { gameAiFor, voiceFor } from "./game-ai.js";
 import { createGuestHost, fetchGuests, guestHowto, guestPostGame, guestRows, guestsChecking } from "./guests.js";
 import { rgbaTable } from "../../../runtime/src/palette.js";
 import { COLORS as C } from "../../../runtime/src/palette.js";
@@ -37,6 +38,7 @@ import { holdOverlay } from "./wifi.js";
 import { WIFI_HINT, asEnt, createWifiFlow } from "./wifi-flow.js";
 import { openKeys, sayKey } from "./say-keys.js";
 import { listenForVolume } from "./volume.js";
+import { seenAll, turnPage } from "./pages.js";
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById("screen"));
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
@@ -237,7 +239,7 @@ function showLimit(kind, why) {
 function showCoinCheck(o) {
   const stop = blocker(o.kind);
   if (stop) return stop();
-  showBoard(coinCheck({ kind: o.kind, pot: /** @type {any} */ (namedPot()), maker: o.maker.name, parentVersion: o.parent?.version }), ["coin", "back"], { make: o });
+  showBoard(coinCheck({ kind: o.kind, pot: /** @type {any} */ (namedPot()), maker: o.maker.name, parentVersion: o.parent?.version, parentName: o.parent?.version_name }), ["coin", "back"], { make: o });
 }
 
 /** COIN pressed on the coin check. @param {any} v */
@@ -329,14 +331,14 @@ function followStudio() {
   if (p) {
     if (view.pendingId === p.id) return;
     const change = studio.kind === "change";
-    if (p.kind === "question") show({ screen: "question", board: change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, makerCoin: true, sel: 0 });
-    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, rightCoin: true, usual: usual(), parentVersion: studio.parent?.version, cartControls: [], flowed: planLines(p), sel: 0 });
+    if (p.kind === "question") show({ screen: "question", board: p.naming ? "R6-name" : change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, makerCoin: true, sel: 0 });
+    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, rightCoin: true, usual: usual(), parentVersion: studio.parent?.version, parentName: studio.parent?.version_name, cartControls: [], flowed: planLines(p), sel: 0 });
     return;
   }
   if (studio.phase === "running") {
     const kind = studio.kind === "change" ? "change" : "new";
     const mins = pot()?.minutes?.[kind] ?? (kind === "change" ? 4 : 7);
-    const v = { screen: "progress", board: kind === "change" ? "R7" : "M10", kind, lines: studio.lines, maker: studio.maker_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: kind === "change" ? usual().change : usual().new, minutesLeft: Math.ceil(mins - (studio.working_s ?? 0) / 60) };
+    const v = { screen: "progress", board: kind === "change" ? "R7" : "M10", kind, lines: studio.lines, maker: studio.maker_name, versionName: studio.version_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: kind === "change" ? usual().change : usual().new, minutesLeft: Math.ceil(mins - (studio.working_s ?? 0) / 60) };
     if (view.screen === "progress") Object.assign(view, v);
     else show(v);
   }
@@ -372,7 +374,7 @@ function showGone() {
 async function answer(choice, said, offered = false) {
   const id = view.pendingId;
   answered.add(id);
-  show({ screen: "progress", board: studio.kind === "change" ? "R7" : "M10", kind: studio.kind, lines: studio.lines ?? [], maker: studio.maker_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: studio.kind === "change" ? usual().change : usual().new });
+  show({ screen: "progress", board: studio.kind === "change" ? "R7" : "M10", kind: studio.kind, lines: studio.lines ?? [], maker: studio.maker_name, versionName: studio.version_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: studio.kind === "change" ? usual().change : usual().new });
   await post("/api/studio/answer", { id, choice, said, offered }).catch((/** @type {any} */ e) => {
     if (e.why !== "redirect") return;
     // E10 for their own words (D270-D275): the question keeps waiting while they choose.
@@ -424,16 +426,19 @@ function startPlay(cart) {
   stage.hidden = false;
   canvas.hidden = true;
   const startedAt = new Date().toISOString();
+  const playId = newId();
   const host = (cart.guest ? createGuestHost : createHost)({
     container: stage,
     cartUrl: cart.url,
     players: config.players,
+    ai: gameAiFor(cart.id, playId), // D480: g.ai asks go to the service; guests have none
+    voice: voiceFor(cart.id, playId, stage), // D489: the mic, while a game's talk button is held
     onStar: () => endPlay("star"),
     onError: () => {
       if (playing) playing.errors++;
     },
   });
-  playing = { cart, host, playId: newId(), startedAt, t0: performance.now(), errors: 0, sides: new Set(), ended: false };
+  playing = { cart, host, playId, startedAt, t0: performance.now(), errors: 0, sides: new Set(), ended: false };
   // The publish gate waits while a game is being played (D310): say so now, and every few seconds.
   const beat = () => post("/api/arcade/playing", { playing: true, what: cart.id }).catch(() => {});
   beat();
@@ -590,6 +595,7 @@ function onStick(dir) {
       break;
     case "question":
       if (ud) moveSel(v, ud, 4);
+      else if (turnPage(v, dir, painter.boxes)) break; // D453: long words in pages
       else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "Claude asks", flowed: questionText(v), top: 0, back: v, pendingId: v.pendingId });
       break;
     case "reader":
@@ -605,6 +611,7 @@ function onStick(dir) {
     case "say":
       if (v.phase === "confirm") {
         if (ud) moveSel(v, ud, confirmTiles(v).length);
+        else if (turnPage(v, dir, painter.boxes)) break; // D453
         else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "I heard", flowed: flow(v.transcript), top: 0, back: v, pendingId: v.pendingId });
       }
       break;
@@ -618,6 +625,7 @@ function onStick(dir) {
       break;
     case "check":
       if (ud) moveSel(v, ud, CHECK_TILES.length);
+      else if (turnPage(v, dir, painter.boxes)) break; // D453
       else if (dir === "right" && somethingCut()) show({ screen: "reader", title: "You check", flowed: flow(v.rule), top: 0, back: v });
       break;
   }
@@ -719,7 +727,8 @@ function onButton() {
       break;
     case "say":
       if (v.phase === "confirm") {
-        if (v.sel === 0) v.done(v.added ? `${v.added} ${v.transcript}` : v.transcript);
+        if (v.sel === 0 && !seenAll(v, painter.boxes)) turnPage(v, "right", painter.boxes); // D453: nothing approved unseen
+        else if (v.sel === 0) v.done(v.added ? `${v.added} ${v.transcript}` : v.transcript);
         else if (v.sel === 1 && (v.purpose !== "name" || canHear())) show({ ...v, phase: "idle", transcript: "", typed: "", added: "", sel: 0 });
         else if (v.purpose === "name") show({ ...typeIt(v), startedTyping: canHear() }); // "Type it": ESC from there is back to the mic
         else show({ ...v, phase: "idle", added: [v.added, v.transcript].filter(Boolean).join(" "), transcript: "", sel: 0 }); // Add more: the next words join these
@@ -919,7 +928,7 @@ async function endTalk(v) {
 async function cancelTalk(v) {
   v.phase = "idle";
   await v.talking;
-  post("/api/speech/stop").catch(() => {});
+  post("/api/speech/cancel").catch(() => {}); // D491: thrown away, not transcribed
 }
 
 const anyButtonHeld = () => [...held].some((c) => BUTTONS.has(c));

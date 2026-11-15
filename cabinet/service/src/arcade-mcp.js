@@ -20,6 +20,7 @@ import { appendLog, readLog, newSpecDiff } from "@game-studio-arcade/studio-cli/
 import { syncTree } from "@game-studio-arcade/studio-cli/src/durable.js";
 import { ensureLibrary, slugify, freeId, specTitle } from "@game-studio-arcade/studio-cli/src/library.js";
 import { readCart, listCarts } from "@game-studio-arcade/player/src/library.js";
+import { cleanVersionName, nameChangelogLine, versionNameTaken, VERSION_NAME_MAX } from "@game-studio-arcade/spec";
 import { mcpServer, ToolError } from "./mcp-rpc.js";
 
 /** The largest bundle, in bytes once decoded, and the most files in one (D343). */
@@ -111,7 +112,7 @@ const cartSummary = (c) => {
   try {
     meta = JSON.parse(fs.readFileSync(path.join(c.dir, "cart.json"), "utf8"));
   } catch {}
-  return { id: c.id, title: c.title, version: c.version, maker: c.maker, with: c.with, parent: c.parent, family: c.family ?? c.id, branch: c.branch, origin: meta.origin ?? (c.source === "example" ? "starter" : null), created: c.created, players: c.players, pitch: c.pitch, auto_rules: c.autoRules, you_check_rules: c.youCheck.length, commit: c.commit, source: c.source };
+  return { id: c.id, title: c.title, version: c.version, version_name: c.version_name ?? null, maker: c.maker, with: c.with, parent: c.parent, family: c.family ?? c.id, branch: c.branch, origin: meta.origin ?? (c.source === "example" ? "starter" : null), created: c.created, players: c.players, pitch: c.pitch, auto_rules: c.autoRules, you_check_rules: c.youCheck.length, commit: c.commit, source: c.source };
 };
 
 /** The latest version of each line (the shelf's rule, HANDOFF §2): a line is its branch, or the cart itself. @param {any[]} carts */
@@ -254,7 +255,7 @@ export function createArcadeMcp(o) {
     {
       name: "list_carts",
       description:
-        "List the games in the cabinet's library. Every version is its own cart; on_shelf marks the latest version of each line (what the kids see), unless a grown-up took the game off the shelf: then off_shelf says when, by whom and why (remove_from_shelf, restore_to_shelf). Fields: id, title, version, maker, with, parent (cart@version), family, branch, line, origin (cabinet, desktop or starter), created, players, pitch, rule counts, commit.",
+        "List the games in the cabinet's library. Every version is its own cart; on_shelf marks the latest version of each line (what the kids see), unless a grown-up took the game off the shelf: then off_shelf says when, by whom and why (remove_from_shelf, restore_to_shelf). Fields: id, title, version, version_name (what the maker called this version, or null: it then goes by its number), maker, with, parent (cart@version), family, branch, line, origin (cabinet, desktop or starter), created, players, pitch, rule counts, commit.",
       inputSchema: { type: "object", properties: { maker: { type: "string", description: "only this maker's carts (a maker id)" }, family: { type: "string", description: "only this game family (the first cart's id)" } }, additionalProperties: false },
       annotations: { readOnlyHint: true },
       async call(a) {
@@ -296,7 +297,7 @@ export function createArcadeMcp(o) {
     {
       name: "publish_cart",
       description:
-        "Publish a cart made on the desktop to the cabinet. It never replaces anything: it becomes a new cart folder and library commit. With parent (a cart id), it's a change to that game: the parent's maker gets the next version of the same line, anyone else their own version, as on the cabinet. The cabinet first validates it and re-runs its playtest in its own Chromium (the publish gate); only a pass reaches the shelf, and a failure says why. maker and with are maker ids from list_carts (a grown-up is a maker too). summary says what was made and how, for the activity log. Through the game-studio plugin, pass dir: the local cart folder, instead of bundle.",
+        "Publish a cart made on the desktop to the cabinet. It never replaces anything: it becomes a new cart folder and library commit. With parent (a cart id), it's a change to that game: the parent's maker gets the next version of the same line, anyone else their own version, as on the cabinet. A maker's own next version can have a name (version_name), which shows on the shelf in place of v3; ask the maker for one. The cabinet first validates it and re-runs its playtest in its own Chromium (the publish gate); only a pass reaches the shelf, and a failure says why. maker and with are maker ids from list_carts (a grown-up is a maker too). summary says what was made and how, for the activity log. Through the game-studio plugin, pass dir: the local cart folder, instead of bundle.",
       inputSchema: {
         type: "object",
         properties: {
@@ -308,6 +309,7 @@ export function createArcadeMcp(o) {
           parent: { type: "string", description: "the cart id this changes, or leave out for a new game" },
           maker: { type: "string", description: "the maker id: whose game it is" },
           with: { type: "string", description: "a second maker id, such as the grown-up who helped" },
+          version_name: { type: "string", description: `what this version is called, such as "Faster logs": at most ${VERSION_NAME_MAX} characters, plain letters, digits and spaces, not a name another version of the game has. Only for a change by the parent's own maker; a new game and someone's own version go by their title.` },
           summary: { type: "string", description: "one or two sentences: what was made or changed, and with whom" },
         },
         required: ["bundle", "maker", "summary"],
@@ -441,6 +443,20 @@ export function createArcadeMcp(o) {
     const target = parent ? changeTarget({ id: parent.id, dir: parent.dir, version: parent.version, maker: parent.maker, family: parent.family, branch: parent.branch, title: parent.title }, maker.id) : null;
     const version = target?.version ?? 1;
     const parentRef = parent ? `${parent.id}@${parent.version}` : null;
+    // The version's name (D472, D473): asked for here, or already in the cart's cart.json. A grown-up is at the desk, so a bad one is refused with the reason.
+    const askedName = a.version_name ?? given.version_name ?? null;
+    /** @type {string | null} */
+    let versionName = null;
+    if (askedName != null && askedName !== "") {
+      if (!parent || !target?.ownVersion) throw new ToolError("version_name: only a maker's own next version of their game has a name. A new game, and someone's own version of another maker's game, go by their title.");
+      versionName = cleanVersionName(askedName);
+      if (!versionName) throw new ToolError(`version_name: "${askedName}" won't do. A name is at most ${VERSION_NAME_MAX} characters of plain letters, digits and spaces.`);
+      const line = parent.branch ?? parent.id;
+      const taken = [parent.title, ...all().filter((x) => (x.branch ?? x.id) === line && x.version_name).map((x) => x.version_name)];
+      if (versionNameTaken(versionName, taken)) throw new ToolError(`version_name: "${versionName}" is already used by this game (${taken.map((t) => `"${t}"`).join(", ")}). Pick another.`);
+      const specFile = path.join(cartDir, "spec.md");
+      if (spec) fs.writeFileSync(specFile, nameChangelogLine(spec, version, versionName));
+    }
     const title = String(given.title || specTitle(spec) || parent?.title || "cart").slice(0, 60);
     // What the cart is: its provenance is the cabinet's to write, as for a cabinet make (HANDOFF §7).
     const cartJson = {
@@ -460,6 +476,8 @@ export function createArcadeMcp(o) {
       delete cartJson.family;
       delete cartJson.branch;
     }
+    delete cartJson.version_name;
+    if (versionName) cartJson.version_name = versionName;
     // A provisional id the validator accepts; the library's own id is chosen at commit.
     cartJson.id = slugify(given.id || title);
     fs.writeFileSync(path.join(cartDir, "cart.json"), JSON.stringify(cartJson, null, 2) + "\n");
@@ -485,7 +503,7 @@ export function createArcadeMcp(o) {
       git(o.paths.carts, ["add", "--", id]);
       git(o.paths.carts, ["commit", "-q", "-m", `desktop ${parentRef ? `change ${parentRef} -> ` : ""}${id} v${version} (${sessionId})`]);
       committed = { id, commit: git(o.paths.carts, ["rev-parse", "HEAD"], { encoding: "utf8" }).trim() };
-      appendLog(o.paths.logs, "cart_version", { cart_id: id, version, parent: parentRef, session_id: sessionId, commit: committed.commit, created: cartJson.created, origin: "desktop" });
+      appendLog(o.paths.logs, "cart_version", { cart_id: id, version, ...(versionName ? { version_name: versionName, named_by: maker.id, name_picked: "desktop" } : {}), parent: parentRef, session_id: sessionId, commit: committed.commit, created: cartJson.created, origin: "desktop" });
     }
     const outcome = committed ? "committed" : "checks_failed";
     const gate = local?.gate ?? null;
@@ -520,7 +538,7 @@ export function createArcadeMcp(o) {
         isError: true,
       };
     }
-    return { ok: true, session_id: sessionId, outcome, cart_id: committed.id, version, parent: parentRef, commit: committed.commit, on_shelf: true, advisory: gate?.advisory ?? [], gate: gate ? { seconds: gate.seconds, host: gate.host, driver: gate.driver, waited_s: gate.waited_s } : null };
+    return { ok: true, session_id: sessionId, outcome, cart_id: committed.id, version, version_name: versionName, parent: parentRef, commit: committed.commit, on_shelf: true, advisory: gate?.advisory ?? [], gate: gate ? { seconds: gate.seconds, host: gate.host, driver: gate.driver, waited_s: gate.waited_s } : null };
   }
 
   return mcpServer({

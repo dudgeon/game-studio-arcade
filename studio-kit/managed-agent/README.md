@@ -4,7 +4,7 @@ The agent and environment that every Studio session runs, as an `ant apply` proj
 
 ```
 agents/studio.md          the agent: frontmatter = config, body = the kid brief and workflow (system prompt)
-agents/tools/*.json       custom tools ask_player, show_plan, tell_player (D41), inserted by glob
+agents/tools/*.json       custom tools ask_player, show_plan, tell_player (D41) and name_version (D471), inserted by glob
 environments/studio.yaml  cloud sandbox, limited networking, no hosts
 scripts/pack-kit.js       builds dist/studio-kit.tgz (+ KIT.md) from runtime/ and studio-kit/*
 claude-lock.json          written by the first `ant apply`; commit it
@@ -50,3 +50,4 @@ In order, once the director clears it (after task 1's probe):
 6. ~~Cost.~~ Done: `usage.list_cost` "0" against a recomputed 0.16¢. Comparing against the Console is still open.
 7. ~~Try the context pack as a skill instead of a tarball.~~ Done 2026-11-08: tarball stays the default (D45).
 8. ~~Apply the current brief as agent v2 and commit `claude-lock.json`.~~ Done 2026-11-08; the re-apply reported "Everything is up to date, 2 unchanged". See D173.
+9. Version names (D471) changed the brief and added `name_version`: each cabinet's workspace needs an `ant apply` before its next make, then one live change to see the name question asked.

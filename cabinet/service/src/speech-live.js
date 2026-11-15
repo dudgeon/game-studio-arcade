@@ -409,10 +409,12 @@ export function liveSpeech(o) {
       if (!fedText.length) for (const e of o.engines) e.warm?.();
       if (!fed.length && !fedText.length) o.recorder.start();
     },
-    async stop() {
+    async stop(opts = {}) {
       if (!open) return { text: "" };
       open = false;
       if (fedText.length) return { text: /** @type {string} */ (fedText.shift()) };
+      // D491: a game's voice action wants speed: Moonshine first, Groq only if it fails.
+      const engines = opts.fast ? [...o.engines].sort((a, b) => (a.name === "moonshine" ? -1 : b.name === "moonshine" ? 1 : 0)) : o.engines;
       let pcm = fed.length ? /** @type {Buffer} */ (fed.shift()) : await o.recorder.stop();
       const heldMs = now() - startedAt;
       const audioMs = Math.round((pcm.length / 2 / RATE) * 1000);
@@ -423,7 +425,7 @@ export function liveSpeech(o) {
       /** @type {string[]} */
       const skipped = [];
       try {
-        for (const engine of o.engines) {
+        for (const engine of engines) {
           if (engine.name === "groq" && o.online && !o.online()) {
             skipped.push("groq: offline");
             continue;
@@ -431,7 +433,7 @@ export function liveSpeech(o) {
           const t = now();
           try {
             const text = (await engine.transcribe(pcm)).trim();
-            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
+            record({ engine: engine.name, held_ms: heldMs, audio_ms: audioMs, ms: now() - t, words: text ? text.split(/\s+/).length : 0, skipped, ...(opts.fast ? { fast: true } : {}), ...(pieces(engine.name, pcm) > 1 ? { pieces: pieces(engine.name, pcm) } : {}) });
             return { text };
           } catch (/** @type {any} */ e) {
             skipped.push(`${engine.name}: ${e.name === "TimeoutError" ? "timed out" : e.message}`);
@@ -444,6 +446,20 @@ export function liveSpeech(o) {
         pcm.fill(0); // drop it: the audio is gone once the words are back
         pcm = Buffer.alloc(0);
       }
+    },
+    /** D491: drop the hold. The recorder stops, the audio is wiped, nothing is transcribed or sent anywhere. */
+    cancel() {
+      if (!open) return;
+      open = false;
+      if (fedText.length) {
+        fedText.shift();
+        return;
+      }
+      const from = fed.length ? Promise.resolve(/** @type {Buffer} */ (fed.shift())) : o.recorder.stop();
+      from.then((pcm) => {
+        pcm.fill(0);
+        record({ engine: null, held_ms: now() - startedAt, audio_ms: Math.round((pcm.length / 2 / RATE) * 1000), ms: 0, result: "cancelled" });
+      }, () => {});
     },
     /** A clip (16 kHz mono WAV) or text, to stand in for the mic at the next hold: tests, and checks without a kid. */
     feed({ text, wav }) {

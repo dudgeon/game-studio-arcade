@@ -105,6 +105,36 @@ declare namespace Arcade {
     voice?: number;
   }
 
+  /**
+   * AI in a game (D480). A game never waits: `next` and `pick` answer in the same frame, with a fresh
+   * answer when the cabinet has one and the game's own fallback otherwise. In a playtest there are only fallbacks.
+   */
+  interface Ai {
+    /**
+     * Declare lines the game wants made up, in `init`. `ask` says what one line is; `fallback` is at
+     * least 3 lines of the game's own; `max` is the longest line it can show (20..120, default 80).
+     */
+    lines(name: string, opts: { ask: string; fallback: readonly string[]; max?: number }): void;
+    /** The next line for a declared `lines` ask. Always a line, at once. */
+    next(name: string): string;
+    /** Declare a choice between 2..8 of the game's own words, in `init`. */
+    choice(name: string, opts: { ask: string; options: readonly string[] }): void;
+    /**
+     * One of a declared choice's options, at once. `facts` are numbers, true/false or one of the
+     * options (at most 8); the answer to them is used at the next `pick`.
+     */
+    pick(name: string, facts?: Record<string, number | boolean | string>): string;
+    /**
+     * Declare a voice ask, in `init` (D489): while the player holds `hold` (a, b, x or y) the cabinet
+     * listens, and it hands back the one of `actions` (2..8 of the game's own words) the player meant.
+     * The game never gets the microphone or the words. Give every action a button too: with no
+     * microphone, and in a playtest, nothing is ever heard.
+     */
+    voice(name: string, opts: { ask: string; actions: readonly string[]; hold: "a" | "b" | "x" | "y" }): void;
+    /** The action the cabinet heard for a voice ask since the last call, or null. Each is given once. */
+    heard(name: string): string | null;
+  }
+
   /** The console handle passed to every cart function. */
   interface G {
     readonly W: Width;
@@ -123,6 +153,8 @@ declare namespace Arcade {
      * turns on the controllers there are (`g.lib.turns` hands them over).
      */
     readonly players: number;
+    /** Made-up lines and choices from a small model, with the game's own fallbacks (D480). */
+    readonly ai: Ai;
 
     // Input. `p` defaults to 1. A player beyond `g.players` never holds anything.
     /** Is the button held this frame? */

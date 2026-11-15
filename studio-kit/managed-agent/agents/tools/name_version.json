@@ -1,0 +1,14 @@
+{
+  "type": "custom",
+  "name": "name_version",
+  "description": "Ask the player what this version of their game should be called, then wait. Only when the request message says this version gets a name (a maker's own change to their game), and only once, right after the player says build on the plan. Offer two short names that say what this change does, such as \"Faster logs\" and \"Turbo river\". The cabinet shows them as A and B, adds C \"Something else\" (the player says their own name) and D \"You pick\" (your `pick` is used). A name is at most 16 characters, plain ASCII letters, digits and spaces, starts with a capital, isn't the game's title, and isn't a name the request message lists as already used. The result is JSON text: {\"choice\":\"A\",\"name\":\"Faster logs\"}, the same for B and D, or {\"choice\":\"C\",\"said\":\"<what the player said>\",\"name\":\"<their name>\"}. `name` is the version's name: use it exactly. If the result has no `name`, the one chosen was too long or already used: make the closest short name yourself, from the player's words if they said some, by the same rules.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "option_a": { "type": "string", "description": "First name, at most 16 characters. Says what this change does, in kid words." },
+      "option_b": { "type": "string", "description": "Second name, at most 16 characters, clearly different from the first." },
+      "pick": { "type": "string", "enum": ["A", "B"], "description": "The one you'd choose. Used when the player says \"You pick\"." }
+    },
+    "required": ["option_a", "option_b", "pick"]
+  }
+}

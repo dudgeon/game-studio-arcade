@@ -37,11 +37,12 @@ no-templates -->
 - `checks`: `checks.js`, `t`, and the tested bot `t.bot`. Read it before writing checks.
 - `sprites`: drawing with `g.sprite` rows, in sizes that read at 256×192.
 - `spec`: writing rules a machine or a person can check. Read it when not starting from a template's spec.
+- `game-ai`: `g.ai`, for made-up lines (new jokes), choices (a boss's mood) and spoken commands (hold a button and say "fire") while the game is played. Only when it's a strong fit; read it before using or offering it.
 
 ## House rules
 
 - `game.js` is one module that imports nothing: `export default { init(g), update(g, s), draw(g, s), probe(g, s), poke(g, s, o) }`. `checks.js` also imports nothing.
-- `cart.json`: `{ "id": "comet-dodge", "title": "Comet Dodge", "players": 1 }`, nothing else; the title matches the spec's.
+- `cart.json`: `{ "id": "comet-dodge", "title": "Comet Dodge", "players": 1 }`, nothing else; the title matches the spec's. A change that was given a name adds `"version_name"`.
 - Lay out from `g.W` and `g.H`, never screen-size numbers, and return them from `probe()`. A text line holds `g.W / 6` characters.
 - One player unless the spec says otherwise; more people take turns with `turns`.
 - Randomness only from `g` (`g.rand`, `g.rnd`, `g.pick`). No `Math.random`, no clock, no timers, no DOM.

@@ -678,6 +678,13 @@ test("the server: routes, origin guard, bad input", async () => {
     assert.equal((await post("/api/speech/feed", { text: "hi" })).status, 200);
     await post("/api/speech/start");
     assert.equal((await (await post("/api/speech/stop")).json()).text, "hi");
+    // D491: a cancelled hold drops what it would have heard.
+    await post("/api/speech/feed", { text: "dropped" });
+    await post("/api/speech/start");
+    assert.equal((await post("/api/speech/cancel")).status, 200);
+    await post("/api/speech/feed", { text: "kept" });
+    await post("/api/speech/start");
+    assert.equal((await (await post("/api/speech/stop")).json()).text, "kept");
     assert.equal((await post("/api/nope")).status, 404);
   } finally {
     await s.close();

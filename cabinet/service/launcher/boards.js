@@ -10,6 +10,7 @@ import { COLORS as C } from "../../../runtime/src/palette.js";
 import { ADVANCE, GLYPH_H, LINE_H, W, clean, colsFor, heightOf, wrap } from "./text.js";
 import { BADGE_W, BODY_Y, HINT_Y, INNER, M, SCREENS, TILE_GAP, TILE_PAD, arrow, flow, planLines } from "./screens.js";
 import { checksFor, iconOf } from "./shelf.js";
+import { makingTitle, readyWords, versionRow, versionWords } from "./version-name.js";
 
 /** @typedef {import("./screens.js").Painter} Painter */
 
@@ -261,14 +262,18 @@ function shelf(p, v) {
       coin(p, right - tw - COIN_W, y + TILE_PAD + 1);
       right -= tw + COIN_W + 4;
     }
+    let column = right;
     tags.forEach((tag, k) => {
+      if (k % 2 === 0) column = right;
       const t = clean(tag.text);
       const tw = t.length * ADVANCE + 1;
       const tx = right - tw;
       const ty = y + TILE_PAD + (k % 2) * LINE_H;
       p.fb.rectfill(tx - 1, ty - 1, tw + 1, GLYPH_H + 1, /** @type {any} */ (TAG_BG)[tag.kind] ?? C.gray);
       p.box({ id: `shelf-tag-${n}-${k}`, text: t, x: tx, y: ty, w: tw, h: GLYPH_H, color: tag.kind === "starter" || tag.kind === "version" ? C.white : C.night, onCut: "never" });
-      if (k % 2 === 1 || k === tags.length - 1) right = Math.min(right, tx - 4);
+      // Two tags share a column, one over the other: the title stops at the wider one (a version's name can be, D474).
+      column = Math.min(column, tx);
+      if (k % 2 === 1 || k === tags.length - 1) right = Math.min(right, column - 4);
     });
     const textX = ix + 20;
     const inner = right - textX;
@@ -429,7 +434,7 @@ function plan(p, v) {
       const names = same.slice(0, 2).map((/** @type {any} */ r) => shortRule(r.text)).join(", ");
       blocks.push({ text: `Staying the same: ${names}${same.length > 2 ? `, and ${same.length - 2} more` : ""}.`, color: C.silver, rows: 3 });
     }
-    blocks.push({ text: `Version ${v.parentVersion ?? 1} stays saved.`, color: C.mint, rows: 1, onCut: "never" });
+    blocks.push({ text: `${versionWords(v.parentVersion, v.parentName)} stays saved.`, color: C.mint, rows: 1, onCut: "never" });
   } else {
     blocks.push({ text: v.summary, rows: 2, after: 3 });
     // Re-shown mid-build because a rule had to change (the brief's step 7): what changed comes first.
@@ -467,7 +472,7 @@ const STEP_WORDS = {
 /** @param {Painter} p @param {any} v */
 function progress(p, v) {
   const kind = v.kind === "change" ? "change" : "new";
-  header(p, kind === "change" ? "Changing your game" : "Making your game", v.maker ?? "");
+  header(p, kind === "change" ? makingTitle(v.versionName) : "Making your game", v.maker ?? "");
   const step = Math.max(0, Math.min(3, v.step ?? 0));
   // The track: four dots and a line, forward only (D198, D201).
   const y = BODY_Y + 6;
@@ -513,7 +518,7 @@ Object.assign(SCREENS, BOARDS);
 
 /** @typedef {{ coins: number, cents: number, month: string, refill_on: string, full_coins: number, makers: any[], last_month: any, usual: {new: number, change: number}, minutes: {new: number, change: number}, over_usual: number }} Pot */
 
-/** The coin check (M3, R3). Only COIN starts it (D205). @param {{ kind: "new" | "change", pot: Pot, maker: string, parentVersion?: number }} o */
+/** The coin check (M3, R3). Only COIN starts it (D205). @param {{ kind: "new" | "change", pot: Pot, maker: string, parentVersion?: number, parentName?: string | null }} o */
 export function coinCheck(o) {
   const change = o.kind === "change";
   const usual = change ? o.pot.usual.change : o.pot.usual.new;
@@ -529,7 +534,7 @@ export function coinCheck(o) {
       { pair: { left: change ? "A change uses about" : "A new game uses about", right: coinsWord(usual), coin: true }, after: 2 },
       { pair: { left: "Some use more. It takes", right: `about ${min} min`, color: C.silver }, color: C.silver, after: 2 },
       { pair: { left: "The family pot has", right: coinsWord(o.pot.coins), coin: true }, after: 4 },
-      { text: change ? `Version ${o.parentVersion ?? 1} stays saved, whatever happens.` : "It always finishes, even if it costs more than usual.", color: C.silver, rows: 2, onCut: "never" },
+      { text: change ? `${versionWords(o.parentVersion, o.parentName)} stays saved, whatever happens.` : "It always finishes, even if it costs more than usual.", color: C.silver, rows: 2, onCut: "never" },
     ],
     tiles: [
       { text: "Press COIN to start", hue: C.yellow, big: true, center: true },
@@ -688,10 +693,11 @@ export function resultView(r, pot) {
   let id = "M11";
   if (kind === "change") {
     id = "R8";
-    title = r.version > 1 ? `Version ${r.version} is ready!` : "Your own version is ready!";
+    const words = readyWords(r);
+    title = words.title;
     blocks.push({ text: r.title, scale: 2, color: C.yellow, rows: 1, after: 2, align: "center" });
     if (r.changed) blocks.push({ text: r.changed, rows: 2, align: "center" });
-    blocks.push({ text: r.version > 1 ? `Version ${r.version - 1} is still saved.` : (r.parent?.maker_name ? `${r.parent.maker_name}'s game stays the same.` : "The old game stays the same."), color: C.mint, rows: 1, align: "center", onCut: "ok" });
+    blocks.push({ text: words.saved, color: C.mint, rows: 1, align: "center", onCut: "ok" });
   } else {
     blocks.push({ text: r.title, scale: 2, color: C.yellow, rows: 2, after: 2, align: "center" }, { text: `by ${clean(by)}`, color: C.silver, rows: 1, align: "center", after: 5 });
   }
@@ -1023,7 +1029,7 @@ export function leaveView(o) {
 export function cardView(o) {
   const { line, family } = o;
   /** @type {any[]} */
-  const rows = line.carts.map((/** @type {any} */ c, /** @type {number} */ i) => ({ text: `Version ${c.version}${i === 0 ? " (newest)" : ""}`, note: c.created ? dayName(c.created.slice(0, 10)) : "", cart: c }));
+  const rows = line.carts.map((/** @type {any} */ c, /** @type {number} */ i) => ({ ...versionRow(c, i === 0, c.created ? dayName(c.created.slice(0, 10)) : ""), cart: c }));
   const others = [family.main, ...family.others].filter((l) => l !== line);
   if (others.length) {
     rows.push({ text: line === family.main ? "Made from it by others:" : "Where it came from:", label: true });

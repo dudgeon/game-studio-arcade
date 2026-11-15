@@ -2,12 +2,14 @@
 // clock, input, sound and saves. Players (the local player, the launcher,
 // the Manager's simulator) and the playtest all use this.
 import { H, W } from "./gfx.js";
-import { DEFAULT_KEYMAP, checkPlayers, readInput } from "./input.js";
+import { BIT, DEFAULT_KEYMAP, checkPlayers, readInput } from "./input.js";
 import { Synth } from "./synth.js";
 
 const STEP_MS = 1000 / 60;
 const MAX_TICKS = 4;
 const SLACK_MS = 4;
+/** A hold shorter than this on a voice ask's button is a tap, not talking (D489). */
+export const VOICE_MIN_MS = 300;
 
 /**
  * @typedef {{ message: string, stack: string, where: string, frame: number }} CartErrorInfo
@@ -22,11 +24,18 @@ const SLACK_MS = 4;
  *   keymap?: typeof DEFAULT_KEYMAP,
  *   onStar?: () => void,
  *   onError?: (e: CartErrorInfo) => void,
+ *   ai?: (ask: import("./ai.js").AiAsk) => Promise<{ ok: boolean, lines?: string[], pick?: string, stop?: boolean }>,
+ *   voice?: { start: (v: { name: string, ask: string, actions: string[], hold: string }) => void, stop: (v: { name: string, ask: string, actions: string[], hold: string }) => Promise<{ action?: string | null }>, cancel: () => void },
  * }} HostOptions
  *   test: paused clock and no live input; frames only advance through `test.step()`.
  *   persist: keep g.save() data in localStorage (default: true unless test).
  *   players: how many controllers this console has, 1..8 (default 1, D110). The
  *     cabinet passes its config's `players`; play.html takes `?players=N`.
+ *   ai: answers the cart's g.ai asks (D480). Only the cabinet's launcher has one; without it, and always
+ *     on a test host, nobody answers and the cart runs on its fallbacks. `stop: true` ends asking for this run.
+ *   voice: the cabinet's microphone, for the cart's voice asks (D489). The host calls `start` when player 1
+ *     holds an ask's button, `stop` on release (the action heard, if any, goes to the cart) and `cancel` for a
+ *     tap. Without it, and on a test host, a cart never hears anything.
  */
 
 /** Largest integer scale (in device pixels) that fits the W x H screen in w x h CSS pixels. */
@@ -89,6 +98,35 @@ export function createHost(opts) {
     return synth;
   };
 
+  let aiStopped = false;
+  let stopped = false;
+  // Voice asks (D489): which one is being held to talk, and since when. One at a time: there's one microphone.
+  /** @type {any[]} */
+  let voices = [];
+  /** @type {{ v: any, at: number } | null} */
+  let talking = null;
+  /** Player 1's buttons this tick: the mic is on only while a voice ask's button is held. @param {number} mask */
+  const voiceTick = (mask) => {
+    if (!voices.length || !opts.voice) return;
+    if (talking && !(mask & BIT[/** @type {Arcade.Button} */ (talking.v.hold)])) {
+      const { v, at } = talking;
+      talking = null;
+      // A tap isn't talking: it's thrown away, and nothing is asked.
+      if (performance.now() - at < VOICE_MIN_MS) return void opts.voice.cancel();
+      Promise.resolve()
+        .then(() => opts.voice?.stop(v))
+        .then(
+          (r) => !stopped && r?.action && send({ type: "heard", name: v.name, action: r.action }),
+          () => {},
+        );
+    } else if (!talking) {
+      const v = voices.find((x) => mask & BIT[/** @type {Arcade.Button} */ (x.hold)]);
+      if (v) {
+        talking = { v, at: performance.now() };
+        opts.voice.start(v);
+      }
+    }
+  };
   let nextId = 1;
   /** @type {Map<number, { resolve: (v: any) => void, reject: (e: Error) => void }>} */
   const pending = new Map();
@@ -161,6 +199,8 @@ export function createHost(opts) {
     },
     destroy() {
       stopped = true;
+      if (talking) opts.voice?.cancel(); // the game ended mid-hold: the mic goes off
+      talking = null;
       removeEventListener("keydown", onKey);
       removeEventListener("keyup", onKey);
       removeEventListener("message", onMessage);
@@ -179,6 +219,8 @@ export function createHost(opts) {
     if (!msg || typeof msg !== "object") return;
     switch (msg.type) {
       case "ready":
+        // D489: the cart's voice asks. Only a live host with a microphone behind it listens.
+        voices = !test && opts.voice && Array.isArray(msg.voices) ? msg.voices.filter((/** @type {any} */ v) => typeof v?.name === "string" && ["a", "b", "x", "y"].includes(v.hold)).slice(0, 4) : [];
         arcade.state = "ready";
         markReady();
         break;
@@ -194,6 +236,21 @@ export function createHost(opts) {
         for (const w of msg.warnings ?? []) arcade.warnings.push(w);
         // D215: round scores, for the player's post-game screen. Only whole numbers in range get this far.
         for (const n of msg.scores ?? []) if (Number.isInteger(n) && n >= 0) arcade.scores.push(n);
+        // D480: g.ai asks go to whoever can answer; a test host never asks anyone (D486).
+        if (!test && opts.ai && !aiStopped) {
+          for (const ask of Array.isArray(msg.ai) ? msg.ai.slice(0, 8) : []) {
+            const id = ask?.id;
+            Promise.resolve()
+              .then(() => opts.ai?.(ask))
+              .then(
+                (r) => {
+                  if (r?.stop) aiStopped = true;
+                  if (!stopped) send({ type: "ai", reply: { id, ok: !!r?.ok, lines: r?.lines, pick: r?.pick } });
+                },
+                () => !stopped && send({ type: "ai", reply: { id, ok: false } }),
+              );
+          }
+        }
         if (msg.save !== undefined && persist) {
           try {
             localStorage.setItem(saveKey, msg.save);
@@ -255,7 +312,7 @@ export function createHost(opts) {
   });
 
   // Live loop: fixed 60 Hz ticks from requestAnimationFrame (D10).
-  let stopped = false;
+  stopped = false;
   let last = performance.now();
   let acc = 0;
   let drawn = 0;
@@ -283,6 +340,7 @@ export function createHost(opts) {
       tapped.clear();
       if (input.star && !star) opts.onStar?.();
       star = input.star;
+      voiceTick(input.masks[0] ?? 0);
       send({ type: "tick", n, masks: input.masks });
       arcade.ticks += n;
       drawn++;

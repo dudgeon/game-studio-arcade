@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { makeCart } from "@game-studio-arcade/studio-cli/src/make.js";
+import { NAME_QUESTION } from "@game-studio-arcade/studio-cli/src/tiles.js";
 import { appendLog } from "@game-studio-arcade/studio-cli/src/log.js";
 import { writeFileDurable, writeJsonDurable } from "@game-studio-arcade/studio-cli/src/durable.js";
 
@@ -180,7 +181,9 @@ export function createStudio(o) {
       ...ended,
       ...extra,
       kind: run.kind,
-      parent: run.parent ? { id: run.parent.id, title: run.parent.title, version: run.parent.version, maker: run.parent.maker } : null,
+      parent: run.parent ? { id: run.parent.id, title: run.parent.title, version: run.parent.version, version_name: run.parent.version_name ?? null, maker: run.parent.maker } : null,
+      // What this version will be called, once its maker has picked (D471): "Making Faster logs".
+      ...(run.versionName ? { version_name: run.versionName } : {}),
       maker: run.maker,
       maker_name: run.makerName,
       lines: run.lines.slice(-KEEP_LINES),
@@ -289,7 +292,7 @@ export function createStudio(o) {
       const cost = charge({ ...base, kind: item.kind, sessionId: item.session_id }, centsOf(record.usage), committed ? "restart, on the shelf" : "restart, didn't finish", { cart_id: committed?.id ?? null, cart_version: record.cart_version ?? null });
       addResult(
         committed
-          ? { ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
+          ? { ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, ...(record.version_name ? { version_name: record.version_name } : {}), title: o.titleOf?.(committed.id) ?? committed.id, session_id: record.id, note: FINISHED_AFTER_RESTART }
           : { ...shelfEntry({ ...base, kind: item.kind, parent: item.parent }), ...cost, ok: false, message: kidMessage(record), session_id: record.id },
       );
       const archived = await archive(api, item.session_id);
@@ -372,7 +375,7 @@ export function createStudio(o) {
     maker_name: current.makerName,
     kind: current.kind ?? "new",
     // The parent's maker by name, for R8's "Tester's game stays the same." (D302).
-    ...(current.parent ? { parent: { id: current.parent.id, title: current.parent.title, version: current.parent.version, maker: current.parent.maker, maker_name: current.parent.maker ? (o.nameOf?.(current.parent.maker) ?? current.parent.maker) : null } } : {}),
+    ...(current.parent ? { parent: { id: current.parent.id, title: current.parent.title, version: current.parent.version, version_name: current.parent.version_name ?? null, maker: current.parent.maker, maker_name: current.parent.maker ? (o.nameOf?.(current.parent.maker) ?? current.parent.maker) : null } } : {}),
   });
 
   /**
@@ -588,6 +591,16 @@ export function createStudio(o) {
           writeJournal(current);
           return a;
         },
+        // The name question (D471): the question board, with D reading "You pick".
+        name: async (q) => {
+          const shown = { question: NAME_QUESTION, option_a: q.option_a, option_b: q.option_b };
+          const a = /** @type {any} */ (await ask(current, { kind: "question", naming: true, ...shown }));
+          stopWaiting(current);
+          current.turns.push({ ...shown, naming: true, choice: a.choice, said: a.said ?? null });
+          current.answered++;
+          writeJournal(current);
+          return a;
+        },
       };
       const ui = {
         progress: (/** @type {string} */ s, /** @type {number | null | undefined} */ stage) => {
@@ -605,6 +618,10 @@ export function createStudio(o) {
           }
         },
         info: () => {}, // Test changes and the library path are for the log, not a kid's screen (D183).
+        named: (/** @type {string | null} */ name) => {
+          current.versionName = name;
+          changed();
+        },
       };
       (async () => {
         const base = await o.api(undefined, { kind });
@@ -656,7 +673,7 @@ export function createStudio(o) {
         const more = cost.over_usual ? { why_more: whyMore(record) } : {};
         addResult(
           committed
-            ? { ...shelfEntry(current), ...cost, ...more, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, title: o.titleOf?.(committed.id) ?? committed.id, changed: changedLine(record, request), session_id: record.id }
+            ? { ...shelfEntry(current), ...cost, ...more, ok: true, cart_id: committed.id, version: record.cart_version ?? 1, ...(record.version_name ? { version_name: record.version_name } : {}), title: o.titleOf?.(committed.id) ?? committed.id, changed: changedLine(record, request), session_id: record.id }
             : { ...shelfEntry(current), ...cost, ok: false, failed: true, request, message: kidMessage(record), session_id: record.id },
         );
         // Every finished session is archived at Anthropic, a game on the shelf too: kept, never deleted (D5, D301).

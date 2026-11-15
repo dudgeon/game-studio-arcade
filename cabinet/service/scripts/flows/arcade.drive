@@ -108,14 +108,18 @@ press a
 wait R6
 shot R6-what-changes
 press a
+# The name question (D471): Claude's two names, say your own, or You pick.
+wait R6-name
+shot R6-name-what-to-call-it
+press a
 wait R7
-shot R7-changing-it
+shot R7-making-faster-logs
 wait R8
-shot R8-version-2-ready
+shot R8-faster-logs-ready
 press down
 press a
 wait S1
-shot R9-shelf-with-version-2
+shot R9-shelf-with-faster-logs
 # The game's card: every version, and Change this game.
 press down
 press right

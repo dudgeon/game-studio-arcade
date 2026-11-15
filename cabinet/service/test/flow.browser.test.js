@@ -104,7 +104,12 @@ test("every long string in a whole session fits, on every frame", { skip: skip |
     assert.deepEqual(await faults(), []);
     assert.deepEqual(problems, []);
     const q1 = shots.find((/** @type {any} */ s) => s.name.endsWith("q1-everything-long"));
-    assert.ok(q1.boxes.filter((/** @type {any} */ b) => b.cut && b.onCut === "reader").length >= 3, "cut, with the reader to go to");
+    // D453: the long question reads in pages; the cut options still have the reader.
+    assert.ok(q1.boxes.find((/** @type {any} */ b) => b.id === "q-question").pages > 1, "the question has pages");
+    assert.ok(q1.boxes.filter((/** @type {any} */ b) => b.cut && b.onCut === "reader").length >= 2, "cut options, with the reader to go to");
+    const heard = shots.find((/** @type {any} */ s) => s.name.endsWith("heard-very-long")).boxes.find((/** @type {any} */ b) => b.id === "say-transcript");
+    assert.equal(heard.cut, false, "the long idea is in pages, not cut");
+    assert.ok(heard.pages > 1);
     assert.equal(q1.boxes.find((/** @type {any} */ b) => b.id === "q-d").lines[0].text, "Make it now", "D is still there");
     assert.equal(readLog(path.join(data, "logs", "studio_session.jsonl"))[0].outcome, "committed");
     const shelf = shots.at(-1);
