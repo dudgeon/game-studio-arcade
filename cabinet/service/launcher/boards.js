@@ -386,6 +386,11 @@ function howto(p, v) {
   let y = BODY_Y + 4;
   const r = p.box({ id: "howto-title", text: v.title, x: M, y, w: INNER, h: heightOf(2) * 2, scale: 2, color: C.yellow, align: "center" });
   y += heightOf(Math.max(1, r.rows)) * 2 + 6;
+  // A downloaded game's full credit (D388): the header's right side is too short for it.
+  if (v.credit) {
+    const c = p.box({ id: "howto-credit", text: v.credit, x: M, y, w: INNER, h: heightOf(2), color: C.silver, align: "center" });
+    y += heightOf(Math.max(1, c.rows)) + 6;
+  }
   if (v.goal) {
     const g = p.box({ id: "howto-goal", text: v.goal, x: M, y, w: INNER, h: heightOf(3), color: C.white, align: "center" });
     y += heightOf(Math.max(1, g.rows)) + 8;

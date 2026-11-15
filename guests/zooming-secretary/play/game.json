@@ -1,0 +1,12 @@
+{
+  "id": "zooming-secretary",
+  "core": "nestopia",
+  "rom": "rom.bin",
+  "rom_name": "game.nes",
+  "keys": {
+    "a": "z",
+    "b": "x",
+    "select": "c",
+    "start": "enter"
+  }
+}

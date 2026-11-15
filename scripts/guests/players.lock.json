@@ -1,0 +1,41 @@
+{
+  "tic80": {
+    "version": "1.4.1",
+    "licence": "MIT",
+    "source": "https://github.com/nesbox/TIC-80",
+    "name": "tic80-v1.4-players.tar.gz",
+    "url": "https://github.com/nesbox/TIC-80/releases/download/v1.4.1/tic80-v1.4-players.tar.gz",
+    "sha256": "03e7bef2d061be40632cc70bc50e84c2f2f99c464bf0bcf8fd90d5e715186a4d"
+  },
+  "retroarch": {
+    "version": "1.22.2",
+    "licence": "GPL-3.0-or-later",
+    "source": "https://github.com/libretro/RetroArch",
+    "name": "RetroArch-1.22.2-emscripten.7z",
+    "url": "https://buildbot.libretro.com/stable/1.22.2/emscripten/RetroArch.7z",
+    "sha256": "00e17fda8792ee15a9d9ea4fc769e9f937e525c722ae10dabba2c993941f55f4",
+    "cores": {
+      "gambatte": {
+        "plays": ["gb", "gbc"],
+        "licence": "GPL-2.0",
+        "source": "https://github.com/libretro/gambatte-libretro",
+        "js": "36b839c5ef3f336bad6db3220e4b4db996c6fd9ff9438c49721a20bb48d03dce",
+        "wasm": "8eb891da29cbd4d7af5e99bb8c496ec1ac3ce265e116e54ef121839f23ddb7a6"
+      },
+      "nestopia": {
+        "plays": ["nes"],
+        "licence": "GPL-2.0",
+        "source": "https://github.com/libretro/nestopia",
+        "js": "aee7fc8881e4f9c60d51a65c54ec9c845e6f8f98b594e951368d4696409a9ec9",
+        "wasm": "4401c4e5eb124a64d8e4221c63550a3b821520ed82ee2e59f9adebc7e6620a29"
+      },
+      "mgba": {
+        "plays": ["gba"],
+        "licence": "MPL-2.0",
+        "source": "https://github.com/libretro/mgba",
+        "js": "4d4d2dc2d55f9cb4a09389c6df1915a727256daeb26daf265e6fa7254ab1c353",
+        "wasm": "e83885d857ce8cfb353a2139d8b00f467c9122c0cb3889813f736f140b6deb84"
+      }
+    }
+  }
+}

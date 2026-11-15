@@ -196,12 +196,12 @@ export function createGate(o) {
     },
     /**
      * Smoke-check a downloaded game at its URL on the guest server.
-     * @param {string} id @param {string} url
+     * @param {string} id @param {string} url @param {{ draws?: boolean }} [what] draws: it must also draw something (D381)
      * @returns {Promise<GateResult>}
      */
-    guest(id, url) {
+    guest(id, url, what = {}) {
       return enqueue(async () => {
-        const args = ["--guest", url, "--watch-ms", String(s.watchMs), ...(s.chromium ? ["--chromium", s.chromium] : [])];
+        const args = ["--guest", url, "--watch-ms", String(s.watchMs), ...(what.draws ? ["--draws"] : []),...(s.chromium ? ["--chromium", s.chromium] : [])];
         /** @type {GateResult} */
         const base = { ok: false, kind: "guest", what: id, host: s.host, driver: "browser", fallback: null, failing: [], seconds: 0, waited_s: 0, restarts: 0 };
         try {
@@ -368,7 +368,8 @@ export function guestGate(o) {
       const url = o.urlOf(id, meta);
       if (url && !pending.has(key)) {
         pending.add(key);
-        o.gate.guest(id, url).then((r) => {
+        // A guest played by a player (guest.json's `player`) must also draw something (D381).
+        o.gate.guest(id, url, { draws: Boolean(meta?.player) }).then((r) => {
           pending.delete(key);
           if (r.error) return void unchecked.add(key);
           known[key] = { ok: r.ok, at: new Date().toISOString(), failing: r.failing, seconds: r.seconds };

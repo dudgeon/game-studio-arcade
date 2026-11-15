@@ -10,6 +10,16 @@ import { openBrowser, plantSeed, startServiceProcess } from "../scripts/drive.js
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures/penguin-catch");
 
+/**
+ * teti and Geoff's teti alone, so these tests see the shelf they're about: with the guest-player games on it
+ * too (D388), Geoff's row is below the shelf's first screen.
+ */
+function tetiOnly() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-teti-guests-"));
+  for (const id of ["teti", "teti-geoff"]) fs.cpSync(path.resolve(import.meta.dirname, "../../../guests", id), path.join(dir, id), { recursive: true });
+  return dir;
+}
+
 let skip = "";
 try {
   const { chromium } = await import("playwright");
@@ -64,7 +74,7 @@ async function press(page, key) {
 test("teti: on the shelf, played with the stick and buttons, Escape back to the shelf, play logged", { skip: skip || false, timeout: 900_000 }, async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guest-flow-"));
   plantSeed(data, { state: "seen" }); // past the first-ever boot's screens (B2, B3)
-  const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10 }));
+  const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, args: ["--guests", tetiOnly()] }));
   const { browser, page, problems } = await openBrowser(service.url);
   const launcher = (/** @type {string} */ f) => page.evaluate((/** @type {string} */ f) => /** @type {any} */ (window).launcher[f](), f);
   try {
@@ -138,7 +148,7 @@ test("teti: on the shelf, played with the stick and buttons, Escape back to the 
 test("Geoff's teti: under teti on the shelf, keeps score; G6 shows the score and the best; the original still shows none (D234-D236)", { skip: skip || false, timeout: 1_800_000 }, async () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-guest-score-"));
   plantSeed(data, { state: "seen" });
-  const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10 }));
+  const service = /** @type {any} */ (await startServiceProcess({ replay: FIXTURE, data, pace: 10, args: ["--guests", tetiOnly()] }));
   const { browser, page, problems } = await openBrowser(service.url);
   const launcher = (/** @type {string} */ f) => page.evaluate((/** @type {string} */ f) => /** @type {any} */ (window).launcher[f](), f);
   /** The text of the launcher's boxes whose ids match. @param {RegExp} id */

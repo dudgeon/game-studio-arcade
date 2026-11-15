@@ -86,7 +86,8 @@ export function createGuestHost(opts) {
  */
 export function guestRow(g, nameOf = (id) => id) {
   // A grown-up maker isn't in the "who's making" list (D236), so the version's own guest.json names them.
-  const by = g.maker ? `by ${g.maker_name ?? nameOf(g.maker)}` : g.by ? `by ${g.by}` : undefined;
+  // The shelf row is short: guest.json's by_short when the full credit doesn't fit there (D388).
+  const by = g.maker ? `by ${g.maker_name ?? nameOf(g.maker)}` : g.by ? `by ${g.by_short ?? g.by}` : undefined;
   return { kind: "cart", cart: g, title: g.title, by, version: null, tags: [{ text: "free game", kind: "starter" }], hasCard: false, indent: 0 };
 }
 
@@ -114,7 +115,8 @@ export function guestRows(guests, nameOf) {
 export function guestHowto(g) {
   const h = g.howToPlay ?? {};
   const controls = Array.isArray(h.controls) && h.controls.length ? h.controls : ["Stick and buttons: try them and see!"];
-  return { screen: "howto", cart: g, title: g.title, by: "", goal: h.goal ?? null, controls };
+  // The full credit goes under the title, where there's room for it (D388).
+  return { screen: "howto", cart: g, title: g.title, by: "", credit: g.by ? `by ${g.by}` : null, goal: h.goal ?? null, controls };
 }
 
 /**

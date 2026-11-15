@@ -157,6 +157,7 @@ service_args_without_key() {
   echo "--replay $ARCADE_HOME/current/studio-kit/cli/fixtures/penguin-catch"
 }
 
+# No GPU here, so WebGL is drawn in software: TIC-80's and RetroArch's web players need it (D381).
 kiosk_env() {
   cat <<'ENV'
 WLR_BACKENDS=headless,libinput
@@ -164,6 +165,6 @@ WLR_RENDERER=pixman
 WLR_HEADLESS_OUTPUTS=1
 WLR_LIBINPUT_NO_DEVICES=1
 ARCADE_OUTPUT=HEADLESS-1
-CHROMIUM_EXTRA=--disable-gpu --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
+CHROMIUM_EXTRA=--disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1
 ENV
 }

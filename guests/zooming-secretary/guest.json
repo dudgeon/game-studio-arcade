@@ -1,0 +1,33 @@
+{
+  "id": "zooming-secretary",
+  "title": "Zooming Secretary",
+  "by": "Shiru and PinWizz",
+  "version": "1.02-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "retroarch",
+    "core": "nestopia"
+  },
+  "upstream": {
+    "source": "https://shiru.untergrund.net/files/src/zooming_secretary_src.zip",
+    "licence": "CC BY (Creative Commons Attribution; the manual gives no version number)",
+    "licence_source": "the game's own manual.pdf, in the author's zip: \"It is free of charge, released under Creative Commons Attribution license\"; its cover: \"CC BY 2011 Alexei Bespalko and Shiru\".",
+    "file": {
+      "name": "Zooming_Secretary.nes",
+      "url": "https://shiru.untergrund.net/files/nes/zooming_secretary.zip",
+      "member": "zooming_secretary/Zooming_Secretary.nes",
+      "sha256": "315adee10052367298959d55256e9f2621381da9f7c839f50832e13516b61770"
+    }
+  },
+  "howToPlay": {
+    "goal": "The phones are ringing! Find the right folder and answer each call in time.",
+    "controls": [
+      "Stick: run. Up and down take the stairs",
+      "A: pick up a folder or a phone",
+      "START: start and pause"
+    ]
+  },
+  "credits": "Zooming Secretary by Shiru (code, sound) and Alexei \"PinWizz\" Bespalko (graphics), CC BY 2011."
+}

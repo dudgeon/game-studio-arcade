@@ -31,6 +31,10 @@ const TYPES = {
   ".wasm": "application/wasm",
   ".woff2": "font/woff2",
   ".ttf": "font/ttf",
+  // A TIC-80 cart, read by its web player (D380).
+  ".tic": "application/octet-stream",
+  // A homebrew ROM, read by RetroArch's web build (D382).
+  ".bin": "application/octet-stream",
 };
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const PLAY_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -121,6 +125,8 @@ export function createGuests(o) {
         guest: true,
         title: meta.title,
         by: meta.by ?? null,
+        // A shorter credit for the shelf row, where the full one doesn't fit (D388). G0 and NOTICE.md keep the full one.
+        by_short: typeof meta.by_short === "string" ? meta.by_short : null,
         version: meta.version ?? null,
         // A version of another guest (D234): who made it, what it came from, and its family.
         maker: typeof meta.maker?.id === "string" ? meta.maker.id : null,

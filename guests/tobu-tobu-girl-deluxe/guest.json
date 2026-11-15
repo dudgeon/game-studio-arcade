@@ -1,0 +1,33 @@
+{
+  "id": "tobu-tobu-girl-deluxe",
+  "title": "Tobu Tobu Girl Deluxe",
+  "by": "Tangram Games",
+  "version": "2019-cabinet.1",
+  "kind": "web",
+  "entry": "index.html",
+  "players": 1,
+  "player": {
+    "name": "retroarch",
+    "core": "gambatte"
+  },
+  "upstream": {
+    "source": "https://github.com/SimonLarsen/tobutobugirl-dx",
+    "licence": "MIT (code), CC BY 4.0 (images, text, sound and music)",
+    "licence_source": "https://github.com/SimonLarsen/tobutobugirl-dx README: \"The source code for Tobu Tobu Girl is licensed under the MIT License.\" and \"All assets (images, text, sound and music) are licensed under the Creative Commons Attribution 4.0 International License\". The ROM is the same file as the official one at https://tangramgames.itch.io/tobu-tobu-girl-deluxe.",
+    "file": {
+      "name": "tobudx.gb",
+      "url": "https://raw.githubusercontent.com/gbdev/database/41454fd5b371475fa761003e05ca129a8c513ebb/entries/tobutobugirldeluxe/tobudx.gb",
+      "sha256": "0a0e8018dbbc8d7f8cd99f05e7cdc7b4cc9e358ecfe9377ebfb2291a84c6e310"
+    }
+  },
+  "howToPlay": {
+    "goal": "Your cat floated away! Bounce up off the baddies to catch it.",
+    "controls": [
+      "Stick: move left and right",
+      "A: jump off a baddie",
+      "B: dash, when the meter is full",
+      "START: pause"
+    ]
+  },
+  "credits": "Tobu Tobu Girl Deluxe by Tangram Games: Simon Larsen (code, art), Lukas Erritsø Hansen (art), potato-tan (music). CC BY 4.0 for the assets."
+}

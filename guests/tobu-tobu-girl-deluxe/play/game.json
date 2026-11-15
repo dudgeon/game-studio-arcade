@@ -1,0 +1,12 @@
+{
+  "id": "tobu-tobu-girl-deluxe",
+  "core": "gambatte",
+  "rom": "rom.bin",
+  "rom_name": "game.gb",
+  "keys": {
+    "a": "z",
+    "b": "x",
+    "select": "c",
+    "start": "enter"
+  }
+}
