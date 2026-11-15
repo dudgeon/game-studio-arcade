@@ -2017,7 +2017,8 @@ Geoff's ask after the Picade showed "No Wi-Fi" on every boot following a power-c
 **D412. A watch on the cabinet brings a lost Wi-Fi back: `arcade-wifi-watch.service`.** *(Claude.)* Root, every 15 s, restarted for ever, and it never restarts the cabinet:
 - puts back any of our networks missing from NetworkManager's folder, or different there (an empty file after a power cut), and reloads them;
 - switches the radio on and unblocks it (rfkill) if it's off, with the country;
-- with a saved network and no Wi-Fi: after 30 s, looks for networks and connects, every minute; after 3 min, restarts wpa_supplicant and NetworkManager; after 5 min, reloads the Wi-Fi chip's driver (`brcmfmac`); then one of those two every 10 min, for ever;
+- with a saved network and no Wi-Fi: after 30 s, looks for networks and connects, every minute; after 3 min and again after 5, restarts wpa_supplicant and NetworkManager, then every 10 min, for ever;
+- **never reloads the Wi-Fi chip's driver while a Wi-Fi device is there** *(changed 2026-11-14, evening)*. It used to, after 5 minutes down. That step had only run in the QEMU rehearsal, which has no Broadcom chip, and on this chip family an unload and reload can leave the chip dead until a restart: a short outage made lasting. The Picade went off the network that evening with nothing deployed, and this step is the suspect until its journal says otherwise (see D417b when written). The driver is now reloaded only when the chip has gone from the system altogether, where there's nothing left to lose: NetworkManager after a minute, then the driver, alternating every 10 min;
 - never restarts NetworkManager while a cable carries the cabinet's default route, which would cut a grown-up's session. Only that counts as a cable: the Picade's eth0 and its USB service port both say "connected" with nothing plugged in (the card worker's finding);
 - says each change in the journal, and leaves `/run/arcade-wifi/status.json` (connected, name, signal, address) for the service.
 - Games play on through all of it: nothing here is in the play path.
@@ -2354,3 +2355,44 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 **D499. The Studio offers chat only when it's a strong fit; chat isn't proven live yet.** *(Geoff, D489: "Studio should only offer if it is a strong fit for the game type — should not push it".)*
 - A `game-chat` guide in the context pack with a catalog line, and the brief's AI line names it. The guide tells the Studio that a game never gets the player's words, so a rule that needs them ("say the password") is a voice action, not chat. The brief change rides the same `ant apply` as D487.
 - **Checked with a stand-in model only:** a table of fourteen turns through the real turn code, memory, failing closed, the requests' shape, the route, and a hold end to end in headless Chromium. **No real model has answered or judged a turn.** One live run of the table on the virtual cabinet comes before any kid uses chat.
+
+## 2026-11-14, evening — The Picade's Wi-Fi stalled while "connected" (D510-D512, Wi-Fi worker)
+
+**What happened.** From about 17:31 the Picade, switched on in the kitchen with nobody home, passed no traffic on its Wi-Fi, while everything on it said the Wi-Fi was fine. The mini couldn't get even an ARP answer from it. It stayed that way until Geoff held the power button at 20:43:36; it was back on Wi-Fi 15 s after the restart. From its own journal (persistent since that morning):
+- 17:33:49, Tailscale: no map from its server for 2 min 6 s; then timeouts to everything, DNS to the router included. 18:00: the IPv6 address expired, no router announcements arriving. 18:01: time sync timed out.
+- NetworkManager and wpa_supplicant logged nothing between 16:09 and the shutdown: `wlan0` stayed "activated", associated to the same access point throughout. No disconnect, no roam, no driver error.
+- The Wi-Fi watch (D412) logged nothing either. It asked NetworkManager whether the Wi-Fi was connected, was told yes, and did nothing for three hours.
+- **Under-voltage:** the kernel logged "Undervoltage detected!" 437 times in that 8.5-hour boot, one of them at 17:32:00, inside the half-minute the traffic stopped. `vcgencmd get_throttled` read 0x50000 after the restart, and 0xd0005 after a minute of speech load. The Pi was powered by a MacBook's USB-C brick into the Pi's own USB-C port, 5 V at 3 A at most (Geoff). He's moving it to a 5 V 5 A supply into the X HAT. The timing is a coincidence that fits, not a proof: those warnings came every few minutes all day. It may also be what flash day's unexplained drop was (D417).
+- **Not the cause:** the watch's driver reload, which the Wi-Fi worker suspected first and said so. It never ran.
+
+**D510. "Connected" isn't taken on trust: the watch asks the router for an answer.** *(Claude.)*
+- Each round, while NetworkManager says the Wi-Fi is connected, the watch sends the network's gateway an ARP request on the Wi-Fi itself (`arping`), so a router that drops pings still counts. A network that names no gateway is taken as fine.
+- Four rounds in a row with no answer, about a minute, and the Wi-Fi counts as down: the journal says "Wi-Fi says connected (name) but the router hasn't answered for 4 rounds", the watch leaves the network and joins it again at once and then every minute, and restarts NetworkManager 3 and 5 minutes on, then every 10 (D412's ladder).
+- The status the service reads says not connected, so the shelf says "No Wi-Fi" with the grown-up's hint, not "No internet" (D415).
+- One answer and everything starts over. A miss or two does nothing.
+- On 2026-11-14 this would have called the stall at about 17:33.
+
+**D511. The last resort: the cabinet restarts itself.** *(Geoff, 2026-11-14: "Yes, as described". Changes D412's "it never restarts the cabinet".)*
+- **When:** no working Wi-Fi for 15 minutes (not connected, a stall by D510, or no Wi-Fi device at all), with a network saved.
+- **Only when nobody is using it:** the update path's own test, `busy_reason` (D332): no make running or left to collect, no game being played, the publish gate idle. While it's busy the watch asks again every minute and the journal says why it's waiting.
+- **At most once an hour,** by a time kept in `/var/lib/arcade-wifi/last-restart`, so it holds across the restart itself. A router that's off all night means one restart an hour, with nobody playing.
+- **Never while a cable carries the cabinet's default route** (a grown-up is working on it).
+- **Every one is written down:** a line in the journal ("restarting the cabinet as a last resort: no working Wi-Fi for N s (why)") and a line in `/var/lib/arcade-wifi/restarts.log`.
+- On 2026-11-14 it would have restarted the cabinet at about 17:48, with nobody home, and had it back a quarter of a minute later.
+
+**D512. The watch never reloads the Wi-Fi chip's driver while a Wi-Fi device is there.** *(Claude.)*
+- D412 reloaded `brcmfmac` after 5 minutes down. That step had only ever run in the QEMU rehearsal, which has no Broadcom chip; on this chip family an unload and reload can leave the chip dead until a restart, turning a short outage into a lasting one. It wasn't what happened on 2026-11-14, but it was shipped unproven on the hardware, and D511 now covers what it was for.
+- The driver is reloaded only when the chip has gone from the system altogether, where there's nothing left to lose: NetworkManager after a minute, then the driver, alternating every 10 minutes.
+
+**Rehearsed (D510, D511): `scripts/cabinet-card/test/wifi-stall-rehearsal.sh DIR`, 11 of 11, 2026-11-14.** On the QEMU copy of the card with its simulated radios (D418), the same failure made on purpose: an nftables rule on the access points' side drops every ARP from the cabinet's radio, so the link stays associated, NetworkManager stays "connected", and the router never answers. For the rehearsal the watch ignores the VM's cable, restarts after 120 s instead of 15 minutes, and allows a restart every 30 minutes instead of every hour.
+- **Stall:** within 90 s the watch said "Wi-Fi says connected (name) but the router hasn't answered for 4 rounds: treating it as down", rejoined, and the status the shelf reads said not connected.
+- **Held:** with a game being played, "no working Wi-Fi for 139 s, but not restarting the cabinet: a game is being played (teti)", and no restart.
+- **Restart:** once nobody was playing, the cabinet restarted itself. The journal of the boot before, `last-restart` and `restarts.log` all say when and why ("no working Wi-Fi for 211 s (connected, but the router doesn't answer)"). After the restart the Wi-Fi was back and the router answered.
+- **At most once:** the same stall again straight away, for over 3 minutes: no second restart, and still one line in `restarts.log`.
+- **What it found and fixed in the watch:** after each rejoin the link came back still deaf, and the watch gave it a fresh four-round wait, so the status read "connected" for three rounds in every minute. A stall now stands at once while an outage is being counted.
+- **What it can't show:** the real chip stalling, and whether a rejoin or a NetworkManager restart cures that on the Pi without the restart. The restart is what cured it on 2026-11-14.
+
+**Also from that evening:**
+- **The Wi-Fi screens were opened on the real Picade for the first time**, by pressing its real key codes (183, ENT; 60, COIN) for 3.8 s from a temporary virtual keyboard, with nobody using the cabinet: the list came up with the home network, and ESC went back. Geoff had found the hold did nothing; the black buttons have no labels, and the shelf said "hold ENT and COIN". It now says where they are: "Grown-up: hold right side + front right" (D413). The two front buttons together don't do it: front left is 1UP.
+- The list no longer says "Not on Wi-Fi" for the second or two before its first look has finished.
+- Not yet done on the real cabinet: typing a password there and joining a second network.

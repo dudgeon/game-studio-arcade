@@ -16,8 +16,13 @@ export const HOLD_KEYS = Object.freeze(["F1", "F2"]);
 export const HOLD_MS = 3000;
 /** Left alone this long, the Wi-Fi screens go back to the shelf. */
 export const IDLE_MS = 120_000;
-/** The shelf's bottom line while the Wi-Fi is down: the one place the hold is written. */
-export const WIFI_HINT = "No Wi-Fi. Grown-up: hold ENT and COIN";
+/**
+ * The shelf's bottom line while the Wi-Fi is down: the one place the hold is written. By where the two black
+ * buttons are, not their names: they have no labels, and the hold did nothing for Geoff on 2026-11-14 while the
+ * real key codes open the screens. ENT is on the
+ * right side, COIN is front right (docs/hardware/picade-wiring). The header already says "No Wi-Fi".
+ */
+export const WIFI_HINT = "Grown-up: hold right side + front right";
 /** Where the hold works: the shelf, and what COIN or Make may have put over it. */
 const HOLD_SCREENS = new Set(["shelf", "pot", "history"]);
 
