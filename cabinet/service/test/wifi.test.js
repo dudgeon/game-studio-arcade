@@ -367,6 +367,13 @@ test("every Wi-Fi screen fits with the longest names: nothing spills, nothing th
     assert.deepEqual(check(p.boxes), [], `${v.screen} ${JSON.stringify(v).slice(0, 80)}`);
   }
   assert.ok(WIFI_HINT.length <= 40, "the shelf's hint fits its line");
+  // The hint says where the two buttons are: they have no labels on the cabinet.
+  assert.match(WIFI_HINT, /right side \+ front right/);
+  // While the first look is going, the list doesn't claim "Not on Wi-Fi": it doesn't know yet.
+  draw(p, { screen: "wifi-list", current: null, scanning: true, networks: [], sel: 0 });
+  assert.ok(!p.boxes.some((b) => b.id === "wifi-status"));
+  draw(p, { screen: "wifi-list", current: null, scanning: false, networks: [], sel: 0 });
+  assert.equal(p.boxes.find((b) => b.id === "wifi-status")?.text, "Not on Wi-Fi");
   assert.deepEqual([0, 20, 40, 60, 90].map(levelOf), [0, 1, 2, 3, 4]);
   // Every character a Wi-Fi password may hold is on a page, or is the space key.
   const all = new Set(PAGES.flatMap((pg) => [...pg.keys]));

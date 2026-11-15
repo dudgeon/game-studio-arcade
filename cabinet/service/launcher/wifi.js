@@ -57,7 +57,8 @@ export const signalWord = (signal) => ["Very weak", "Weak", "Fair", "Good", "Str
 function list(p, v) {
   p.header("Wi-Fi", "Grown-ups");
   const status = v.current ? `On: ${clean(v.current)}` : "Not on Wi-Fi";
-  p.box({ id: "wifi-status", text: status, x: M, y: BODY_Y, w: INNER, h: GLYPH_H, color: v.current ? C.lime : C.coral, onCut: "ok" });
+  // While the first look is still going it isn't known yet: saying "Not on Wi-Fi" then would be wrong half the time.
+  if (v.current || !v.scanning || v.networks.length) p.box({ id: "wifi-status", text: status, x: M, y: BODY_Y, w: INNER, h: GLYPH_H, color: v.current ? C.lime : C.coral, onCut: "ok" });
   const top0 = BODY_Y + LINE_H + 3;
   if (v.scanning && !v.networks.length) {
     p.box({ id: "wifi-scanning", text: "Looking for networks...", x: M, y: top0 + 30, w: INNER, h: GLYPH_H, color: C.silver, align: "center", onCut: "never" });
