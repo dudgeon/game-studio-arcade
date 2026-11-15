@@ -581,10 +581,10 @@ test("first boot unpacks the twin's data into an empty data folder, before the s
   assert.equal(fs.readFileSync(path.join(data, "logs/coin_ledger.jsonl"), "utf8"), '{"kind":"refill"}\n');
   assert.ok(fs.existsSync(path.join(payload, "twin-data.tar.gz")), "the card keeps its copy (D5)");
   // Never over a cabinet's own data.
-  fs.writeFileSync(path.join(data, "makers.json"), '[{"id":"owen"}]');
+  fs.writeFileSync(path.join(data, "makers.json"), '[{"id":"milo"}]');
   out = step();
   assert.match(out, /already has data: keeping its own/);
-  assert.equal(fs.readFileSync(path.join(data, "makers.json"), "utf8"), '[{"id":"owen"}]');
+  assert.equal(fs.readFileSync(path.join(data, "makers.json"), "utf8"), '[{"id":"milo"}]');
   const prov = fs.readFileSync(path.join(REPO, "cabinet/provision/provision.sh"), "utf8");
   assert.match(prov, /step_twin_data\nstep_carts\nstep_library\nstep_cabinet_config\n/, "before the starters, so a twin's own copies of them stay");
   fs.rmSync(dir, { recursive: true, force: true });

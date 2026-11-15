@@ -35,8 +35,8 @@ const passing = {
 async function service(holdMs) {
   const paths = dataPaths(tmp());
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("Alina");
-  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "alina" }, message: "make {id}" });
+  makers.add("Ivy");
+  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "ivy" }, message: "make {id}" });
   let runs = 0;
   const checker = {
     ...passing,
@@ -72,7 +72,7 @@ test(`a publish held by the gate ${LONG_S ? `for ${LONG_S} s` : "for a few secon
     const notes = [];
     const call = caller(createBridge(directLink(s.url, TOKEN), { pollWaitS: LONG_S ? 25 : 1, retryMs: 50 }));
     const t0 = Date.now();
-    let r = await call("publish_cart", { dir: pulledFolder(), maker: "alina", summary: "Faster." }, { notify: (/** @type {any} */ m) => notes.push(m) });
+    let r = await call("publish_cart", { dir: pulledFolder(), maker: "ivy", summary: "Faster." }, { notify: (/** @type {any} */ m) => notes.push(m) });
     // Past the bridge's own 4-minute budget it answers pending; publish_status waits on, as a caller is told to.
     for (let i = 0; i < 3 && r.structuredContent?.status === "pending"; i++) {
       assert.match(r.structuredContent.note, /Call publish_status with publish_id pub_.*Don't publish again/);
@@ -98,10 +98,10 @@ test("past the bridge's own budget it answers pending with a publish_id; publish
   try {
     const call = caller(createBridge(directLink(s.url, TOKEN), { pollWaitS: 0, waitBudgetMs: 300, retryMs: 50 }));
     const dir = pulledFolder();
-    const first = (await call("publish_cart", { dir, maker: "alina", summary: "Faster." })).structuredContent;
+    const first = (await call("publish_cart", { dir, maker: "ivy", summary: "Faster." })).structuredContent;
     assert.equal(first.status, "pending");
     assert.match(first.note, /publish_status with publish_id pub_/);
-    const again = (await call("publish_cart", { dir, maker: "alina", summary: "Faster, I said." })).structuredContent;
+    const again = (await call("publish_cart", { dir, maker: "ivy", summary: "Faster, I said." })).structuredContent;
     assert.equal(again.publish_id, first.publish_id);
     const patient = caller(createBridge(directLink(s.url, TOKEN), { pollWaitS: 1, retryMs: 50 }));
     const done = (await patient("publish_status", { publish_id: first.publish_id })).structuredContent;
@@ -128,7 +128,7 @@ test("a dropped connection mid-publish: the bridge asks again and joins the same
         return r;
       },
     };
-    const r = (await caller(createBridge(flaky, { pollWaitS: 1, retryMs: 20 }))("publish_cart", { dir: pulledFolder(), maker: "alina", summary: "Faster." })).structuredContent;
+    const r = (await caller(createBridge(flaky, { pollWaitS: 1, retryMs: 20 }))("publish_cart", { dir: pulledFolder(), maker: "ivy", summary: "Faster." })).structuredContent;
     assert.equal(r.cart_id, "penguin-catch-v2");
     assert.equal(runs(), 1, "asked three times, published once");
   } finally {

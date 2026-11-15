@@ -160,7 +160,7 @@ function dataFolder() {
   put("carts/.git/HEAD", "ref: refs/heads/main\n");
   put("sessions/sesn_failed/events.jsonl", '{"type":"x"}\n');
   put("sessions/sesn_failed/answers.json", "[]\n");
-  put("makers.json", '[{"id":"alina"}]\n');
+  put("makers.json", '[{"id":"ivy"}]\n');
   put("studio-results.json", '[{"id":1}]\n');
   put("studio-left.json", "[]\n");
   put("kit-uploads.json", "{}\n");
@@ -193,7 +193,7 @@ test("data-check: nothing changed passes, logs may grow, and new logs are fine",
 
 for (const [what, harm, field, file] of [
   ["a failed make's record in sessions/ removed", (d) => fs.rmSync(path.join(d.root, "sessions/sesn_failed"), { recursive: true }), "missing", "sessions/sesn_failed/events.jsonl"],
-  ["makers.json rewritten", (d) => d.put("makers.json", '[{"id":"owen"}]\n'), "changed", "makers.json"],
+  ["makers.json rewritten", (d) => d.put("makers.json", '[{"id":"milo"}]\n'), "changed", "makers.json"],
   ["studio-results.json changed", (d) => d.put("studio-results.json", '[{"id":1,"viewed_at":"x"}]\n'), "changed", "studio-results.json"],
   ["studio-left.json changed", (d) => d.put("studio-left.json", '[{"session_id":"s"}]\n'), "changed", "studio-left.json"],
   ["kit-uploads.json deleted", (d) => fs.rmSync(path.join(d.root, "kit-uploads.json")), "missing", "kit-uploads.json"],
@@ -219,10 +219,10 @@ for (const [what, harm, field, file] of [
 
 test("data-check: reports paths, never contents", () => {
   const d = dataFolder();
-  d.put("makers.json", '[{"id":"alina","secret":"SHOULD-NOT-APPEAR"}]\n');
+  d.put("makers.json", '[{"id":"ivy","secret":"SHOULD-NOT-APPEAR"}]\n');
   runCheck("record", d.root, d.manifest);
   d.put("makers.json", "[]\n");
   const r = runCheck("check", d.root, d.manifest);
-  assert.doesNotMatch(r.out, /SHOULD-NOT-APPEAR|alina/);
-  assert.doesNotMatch(fs.readFileSync(d.manifest, "utf8"), /SHOULD-NOT-APPEAR|alina/);
+  assert.doesNotMatch(r.out, /SHOULD-NOT-APPEAR|ivy/);
+  assert.doesNotMatch(fs.readFileSync(d.manifest, "utf8"), /SHOULD-NOT-APPEAR|ivy/);
 });

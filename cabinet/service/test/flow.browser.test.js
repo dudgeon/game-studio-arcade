@@ -60,7 +60,7 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
     const logs = path.join(data, "logs");
     const [session, ...more] = readLog(path.join(logs, "studio_session.jsonl"));
     assert.equal(more.length, 0);
-    assert.equal(session.maker, "alina");
+    assert.equal(session.maker, "ivy");
     assert.equal(session.origin, "cabinet");
     assert.equal(session.outcome, "committed", JSON.stringify(session.playtest));
     assert.match(session.request, /penguin catches fish/);
@@ -71,7 +71,7 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
 
     const cartId = session.cart_id;
     const cart = JSON.parse(fs.readFileSync(path.join(data, "carts", cartId, "cart.json"), "utf8"));
-    assert.equal(cart.maker, "alina");
+    assert.equal(cart.maker, "ivy");
     assert.equal(cart.origin, "cabinet");
     const head = execFileSync("git", ["log", "-1", "--format=%H"], { cwd: path.join(data, "carts"), encoding: "utf8" }).trim();
     assert.equal(head, session.commit);
@@ -87,13 +87,13 @@ test("the whole flow: shelf to who to talk to tiles to plan to build to play to 
 
     const [check] = readLog(path.join(logs, "you_check.jsonl"));
     assert.equal(check.cart_id, cartId);
-    assert.equal(check.checker, "alina");
+    assert.equal(check.checker, "ivy");
     assert.equal(check.play_id, play.id);
     assert.deepEqual(check.answers.map((/** @type {any} */ a) => a.answer), ["yes", "no"], "two at most, none about sound (D207)");
 
     const makers = JSON.parse(fs.readFileSync(path.join(data, "makers.json"), "utf8"));
-    // Only Alina, added through the new-name slot: the service never adds makers on its own (D236).
-    assert.deepEqual(makers.map((/** @type {any} */ m) => [m.id, m.name, m.guest]), [["alina", "Alina", true]]);
+    // Only Ivy, added through the new-name slot: the service never adds makers on its own (D236).
+    assert.deepEqual(makers.map((/** @type {any} */ m) => [m.id, m.name, m.guest]), [["ivy", "Ivy", true]]);
   });
 });
 
@@ -126,7 +126,7 @@ test("a button still held from the last screen doesn't open the mic; silence and
       wait who
       press a
       wait say typing
-      type owen
+      type milo
       press enter
       wait say confirm
       press a
@@ -171,7 +171,7 @@ test("ENT held with a pink is the volume's: it doesn't type, talk or pick; ENT t
       wait who
       press a
       wait say typing
-      type owen
+      type milo
       press enter
       wait say confirm
       press a
@@ -215,7 +215,7 @@ test("ESC mid-make goes to the shelf, and the tile goes back to the same questio
       wait who
       press a
       wait say typing
-      type alina
+      type ivy
       press enter
       wait say confirm
       press a
@@ -237,7 +237,7 @@ test("ESC mid-make goes to the shelf, and the tile goes back to the same questio
       shot shelf-question-waiting
     `);
     const firstTitle = await page.evaluate(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-title-0").text);
-    assert.equal(firstTitle, "Claude is waiting for Alina", "D201's wording");
+    assert.equal(firstTitle, "Claude is waiting for Ivy", "D201's wording");
     const note = await page.evaluate(() => /** @type {any} */ (window).launcher.boxes().find((/** @type {any} */ b) => b.id === "shelf-by-0").text);
     assert.match(note, /question/);
     await page.goto(url);
@@ -266,7 +266,7 @@ test("an answer's response landing after the next question doesn't lose the ques
       wait who
       press a
       wait say typing
-      type alina
+      type ivy
       press enter
       wait say confirm
       press a
@@ -296,7 +296,7 @@ const TO_FIRST_QUESTION = `
   wait who
   press a
   wait say typing
-  type alina
+  type ivy
   press enter
   wait say confirm
   press a
@@ -732,7 +732,7 @@ test("the service restarts mid-build: told, back at the shelf, and the finished 
         await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
         assert.equal(await boxText(page, "shelf-by-0"), "Tell Claude your idea", "and Make is Make again");
         assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
-        assert.equal(await boxText(page, "shelf-by-1"), "by Alina - Penguin Catch");
+        assert.equal(await boxText(page, "shelf-by-1"), "by Ivy - Penguin Catch");
         await run(`
           press down
           press a
@@ -784,11 +784,11 @@ test("someone else's result is its own entry, and Make stays Make (D192)", { ski
       press esc
       wait S2
     `);
-    assert.equal(await boxText(page, "shelf-title-0"), "Making Alina's game", "while it's running");
+    assert.equal(await boxText(page, "shelf-title-0"), "Making Ivy's game", "while it's running");
     await page.waitForFunction(() => /** @type {any} */ (window).launcher.boxes().some((/** @type {any} */ b) => b.id === "shelf-title-1" && b.text === "New game ready!"), null, { timeout: 120_000 });
     await run("shot shelf-with-result");
     assert.equal(await boxText(page, "shelf-title-0"), "Make a new game");
-    assert.equal(await boxText(page, "shelf-by-1"), "by Alina - Penguin Catch");
+    assert.equal(await boxText(page, "shelf-by-1"), "by Ivy - Penguin Catch");
     // The next kid can just make.
     await run(`
       press a

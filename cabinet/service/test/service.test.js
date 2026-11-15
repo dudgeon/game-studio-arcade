@@ -52,7 +52,7 @@ function setup(o = {}) {
     kit: async () => ({ fileId: "file_k", hash: "h" }),
     checker: o.checker ?? passing,
     titleOf: () => "Penguin Catch",
-    nameOf: () => "Alina",
+    nameOf: () => "Ivy",
     questionTimeoutMs: o.questionTimeoutMs,
     warningMs: o.warningMs,
     ...(o.online ? { online: o.online } : {}),
@@ -75,8 +75,8 @@ function setup(o = {}) {
 }
 
 test("first names: first word, tidied, capped", () => {
-  assert.equal(firstName("alina"), "Alina");
-  assert.equal(firstName("  owen the great "), "Owen");
+  assert.equal(firstName("ivy"), "Ivy");
+  assert.equal(firstName("  milo the great "), "Milo");
   assert.equal(firstName("Zoë"), "Zoë");
   assert.equal(firstName("O'Neil-Smith"), "O'Neil-Smith");
   assert.equal(firstName("x".repeat(99))?.length, NAME_MAX);
@@ -88,20 +88,20 @@ test("makers: an open list, most recent first, never removed, same name same mak
   const file = path.join(tmp(), "makers.json");
   const m = makersStore({ file, now: () => new Date((t += 1000)) });
   assert.deepEqual(m.list(), []);
-  const a = m.add("alina");
-  const o = m.add("Owen");
+  const a = m.add("ivy");
+  const o = m.add("Milo");
   assert.equal(a?.guest, true);
-  assert.equal(m.add("ALINA")?.id, a?.id);
-  assert.deepEqual(m.list().map((x) => x.id), ["owen", "alina"]);
-  m.touch("alina");
-  assert.deepEqual(m.list().map((x) => x.id), ["alina", "owen"]);
+  assert.equal(m.add("IVY")?.id, a?.id);
+  assert.deepEqual(m.list().map((x) => x.id), ["milo", "ivy"]);
+  m.touch("ivy");
+  assert.deepEqual(m.list().map((x) => x.id), ["ivy", "milo"]);
   assert.equal(m.add("!!!"), null);
   const raw = JSON.parse(fs.readFileSync(file, "utf8"));
   raw[1].hidden = true;
   fs.writeFileSync(file, JSON.stringify(raw));
-  assert.deepEqual(m.list().map((x) => x.id), ["alina"]);
+  assert.deepEqual(m.list().map((x) => x.id), ["ivy"]);
   assert.equal(m.read().length, 2, "hidden isn't gone");
-  assert.equal(m.get(o?.id ?? "")?.name, "Owen");
+  assert.equal(m.get(o?.id ?? "")?.name, "Milo");
 });
 
 test("speech stub: text in, transcript out only while held; silence when empty", async () => {
@@ -134,8 +134,8 @@ test("speech stub: a WAV needs to be one, with a transcript beside it", async ()
 
 test("the recorded session relays through the service, commits and logs", async () => {
   const { studio, until, paths, made } = setup();
-  studio.start({ maker: "alina", request: "a penguin game" });
-  assert.throws(() => studio.start({ maker: "alina", request: "another" }), /already/);
+  studio.start({ maker: "ivy", request: "a penguin game" });
+  assert.throws(() => studio.start({ maker: "ivy", request: "another" }), /already/);
   const seen = [];
   for (const [choice, said] of [["A"], ["B"], ["C", "slides like on ice"]]) {
     const s = await until((x) => x.pending?.kind === "question");
@@ -155,7 +155,7 @@ test("the recorded session relays through the service, commits and logs", async 
   studio.answer({ id: p.pending.id, choice: "build" });
   const done = await until((x) => x.results?.length);
   assert.equal(done.results[0].ok, true);
-  assert.equal(done.results[0].maker_name, "Alina");
+  assert.equal(done.results[0].maker_name, "Ivy");
   assert.equal(done.results[0].title, "Penguin Catch");
   assert.ok(lines.includes("Getting my tools out"));
   assert.ok(!lines.includes("All done! Your penguin game is ready to play"), "the result screen says it, after the checks (D198)");
@@ -164,7 +164,7 @@ test("the recorded session relays through the service, commits and logs", async 
 
   const log = readLog(path.join(paths.logs, "studio_session.jsonl"));
   assert.equal(log.length, 1);
-  assert.equal(log[0].maker, "alina");
+  assert.equal(log[0].maker, "ivy");
   assert.equal(log[0].origin, "cabinet");
   assert.equal(log[0].outcome, "committed");
   assert.equal(log[0].brief, "applied-agent");
@@ -179,7 +179,7 @@ test("the recorded session relays through the service, commits and logs", async 
 
 test("make it now: D ends the questions, the later ones answered for the kid", async () => {
   const { studio, until, paths } = setup();
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const s = await until((x) => x.pending?.kind === "question");
   studio.answer({ id: s.pending.id, choice: "D" });
   const p = await until((x) => x.pending?.kind === "plan");
@@ -192,7 +192,7 @@ test("make it now: D ends the questions, the later ones answered for the kid", a
 test("a stale applied brief stops before anything starts, in kid words on screen and details in the log (D173)", async () => {
   const stale = replayApi({ dir: FIXTURE, appliedAgent: { version: 1, system: "an old brief", tools: [] } });
   const { studio, until, paths } = setup({ replay: stale });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const done = await until((x) => x.results?.length);
   assert.equal(done.results[0].ok, false);
   assert.match(done.results[0].message, /isn't ready/);
@@ -206,7 +206,7 @@ test("a stale applied brief stops before anything starts, in kid words on screen
 
 test("failed checks: nothing on the shelf, the kid told plainly, everything logged", async () => {
   const { studio, until, paths } = setup({ checker: failing });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   for (let i = 0; i < 3; i++) {
     const s = await until((x) => x.pending?.kind === "question");
     studio.answer({ id: s.pending.id, choice: "A" });
@@ -226,7 +226,7 @@ test("no network: logged with the request and turns, and the error isn't on scre
       throw new Error("connect ECONNREFUSED 1.2.3.4");
     },
   });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const done = await until((x) => x.results?.length);
   assert.doesNotMatch(done.results[0].message, /ECONNREFUSED/);
   const [rec] = readLog(path.join(paths.logs, "studio_session.jsonl"));
@@ -238,7 +238,7 @@ test("no network: logged with the request and turns, and the error isn't on scre
 test("a question nobody answers: a warning, then released, archived and logged; Make is free (D188)", async () => {
   const replay = replayApi({ dir: FIXTURE });
   const { studio, until, paths } = setup({ replay, questionTimeoutMs: 120, warningMs: 60 });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const first = await until((x) => x.pending?.kind === "question");
   studio.answer({ id: first.pending.id, choice: "A" });
   const q = await until((x) => x.pending?.question === "How should the game get harder?");
@@ -249,7 +249,7 @@ test("a question nobody answers: a warning, then released, archived and logged; 
   assert.match(gone.notice.message, /away for a while/);
   assert.equal(fs.existsSync(path.join(paths.root, "studio-run.json")), false, "the journal has gone");
   // Make is free straight away, even before the API calls finish.
-  studio.start({ maker: "alina", request: "another" });
+  studio.start({ maker: "ivy", request: "another" });
   assert.equal(studio.state().phase, "running");
   assert.equal(studio.state().notice, undefined);
   await eventually(() => logged(paths).some((r) => r.outcome === "abandoned"), "the walked-away session is logged");
@@ -271,7 +271,7 @@ test("a key pressed resets the clock and clears the warning (D188)", async (t) =
   // between two lines here.
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const pass = (/** @type {number} */ ms) => t.mock.timers.tick(ms);
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   await until((x) => x.pending?.kind === "question");
   pass(99);
   assert.equal(studio.state().pending.warn, false, "not yet");
@@ -294,14 +294,14 @@ test("the kid chooses to stop: released, the idea kept for Make, and stop needs 
   const replay = replayApi({ dir: FIXTURE });
   const { studio, until, paths } = setup({ replay });
   assert.throws(() => studio.stop(), /nothing is waiting/);
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   await until((x) => x.pending?.kind === "question");
   studio.stop();
   const s = /** @type {any} */ (studio.state());
   assert.equal(s.phase, "idle");
   assert.equal(s.notice.kind, "stopped");
   assert.equal(s.notice.short, "Your idea is saved");
-  assert.deepEqual(s.notice.retry, { maker: "alina", request: "a penguin game", kind: "new", parent: null });
+  assert.deepEqual(s.notice.retry, { maker: "ivy", request: "a penguin game", kind: "new", parent: null });
   await eventually(() => logged(paths).length > 0, "the stopped session is logged");
   const [rec] = logged(paths);
   assert.equal(rec.outcome, "abandoned");
@@ -311,7 +311,7 @@ test("the kid chooses to stop: released, the idea kept for Make, and stop needs 
 test("an archive that's refused interrupts and tries again; one that fails is logged and Make stays free (D188)", async () => {
   const once = replayApi({ dir: FIXTURE, archiveRefusals: 1 });
   const a = setup({ replay: once });
-  a.studio.start({ maker: "alina", request: "x" });
+  a.studio.start({ maker: "ivy", request: "x" });
   await a.until((x) => x.pending?.kind === "question");
   a.studio.stop();
   await eventually(() => logged(a.paths).length > 0, "logged once the second try archives");
@@ -320,7 +320,7 @@ test("an archive that's refused interrupts and tries again; one that fails is lo
 
   const never = replayApi({ dir: FIXTURE, archiveRefusals: 9 });
   const b = setup({ replay: never });
-  b.studio.start({ maker: "alina", request: "x" });
+  b.studio.start({ maker: "ivy", request: "x" });
   await b.until((x) => x.pending?.kind === "question");
   b.studio.stop();
   assert.equal(b.studio.state().phase, "idle");
@@ -333,7 +333,7 @@ test("an archive that's refused interrupts and tries again; one that fails is lo
 /** @param {any} paths @param {any} journal */
 const leaveJournal = (paths, journal) => {
   fs.mkdirSync(paths.root, { recursive: true });
-  fs.writeFileSync(path.join(paths.root, "studio-run.json"), JSON.stringify({ session_id: "sesn_replay", maker: "alina", maker_name: "Alina", request: "a penguin game", turns: [], answered: 0, waiting: false, started_at: "2026-11-08T20:00:00Z", ...journal }));
+  fs.writeFileSync(path.join(paths.root, "studio-run.json"), JSON.stringify({ session_id: "sesn_replay", maker: "ivy", maker_name: "Ivy", request: "a penguin game", turns: [], answered: 0, waiting: false, started_at: "2026-11-08T20:00:00Z", ...journal }));
 };
 /** @param {any} paths @param {any} api @param {any} [extra] */
 const reboot = (paths, api, extra = {}) =>
@@ -341,7 +341,7 @@ const reboot = (paths, api, extra = {}) =>
 
 test("a restart mid-question: logged, told, archived, since nobody can answer it (D189, D191)", async () => {
   const a = setup();
-  a.studio.start({ maker: "alina", request: "a penguin game" });
+  a.studio.start({ maker: "ivy", request: "a penguin game" });
   const q = await a.until((x) => x.pending?.kind === "question");
   a.studio.answer({ id: q.pending.id, choice: "B" });
   await a.until((x) => x.pending?.question === "How should the game get harder?");
@@ -388,7 +388,7 @@ test("a restart mid-build: the session is picked up, its cart collected and on t
 
   const r = b.state().results[0];
   assert.equal(r.ok, true);
-  assert.equal(r.maker_name, "Alina");
+  assert.equal(r.maker_name, "Ivy");
   assert.equal(r.note, "It finished while the cabinet was restarting.");
   assert.equal(b.state().phase, "idle");
 
@@ -430,10 +430,10 @@ test("while a restarted make is being collected, Make is busy; the journal says 
     { log: (/** @type {string} */ l) => lines.push(l) },
   );
   assert.equal(b.state().collecting, true);
-  assert.throws(() => b.start({ maker: "alina", request: "another game" }), /still being finished/);
+  assert.throws(() => b.start({ maker: "ivy", request: "another game" }), /still being finished/);
   const collected = b.collectLeft();
   assert.equal(b.state().collecting, true, "still busy while it's attached");
-  assert.throws(() => b.start({ maker: "alina", request: "another game" }), StudioBusy);
+  assert.throws(() => b.start({ maker: "ivy", request: "another game" }), StudioBusy);
   release();
   await collected;
   assert.equal(b.state().collecting, undefined);
@@ -442,7 +442,7 @@ test("while a restarted make is being collected, Make is busy; the journal says 
   assert.match(lines[1], /re-attaching to session sesn_replay/);
   assert.match(lines[2], /collected session sesn_replay: committed \(penguin-catch\); archive ok/);
   // And Make is Make again.
-  b.start({ maker: "alina", request: "another game" });
+  b.start({ maker: "ivy", request: "another game" });
   assert.equal(b.state().phase, "running");
 });
 
@@ -456,7 +456,7 @@ test("busy stays while an attach waits to retry, and a restart before a session 
   }, { recheckMs: 3_600_000, log: (/** @type {string} */ l) => lines.push(l) });
   await b.collectLeft();
   assert.equal(b.state().collecting, true, "nothing collected, so still busy");
-  assert.throws(() => b.start({ maker: "alina", request: "x" }), StudioBusy);
+  assert.throws(() => b.start({ maker: "ivy", request: "x" }), StudioBusy);
 
   const none = dataPaths(tmp());
   leaveJournal(none, { session_id: null });
@@ -527,7 +527,7 @@ test("a session the API no longer has is logged and dropped (D191)", async () =>
 
 test("how a make ended is an entry: Make is free, and it stays until viewed, across a restart (D192)", async () => {
   const { studio, until, paths } = setup();
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   const s = await until((x) => x.pending?.kind === "question");
   studio.answer({ id: s.pending.id, choice: "D" });
   const p = await until((x) => x.pending?.kind === "plan");
@@ -535,7 +535,7 @@ test("how a make ended is an entry: Make is free, and it stays until viewed, acr
   const done = await until((x) => x.results?.length);
   const r = done.results[0];
   assert.equal(done.phase, "idle");
-  assert.equal(r.maker, "alina");
+  assert.equal(r.maker, "ivy");
   assert.equal(typeof r.run_id, "number");
   const after = reboot(paths, async () => replayApi({ dir: FIXTURE }).api);
   assert.equal(after.state().results[0].id, r.id, "still there after a restart");
@@ -549,7 +549,7 @@ test("how a make ended is an entry: Make is free, and it stays until viewed, acr
 test("a make that ends normally leaves no journal (D189)", async () => {
   const { studio, until, paths } = setup();
   const journal = path.join(paths.root, "studio-run.json");
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   assert.ok(fs.existsSync(journal));
   const s = await until((x) => x.pending?.kind === "question");
   studio.answer({ id: s.pending.id, choice: "D" });
@@ -569,7 +569,7 @@ test("budget reached and a refusal get their own words", () => {
 test("a session that dies mid-stream ends cleanly", async () => {
   const script = stepsFrom([{ type: "user.message" }, { id: "i", type: "session.status_terminated" }]);
   const { studio, until } = setup({ replay: replayApi({ script, outputs: {} }) });
-  studio.start({ maker: "alina", request: "x" });
+  studio.start({ maker: "ivy", request: "x" });
   const done = await until((x) => x.results?.length);
   assert.equal(done.results[0].ok, false);
 });
@@ -684,11 +684,11 @@ test("the server: routes, origin guard, bad input", async () => {
     assert.deepEqual((await (await fetch(`${s.url}/api/config`)).json()).speech, "stub");
     assert.deepEqual(await (await fetch(`${s.url}/api/carts`)).json().then((b) => b.carts), [], "the player's handler is mounted");
     assert.equal((await post("/api/makers", { name: "!!!" })).status, 400);
-    assert.equal((await post("/api/makers", { name: "alina" }, { Origin: "http://evil.example" })).status, 403);
-    assert.equal((await post("/api/makers", { name: "alina" }, { Origin: "null" })).status, 403);
-    assert.equal((await (await post("/api/makers", { name: "alina" })).json()).maker.id, "alina");
+    assert.equal((await post("/api/makers", { name: "ivy" }, { Origin: "http://evil.example" })).status, 403);
+    assert.equal((await post("/api/makers", { name: "ivy" }, { Origin: "null" })).status, 403);
+    assert.equal((await (await post("/api/makers", { name: "ivy" })).json()).maker.id, "ivy");
     assert.equal((await post("/api/studio/start", { maker: "nobody", request: "x" })).status, 400);
-    assert.equal((await post("/api/studio/start", { maker: "alina", request: "  " })).status, 400);
+    assert.equal((await post("/api/studio/start", { maker: "ivy", request: "  " })).status, 400);
     assert.equal((await post("/api/studio/answer", { id: 1, choice: "A" })).status, 409);
     assert.equal((await post("/api/speech/feed", { text: "hi" })).status, 200);
     await post("/api/speech/start");
@@ -774,13 +774,13 @@ test("no length cutoff (D470): an hour's idea is taken whole", async () => {
   /** @param {string} u @param {any} [body] */
   const post = (u, body = {}) => fetch(s.url + u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   try {
-    await post("/api/makers", { name: "alina" });
+    await post("/api/makers", { name: "ivy" });
     // About what an hour of talking makes: 9,000 words, 60,000 characters. The old limits refused a tenth of it.
     const long = Array.from({ length: 9000 }, (_, i) => `word${i % 100}`).join(" ");
     assert.equal((await post("/api/speech/feed", { text: long })).status, 200);
     await post("/api/speech/start");
     assert.equal((await (await post("/api/speech/stop")).json()).text, long);
-    const r = await post("/api/studio/start", { maker: "alina", request: long });
+    const r = await post("/api/studio/start", { maker: "ivy", request: long });
     assert.equal(r.status, 200, await r.text());
     assert.equal(started[0], long, "every word reached the Studio");
   } finally {

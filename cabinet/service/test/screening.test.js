@@ -51,7 +51,7 @@ test("with the model, the whole table comes out right, and every check is logged
   const logs = tmp();
   const s = createScreener({ logsDir: logs, model: tableModel });
   for (const row of TABLE) {
-    const r = await s.check({ text: row.text, kind: row.kind, maker: "owen" });
+    const r = await s.check({ text: row.text, kind: row.kind, maker: "milo" });
     assert.equal(r.ok, row.expect === "pass", row.text);
     if (!r.ok) {
       assert.ok(r.alternative.length > 10);
@@ -60,7 +60,7 @@ test("with the model, the whole table comes out right, and every check is logged
   }
   const log = readLog(path.join(logs, "screening.jsonl"));
   assert.equal(log.length, TABLE.length);
-  assert.ok(log.every((l) => l.by === "model" && typeof l.cost_usd === "number" && l.maker === "owen" && typeof l.said === "string"));
+  assert.ok(log.every((l) => l.by === "model" && typeof l.cost_usd === "number" && l.maker === "milo" && typeof l.said === "string"));
   assert.equal(log.filter((l) => l.outcome === "redirected").length, TABLE.filter((r) => r.expect === "redirect").length);
   assert.ok(log.filter((l) => l.outcome === "redirected").every((l) => l.alternative));
 });
@@ -155,7 +155,7 @@ function fakeStudio() {
     calls,
     setPending: (/** @type {any} */ p) => (pending = p),
     studio: /** @type {any} */ ({
-      state: () => ({ phase: pending ? "running" : "idle", maker: "owen", pending }),
+      state: () => ({ phase: pending ? "running" : "idle", maker: "milo", pending }),
       subscribe: () => () => {},
       start: (/** @type {any} */ a) => calls.start.push(a),
       answer: (/** @type {any} */ a) => calls.answer.push(a),
@@ -168,20 +168,20 @@ test("the service: a redirected idea starts no session; the alternative, picked,
   const f = fakeStudio();
   f.setPending(null);
   const makers = makersStore({ file: path.join(data, "makers.json") });
-  makers.add("Owen");
+  makers.add("Milo");
   const screen = createScreener({ logsDir: path.join(data, "logs"), model: tableModel });
   const s = await startService({ studio: f.studio, makers, speech: stubSpeech(), libraryDir: path.join(data, "carts"), logsDir: path.join(data, "logs"), port: 0, screen });
   const post = (/** @type {string} */ u, /** @type {any} */ body) => fetch(s.url + u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
   try {
-    const bad = await post("/api/studio/start", { maker: "owen", request: TABLE[12].text });
+    const bad = await post("/api/studio/start", { maker: "milo", request: TABLE[12].text });
     assert.equal(bad.status, 200);
     assert.deepEqual([bad.body.ok, bad.body.why], [false, "redirect"]);
     assert.ok(bad.body.redirect.alternative);
     assert.equal(f.calls.start.length, 0, "no session, so no coins");
-    const took = await post("/api/studio/start", { maker: "owen", request: bad.body.redirect.alternative, offered: true });
+    const took = await post("/api/studio/start", { maker: "milo", request: bad.body.redirect.alternative, offered: true });
     assert.equal(took.body.ok, true);
     assert.equal(f.calls.start.length, 1);
-    const fine = await post("/api/studio/start", { maker: "owen", request: "a zombie shooter where you blast zombies with a laser gun" });
+    const fine = await post("/api/studio/start", { maker: "milo", request: "a zombie shooter where you blast zombies with a laser gun" });
     assert.equal(fine.body.ok, true, "game violence goes straight through");
 
     f.setPending({ id: 7, kind: "question", question: "What does the shark say?" });

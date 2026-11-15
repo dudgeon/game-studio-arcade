@@ -84,10 +84,10 @@ test("new_cart from a template, validate_cart and playtest pass on it, play serv
   const s = createStudioServer({ open: (u) => opened.push(u) });
   const call = caller(s);
   const dir = path.join(tmp(), "snow-dodge");
-  const made = await call("new_cart", { dir, from: "dodge", title: "Snow Dodge", maker: "owen", with: "geoff" });
+  const made = await call("new_cart", { dir, from: "dodge", title: "Snow Dodge", maker: "milo", with: "geoff" });
   assert.equal(made.isError, false, made.content[0].text);
   const cart = JSON.parse(fs.readFileSync(path.join(dir, "cart.json"), "utf8"));
-  assert.deepEqual([cart.id, cart.title, cart.maker, cart.with, cart.parent], ["snow-dodge", "Snow Dodge", "owen", "geoff", null]);
+  assert.deepEqual([cart.id, cart.title, cart.maker, cart.with, cart.parent], ["snow-dodge", "Snow Dodge", "milo", "geoff", null]);
   assert.match(fs.readFileSync(path.join(dir, "spec.md"), "utf8"), /^# Snow Dodge$/m);
   assert.equal((await call("new_cart", { dir, from: "dodge" })).isError, true, "not over a cart");
   assert.equal((await call("new_cart", { dir: path.join(tmp(), "x"), from: "tetris" })).isError, true);
@@ -117,7 +117,7 @@ test("new_cart from a pulled folder keeps its parent; validate reports a broken 
   fs.cpSync(FIXTURE, pulled, { recursive: true });
   fs.writeFileSync(path.join(pulled, PULLED), JSON.stringify({ id: "penguin-catch", version: 3 }));
   const dir = path.join(tmp(), "mine");
-  await call("new_cart", { dir, from: pulled, maker: "owen" });
+  await call("new_cart", { dir, from: pulled, maker: "milo" });
   const cart = JSON.parse(fs.readFileSync(path.join(dir, "cart.json"), "utf8"));
   assert.equal(cart.parent, "penguin-catch@3");
   assert.equal(cart.title, "Penguin Catch");
@@ -173,13 +173,13 @@ test("import_asset: a picture into a cart's assets, a NOTICE line, and rows to p
   await call("new_cart", { dir, from: "blank" });
   const pic = path.join(tmp(), "Happy Star.png");
   fs.writeFileSync(pic, rgbaPng(20, 20, (x, y) => (Math.abs(x - 10) + Math.abs(y - 10) < 9 ? [250, 220, 40, 255] : [0, 0, 0, 0])));
-  const r = await call("import_asset", { file: pic, cart: dir, size: 10, source: "drawn by Owen" });
+  const r = await call("import_asset", { file: pic, cart: dir, size: 10, source: "drawn by Milo" });
   assert.equal(r.isError, false, r.content[0].text);
   const out = r.structuredContent;
   assert.equal(out.name, "HAPPY_STAR");
   assert.deepEqual([out.width, out.height], [10, 10]);
   assert.match(out.code, /const HAPPY_STAR_ROWS = \[/);
-  assert.match(fs.readFileSync(path.join(dir, "NOTICE.md"), "utf8"), /assets\/happy-star\.png \(from Happy Star\.png\): drawn by Owen/);
+  assert.match(fs.readFileSync(path.join(dir, "NOTICE.md"), "utf8"), /assets\/happy-star\.png \(from Happy Star\.png\): drawn by Milo/);
   const saved = JSON.parse(fs.readFileSync(path.join(dir, "assets/happy-star.sprite.json"), "utf8"));
   assert.equal(saved.rows.length, 10);
   assert.equal((await call("import_asset", { file: pic, cart: dir, size: 999 })).isError, true);
@@ -200,10 +200,10 @@ test("import_asset: a picture into a cart's assets, a NOTICE line, and rows to p
 async function localCabinet() {
   const paths = dataPaths(tmp("gsa-cab-"));
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("Alina");
-  makers.add("Owen");
+  makers.add("Ivy");
+  makers.add("Milo");
   makers.ensureGrownUp("Geoff");
-  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "alina" }, message: "make {id}" });
+  commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...JSON.parse(fs.readFileSync(path.join(FIXTURE, "cart.json"), "utf8")), maker: "ivy" }, message: "make {id}" });
   const launches = launchRelay();
   const mcp = createArcadeMcp({ paths, makers, checker: passing, launches });
   const studio = { state: () => ({ phase: "idle" }), subscribe: () => () => {} };
@@ -225,7 +225,7 @@ test("bridge: pull into a folder, change it, publish the folder as a change; ref
     assert.match((await call("get_cart", { id: "penguin-catch", into: dir })).content[0].text, /isn't empty/);
     fs.appendFileSync(path.join(dir, "spec.md"), "\n- v2: the penguin is faster\n");
     fs.writeFileSync(path.join(dir, "README.md"), "not part of a cart");
-    const pub = await call("publish_cart", { dir, maker: "alina", with: "geoff", summary: "Alina made the penguin faster with Geoff." });
+    const pub = await call("publish_cart", { dir, maker: "ivy", with: "geoff", summary: "Ivy made the penguin faster with Geoff." });
     assert.equal(pub.isError, false, pub.content[0].text);
     assert.equal(pub.structuredContent.cart_id, "penguin-catch-v2");
     assert.equal(pub.structuredContent.parent_from_folder, true);

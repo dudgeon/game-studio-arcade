@@ -1,7 +1,7 @@
 {
   "makers": [
-    "Owen",
-    "Alina"
+    "Milo",
+    "Ivy"
   ],
   "state": "seen",
   "ledger": [
@@ -10,7 +10,7 @@
     },
     {
       "kind": "charge",
-      "who": "owen",
+      "who": "milo",
       "cost_cents": 930
     }
   ]

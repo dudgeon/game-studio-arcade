@@ -33,7 +33,7 @@ test("agent frontmatter: name, default model, web tools off, custom tools insert
 test("system prompt covers the kid brief, D-meaning, spec-first and outputs", () => {
   const { body } = frontmatter(read("agents/studio.md"));
   for (const needle of [
-    "aged 10 and 13",
+    "two kids at home",
     "Claude, an AI",
     "inspired by, never copies",
     "D means stop asking",

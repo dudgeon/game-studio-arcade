@@ -156,9 +156,9 @@ press a
 wait R6
 press a
 wait R8
-shot R8-owens-own-version
+shot R8-milos-own-version
 press down
 press a
 wait S1
 press down
-shot R9-shelf-with-owens-version
+shot R9-shelf-with-milos-version

@@ -293,7 +293,7 @@ test("a make a restart cut off is one row, with its final outcome and a restart 
 
 test("a desktop publish is its own kind of row: origin desktop, no coins, its gate (D343, D345)", () => {
   const a = activity({
-    studio_session: [{ id: "desk_1", origin: "desktop", maker: "alina", with: "geoff", request: "Faster fish.", summary: "Faster fish.", kind: "change", parent: "penguin-catch@1", turns: [], ended_by: "published", list_cost: null, outcome: "committed", cart_id: "penguin-catch-v2", cart_version: 2, started_at: "2026-11-13T20:00:00Z", playtest: { local: { ok: true, gate: { ok: true, seconds: 6.1, failing: [] } } } }],
+    studio_session: [{ id: "desk_1", origin: "desktop", maker: "ivy", with: "geoff", request: "Faster fish.", summary: "Faster fish.", kind: "change", parent: "penguin-catch@1", turns: [], ended_by: "published", list_cost: null, outcome: "committed", cart_id: "penguin-catch-v2", cart_version: 2, started_at: "2026-11-13T20:00:00Z", playtest: { local: { ok: true, gate: { ok: true, seconds: 6.1, failing: [] } } } }],
   });
   const m = a.makes[0];
   assert.deepEqual([m.origin, m.kind, m.cents, m.coins, m.charged, m.said, m.answers.length], ["desktop", "change", null, null, false, "Faster fish.", 0]);
@@ -380,7 +380,7 @@ test("Games: the list, Remove from shelf and Put back, hiding a maker, all asked
   cab.service = async (method, p, body) => {
     calls.push({ method, p, body });
     if (p === "/api/manager/games") return { status: 200, body: { games: [{ id: "rock-rain", on_shelf: true }], history: [] } };
-    if (p === "/api/manager/makers") return { status: 200, body: { makers: [{ id: "owen", on_list: true }] } };
+    if (p === "/api/manager/makers") return { status: 200, body: { makers: [{ id: "milo", on_list: true }] } };
     if (p === "/api/manager/games/remove" && body.id === "nope") return { status: 404, body: { ok: false, error: 'no game "nope" on this cabinet' } };
     return { status: 200, body: { ok: true, changed: true } };
   };
@@ -390,15 +390,15 @@ test("Games: the list, Remove from shelf and Put back, hiding a maker, all asked
     assert.equal(games.games[0].id, "rock-rain");
     assert.equal((await post(base, cookie, "/api/c/virtual/games/remove", { id: "rock-rain", reason: "test game" })).status, 200);
     assert.equal((await post(base, cookie, "/api/c/virtual/games/restore", { id: "rock-rain" })).status, 200);
-    assert.equal((await post(base, cookie, "/api/c/virtual/makers/hide", { id: "owen" })).status, 200);
-    assert.equal((await post(base, cookie, "/api/c/virtual/makers/show", { id: "owen" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/makers/hide", { id: "milo" })).status, 200);
+    assert.equal((await post(base, cookie, "/api/c/virtual/makers/show", { id: "milo" })).status, 200);
     assert.equal((await post(base, cookie, "/api/c/virtual/games/remove", { id: "../x" })).status, 400);
     const missing = await post(base, cookie, "/api/c/virtual/games/remove", { id: "nope" });
     assert.equal(missing.status, 404);
     // Without the Manager's own header, nothing is asked of the cabinet.
     assert.equal((await fetch(`${base}/api/c/virtual/games/remove`, { method: "POST", headers: { Cookie: cookie }, body: JSON.stringify({ id: "rock-rain" }) })).status, 403);
     const posts = calls.filter((c) => c.method === "POST");
-    assert.deepEqual(posts.map((c) => [c.p, c.body.id]), [["/api/manager/games/remove", "rock-rain"], ["/api/manager/games/restore", "rock-rain"], ["/api/manager/makers/hide", "owen"], ["/api/manager/makers/show", "owen"], ["/api/manager/games/remove", "nope"]]);
+    assert.deepEqual(posts.map((c) => [c.p, c.body.id]), [["/api/manager/games/remove", "rock-rain"], ["/api/manager/games/restore", "rock-rain"], ["/api/manager/makers/hide", "milo"], ["/api/manager/makers/show", "milo"], ["/api/manager/games/remove", "nope"]]);
     assert.equal(posts[0].body.reason, "test game");
     assert.match(posts[0].body.by, /in the Manager$/);
   });

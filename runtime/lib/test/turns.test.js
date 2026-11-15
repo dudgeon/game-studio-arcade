@@ -130,7 +130,7 @@ test("drawPass draws only while passing, on the real console", async () => {
     },
     draw(g, s) {
       g.cls(0);
-      s.drew = g.lib.turns.drawPass(g, s.tu, { names: ["Alina", "Owen"] });
+      s.drew = g.lib.turns.drawPass(g, s.tu, { names: ["Ivy", "Milo"] });
     },
     probe: (g, s) => ({ ...s.tu, drew: s.drew, players: g.players }),
   };

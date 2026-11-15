@@ -415,7 +415,7 @@
      ]
     },
     {
-     "text": "Anyone can change any game. When Alina changes hers, it becomes the next version, and the old one is kept.",
+     "text": "Anyone can change any game. When Ivy changes hers, it becomes the next version, and the old one is kept.",
      "cues": [
       {
        "on": "next version",
@@ -436,7 +436,7 @@
      ]
     },
     {
-     "text": "When Owen changes it, he gets his own version, and Alina's stays the same.",
+     "text": "When Milo changes it, he gets his own version, and Ivy's stays the same.",
      "cues": [
       {
        "on": "own version",
@@ -508,7 +508,7 @@
      ]
     },
     {
-     "text": "All four hold the same games: Alina's penguin game on version three, and Owen's version built on it.",
+     "text": "All four hold the same games: Ivy's penguin game on version three, and Milo's version built on it.",
      "cues": [
       {
        "on": "same games",
@@ -536,7 +536,7 @@
      "recommended": true,
      "lines": [
       {
-       "text": "Family rows. The newest is one press to play, and Owen's version sits under Alina's. Remixes make the shelf longer.",
+       "text": "Family rows. The newest is one press to play, and Milo's version sits under Ivy's. Remixes make the shelf longer.",
        "cues": [
         {
          "at": 0,

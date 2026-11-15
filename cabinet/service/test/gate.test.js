@@ -275,7 +275,7 @@ async function makeIt(studio) {
         }
       });
     });
-  studio.start({ maker: "alina", request: "a penguin game" });
+  studio.start({ maker: "ivy", request: "a penguin game" });
   for (;;) {
     const s = /** @type {any} */ (await until((x) => x.pending || x.results?.length));
     if (s.results?.length) return s.results[0];
@@ -288,7 +288,7 @@ function gatedStudio(dir) {
   const paths = dataPaths(tmp());
   const pot = potStore({ logsDir: paths.logs });
   const gate = createGate({ settings: realSettings(), playing: () => false, logsDir: paths.logs });
-  const studio = createStudio({ paths, api: async () => replayApi({ dir, usage: usageOf(dir, 40) }).api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "f", hash: "h" }), checker: gatedChecker(defaultChecker(), gate), titleOf: () => "Penguin Catch", nameOf: () => "Alina", pot });
+  const studio = createStudio({ paths, api: async () => replayApi({ dir, usage: usageOf(dir, 40) }).api, lock: () => REPLAY_LOCK, kit: async () => ({ fileId: "f", hash: "h" }), checker: gatedChecker(defaultChecker(), gate), titleOf: () => "Penguin Catch", nameOf: () => "Ivy", pot });
   return { paths, studio, pot };
 }
 

@@ -19,9 +19,9 @@ async function cabinet() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-coin-"));
   const paths = dataPaths(root);
   const pot = potStore({ logsDir: paths.logs });
-  pot.charge({ maker: "alina", what: "new", session_id: "s1", cost_cents: 54, outcome: "on the shelf" });
+  pot.charge({ maker: "ivy", what: "new", session_id: "s1", cost_cents: 54, outcome: "on the shelf" });
   const makers = makersStore({ file: path.join(root, "makers.json") });
-  makers.add("alina");
+  makers.add("ivy");
   const studio = createStudio({ paths, api: async () => { throw new Error("no API here"); }, lock: () => ({ agentId: "a", environmentId: "e" }), kit: async () => ({ fileId: "", hash: "" }), checker: /** @type {any} */ ({}), pot });
   // The token as the cabinet reads it: from its file, on each request.
   const cabinetFile = path.join(root, "manager-token");
@@ -40,12 +40,12 @@ test("coin: show, add with a reason the kids see, the $15 warning, reset (D205, 
   try {
     assert.equal(await c.run(["show"]), 0);
     assert.match(c.out.join("\n"), /Pot: 95 coins \(\$9\.46\) of 100/);
-    assert.match(c.out.join("\n"), /Alina: 5 coins/);
+    assert.match(c.out.join("\n"), /Ivy: 5 coins/);
 
-    assert.equal(await c.run(["add", "20", "Owen", "helped", "clean", "the", "basement", "--by", "Geoff"]), 0);
-    assert.match(c.out.at(-1) ?? "", /Added 20 coins \(\$2\.00\): "Owen helped clean the basement"\. The pot now has 115 coins/);
+    assert.equal(await c.run(["add", "20", "Milo", "helped", "clean", "the", "basement", "--by", "Geoff"]), 0);
+    assert.match(c.out.at(-1) ?? "", /Added 20 coins \(\$2\.00\): "Milo helped clean the basement"\. The pot now has 115 coins/);
     const history = await (await fetch(`${c.url}/api/pot`)).json();
-    assert.equal(history.history[0].reason, "Owen helped clean the basement", "the launcher's coin history (A2) has the reason");
+    assert.equal(history.history[0].reason, "Milo helped clean the basement", "the launcher's coin history (A2) has the reason");
     assert.equal(history.history[0].by, "Geoff");
 
     // $0.54 spent + $11.46 in the pot + $4 = $16: past $15, so it stops and asks.

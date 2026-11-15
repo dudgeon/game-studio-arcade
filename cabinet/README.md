@@ -83,7 +83,7 @@ Until the Cabinet Manager exists, a grown-up does it from the mini (D215). The r
 ```sh
 node scripts/coin.mjs pair                      # once: the cabinet makes its Manager token, and a copy is kept in ~/.config/game-studio-arcade/
 node scripts/coin.mjs show                      # the pot, this month's makers, the latest entries
-node scripts/coin.mjs add 20 "Owen helped clean the basement"
+node scripts/coin.mjs add 20 "Milo helped clean the basement"
 node scripts/coin.mjs reset "Fresh start after the fix"
 ```
 

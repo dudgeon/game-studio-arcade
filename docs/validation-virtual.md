@@ -33,7 +33,7 @@ Geoff's goal (docs/validation-direction.md): one complete game generation, start
 2. **The request, by voice.**
    - The coin check said "A new game uses about 6 coins … The family pot has 84 coins". Pressing A did nothing there; COIN started it.
    - "Tell me your game idea" opened with "Hi! I'm Claude, an AI." Holding A while the clip played went to listening, then "Is this right? I heard:" with the transcript, and stick right showed it all.
-   - The transcript: "Can you make tetris buttway cuter? … he gets really happy when 20 when you clear lines … and can oh and play too, but not on my side." "Owen" came through as "oh and", and "but way" as "buttway".
+   - The transcript: "Can you make tetris buttway cuter? … he gets really happy when 20 when you clear lines … and can oh and play too, but not on my side." "Milo" came through as "oh and", and "but way" as "buttway".
    - Screening passed it (the Manager shows "pass").
 3. **Claude's questions (3).**
    - "Two players: how should they play?" → **A**, take turns.
@@ -80,13 +80,13 @@ All three were archived at Anthropic after they finished (D301; each has its "th
   - Candy blocks in seven colours with a shine.
   - A cat on a cushion who is calm, cries when the stack gets high, and grins with sparkles on the title.
   - A next-piece box, levels, score and best, and a title screen that says how to play.
-  - It turned "can Owen play too" into a 1-or-2-players choice that takes turns.
+  - It turned "can Milo play too" into a 1-or-2-players choice that takes turns.
   - The controls on the title match what the game does: left/right move, A/B turn, up hard-drops, down speeds up.
   - It looks like a polished small game, not a test.
 - **What I couldn't judge, honestly:**
   - I didn't clear a single line, so I never saw a line go POP with sparkles or the cat's happy dance, and every score was 0.
   - The reason is me, not the game. Each look-then-decide turn of mine takes 20 to 30 seconds. A piece falls to the stack in about 10, so it lands before I've decided. Scripted placements (left wall, right wall, centre, with turns) stack without clearing.
-  - Whether it's fun to play needs a person at the controls. That's for Alina, or Geoff, on the cabinet.
+  - Whether it's fun to play needs a person at the controls. That's for Ivy, or Geoff, on the cabinet.
 - **Correction (D303): the left-tap fault isn't real.** I first noted that a single short left tap often didn't move the piece. Measured afterwards, every tap lands: locally with real key events (72 of 72) and on the cabinet through `drive` (each tap one cell, already moved 150 ms later). The one probe that looked wrong was most likely a screenshot taken before the screen caught up.
 - **Played properly afterwards (D307):** a falling-blocks bot playing with button presses only cleared 58 lines in 150 pieces, reaching level 12 with a score of 37,700.
   - Every clear made a POP and sparkles, and the cat danced.
@@ -97,7 +97,7 @@ All three were archived at Anthropic after they finished (D301; each has its "th
 
 ## Surprises and notes (nothing fixed mid-run)
 
-1. **The voice was misheard, and it carried into the game.** "happy when 20 when you clear lines" became a question offering "after every 20 lines". "can Owen play too" came through as "can oh and play too", though Claude still asked about two players. The C answer fixed the 20-lines error. The kids will need "Say it again" more than the planned run expects.
+1. **The voice was misheard, and it carried into the game.** "happy when 20 when you clear lines" became a question offering "after every 20 lines". "can Milo play too" came through as "can oh and play too", though Claude still asked about two players. The C answer fixed the 20-lines error. The kids will need "Say it again" more than the planned run expects.
 2. **The new game cost 109c**, about twice the usual 6 coins: Claude needed extra tries. That's the first make over 1.5 times its usual (L4) on this cabinet. The pot would cover about six of them a month.
 3. **"90 frames" on the plan screen.** The brief asks for plain words; a rule's number in frames slipped through.
 4. **The coin history shows "-0 coins (1c), stopped"** for a 1c stop (from an earlier test run). Less than a coin should read better than "-0".

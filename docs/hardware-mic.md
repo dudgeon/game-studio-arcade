@@ -11,7 +11,7 @@ Every price and stock line below was read live from the page cited: options A–
 - The kid is 30–60 cm from the cabinet, standing or sitting at a bartop. Talking is mostly the opening request and "C: Something else" answers; it's short clips.
 - Audio goes to Groq Whisper (primary) or Moonshine on the Pi (offline). Both want 16 kHz mono. Clean, close speech matters more than range.
 - Basement: probably some echo off hard walls and floor, plus the cabinet's own speaker. The cabinet can mute its speaker while the Studio is listening, so the game's sound isn't recorded with the kid's voice.
-- Kids aged 10 and 13, unsupervised. Nothing that comes off easily, gets yanked out, or has to be worn.
+- Two kids, unsupervised. Nothing that comes off easily, gets yanked out, or has to be worn.
 - Raspberry Pi 5 on Raspberry Pi OS Lite (trixie). It has no mic input, so the mic has to be USB. A USB Audio Class device uses the stock `snd-usb-audio` driver, so no driver install. Check it with `arecord -l` and a test recording.
 
 ## The cabinet: where a mic can go

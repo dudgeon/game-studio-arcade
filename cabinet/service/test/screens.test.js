@@ -58,19 +58,19 @@ function viewsWith(s) {
 
 /** The arcade's boards (D201) with one string in every slot it can reach. @param {string} s */
 function boardsWith(s) {
-  const makers = [{ maker: "owen", name: s, coins: 19, cents: 193, makes: 3 }, { maker: "alina", name: s, coins: 6, cents: 56, makes: 1 }, { maker: "sam", name: s, coins: 3, cents: 31, makes: 1 }, { maker: "zed", name: s, coins: 1, cents: 9, makes: 1 }];
+  const makers = [{ maker: "milo", name: s, coins: 19, cents: 193, makes: 3 }, { maker: "ivy", name: s, coins: 6, cents: 56, makes: 1 }, { maker: "sam", name: s, coins: 3, cents: 31, makes: 1 }, { maker: "zed", name: s, coins: 1, cents: 9, makes: 1 }];
   const pot = (/** @type {number} */ coins) => ({ coins, cents: coins * 10 + 1, month: "2026-11", refill_on: "2026-12-01", full_coins: 100, makers, last_month: { month: "2026-10", makers, ended_cents: -52, ended_coins: -5 }, usual: { new: 6, change: 3 }, minutes: { new: 7, change: 4 }, over_usual: 1.5 });
-  const cart = { id: "penguin-catch", title: s, version: 2, maker: "alina", parent: "penguin-catch@1", family: "penguin-catch", branch: "penguin-catch", plays: 0, pitch: s, controls: [s, s, s, s, s], youCheck: [{ id: "R12", text: s }], created: "2026-11-11T10:00:00Z" };
+  const cart = { id: "penguin-catch", title: s, version: 2, maker: "ivy", parent: "penguin-catch@1", family: "penguin-catch", branch: "penguin-catch", plays: 0, pitch: s, controls: [s, s, s, s, s], youCheck: [{ id: "R12", text: s }], created: "2026-11-11T10:00:00Z" };
   const carts = [
     { ...cart, version: 1, id: "penguin-catch", branch: null, family: null, parent: null, created: "2026-11-10T10:00:00Z" },
     cart,
-    { ...cart, id: "owens", version: 1, maker: "owen", branch: null, created: "2026-11-11T11:00:00Z" },
+    { ...cart, id: "milos", version: 1, maker: "milo", branch: null, created: "2026-11-11T11:00:00Z" },
     { id: "starter", title: s, version: 1, maker: null, parent: null, plays: 3 },
   ];
   const nameOf = () => s;
   const fam = /** @type {any} */ (familyOfCart(/** @type {any} */ (carts), "penguin-catch"));
-  const result = { id: 1, ok: true, kind: "new", title: s, maker: "alina", maker_name: s, cost_cents: 68, coins: 7, pot_before_cents: 850, pot_after_cents: 782, note: s };
-  const change = { ...result, kind: "change", version: 3, changed: s, parent: { id: "penguin-catch", title: s, version: 2, maker: "alina" } };
+  const result = { id: 1, ok: true, kind: "new", title: s, maker: "ivy", maker_name: s, cost_cents: 68, coins: 7, pot_before_cents: 850, pot_after_cents: 782, note: s };
+  const change = { ...result, kind: "change", version: 3, changed: s, parent: { id: "penguin-catch", title: s, version: 2, maker: "ivy" } };
   const rules = [1, 2, 3, 4, 5, 6].map((n) => ({ id: `R${n}`, kind: n > 4 ? "you-check" : "auto", text: s, ...(n === 2 ? { was: s } : {}) }));
   const plan = { screen: "plan", summary: s, controls: s, top_rules: ["R1", "R2", "R5", "R6"], rules, right: s, usual: { new: 6, change: 3 }, sel: 0 };
   return {
@@ -87,7 +87,7 @@ function boardsWith(s) {
     "A1": { screen: "pot", pot: pot(62) },
     "A1 nobody yet": { screen: "pot", pot: { ...pot(100), makers: [] } },
     "A1 negative": { screen: "pot", pot: pot(-12) },
-    "A2": { screen: "history", flowed: historyLines([{ kind: "charge", at: "2026-11-11T10:00:00Z", who: "alina", name: s, what: "new game", title: s, coins: 7, cost_cents: 68, outcome: "didn't finish" }, { kind: "topup", at: "2026-11-10T10:00:00Z", cents: 200, reason: s }, { kind: "reset", at: "2026-11-09T10:00:00Z", reason: s }, { kind: "refill", at: "2026-11-01T00:00:00Z", pot_after_cents: 1000 }]), top: 0 },
+    "A2": { screen: "history", flowed: historyLines([{ kind: "charge", at: "2026-11-11T10:00:00Z", who: "ivy", name: s, what: "new game", title: s, coins: 7, cost_cents: 68, outcome: "didn't finish" }, { kind: "topup", at: "2026-11-10T10:00:00Z", cents: 200, reason: s }, { kind: "reset", at: "2026-11-09T10:00:00Z", reason: s }, { kind: "refill", at: "2026-11-01T00:00:00Z", pot_after_cents: 1000 }]), top: 0 },
     "G0": howtoView(cart, nameOf),
     "G0 guest": guestHowto({ id: "teti", guest: true, title: s, by: s, howToPlay: { goal: s, controls: [s, s, s, s, s] } }),
     "G6 guest": guestPostGame({ id: "teti", guest: true, title: s, by: s }),
@@ -101,7 +101,7 @@ function boardsWith(s) {
     "G5 with a score": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 2 }, score: 120, best: 340, bestBefore: 340 }),
     "G5": postGame({ cart: { ...cart, maker: null }, noRule: null, versions: 1, usual: { change: 3 } }),
     "M1": whoView({ makers: Array.from({ length: 12 }, (_, i) => ({ id: `m${i}`, name: s })), pot: pot(40) }),
-    "R1": whoView({ makers: [{ id: "alina", name: s }, { id: "owen", name: s }], pot: pot(40), change: { cart } }),
+    "R1": whoView({ makers: [{ id: "ivy", name: s }, { id: "milo", name: s }], pot: pot(40), change: { cart } }),
     "R2": notYours({ cart, makerName: s, ownerName: s }),
     "M3": coinCheck({ kind: "new", pot: pot(100), maker: s }),
     "R3": coinCheck({ kind: "change", pot: pot(-5), maker: s, parentVersion: 12 }),
@@ -317,7 +317,7 @@ test("coins are counted in words a kid would say: 1 coin, 2 coins (the shelf's f
   assert.equal(row(68).note, "used 7 coins");
   assert.equal(row(9).by, "by Tester");
   assert.equal(resultItem({ ok: true, kind: "change", title: "Log Hopper", maker_name: "Tester" }).title, "A change is ready!");
-  assert.equal(resultItem({ ok: false, message: "x", maker: "owen" }).note, undefined, "no cost known, nothing said");
+  assert.equal(resultItem({ ok: false, message: "x", maker: "milo" }).note, undefined, "no cost known, nothing said");
 });
 
 test("a guest's G0, from its real guest.json: nothing cut, no author in the header (it was cut to \"by...\"), the full credit under the title (D388)", () => {

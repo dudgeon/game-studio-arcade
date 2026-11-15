@@ -195,7 +195,7 @@ So cost and process compare fairly, and game details are similar rather than ide
 
 ## What hasn't been measured
 
-- **Falling Blocks.** Task 10's real comparison, with Geoff's live answers and his 1–5 rating ("would Alina play this?").
+- **Falling Blocks.** Task 10's real comparison, with Geoff's live answers and his 1–5 rating ("would Ivy play this?").
 - **Anyone playing these.** The you-check rules are unanswered.
 - **The Pi.** Frame times here are all well under budget off the Pi (node p95 under 0.1 ms, browser p95 0.8 ms), which says little about a Pi.
 - **Repeatability.** Two builds per model, one for this Sonnet brief. Three more Sonnet builds under earlier briefs cost 68¢, 80¢ and 60¢.

@@ -20,17 +20,17 @@ const TOKEN = "t".repeat(40);
 const MODERN = { "io.modelcontextprotocol/protocolVersion": "2026-07-28" };
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "gsa-marks-"));
 
-/** A library: Rock Rain v1 and v2 (one line), Snowball Drop (Owen's version of it, its own line), Frog. */
+/** A library: Rock Rain v1 and v2 (one line), Snowball Drop (Milo's version of it, its own line), Frog. */
 function library() {
   const paths = dataPaths(tmp());
   const makers = makersStore({ file: path.join(paths.root, "makers.json") });
-  makers.add("Alina");
-  makers.add("Owen");
+  makers.add("Ivy");
+  makers.add("Milo");
   const cart = (/** @type {any} */ extra) => commitNewCart({ root: paths.carts, cartDir: FIXTURE, cartJson: { ...BASE, ...extra }, message: "make {id}" }).id;
-  cart({ id: "rock-rain", title: "Rock Rain", maker: "alina", version: 1, created: "2026-11-10T10:00:00Z" });
-  cart({ id: "rock-rain-v2", title: "Rock Rain", maker: "alina", version: 2, branch: "rock-rain", family: "rock-rain", parent: "rock-rain@1", created: "2026-11-11T10:00:00Z" });
-  cart({ id: "snowball-drop", title: "Snowball Drop", maker: "owen", version: 1, family: "rock-rain", parent: "rock-rain-v2@2", created: "2026-11-12T10:00:00Z" });
-  cart({ id: "frog", title: "Frog", maker: "owen", version: 1, created: "2026-11-09T10:00:00Z" });
+  cart({ id: "rock-rain", title: "Rock Rain", maker: "ivy", version: 1, created: "2026-11-10T10:00:00Z" });
+  cart({ id: "rock-rain-v2", title: "Rock Rain", maker: "ivy", version: 2, branch: "rock-rain", family: "rock-rain", parent: "rock-rain@1", created: "2026-11-11T10:00:00Z" });
+  cart({ id: "snowball-drop", title: "Snowball Drop", maker: "milo", version: 1, family: "rock-rain", parent: "rock-rain-v2@2", created: "2026-11-12T10:00:00Z" });
+  cart({ id: "frog", title: "Frog", maker: "milo", version: 1, created: "2026-11-09T10:00:00Z" });
   fs.mkdirSync(paths.logs, { recursive: true });
   fs.appendFileSync(path.join(paths.logs, "play.jsonl"), JSON.stringify({ type: "play", cart_id: "rock-rain-v2", started_at: "2026-11-12T20:00:00Z", score: 7 }) + "\n");
   const marks = shelfMarks({ logsDir: paths.logs });
@@ -98,9 +98,9 @@ test("game lines: versions, lineage, last played, on or off (D361, D362)", () =>
   assert.deepEqual(
     g.map((x) => [x.id, x.title, x.maker_name, x.versions, x.newest.id, x.from, x.from_off, x.plays, x.on_shelf]),
     [
-      ["snowball-drop", "Snowball Drop", "Owen", 1, "snowball-drop", "rock-rain", true, 0, true],
-      ["rock-rain", "Rock Rain", "Alina", 2, "rock-rain-v2", null, false, 1, false],
-      ["frog", "Frog", "Owen", 1, "frog", null, false, 1, true],
+      ["snowball-drop", "Snowball Drop", "Milo", 1, "snowball-drop", "rock-rain", true, 0, true],
+      ["rock-rain", "Rock Rain", "Ivy", 2, "rock-rain-v2", null, false, 1, false],
+      ["frog", "Frog", "Milo", 1, "frog", null, false, 1, true],
     ],
   );
   assert.deepEqual({ ...g[1].off, at: null }, { at: null, by: "geoff", via: "manager", reason: "test" });
@@ -129,7 +129,7 @@ test("the service: a removed game leaves the shelf with all its versions; a kid'
     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: lib.paths.carts, encoding: "utf8" }), "");
 
     // A change of a game that's off is refused.
-    const change = await post("/api/studio/start", { maker: "owen", request: "make it faster", parent: "rock-rain-v2@2" }, false);
+    const change = await post("/api/studio/start", { maker: "milo", request: "make it faster", parent: "rock-rain-v2@2" }, false);
     assert.equal(change.status, 409);
 
     // The Manager's list has every game, on and off, with lineage.
@@ -137,7 +137,7 @@ test("the service: a removed game leaves the shelf with all its versions; a kid'
     const byId = Object.fromEntries(games.map((/** @type {any} */ x) => [x.id, x]));
     assert.deepEqual(Object.keys(byId).sort(), ["frog", "rock-rain", "snowball-drop"]);
     assert.deepEqual([byId["rock-rain"].versions, byId["rock-rain"].on_shelf, byId["rock-rain"].off.reason, byId["rock-rain"].off.by], [2, false, "a test game", "geoff"]);
-    assert.deepEqual([byId["rock-rain"].plays, byId["rock-rain"].last_played, byId["rock-rain"].maker_name], [1, "2026-11-12T20:00:00Z", "Alina"]);
+    assert.deepEqual([byId["rock-rain"].plays, byId["rock-rain"].last_played, byId["rock-rain"].maker_name], [1, "2026-11-12T20:00:00Z", "Ivy"]);
     assert.deepEqual([byId["snowball-drop"].from, byId["snowball-drop"].from_off, byId["snowball-drop"].on_shelf], ["rock-rain", true, true]);
 
     const back = await post("/api/manager/games/restore", { id: "rock-rain", by: "geoff" });
@@ -154,20 +154,20 @@ test("the service: a hidden maker leaves 'Who's making?' and comes back (D363)",
   const lib = library();
   const { s, get, post } = await service(lib);
   try {
-    assert.deepEqual((await get("/api/makers")).makers.map((/** @type {any} */ m) => m.id).sort(), ["alina", "owen"]);
-    assert.equal((await post("/api/manager/makers/hide", { id: "owen", reason: "test name" })).status, 200);
+    assert.deepEqual((await get("/api/makers")).makers.map((/** @type {any} */ m) => m.id).sort(), ["ivy", "milo"]);
+    assert.equal((await post("/api/manager/makers/hide", { id: "milo", reason: "test name" })).status, 200);
     const after = await get("/api/makers");
-    assert.deepEqual(after.makers.map((/** @type {any} */ m) => m.id), ["alina"]);
-    // The shelf still says "by Owen" on their games.
-    assert.equal(after.names.owen, "Owen");
+    assert.deepEqual(after.makers.map((/** @type {any} */ m) => m.id), ["ivy"]);
+    // The shelf still says "by Milo" on their games.
+    assert.equal(after.names.milo, "Milo");
     const all = (await get("/api/manager/makers", true)).makers;
-    assert.deepEqual(all.find((/** @type {any} */ m) => m.id === "owen").on_list, false);
-    assert.equal(all.find((/** @type {any} */ m) => m.id === "owen").off.reason, "test name");
+    assert.deepEqual(all.find((/** @type {any} */ m) => m.id === "milo").on_list, false);
+    assert.equal(all.find((/** @type {any} */ m) => m.id === "milo").off.reason, "test name");
     // Their games stay on the shelf.
-    assert.ok((await get("/api/carts")).carts.some((/** @type {any} */ c) => c.maker === "owen"));
+    assert.ok((await get("/api/carts")).carts.some((/** @type {any} */ c) => c.maker === "milo"));
     assert.equal((await post("/api/manager/makers/hide", { id: "nobody" })).status, 404);
-    await post("/api/manager/makers/show", { id: "owen" });
-    assert.deepEqual((await get("/api/makers")).makers.map((/** @type {any} */ m) => m.id).sort(), ["alina", "owen"]);
+    await post("/api/manager/makers/show", { id: "milo" });
+    assert.deepEqual((await get("/api/makers")).makers.map((/** @type {any} */ m) => m.id).sort(), ["ivy", "milo"]);
   } finally {
     await s.close();
   }

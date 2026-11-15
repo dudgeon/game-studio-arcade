@@ -31,7 +31,7 @@ async function picade() {
   fs.writeFileSync(path.join(t, "shot.png"), PNG);
   fs.writeFileSync(path.join(shims, "arcade-screenshot"), `#!/bin/bash\ncat ${JSON.stringify(path.join(t, "shot.png"))}\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(shims, "arcade-keyd"), `#!/bin/bash\necho "$@" >> ${JSON.stringify(path.join(t, "keys.log"))}\n`, { mode: 0o755 });
-  fs.writeFileSync(path.join(root, "var/lib/arcade/logs/studio_session.jsonl"), JSON.stringify({ type: "studio_session", id: "s1", maker: "alina", request: "a frog game", outcome: "committed", started_at: "2026-11-14T10:00:00Z" }) + "\n");
+  fs.writeFileSync(path.join(root, "var/lib/arcade/logs/studio_session.jsonl"), JSON.stringify({ type: "studio_session", id: "s1", maker: "ivy", request: "a frog game", outcome: "committed", started_at: "2026-11-14T10:00:00Z" }) + "\n");
   // The cabinet's service: Manager endpoints only with the token pairing made.
   const service = http.createServer((req, res) => {
     const token = fs.existsSync(path.join(root, "etc/arcade/manager-token")) ? fs.readFileSync(path.join(root, "etc/arcade/manager-token"), "utf8").trim() : null;
