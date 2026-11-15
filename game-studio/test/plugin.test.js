@@ -52,7 +52,7 @@ test("the plugin's manifest, MCP servers, skill and marketplace entry", () => {
   assert.match(skill, /^---\nname: build-cart\ndescription: .{40,}\n---\n/);
   // Every tool the skill names exists.
   const names = [...bridgeToolDefs().map((t) => t.name), ...createStudioServer().tools().map((t) => t.name)];
-  for (const m of skill.matchAll(/`([a-z_]+)`/g)) if (/_/.test(m[1]) && !["g.lib", "you_check", "include_words", "version_name"].includes(m[1]) && !m[1].startsWith("math")) assert.ok(names.includes(m[1]), `the skill names ${m[1]}`);
+  for (const m of skill.matchAll(/`([a-z_]+)`/g)) if (/_/.test(m[1]) && !["g.lib", "you_check", "include_words", "version_name", "publish_id"].includes(m[1]) && !m[1].startsWith("math")) assert.ok(names.includes(m[1]), `the skill names ${m[1]}`);
   const market = JSON.parse(fs.readFileSync(path.join(REPO, ".claude-plugin/marketplace.json"), "utf8"));
   assert.equal(market.plugins[0].name, manifest.name);
   assert.ok(fs.existsSync(path.join(REPO, market.plugins[0].source, ".claude-plugin/plugin.json")));
@@ -272,7 +272,7 @@ test("end to end over stdio: Claude Code's way in, through plugin/bin/run.mjs ar
     assert.equal(init.result.serverInfo.name, "arcade");
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
     const list = /** @type {any} */ (await rpc("tools/list"));
-    assert.equal(list.result.tools.length, 8);
+    assert.equal(list.result.tools.length, 10);
     assert.ok(list.result.tools.find((/** @type {any} */ t) => t.name === "publish_cart").inputSchema.properties.dir);
     const carts = /** @type {any} */ (await rpc("tools/call", { name: "list_carts", arguments: {} }));
     assert.equal(carts.result.structuredContent.carts[0].id, "penguin-catch");

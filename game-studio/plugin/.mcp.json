@@ -2,8 +2,7 @@
   "mcpServers": {
     "arcade": {
       "command": "${GSA_NODE:-/opt/homebrew/opt/node@22/bin/node}",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/run.mjs", "arcade"],
-      "env": { "ARCADE_CABINET": "${ARCADE_CABINET:-virtual}" }
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/run.mjs", "arcade"]
     },
     "studio": {
       "command": "${GSA_NODE:-/opt/homebrew/opt/node@22/bin/node}",

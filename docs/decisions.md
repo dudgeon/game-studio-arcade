@@ -2405,3 +2405,38 @@ Round two, part 7 (docs/round-two-plan.md §5, proposals D463 to D468). Geoff's 
 - **Real costs:** a batch of 12 lines $0.00021; a choice $0.00006; a voice hold $0.00005; a chat turn $0.00017 (two calls). Model time: lines 3.4 s, a choice or voice hold 1 to 2.5 s, a chat turn 2 to 3.7 s. All three runs together cost $0.0065.
 - **The runner** is `cabinet/service/scripts/game-ai-live.mjs`. It writes its logs to a temp folder it removes, so test words never reach a cabinet's "Said to games".
 - **Still not done live:** a turn through the running service and launcher with a real microphone.
+
+## 2026-11-15 — The desktop flow, fixed from real use (D513-D516)
+
+*(Worker, at the director's ask. Real use found it twice: Alina's Taco Cat ended up as two copies, and the showcase game hit it again.)*
+
+**D513. A publish never waits in one call: it's a job, and callers wait for it a little at a time.** *(Claude.)*
+- **Found:** `publish_cart` held one HTTP request open for the whole publish. The gate never interrupts a game being played (D310), and once waited 335 s. Node's fetch gives up on a request with no answer after 300 s, so the bridge reported "fetch failed" or a timeout. The publish still landed, and a caller who tried again made a second cart.
+- **Now, on the cabinet,** `publish_cart` starts a job and answers within `wait_s` (25 s by default, at most 50): the result, or `status: "pending"` with a `publish_id`, what it's waiting for ("a game being played on the cabinet…") and how long so far. `publish_status` waits on it the same way. A job runs to the end whether or not anyone is asking.
+- **The bridge waits for you.** One `publish_cart` or `publish_status` call through the plugin waits up to 4 minutes in 25-second calls, sends MCP progress notifications when Claude Code asks for them, and tries a dropped connection again. If the publish is still going after that, it answers pending, says to call `publish_status`, and says never to publish again.
+
+**D514. The same cart again is the same publish.** *(Claude.)*
+- A publish's key is a hash of its files, parent, maker, with and version name. The summary isn't part of it, so a retry in other words is still the same publish.
+- The same key while that publish is running joins it (`same_as_before`). After it has committed, it answers with the cart it made. After a service restart, the `publish_key` in its `studio_session` record still finds it (`already_published`). Either way there's no second gate run and no second cart.
+- A publish the gate kept off runs again when asked, since a fix may be outside the bundle, such as a cabinet that couldn't run Chromium.
+
+**D515. launch_on_cabinet puts away an after-game screen nobody is using, and says exactly why when it won't.** *(Claude; the director suggested it, never mid-play, during a make or on a question.)*
+- **Found:** a launch was refused on "Done playing" and "You check", saying only "another screen". The caller then pressed the cabinet's keys to reach the shelf, and landed in Make.
+- **Now:** over G2-G6 (you check, the after-game screens) or another game's G0, once nobody has pressed a key at the cabinet for 20 s, the launch puts that screen away and opens the game's G0. The result says what it replaced. Unanswered you-check rules are asked after the next play, as "Later" does.
+- **Otherwise it refuses, naming the screen** (its title and board) and saying what to do:
+  - an after-game screen just used: try again in a minute;
+  - a make or change under way: wait, nothing interrupts a make;
+  - the coin pot: someone is looking at it;
+  - a message: wait for the shelf;
+  - a game being played: try when it's over.
+- Each refusal adds "Don't drive it there with the cabinet's keys: from the shelf, the first press opens Make." The tool's description and the skill say the same.
+
+**D516. Which cabinet a desktop session reaches: the environment, else the project's `.arcade-cabinet`, else virtual; and every result says which.** *(Claude.)*
+- **Found:** alina-game was a background session started by Duo, and `duo2 session new` can't set an environment variable. So `ARCADE_CABINET` was unset, and the plugin's `.mcp.json` (`${ARCADE_CABINET:-virtual}`) gave the bridge the virtual cabinet while everyone meant the Picade. Setting the variable inside the session can't reach an MCP server that's already running.
+- **Now:**
+  - `.mcp.json` no longer sets the variable; plugin servers inherit Claude Code's environment.
+  - The bridge takes `ARCADE_CABINET` if set, else the first word of a `.arcade-cabinet` file in the project folder or any folder above it, else `virtual`.
+  - `use_cabinet` switches it for the rest of a session.
+  - Every arcade result carries `cabinet` (for example "real: Real cabinet (Picade) (arcade.local)"), and an error names it too, so a wrong cabinet shows at once.
+- Checked with real Claude Code (`claude -p --plugin-dir`): the file was found from a subfolder with no variable set, and the variable still wins when it is set.
+- **For the director:** when starting a desk session for the Picade, write `real` into its folder's `.arcade-cabinet` first.

@@ -1095,18 +1095,39 @@ function connect() {
 }
 connect();
 
-// ---------- launch_on_cabinet (D344): the desktop asks for a game's how-to-play screen, only from the shelf ----------
+// ---------- launch_on_cabinet (D344, D515): the desktop asks for a game's how-to-play screen ----------
+// From the shelf; or over a post-game screen (G2-G6) or another game's how-to-play (G0) that nobody has touched for
+// LAUNCH_QUIET_MS. Never mid-play, during a make, or on a question. A refusal says which screen is up and what to do.
+const LAUNCH_QUIET_MS = Number(/** @type {any} */ (window).launchQuietMs ?? 20_000); // a test sets it shorter
+let launchLastKey = 0;
+addEventListener("keydown", () => (launchLastKey = Date.now()), { capture: true });
+/** @param {any} v */
+function launchRefusal(v) {
+  const b = v.board ?? v.screen;
+  const name = v.title ? `"${v.title}" (${b})` : b;
+  const keys = "Don't drive it there with the cabinet's keys: from the shelf, the first press opens Make.";
+  if (/^G[2-6]$|^G0$/.test(b)) return `the after-game screen ${name} is up and someone pressed a key ${Math.round((Date.now() - launchLastKey) / 1000)} s ago, so they may still be there. Try again in a minute: launch puts it away once nobody has touched it for ${LAUNCH_QUIET_MS / 1000} s. ${keys}`;
+  if (["question", "plan", "progress", "say"].includes(v.screen) || /^[MR]\d/.test(b) || studio.phase === "running") return `a game is being made or changed (${name}). Wait until it's done; nothing interrupts a make. ${keys}`;
+  if (v.screen === "pot" || v.screen === "history") return `the coin pot is open (${name}). Someone is looking at it; ESC on the cabinet goes back to the shelf. Try again in a minute.`;
+  if (v.screen === "boot" || v.screen === "notice" || /^[BE]\d/.test(b)) return `the cabinet is showing a message (${name}). Wait for it to go back to the shelf.`;
+  return `the cabinet is on ${name}, not the shelf. Try again when it's back on the shelf. ${keys}`;
+}
 (function listenForLaunches() {
   const launches = new EventSource("/api/arcade/launch");
   launches.onmessage = async (e) => {
     const l = JSON.parse(e.data);
     const answer = (/** @type {boolean} */ ok, /** @type {string} */ why = "") => post("/api/arcade/launch/answer", { launch: l.launch, ok, why }).catch(() => {});
-    if (view.screen !== "shelf" || playing || studio.phase === "running") return answer(false, `the cabinet is on another screen (${view.board ?? view.screen})`);
+    const b = view.board ?? view.screen;
+    const quiet = Date.now() - launchLastKey >= LAUNCH_QUIET_MS;
+    // After a game, left alone: launch puts the screen away (D515). Unanswered you-check rules are asked after the next play, as "Later" does.
+    const putAway = !playing && studio.phase !== "running" && /^G[02-6]$/.test(b) && quiet ? `put away the ${view.title ? `"${view.title}" ` : ""}${b} screen, untouched for ${Math.round((Date.now() - launchLastKey) / 1000)} s` : "";
+    if (playing) return answer(false, `someone is playing ${view.cart?.title ? `"${view.cart.title}"` : "a game"} (G1). Nothing interrupts a game; try again when it's over.`);
+    if (view.screen !== "shelf" && !putAway) return answer(false, launchRefusal(view));
     await refresh().catch(() => {});
     const cart = carts.find((c) => c.id === l.cart);
     if (!cart) return answer(false, "the shelf doesn't have that game");
     showHowTo(cart);
-    answer(true);
+    answer(true, putAway);
   };
   launches.onerror = () => {
     if (launches.readyState === EventSource.CLOSED) setTimeout(listenForLaunches, 1000);

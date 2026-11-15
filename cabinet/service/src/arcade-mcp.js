@@ -12,7 +12,7 @@
 //   remove_from_shelf  take a game (every version of it) off the kids' shelf; kept in the records (D360-D362)
 //   restore_to_shelf   put it back
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { changeTarget, specChange } from "@game-studio-arcade/studio-cli/src/make.js";
@@ -34,6 +34,21 @@ const PART = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$/;
 const TEXT_EXT = new Set([".md", ".js", ".json", ".txt", ".ts", ".csv", ".svg"]);
 /** How long launch_on_cabinet waits for the launcher to say yes or no. */
 export const LAUNCH_WAIT_MS = 8000;
+/** A publish call answers within this, finished or not (D513): no request waits on the gate, which can wait out a whole game. */
+export const PUBLISH_WAIT_S = 25;
+export const PUBLISH_WAIT_MAX_S = 50;
+
+/**
+ * What makes two publishes the same (D514): the cart's files, its parent, maker, with and version name. The summary
+ * isn't part of it, so a retry with other words is still the same publish.
+ * @param {Map<string, Buffer>} files @param {{ parent?: string | null, maker?: string, with?: string | null, version_name?: string | null }} a
+ */
+export function publishKey(files, a) {
+  const h = createHash("sha256");
+  h.update(JSON.stringify({ parent: a.parent ?? null, maker: a.maker ?? null, with: a.with ?? null, version_name: a.version_name ?? null }));
+  for (const p of [...files.keys()].sort()) h.update(`\n${p}\n`).update(createHash("sha256").update(/** @type {Buffer} */ (files.get(p))).digest("hex"));
+  return h.digest("hex");
+}
 
 // core.fsync: a commit is on disk before it returns, as in the Studio's library (D371).
 const GIT_ENV = { GIT_AUTHOR_NAME: "Studio", GIT_AUTHOR_EMAIL: "studio@game-studio-arcade.invalid", GIT_COMMITTER_NAME: "Studio", GIT_COMMITTER_EMAIL: "studio@game-studio-arcade.invalid", GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsync", GIT_CONFIG_VALUE_0: "added", GIT_CONFIG_KEY_1: "core.fsyncMethod", GIT_CONFIG_VALUE_1: "fsync" };
@@ -162,7 +177,7 @@ export function launchRelay(o = {}) {
     },
     /** @param {string} id @param {boolean} ok @param {string} [why] */
     answer(id, ok, why) {
-      waiting.get(id)?.({ ok, ...(why ? { why: String(why).slice(0, 200) } : {}) });
+      waiting.get(id)?.({ ok, ...(why ? { why: String(why).slice(0, 600) } : {}) });
     },
   };
 }
@@ -250,6 +265,53 @@ export function createArcadeMcp(o) {
   /** One publish at a time: each goes through the gate's queue anyway, and the library commit is ordered. */
   let publishing = Promise.resolve();
 
+  /**
+   * Publishes as jobs (D513, D514). A job runs to the end whether or not anyone is still asking: the gate may wait out a
+   * whole game first. Callers wait a little at a time (publish_cart, then publish_status), and the same bundle again joins
+   * the job, or gets the cart it already made.
+   * @typedef {{ id: string, key: string, state: "queued" | "checking" | "done", started: number, done: Promise<any>, result?: any, finished?: number }} Job
+   * @type {Map<string, Job>}
+   */
+  const jobs = new Map();
+  const JOB_KEEP_MS = 6 * 3600_000;
+  const jobId = (/** @type {string} */ key) => `pub_${key.slice(0, 20)}`;
+  /** A committed desktop publish of this bundle, from the logs: a retry after a restart still finds it. @param {string} key */
+  const publishedBefore = (key) =>
+    readLog(path.join(o.paths.logs, "studio_session.jsonl"))
+      .filter((r) => r.origin === "desktop" && r.publish_key === key && r.outcome === "committed")
+      .at(-1) ?? null;
+  /** Where a job is, in words. @param {Job} j */
+  const waitingFor = (j) => {
+    if (j.state === "queued") return "another publish ahead of it";
+    if (j.state === "checking") return o.plays?.playing() ? "a game being played on the cabinet: the cabinet's test runs when it ends (it never interrupts a game)" : "the cabinet's checks and its test in its own Chromium";
+    return null;
+  };
+  /** Wait up to waitS for a job, then say where it is. @param {Job} j @param {number} waitS @param {object} [extra] */
+  const answerFor = async (j, waitS, extra = {}) => {
+    const s = Math.min(PUBLISH_WAIT_MAX_S, Math.max(0, Number.isFinite(waitS) ? waitS : PUBLISH_WAIT_S));
+    let timer;
+    await Promise.race([j.done, new Promise((r) => (timer = setTimeout(r, s * 1000)))]);
+    clearTimeout(timer);
+    if (j.state === "done") {
+      const r = j.result;
+      if (r?.isError) return { ...r, structuredContent: { ...r.structuredContent, publish_id: j.id, ...extra } };
+      return { ...r, publish_id: j.id, ...extra };
+    }
+    return {
+      ok: true,
+      status: "pending",
+      publish_id: j.id,
+      state: j.state,
+      waiting_for: waitingFor(j),
+      seconds_so_far: Math.round((Date.now() - j.started) / 1000),
+      ...extra,
+      note: `Not finished yet, and still going on the cabinet. Call publish_status with publish_id ${j.id} to wait for it. Don't publish again: the same cart joins this publish anyway.`,
+    };
+  };
+  const sweep = () => {
+    for (const [k, j] of jobs) if (j.finished && Date.now() - j.finished > JOB_KEEP_MS) jobs.delete(k);
+  };
+
   /** @type {import("./mcp-rpc.js").Tool[]} */
   const tools = [
     {
@@ -311,23 +373,69 @@ export function createArcadeMcp(o) {
           with: { type: "string", description: "a second maker id, such as the grown-up who helped" },
           version_name: { type: "string", description: `what this version is called, such as "Faster logs": at most ${VERSION_NAME_MAX} characters, plain letters, digits and spaces, not a name another version of the game has. Only for a change by the parent's own maker; a new game and someone's own version go by their title.` },
           summary: { type: "string", description: "one or two sentences: what was made or changed, and with whom" },
+          wait_s: { type: "integer", minimum: 0, maximum: PUBLISH_WAIT_MAX_S, description: `how long to wait for the result before answering "pending" with a publish_id; default ${PUBLISH_WAIT_S}` },
         },
         required: ["bundle", "maker", "summary"],
         additionalProperties: false,
       },
       async call(a) {
-        const run = publishing.then(() => publish(a));
+        sweep();
+        // Checked before the job starts, so a bundle that can't be published is refused at once, not "pending".
+        const files = readBundle(a.bundle);
+        if (!o.makers.get(String(a.maker ?? ""))) throw new ToolError(`no maker "${a.maker}" on this cabinet (list_carts lists makers; a grown-up is added with scripts/maker.mjs add-grown-up)`);
+        if (a.with && !o.makers.get(String(a.with))) throw new ToolError(`no maker "${a.with}" on this cabinet`);
+        if (!(typeof a.summary === "string" && a.summary.trim())) throw new ToolError("summary: say in a sentence or two what was made");
+        if (a.parent) find(a.parent);
+        const key = publishKey(files, a);
+        const live = jobs.get(key);
+        // The same cart again (D514): join the publish still going, or answer with the cart it made.
+        if (live && !(live.state === "done" && live.result?.isError)) return answerFor(live, Number(a.wait_s), { same_as_before: true });
+        const before = publishedBefore(key);
+        if (before) return { ok: true, already_published: true, publish_id: jobId(key), session_id: before.id, outcome: "committed", cart_id: before.cart_id, version: before.cart_version, commit: before.commit, note: "This exact cart was published before; nothing new was made." };
+        /** @type {Job} */
+        const job = { id: jobId(key), key, state: "queued", started: Date.now(), done: Promise.resolve() };
+        const run = publishing.then(() => {
+          job.state = "checking";
+          return publish(a, files, key);
+        });
         publishing = run.then(
           () => {},
           () => {},
         );
-        return run;
+        job.done = run.then(
+          (r) => {
+            job.result = r;
+          },
+          (e) => {
+            job.result = { content: [{ type: "text", text: e instanceof ToolError ? e.message : `publish_cart failed: ${e?.message ?? e}` }], structuredContent: { ok: false, outcome: "error" }, isError: true };
+          },
+        ).finally(() => {
+          job.state = "done";
+          job.finished = Date.now();
+        });
+        jobs.set(key, job);
+        return answerFor(job, Number(a.wait_s));
+      },
+    },
+    {
+      name: "publish_status",
+      description: "Wait for a publish that answered pending, by its publish_id: it answers with the result once the cabinet's checks finish, or pending again after wait_s. A publish keeps going on the cabinet whether or not anyone asks; the gate never interrupts a game being played, so it can take as long as that game.",
+      inputSchema: { type: "object", properties: { publish_id: { type: "string" }, wait_s: { type: "integer", minimum: 0, maximum: PUBLISH_WAIT_MAX_S } }, required: ["publish_id"], additionalProperties: false },
+      annotations: { readOnlyHint: true },
+      async call(a) {
+        const j = [...jobs.values()].find((x) => x.id === a.publish_id);
+        if (j) return answerFor(j, Number(a.wait_s));
+        const rec = readLog(path.join(o.paths.logs, "studio_session.jsonl"))
+          .filter((r) => r.origin === "desktop" && typeof r.publish_key === "string" && jobId(r.publish_key) === a.publish_id)
+          .at(-1);
+        if (rec) return rec.outcome === "committed" ? { ok: true, publish_id: a.publish_id, session_id: rec.id, outcome: "committed", cart_id: rec.cart_id, version: rec.cart_version, commit: rec.commit } : { ok: false, publish_id: a.publish_id, session_id: rec.id, outcome: rec.outcome, failing: rec.playtest?.local?.gate?.failing ?? rec.playtest?.local?.failing ?? [] };
+        throw new ToolError(`no publish ${a.publish_id} on this cabinet: it may have restarted before it finished. list_carts shows whether the cart is there; if not, publish again.`);
       },
     },
     {
       name: "launch_on_cabinet",
       description:
-        "Show a game on the cabinet's screen: its how-to-play screen opens, and whoever is at the cabinet presses a button to play. Only from the shelf: it's refused, with the reason, while someone is playing, making a game, or on any other screen.",
+        "Show a game on the cabinet's screen: its how-to-play screen opens, and whoever is at the cabinet presses a button to play. From the shelf, or over an after-game screen (Done playing, You check) or another game's how-to-play that nobody has touched for 20 s, which it puts away (replaced says so). Never during a game, a make or a question: it's refused, saying which screen is up and what to do. Don't press the cabinet's keys to get to the shelf instead.",
       inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
       async call(a) {
         const c = find(a.id);
@@ -337,7 +445,8 @@ export function createArcadeMcp(o) {
         if (o.plays?.playing()) throw new ToolError("not now: someone is playing a game on the cabinet");
         const r = await o.launches.ask({ id: c.id, title: c.title });
         if (!r.ok) throw new ToolError(`the cabinet didn't open it: ${r.why ?? "no reason given"}`);
-        return { ok: true, launched: c.id, title: c.title, shown: "how to play (G0)" };
+        // Over a post-game screen nobody had touched (D515), the launcher says what it put away.
+        return { ok: true, launched: c.id, title: c.title, shown: "how to play (G0)", ...(r.why ? { replaced: r.why } : {}) };
       },
     },
     {
@@ -410,9 +519,8 @@ export function createArcadeMcp(o) {
     },
   ];
 
-  /** @param {any} a */
-  async function publish(a) {
-    const files = readBundle(a.bundle);
+  /** @param {any} a @param {Map<string, Buffer>} files @param {string} key what makes it the same publish (D514) */
+  async function publish(a, files, key) {
     const maker = o.makers.get(String(a.maker ?? ""));
     if (!maker) throw new ToolError(`no maker "${a.maker}" on this cabinet (list_carts lists makers; a grown-up is added with scripts/maker.mjs add-grown-up)`);
     const withMaker = a.with ? o.makers.get(String(a.with)) : null;
@@ -512,6 +620,7 @@ export function createArcadeMcp(o) {
     appendLog(o.paths.logs, "studio_session", {
       id: sessionId,
       origin: "desktop",
+      publish_key: key, // the same cart again is the same publish (D514)
       maker: maker.id,
       with: withMaker?.id ?? null,
       request: summary,
