@@ -30,9 +30,12 @@ const GAME = `export default {
     g.ai.lines("joke", { ask: "A short, silly duck joke for a kid.", fallback: ["Fallback one", "Fallback two", "Fallback three"], max: 60 });
     g.ai.choice("mood", { ask: "How does the boss act next?", options: ["sneaky", "angry", "scared"] });
     g.ai.voice("spell", { ask: "Which spell does the wizard cast?", actions: ["fire", "ice"], hold: "y" });
-    return { said: [], moods: [], reached: "untried", cast: [] };
+    g.ai.chat("wizard", { who: "A grumpy but kind wizard who guards a bridge.", fallback: ["Own line one", "Own line two", "Own line three"], hold: "x", max: 80 });
+    return { said: [], moods: [], reached: "untried", cast: [], wizard: [] };
   },
   update(g, s) {
+    const line = g.ai.reply("wizard");
+    if (line) s.wizard.push(line);
     const spell = g.ai.heard("spell");
     if (spell) s.cast.push(spell);
     if (g.frame % 30 === 0) { s.said.push(g.ai.next("joke")); s.moods.push(g.ai.pick("mood", { round: s.said.length })); }
@@ -58,9 +61,14 @@ test("a cart's asks reach the service through the launcher and fresh answers rea
     return { tokens: { input: 300, output: 100 }, cost: 0.00008, ...(a.kind === "lines" ? { lines: ["Fresh quack one", "Fresh quack two", "A line that says shit", "Fresh quack three"] } : { pick: a.kind === "voice" ? "ice" : "scared" }) };
   };
   const speech = stubSpeech();
+  /** A stand-in character and judge: the judge holds any line about school. @type {import("../src/game-chat.js").ChatModel} */
+  const chat = {
+    reply: async (a) => ({ tokens: { input: 500, output: 40 }, cost: 0.00007, say: /school/.test(a.said) ? "What school do you go to?" : "Answer my riddle first!", worried: false }),
+    judge: async (a) => ({ tokens: { input: 700, output: 20 }, cost: 0.00008, verdict: /school/.test(a.reply) ? "hold" : "pass", why: "" }),
+  };
   const plays = playTracker();
   plays.set(true, "duck-dash");
-  const s = await startService({ studio: /** @type {any} */ ({}), makers: makersStore({ file: path.join(dir, "makers.json") }), speech, libraryDir: carts, logsDir: path.join(dir, "logs"), plays, gameAi: createGameAi({ logsDir: path.join(dir, "logs"), keepDir: path.join(dir, "game-ai"), model }), port: 0 });
+  const s = await startService({ studio: /** @type {any} */ ({}), makers: makersStore({ file: path.join(dir, "makers.json") }), speech, libraryDir: carts, logsDir: path.join(dir, "logs"), plays, gameAi: createGameAi({ logsDir: path.join(dir, "logs"), keepDir: path.join(dir, "game-ai"), model, chat }), port: 0 });
   const browser = await chromium.launch({ headless: true }).catch(() => chromium.launch({ headless: true, channel: "chrome" }));
   try {
     const page = await browser.newPage();
@@ -104,8 +112,30 @@ test("a cart's asks reach the service through the launcher and fresh answers rea
     await page.keyboard.up("KeyV");
     await page.waitForTimeout(600);
     assert.deepEqual((await probe()).cast, ["ice"], "a tap does nothing");
+    // Chat (D495): hold the character's button and talk. The character's judged line reaches the cart; the
+    // cabinet's own sign shows what it heard; a line the judge holds becomes one of the cart's own.
+    const talkTo = async (/** @type {string} */ words, /** @type {number} */ lines) => {
+      speech.feed?.({ text: words });
+      await page.keyboard.down("KeyC");
+      await page.waitForTimeout(500);
+      await page.keyboard.up("KeyC");
+      for (const end = Date.now() + 10_000; (state = await probe()).wizard.length < lines && Date.now() < end; ) await new Promise((r) => setTimeout(r, 100));
+    };
+    await talkTo("can I cross your bridge", 1);
+    assert.deepEqual(state.wizard, ["Answer my riddle first!"]);
+    assert.equal(await page.evaluate(() => document.body.textContent?.includes("YOU: can I cross your bridge")), true, "the cabinet shows what it heard");
+    assert.ok(!JSON.stringify(state).includes("can I cross"), "the kid's words never reach the cart");
+    await talkTo("ask me about school", 2);
+    assert.ok(state.wizard[1].startsWith("Own line"), `a held line becomes the cart's own: ${state.wizard[1]}`);
+    assert.ok(!JSON.stringify(state).includes("What school"), "the held line never reaches the cart");
+
     const talk = readLog(path.join(dir, "logs", "game_talk.jsonl"));
-    assert.deepEqual(talk.map((t) => [t.cart_id, t.play_id, t.kind, t.said, t.action, t.outcome]), [["duck-dash", "pl_web", "voice", "freeze that duck", "ice", "heard"]]);
+    assert.deepEqual(talk.map((t) => [t.cart_id, t.play_id, t.kind, t.said, t.action ?? t.reply ?? null, t.outcome]), [
+      ["duck-dash", "pl_web", "voice", "freeze that duck", "ice", "heard"],
+      ["duck-dash", "pl_web", "chat", "can I cross your bridge", "Answer my riddle first!", "said"],
+      ["duck-dash", "pl_web", "chat", "ask me about school", null, "held"],
+    ]);
+    assert.equal(talk[2].held_reply, "What school do you go to?", "what was held is there for Geoff");
 
     const log = readLog(path.join(dir, "logs", "game_ai.jsonl"));
     assert.ok(log.length >= 2);

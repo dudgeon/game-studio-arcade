@@ -162,13 +162,13 @@ function gameAi(ai) {
   return `${head}${trips}<table><tr><th>Game</th><th class=n>Calls this month</th><th class=n>Cost this month</th><th class=n>Calls ever</th><th class=n>Cost ever</th><th>Last</th><th></th></tr>${ai.games.map((g) => `<tr><td>${esc(g.game)}</td><td class=n>${esc(g.month_calls)}</td><td class=n>${usd(g.month_cost_usd)}</td><td class=n>${esc(g.calls)}</td><td class=n>${usd(g.cost_usd)}</td><td>${when(g.last)}</td><td>${g.errors ? `<span class=hint>${esc(g.errors)} failed</span> ` : ""}${g.dropped ? `<span class=hint>${esc(g.dropped)} lines dropped</span> ` : ""}${g.trips ? `<span class=bad>guard ×${esc(g.trips)}</span>` : ""}</td></tr>`).join("")}</table>`;
 }
 // What was said into the mic during games (D489): every voice action and chat turn, newest first.
-const TALK_OUTCOME = { heard: "", none: "no action fitted", steered: "off-limits words: nothing sent on", held: "the reply was held back", flagged: "flagged: worth a look" };
+const TALK_OUTCOME = { heard: "", said: "", none: "no action fitted", steered: "off-limits words: nothing sent on", held: "the reply was held back", judge_failed: "the check didn't answer, so the reply was held back", reply_failed: "no reply came", off: "chat is switched off", flagged: "flagged: worth a look" };
 function gameTalk(rows) {
   if (!rows.length) return "<p class=hint>Nothing yet. Every voice action and chat turn in a game shows here.</p>";
   return rows.slice(0, 200).map((t) => {
-    const how = t.outcome?.startsWith("by_word") ? "matched by word, no model" : (TALK_OUTCOME[t.outcome] ?? t.outcome ?? "");
-    const loud = t.outcome === "steered" || t.outcome === "held" || t.outcome === "flagged";
-    return `<div class="make"><div class="top"><span class="who">${esc(t.game)}</span><span class="hint">v${esc(t.version)} · ${when(t.at)}</span><span class="tag">${esc(t.kind)}${t.ask ? `: ${esc(t.ask)}` : ""}</span>${how ? `<span class="${loud ? "bad" : "hint"}">${esc(how)}</span>` : ""}</div><div class="said">“${esc(t.said)}”</div>${t.reply ? `<div class="hint">The character said: ${esc(t.reply)}</div>` : ""}${t.action ? `<div class="hint">The game did: ${esc(t.action)}</div>` : ""}</div>`;
+    const how = t.outcome?.startsWith("by_word") ? "matched by word, no model" : t.outcome?.startsWith("no_model") ? "no model to ask: the game's own line" : (TALK_OUTCOME[t.outcome] ?? t.outcome ?? "");
+    const loud = t.outcome === "steered" || t.outcome === "held" || t.outcome === "flagged" || t.outcome === "judge_failed";
+    return `<div class="make"><div class="top"><span class="who">${esc(t.game)}</span><span class="hint">v${esc(t.version)} · ${when(t.at)}</span><span class="tag">${esc(t.kind)}${t.ask ? `: ${esc(t.ask)}` : ""}</span>${how ? `<span class="${loud ? "bad" : "hint"}">${esc(how)}</span>` : ""}</div><div class="said">“${esc(t.said)}”</div>${t.reply ? `<div class="hint">The character said: ${esc(t.reply)}</div>` : t.kind === "chat" ? `<div class="hint">The character said one of the game's own lines.</div>` : ""}${t.held ? `<div class="bad">Held back, not shown: ${esc(t.held)}${t.why ? ` (${esc(t.why)})` : ""}</div>` : ""}${t.action ? `<div class="hint">The game did: ${esc(t.action)}</div>` : ""}</div>`;
   }).join("");
 }
 function make(m) {

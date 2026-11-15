@@ -244,6 +244,14 @@ test("activity lists what was said to games, newest first, and it isn't mixed in
   });
   assert.deepEqual(a.talk.map((t) => [t.game, t.version, t.kind, t.ask, t.said, t.action, t.outcome]), [["wizard-bridge", 2, "voice", "spell", "something rude", null, "steered"], ["wizard-bridge", 2, "voice", "spell", "burn it", "fire", "heard"]]);
   assert.deepEqual(a.screened, []);
+  // A chat turn: what the character said, and a line that was held back with why (D498).
+  const c = activity({
+    game_talk: [
+      { at: "2026-11-14T11:00:00Z", cart_id: "wizard-bridge", cart_version: 2, name: "wizard", kind: "chat", said: "can I cross", reply: "Answer my riddle first!", outcome: "said" },
+      { at: "2026-11-14T11:01:00Z", cart_id: "wizard-bridge", cart_version: 2, name: "wizard", kind: "chat", said: "hi", reply: null, held_reply: "What school do you go to?", why: "personal question", outcome: "held" },
+    ],
+  });
+  assert.deepEqual(c.talk.map((t) => [t.kind, t.said, t.reply, t.held, t.why, t.outcome]), [["chat", "hi", null, "What school do you go to?", "personal question", "held"], ["chat", "can I cross", "Answer my riddle first!", null, null, "said"]]);
 });
 
 test("key names map to Linux codes; unknown keys are refused", () => {

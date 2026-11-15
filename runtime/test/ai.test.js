@@ -155,6 +155,65 @@ test("voice asks (D489): declared with a talk button, an action is heard once, a
   );
 });
 
+test("chat (D495): a character's line is given once; with no line to give, one of the cart's own; never anything odd", async () => {
+  const OWN = ["Hmph. Ask me later.", "The bridge is closed for lunch.", "My beard is tired of talking."];
+  const cart = {
+    init(/** @type {any} */ g) {
+      g.ai.chat("wizard", { who: "A grumpy but kind wizard who guards a bridge.", fallback: OWN, hold: "x", max: 60 });
+      g.ai.voice("spell", { ask: "Which spell?", actions: ["fire", "ice"], hold: "y" });
+      return { lines: /** @type {string[]} */ ([]) };
+    },
+    update(/** @type {any} */ g, /** @type {any} */ s) {
+      const l = g.ai.reply("wizard");
+      if (l) s.lines.push(l);
+    },
+    draw() {},
+    probe: (/** @type {any} */ _g, /** @type {any} */ s) => s,
+  };
+  const m = createMachine({ cart, seed: 1 });
+  assert.deepEqual(m.aiVoices(), [
+    { kind: "chat", name: "wizard", who: "A grumpy but kind wizard who guards a bridge.", max: 60, hold: "x" },
+    { kind: "voice", name: "spell", ask: "Which spell?", actions: ["fire", "ice"], hold: "y" },
+  ]);
+  assert.deepEqual(m.drainAi(), [], "a chat asks nothing until the player talks");
+  m.aiHear({ name: "wizard", reply: "None shall pass without a riddle!" });
+  m.update();
+  m.update();
+  assert.deepEqual(/** @type {any} */ (m.probe()).lines, ["None shall pass without a riddle!"]);
+  // No line from the cabinet (offline, held back): the character says one of its own.
+  for (let i = 0; i < 3; i++) {
+    m.aiHear({ name: "wizard", fallback: true });
+    m.update();
+  }
+  assert.deepEqual([.../** @type {any} */ (m.probe()).lines.slice(1)].sort(), [...OWN].sort());
+  // A line that's too long, not plain, or not a string never reaches the game as it is.
+  for (const odd of ["x".repeat(61), "café time", 7, ""]) {
+    m.aiHear({ name: "wizard", reply: odd });
+    m.update();
+    assert.ok(OWN.includes(/** @type {any} */ (m.probe()).lines.at(-1)), String(odd));
+  }
+  const before = /** @type {any} */ (m.probe()).lines.length;
+  m.aiHear({ name: "wizard" });
+  m.aiHear({ name: "wizard", action: "fire" });
+  m.aiHear({ name: "nobody", reply: "hello" });
+  m.update();
+  assert.equal(/** @type {any} */ (m.probe()).lines.length, before, "nothing to say: nothing said");
+
+  const t = await headless(cart);
+  await t.step(120);
+  assert.deepEqual(/** @type {any} */ (await t.probe()).lines, [], "in a playtest nobody talks");
+
+  const bad = (/** @type {any} */ o, /** @type {RegExp} */ re) => assert.rejects(headless({ ...cart, init: (/** @type {any} */ g) => (g.ai.chat("c", o), {}) }), re);
+  await bad({ who: "", fallback: OWN, hold: "x" }, /needs who/);
+  await bad({ who: "A cat.", fallback: OWN.slice(0, 2), hold: "x" }, /at least 3 lines/);
+  await bad({ who: "A cat.", fallback: OWN, hold: "x", max: 500 }, /40 to 160/);
+  await bad({ who: "A cat.", fallback: OWN, hold: "start" }, /button to hold while talking/);
+  await assert.rejects(
+    headless({ ...cart, init: (/** @type {any} */ g) => (g.ai.voice("v", { ask: "Which?", actions: ["a", "b"], hold: "x" }), g.ai.chat("c", { who: "A cat.", fallback: OWN, hold: "x" }), {}) }),
+    /already uses the x button/,
+  );
+});
+
 test("outside init nothing can be declared, an undeclared ask is an error, and facts can't carry free text", async () => {
   const late = { init: () => ({}), update: (/** @type {any} */ g) => g.ai.lines("joke", { ask: "A joke.", fallback: JOKES }), draw() {} };
   await assert.rejects((await headless(late)).step(1), /belongs in init/);
