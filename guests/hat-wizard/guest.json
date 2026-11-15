@@ -2,6 +2,7 @@
   "id": "hat-wizard",
   "title": "The Hat Chooses the Wizard",
   "by": "Corwin Kuiper and Gwilym Inzani",
+  "by_short": "Corwin and Gwilym",
   "version": "agb-0.25.0-cabinet.1",
   "kind": "web",
   "entry": "index.html",

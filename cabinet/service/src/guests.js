@@ -125,6 +125,8 @@ export function createGuests(o) {
         guest: true,
         title: meta.title,
         by: meta.by ?? null,
+        // A shorter credit for the shelf row, where the full one doesn't fit (D388). G0 and NOTICE.md keep the full one.
+        by_short: typeof meta.by_short === "string" ? meta.by_short : null,
         version: meta.version ?? null,
         // A version of another guest (D234): who made it, what it came from, and its family.
         maker: typeof meta.maker?.id === "string" ? meta.maker.id : null,

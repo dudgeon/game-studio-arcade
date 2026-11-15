@@ -320,14 +320,15 @@ test("coins are counted in words a kid would say: 1 coin, 2 coins (the shelf's f
   assert.equal(resultItem({ ok: false, message: "x", maker: "owen" }).note, undefined, "no cost known, nothing said");
 });
 
-test("a guest's G0, from its real guest.json: nothing cut, and no author in the header (it was cut to \"by...\")", () => {
+test("a guest's G0, from its real guest.json: nothing cut, no author in the header (it was cut to \"by...\"), the full credit under the title (D388)", () => {
   const meta = JSON.parse(fs.readFileSync(new URL("../../../guests/teti/guest.json", import.meta.url), "utf8"));
   const p = new Painter();
   draw(p, { ...guestHowto({ ...meta, guest: true }), board: "G0" });
   assert.deepEqual(check(p.boxes), []);
   assert.deepEqual(p.boxes.filter((b) => b.cut).map((b) => b.id), [], "every box on teti's G0 shows its words in full");
   const words = p.boxes.flatMap((b) => b.lines.map((l) => l.text)).join(" | ");
-  assert.doesNotMatch(words, /\bby\b/, "the header has no author; the shelf row says who made it");
+  assert.doesNotMatch(p.boxes.filter((b) => /^header/.test(b.id)).flatMap((b) => b.lines.map((l) => l.text)).join(" "), /\bby\b/, "the header has no author");
+  assert.equal(p.boxes.find((b) => b.id === "howto-credit")?.text, "by TitanPlayz100", "the full credit, under the title");
   assert.match(words, /Fill whole rows/);
   assert.equal(p.boxes.filter((b) => /^howto-control-/.test(b.id)).length, 4, "all four control lines show");
 });
@@ -519,4 +520,28 @@ test("D492: live words while listening, dimmer, the last three lines; a stopped 
   draw(q, { screen: "say", phase: "listening", purpose: "idea", live: { listening: true, seconds: 5, words, stopped: true }, sel: 0 });
   assert.equal(q.boxes.find((b) => b.id === "say-message")?.text, "The mic stopped hearing you. Let go and try again.");
   assert.equal(q.boxes.find((b) => b.id === "say-live"), undefined);
+});
+
+test("every guest in the repo: its shelf row and its G0 show every word, with the short credit on the shelf and the full one on G0 (D388)", async () => {
+  const { createGuests } = await import("../src/guests.js");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const listed = createGuests({ dirs: [new URL("../../../guests", import.meta.url).pathname], logsDir: fs.mkdtempSync(path.join(os.tmpdir(), "gsa-fit-")) }).list("");
+  assert.ok(listed.length >= 8, "teti, Geoff's teti and the six picks");
+  const rows = guestRows(listed, (id) => id);
+  for (const [i, row] of rows.entries()) {
+    const p = new Painter();
+    draw(p, { screen: "shelf", console: "Quarter Deck", pot: 100, sel: i + 1, items: [{ kind: "make", title: "Make a new game", cost: 6 }, ...rows] });
+    assert.deepEqual(p.boxes.filter((b) => b.cut && b.onCut !== "ok" && new RegExp(`-${i + 1}$`).test(b.id)).map((b) => `${b.id}: ${b.text}`), [], `${row.cart.id}'s shelf row, lit`);
+    assert.deepEqual(p.boxes.filter((b) => b.cut && /^shelf-(title|by)-/.test(b.id)).map((b) => `${b.id}: ${b.text}`), [], `no title or credit cut on the shelf, ${row.cart.id} lit`);
+  }
+  for (const g of listed) {
+    const p = new Painter();
+    draw(p, { ...guestHowto(g), board: "G0" });
+    assert.deepEqual(check(p.boxes), [], `${g.id}'s G0`);
+    assert.deepEqual(p.boxes.filter((b) => b.cut).map((b) => b.id), [], `${g.id}'s G0: every word shows`);
+    if (g.by) assert.equal(p.boxes.find((b) => b.id === "howto-credit")?.text, `by ${g.by}`, `${g.id}: the full credit on G0`);
+  }
+  const hat = /** @type {any} */ (listed.find((/** @type {any} */ g) => g.id === "hat-wizard"));
+  assert.equal(guestRows([hat])[0].by, `by ${hat.by_short}`, "a long credit is short on the shelf");
 });
