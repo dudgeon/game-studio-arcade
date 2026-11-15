@@ -380,7 +380,7 @@ test("real Chromium: a downloaded game is on the shelf once its smoke check pass
 test("real Chromium: a guest played by a player must draw: a real TIC-80 cart passes, a flat screen doesn't (D381)", { skip: noChromium, timeout: 120000 }, async () => {
   const root = tmp();
   // A shortlisted TIC-80 guest as it is: its player needs WebGL, which the gate's Chromium draws in software.
-  fs.cpSync(path.resolve(import.meta.dirname, "../../../guest-shortlist/grow-quickly"), path.join(root, "grow-quickly"), { recursive: true });
+  fs.cpSync(path.resolve(import.meta.dirname, "../../../guests/grow-quickly"), path.join(root, "grow-quickly"), { recursive: true });
   // A player that never starts: nothing thrown, nothing drawn.
   fs.mkdirSync(path.join(root, "flat", "play"), { recursive: true });
   fs.writeFileSync(path.join(root, "flat", "guest.json"), JSON.stringify({ id: "flat", title: "flat", version: "1", kind: "web", entry: "index.html", player: { name: "tic80" } }));

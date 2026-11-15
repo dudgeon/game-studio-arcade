@@ -15,6 +15,10 @@ import { BUNDLE_PATHS } from "../../virtual-cabinet/lib.mjs";
 const HERE = import.meta.dirname;
 const REPO = resolve(HERE, "../../..");
 const SHORTLIST = join(REPO, "guest-shortlist");
+const SHELF = join(REPO, "guests");
+/** Every guest that needs a player: Geoff's picks on the shelf (D388) and the rest of the shortlist. */
+const PLAYED = [...listGuests(SHELF), ...listGuests(SHORTLIST)].filter((g) => g.meta.player);
+const dirOf = (/** @type {string} */ id) => /** @type {any} */ (PLAYED.find((g) => g.id === id)).dir;
 const CACHE = process.env.GSA_GUEST_PLAYERS || join(homedir(), "game-studio-data/guest-players");
 const sha256 = (/** @type {string} */ f) => createHash("sha256").update(readFileSync(f)).digest("hex");
 const files = (/** @type {string} */ d) => readdirSync(d).sort();
@@ -54,7 +58,7 @@ test("the shortlist stays off the shelf and out of the bundle until Geoff picks 
   for (const g of listGuests(SHORTLIST)) assert.ok(!shelf.has(g.id), `${g.id} is in one place`);
 });
 
-for (const g of listGuests(SHORTLIST)) {
+for (const g of PLAYED) {
   test(`${g.id}: a complete guest, licence stated with its source, files as pinned`, () => {
     const m = g.meta;
     const play = join(g.dir, "play");
@@ -95,8 +99,14 @@ for (const g of listGuests(SHORTLIST)) {
   });
 }
 
-test("the shortlist covers both players and all three cores", () => {
-  const all = listGuests(SHORTLIST).map((g) => g.meta.player);
+test("Geoff's six picks are on the shelf (D388): three TIC-80 carts and one game for each of the three cores", () => {
+  const picks = listGuests(SHELF).filter((g) => g.meta.player);
+  assert.deepEqual(picks.map((g) => g.id).sort(), ["8-bit-panda", "cauliflower-power", "grow-quickly", "hat-wizard", "tobu-tobu-girl-deluxe", "zooming-secretary"]);
+  assert.deepEqual(picks.filter((g) => g.meta.player.name === "retroarch").map((g) => g.meta.player.core).sort(), ["gambatte", "mgba", "nestopia"]);
+});
+
+test("the shortlist and the shelf together cover both players and all three cores", () => {
+  const all = PLAYED.map((g) => g.meta.player);
   assert.ok(all.filter((p) => p.name === "tic80").length >= 3);
   assert.deepEqual([...new Set(all.filter((p) => p.name === "retroarch").map((p) => p.core))].sort(), ["gambatte", "mgba", "nestopia"]);
 });
@@ -106,19 +116,19 @@ test("a rebuild from guest.json gives the same play/ folder, byte for byte", { s
   for (const id of ["libbet", "grow-quickly"]) {
     const dir = join(mkdtempSync(join(tmpdir(), "gsa-guest-build-")), id);
     mkdirSync(dir, { recursive: true });
-    cpSync(join(SHORTLIST, id, "guest.json"), join(dir, "guest.json"));
-    const was = join(SHORTLIST, id, "play");
+    cpSync(join(dirOf(id), "guest.json"), join(dir, "guest.json"));
+    const was = join(dirOf(id), "play");
     build(dir, { file: join(was, id === "libbet" ? "rom.bin" : "cart.tic") });
     assert.deepEqual(files(join(dir, "play")), files(was));
     for (const f of files(was)) assert.equal(sha256(join(dir, "play", f)), sha256(join(was, f)), `${id} ${f}`);
-    assert.equal(readFileSync(join(dir, "NOTICE.md"), "utf8"), readFileSync(join(SHORTLIST, id, "NOTICE.md"), "utf8"));
+    assert.equal(readFileSync(join(dir, "NOTICE.md"), "utf8"), readFileSync(join(dirOf(id), "NOTICE.md"), "utf8"));
   }
 });
 
 test("a game file that isn't the pinned one is refused", () => {
   const dir = join(mkdtempSync(join(tmpdir(), "gsa-guest-build-")), "libbet");
   mkdirSync(dir, { recursive: true });
-  cpSync(join(SHORTLIST, "libbet", "guest.json"), join(dir, "guest.json"));
+  cpSync(join(dirOf("libbet"), "guest.json"), join(dir, "guest.json"));
   const other = join(dir, "other.gb");
   writeFileSync(other, "not libbet");
   assert.throws(() => build(dir, { file: other }), /not guest\.json's/);

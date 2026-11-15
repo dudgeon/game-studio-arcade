@@ -11,6 +11,7 @@ import { openBrowser, plantSeed, startServiceProcess } from "../scripts/drive.js
 
 const FIXTURE = path.resolve(import.meta.dirname, "../../../studio-kit/cli/fixtures/penguin-catch");
 const SHORTLIST = path.resolve(import.meta.dirname, "../../../guest-shortlist");
+const REPO_GUESTS = path.resolve(import.meta.dirname, "../../../guests");
 
 let skip = "";
 try {
@@ -109,7 +110,7 @@ test("a TIC-80 cart: on the shelf, draws, the cabinet's keys are its buttons, Es
   // A cart that shows which buttons are down, in TIC-80's own player from a shortlisted guest.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsa-tic-"));
   const play = path.join(dir, "keys", "play");
-  fs.cpSync(path.join(SHORTLIST, "grow-quickly", "play"), play, { recursive: true });
+  fs.cpSync(path.join(REPO_GUESTS, "grow-quickly", "play"), play, { recursive: true });
   fs.writeFileSync(path.join(play, "cart.tic"), ticCart("-- script: lua\nfunction TIC()\n cls(0)\n rect(0,0,240,8,12)\n for i=0,7 do if btn(i) then rect(i*30,20,30,100,i+1) end end\nend\n"));
   fs.writeFileSync(path.join(dir, "keys", "guest.json"), JSON.stringify({ id: "keys", title: "Key Test", version: "1", kind: "web", entry: "index.html", player: { name: "tic80", script: "lua" } }));
   const g = await playGuest(dir, "Key Test");
