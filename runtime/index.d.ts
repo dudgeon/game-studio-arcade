@@ -33,6 +33,8 @@ export interface HeadlessOptions {
   save?: unknown;
   /** Controllers for this run (D110), 1..8. Default 1, like the cabinet. */
   players?: number;
+  /** Also draw a gliding cart's glide picture (D476), at this many display pixels per game pixel (2..8; the cabinet's is 4). Default none. */
+  fine?: number;
 }
 
 /**

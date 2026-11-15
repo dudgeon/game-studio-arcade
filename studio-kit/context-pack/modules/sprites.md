@@ -15,3 +15,5 @@ const CAT = ["..1...1.", ".1f1.1f1", ".1fffff1", ".1f1f1f1", ".1fffff1", "..1111
 ```
 
 Plain shapes (`circfill`, `rectfill`) are cheapest and often enough for backgrounds and small things.
+
+**Turning and growing.** `g.spr(sp, x, y, { rot, zoom })` turns and sizes one sprite smoothly, so draw it once, facing right, and turn it; don't draw eight directions. See `cart-api`, and the `movement` guide for squash and stretch.

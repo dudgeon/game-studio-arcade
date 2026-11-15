@@ -5,7 +5,7 @@ A small JavaScript fantasy console: 256×192 (shown 4× on the Picade 10"'s 1024
 - **Cart API:** [cart.d.ts](cart.d.ts) (`Arcade.Cart`, `Arcade.G`, `Arcade.Lib.*`)
 - **Test hook:** [test-hook.d.ts](test-hook.d.ts) (`Arcade.Checks`, `Arcade.TestHandle`)
 - **Starter library:** [lib/REFERENCE.md](lib/REFERENCE.md), an index of `lib/ref/<module>.md` (carts use it as `g.lib`)
-- **Example:** [examples/hello/](examples/hello/) (`game.js` + `checks.js`)
+- **Examples:** [examples/hello/](examples/hello/) (`game.js` + `checks.js`), and [examples/motion/](examples/motion/), a whole cart that shows glide, the motion kit and the 2.5D modules in four scenes (D475–D479)
 
 ## Writing a cart
 
@@ -17,7 +17,7 @@ A cart's `game.js` is one ES module that **imports nothing**. Its default export
 /** @type {Arcade.Cart<State>} */
 export default {
   init(g) { return { x: g.W / 2, score: 0, board: g.lib.grid.make(10, 20) }; },
-  update(g, s) { if (g.btn("right")) s.x += 2; if (g.btnp("a")) g.sfx("coin"); },
+  update(g, s) { s.x = g.lib.motion.damp(s.x, g.btn("right") ? g.W - 8 : 8); if (g.btnp("a")) g.sfx("coin"); },
   draw(g, s) { g.cls(g.colors.night); g.text(`SCORE ${s.score}`, 4, 4, g.colors.white); },
   probe(g, s) { return { x: s.x, score: s.score }; },  // what checks.js can see
 };
@@ -35,12 +35,15 @@ export default {
   - shapes: `cls pset pget line rect rectfill circ circfill`;
   - text: `text(s, x, y, c, {scale, align})` and `textWidth`;
   - sprites: `sprite(rows)` and `spr(s, x, y, {flipX, flipY, scale, color})`. In sprite rows, `0`–`9` and `a`–`v` are colors 0–31 and `.` is transparent;
+  - turned and zoomed sprites (D475): `spr` also takes `rot` (radians), `zoom`, `zoomX`, `zoomY`, `pivot` and `shade`. Nearest-pixel, whole game pixels, so it stays pixel art;
+  - textured rows and columns (D477): `texRow` and `texCol`, which `g.lib.floor` and `g.lib.raycast` are built on;
   - view: `camera`, `clip`.
+- **Glide (D476):** `g.glide()` in `init` makes the screen keep each position's fraction: at the Picade's 4× a thing moves by a quarter of a game pixel instead of a whole one, and scrolling slides. The cart draws as usual; the runtime draws the same calls a second time into a glide buffer on the display's grid (each game pixel a 4×4 block, so the art is as chunky as ever) and the frame shows that. The 256×192 framebuffer is still drawn exactly as without glide, and it's what `pget`, checks, hashes and saved frames see. A cart that doesn't call it is untouched.
 - **Randomness:** `g.rand()`, `g.rnd(n)` and `g.pick(arr)`. These are seeded, so tests reproduce. Never use `Math.random`.
 - **Sound:** `g.sfx(name)` takes `blip select jump coin pop hit explode powerup lose win`. Also `g.tone({ note: "C5", wave, frames, vol, slide })` and `g.stop()`.
 - **Colors outside 0–31** still draw (wrapped), but each one is reported once as a dev warning (`t.warnings()`, `arcade.warnings`, the browser console), so the playtest's palette check can flag it.
 - **Saves:** `g.save(data)` and `g.load()` hold one JSON value of at most 4 KB, e.g. for a high score.
-- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score`, `g.lib.flow`, `g.lib.turns` and `g.lib.fx`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer` and so on.
+- **Library:** `g.lib.grid`, `g.lib.collide`, `g.lib.timers`, `g.lib.score`, `g.lib.flow`, `g.lib.turns` and `g.lib.fx`; for movement and depth, `g.lib.motion`, `camera`, `parallax`, `anim`, `particles`, `floor`, `raycast` and `stack`. See [lib/REFERENCE.md](lib/REFERENCE.md). Types are `Arcade.Lib.Grid`, `Arcade.Lib.Piece`, `Arcade.Lib.Timer`, `Arcade.Lib.Body` and so on.
 - **Not allowed:** `document`, `window`, `fetch`, timers, `eval` and imports. The frame's sandbox blocks them anyway, and the type-check flags them.
 
 `checks.js` has one async check per `(auto)` rule id. A check fails by throwing, and the message becomes the reason in the report. Each check's `t` also has the tested bot `t.bot` (D162, [lib/bot.js](lib/bot.js)), and `t.poke(o)` calls a cart's optional `poke(g, s, o)` to set up a situation (D163). See [test-hook.d.ts](test-hook.d.ts) and [examples/hello/checks.js](examples/hello/checks.js).
@@ -77,6 +80,7 @@ Only players up to `?players=N` (default 1) get input, so add `&players=2` to us
 - `test=1`: a paused clock and no live input. Frames only advance through `arcade.test.step()`.
 - `save=<url-encoded JSON>`: the initial `g.load()` value.
 - `fps=1`: show the fps, the scale and the tick count.
+- `glide=0`: never show a cart's glide picture (D476), to compare with and without.
 
 ## Driving it from code
 

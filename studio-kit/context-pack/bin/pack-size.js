@@ -27,7 +27,8 @@ export const CALIBRATION = [
   { what: "cart.d.ts + palette.js", kind: "code", chars: 11476, tokens: 4810 },
 ];
 
-export const BUDGETS = { catalog: 2000, module: 1500, template: 4500 };
+// template: 5,000 since D478: a scrolling game carries a map and a camera, and wouldn't fit 4,500.
+export const BUDGETS = { catalog: 2000, module: 1500, template: 5000 };
 
 /** @param {string} file @param {string} text */
 export const estimateTokens = (file, text) => Math.ceil(text.length / (file.endsWith(".md") ? MD_CHARS_PER_TOKEN : CODE_CHARS_PER_TOKEN));

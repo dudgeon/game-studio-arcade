@@ -71,6 +71,8 @@ async function open() {
   }
   const rt = await import(data.runtimeUrl);
   /** @type {Arcade.TestHandle} */
+  // No glide buffer here (D476, D479): this driver times the game's own work against its 4 ms budget.
+  // The browser driver, and so the cabinet's gate, draws and shows a gliding cart's glide picture.
   const base = await rt.headless(data.gameUrl, { seed: data.seed });
   return {
     base,

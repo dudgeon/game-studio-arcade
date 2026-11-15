@@ -208,7 +208,7 @@ test("--examples adds the runtime's examples; the library wins a clash", async (
       const only = /** @type {any} */ (await (await fetch(`${s3.url}/api/carts`)).json()).carts;
       assert.deepEqual(
         only.map((c) => [c.id, c.source]),
-        [["hello", "example"]],
+        [["hello", "example"], ["motion", "example"]],
       );
     } finally {
       await s3.close();

@@ -14,15 +14,16 @@ export function cartError(e, where, frame) {
 
 /**
  * @param {Arcade.Cart} cart
- * @param {{ seed?: number, save?: string | null, players?: number }} [opts]
+ * @param {{ seed?: number, save?: string | null, players?: number, fine?: number }} [opts]
  *   players: controllers for this run (D110), default 1; `reset({ players })` changes it.
+ *   fine: the glide buffer's size (D476), default none; a reset keeps the size the machine has then.
  */
 export function createTestHandle(cart, opts = {}) {
   const basePlayers = checkPlayers(opts.players);
-  const start = (seed, save, players) => {
+  const start = (seed, save, players, fine = opts.fine) => {
     checkPlayers(players); // a bad setting is the check's mistake, not a cart error
     try {
-      return createMachine({ cart, seed, save, players });
+      return createMachine({ cart, seed, save, players, fine });
     } catch (e) {
       throw cartError(e, "init", 0);
     }
@@ -81,7 +82,7 @@ export function createTestHandle(cart, opts = {}) {
       return m.warnings();
     },
     async reset(r = {}) {
-      m = start(r.seed ?? 1, r.keepSave ? m.saved : null, r.players ?? basePlayers);
+      m = start(r.seed ?? 1, r.keepSave ? m.saved : null, r.players ?? basePlayers, m.fineK);
       queue = [];
     },
     machine: () => m,
