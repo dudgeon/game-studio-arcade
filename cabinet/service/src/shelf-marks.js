@@ -129,7 +129,7 @@ export function gameLines(carts, marks, o = {}) {
       maker: newest.maker ?? null,
       maker_name: newest.maker ? (o.makerName?.(newest.maker) ?? newest.maker) : null,
       versions: cs.length,
-      newest: { id: newest.id, version: newest.version ?? null, created: newest.created ?? null },
+      newest: { id: newest.id, version: newest.version ?? null, version_name: newest.version_name ?? null, created: newest.created ?? null },
       from,
       from_off: from ? offGames.has(from) : false,
       plays: played.get(id)?.n ?? 0,

@@ -93,7 +93,7 @@ test("readAgentDef gives the repo's brief, and its toolset matches the agent fil
   assert.match(def.system, /^You are the Studio/);
   assert.match(def.system, /The checks are now frozen/);
   assert.doesNotMatch(def.system, /^---/);
-  assert.deepEqual(def.tools.map((t) => /** @type {any} */ (t).name ?? /** @type {any} */ (t).type), ["agent_toolset_20260401", "ask_player", "show_plan", "tell_player"]);
+  assert.deepEqual(def.tools.map((t) => /** @type {any} */ (t).name ?? /** @type {any} */ (t).type), ["agent_toolset_20260401", "ask_player", "name_version", "show_plan", "tell_player"]);
   const yaml = fs.readFileSync(path.join(MANAGED_AGENT_DIR, "agents/studio.md"), "utf8");
   for (const c of STUDIO_TOOLSET.configs) assert.match(yaml, new RegExp(`- name: ${c.name}\\n\\s+enabled: false`));
   assert.match(yaml, /default_config:\n\s+enabled: true\n\s+permission_policy:\n\s+type: always_allow/);

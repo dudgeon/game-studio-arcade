@@ -37,6 +37,12 @@ export function activity(files) {
   const playsBy = new Map();
   for (const p of files.play ?? []) if (p.session_id) playsBy.set(p.session_id, (playsBy.get(p.session_id) ?? 0) + 1);
 
+  // What each version was called (D472): the cart_version log has the name beside the number.
+  /** @type {Map<string, string>} */
+  const names = new Map();
+  for (const v of files.cart_version ?? []) if (v.version_name) names.set(`${v.cart_id}@${v.version}`, String(v.version_name));
+  const nameOf = (/** @type {any} */ id, /** @type {any} */ version) => names.get(`${id}@${version}`) ?? null;
+
   const makes = [...sessions.values(), ...noId].map((s) => {
     const charge = s.id ? charges.get(s.id) : undefined;
     const listCents = s.list_cost?.amount != null ? Math.round(Number(s.list_cost.amount)) : s.list_cost_usd != null ? Math.round(Number(s.list_cost_usd) * 100) : null;
@@ -55,7 +61,7 @@ export function activity(files) {
       ended_by: s.ended_by ?? null,
       outcome: s.outcome ?? null,
       kid_outcome: charge?.outcome ?? null,
-      cart: s.cart_id ? { id: s.cart_id, version: s.cart_version ?? null } : null,
+      cart: s.cart_id ? { id: s.cart_id, version: s.cart_version ?? null, version_name: s.version_name ?? nameOf(s.cart_id, s.cart_version) } : null,
       cents,
       coins: charge ? Number(charge.coins ?? coinsOf(cents ?? 0)) : cents == null ? null : coinsOf(cents),
       charged: Boolean(charge),
@@ -70,7 +76,7 @@ export function activity(files) {
   });
 
   const plays = [
-    ...(files.play ?? []).map((p) => ({ at: p.started_at, game: p.cart_id, version: p.cart_version, guest: false, seconds: p.duration_s, score: p.score ?? null, ended: p.ended ?? (p.early_quit ? "quit early" : null), errors: p.errors ?? 0, made_by: sessions.get(p.session_id)?.maker ?? null })),
+    ...(files.play ?? []).map((p) => ({ at: p.started_at, game: p.cart_id, version: p.cart_version, version_name: nameOf(p.cart_id, p.cart_version), guest: false, seconds: p.duration_s, score: p.score ?? null, ended: p.ended ?? (p.early_quit ? "quit early" : null), errors: p.errors ?? 0, made_by: sessions.get(p.session_id)?.maker ?? null })),
     ...(files.guest_play ?? []).map((p) => ({ at: p.started_at, game: p.guest_id, version: p.guest_version, guest: true, seconds: p.duration_s, score: p.score ?? null, ended: p.ended ?? null, errors: p.errors ?? 0, made_by: null })),
   ];
 

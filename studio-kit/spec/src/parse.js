@@ -14,13 +14,14 @@ const RULE_RE = /^- (R(\d+)) \((auto|you check)\): (.*)$/;
 const ASSUMPTION_RE = /^- (A(\d+)): (.*)$/;
 // A dotted version (v1.1) counts as its whole number: a changelog line is history,
 // and a kid's working game is never refused over one (D197).
-const CHANGE_RE = /^- (v(\d+)(?:\.\d+)?): (.*)$/;
+// A version's name sits in quotes after its number (D472): `- v3 "Faster logs": ...`.
+const CHANGE_RE = /^- (v(\d+)(?:\.\d+)?)(?: "([^"]*)")?: (.*)$/;
 
 // Item kinds for the structured sections.
 const LISTS = {
   Rules: { key: 'rules', re: RULE_RE, form: '- R<n> (auto): <text>  or  - R<n> (you check): <text>' },
   Assumptions: { key: 'assumptions', re: ASSUMPTION_RE, form: '- A<n>: <text>' },
-  Changelog: { key: 'changelog', re: CHANGE_RE, form: '- v<n>: <text>' },
+  Changelog: { key: 'changelog', re: CHANGE_RE, form: '- v<n>: <text>  or  - v<n> "<name>": <text>' },
 };
 
 /**
@@ -170,6 +171,10 @@ function parseList(kind, bodyLines, firstLineNo, err) {
     if (kind.key === 'rules') {
       current.kind = m[3] === 'auto' ? 'auto' : 'you-check';
       current.text = m[4].trim();
+    } else if (kind.key === 'changelog') {
+      // The name isn't checked here: cart.json's `version_name` is, and a working game is never refused over history (D197).
+      if (m[3] != null) current.name = m[3];
+      current.text = m[4].trim();
     } else {
       current.text = m[3].trim();
     }
@@ -233,7 +238,7 @@ export function formatSpec(spec) {
 
 function formatItem(it) {
   const [first, ...rest] = it.text.split('\n');
-  const head = it.kind ? `- ${it.id} (${KIND_TEXT[it.kind]}): ${first}` : `- ${it.id}: ${first}`;
+  const head = it.kind ? `- ${it.id} (${KIND_TEXT[it.kind]}): ${first}` : it.name != null ? `- ${it.id} "${it.name}": ${first}` : `- ${it.id}: ${first}`;
   return [head, ...rest.map((l) => `  ${l}`)].join('\n');
 }
 

@@ -239,7 +239,7 @@ function showLimit(kind, why) {
 function showCoinCheck(o) {
   const stop = blocker(o.kind);
   if (stop) return stop();
-  showBoard(coinCheck({ kind: o.kind, pot: /** @type {any} */ (namedPot()), maker: o.maker.name, parentVersion: o.parent?.version }), ["coin", "back"], { make: o });
+  showBoard(coinCheck({ kind: o.kind, pot: /** @type {any} */ (namedPot()), maker: o.maker.name, parentVersion: o.parent?.version, parentName: o.parent?.version_name }), ["coin", "back"], { make: o });
 }
 
 /** COIN pressed on the coin check. @param {any} v */
@@ -331,14 +331,14 @@ function followStudio() {
   if (p) {
     if (view.pendingId === p.id) return;
     const change = studio.kind === "change";
-    if (p.kind === "question") show({ screen: "question", board: change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, makerCoin: true, sel: 0 });
-    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, rightCoin: true, usual: usual(), parentVersion: studio.parent?.version, cartControls: [], flowed: planLines(p), sel: 0 });
+    if (p.kind === "question") show({ screen: "question", board: p.naming ? "R6-name" : change ? "R5" : "M7", pendingId: p.id, ...p, maker: right, makerCoin: true, sel: 0 });
+    else show({ screen: "plan", board: change ? "R6" : "M9", mode: change ? "change" : "new", pendingId: p.id, ...p, right, rightCoin: true, usual: usual(), parentVersion: studio.parent?.version, parentName: studio.parent?.version_name, cartControls: [], flowed: planLines(p), sel: 0 });
     return;
   }
   if (studio.phase === "running") {
     const kind = studio.kind === "change" ? "change" : "new";
     const mins = pot()?.minutes?.[kind] ?? (kind === "change" ? 4 : 7);
-    const v = { screen: "progress", board: kind === "change" ? "R7" : "M10", kind, lines: studio.lines, maker: studio.maker_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: kind === "change" ? usual().change : usual().new, minutesLeft: Math.ceil(mins - (studio.working_s ?? 0) / 60) };
+    const v = { screen: "progress", board: kind === "change" ? "R7" : "M10", kind, lines: studio.lines, maker: studio.maker_name, versionName: studio.version_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: kind === "change" ? usual().change : usual().new, minutesLeft: Math.ceil(mins - (studio.working_s ?? 0) / 60) };
     if (view.screen === "progress") Object.assign(view, v);
     else show(v);
   }
@@ -374,7 +374,7 @@ function showGone() {
 async function answer(choice, said, offered = false) {
   const id = view.pendingId;
   answered.add(id);
-  show({ screen: "progress", board: studio.kind === "change" ? "R7" : "M10", kind: studio.kind, lines: studio.lines ?? [], maker: studio.maker_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: studio.kind === "change" ? usual().change : usual().new });
+  show({ screen: "progress", board: studio.kind === "change" ? "R7" : "M10", kind: studio.kind, lines: studio.lines ?? [], maker: studio.maker_name, versionName: studio.version_name, step: studio.step ?? 0, used_cents: studio.used_cents ?? 0, usual: studio.kind === "change" ? usual().change : usual().new });
   await post("/api/studio/answer", { id, choice, said, offered }).catch((/** @type {any} */ e) => {
     if (e.why !== "redirect") return;
     // E10 for their own words (D270-D275): the question keeps waiting while they choose.

@@ -2142,8 +2142,44 @@ Geoff, 2026-11-14: "step 1 of game creator is to enter your name. but the cabine
 - **speech.jsonl** gains `pieces` when a hold was split.
 - **Tests:** a 3-minute and a 25-minute hold through a stand-in arecord (every second kept, Groq in 1 and 3 pieces, Moonshine in 30 s pieces), the splitter, and an hour's idea taken whole by the service.
 
-## 2026-11-14 — Security updates to pinned packages (D375)
+## 2026-11-14 — Version names (D471-D474, names worker)
 
+Geoff's decision on D456 (docs/round-two-plan.md §3 and its last section): a version gets a name on the question board, two names from Claude plus "say your own", or "You pick". The name replaces v2/v3 on the shelf, in the Manager and in the MCP list, and lineage stays intact. D457 and D458 were the plan's proposals for where the name lives and where it shows; D472 and D474 are those as built.
+
+**D471. A maker's own change gets a name, asked on the question board right after "Build it!".** *(Geoff chose the board, D456; Claude built it.)*
+- **Who gets one:** the next version of a game by its own maker (v2, v3...). A new game, and someone's own version of another maker's game, go by the game's title, as before (D206). The first screen of a change, "makes version 4", is unchanged: the name doesn't exist yet.
+- **The board** is the one the kids know: "What should this version be called?", A and B are Claude's two names, C "Something else" opens the mic for their own, and D reads **"You pick"**: Claude's choice of its two. D here isn't "Make it now"; it ends nothing.
+- **How Claude asks:** a fourth custom tool, `name_version` (`option_a`, `option_b`, `pick`), called once when the plan is agreed and before the checks are written. The cabinet answers with the name itself (`{"choice":"A","name":"Faster logs"}`), so the name Claude writes is the one the maker saw.
+- **The maker's own words are never cut.** A spoken name that fits is used as said (tidied: "turbo frog." is "Turbo frog"). One that's too long or already used comes back to Claude with no name, and Claude makes the closest short one from their words. Claude's own names are cut to fit.
+- **A name never stops a game.** If no usable name comes out of the make (a restart with nobody to ask is "You pick"; a name that breaks the rules is dropped), the version is saved with no name and shows by its number.
+- **Spoken names are screened** like any other answer (D270): the name question goes to the screener with the words.
+- **The agent's brief changed** (`agents/studio.md`, `agents/tools/name_version.json`), so each cabinet's workspace needs an `ant apply` before its next make: until then `studio check-brief` says the applied agent is stale and Make is refused (D173). The director runs it on both workspaces, with the update.
+- **The replay's change fixture** (`studio-kit/cli/fixtures/log-hopper-change`, recorded before names) has the name question added by hand, where the brief now asks it: two events in `events.jsonl` and `name` in `answers.json`. Nothing else in the recording changed.
+
+**D472. Where the name lives: the spec's Changelog, `cart.json`, and the logs. The number stays as the order.** *(The plan's D457, as built. Claude.)*
+- **Spec first:** the version's Changelog line carries it in quotes, `- v3 "Faster logs": The logs move faster.` The parser reads it as the entry's `name`; a line with no name is as it was.
+- **`cart.json`** gets `"version_name": "Faster logs"`, so the shelf never parses the spec. `validate-cart` knows the field and refuses one that wouldn't show; the cabinet tidies or drops a bad one before it validates, so a kid's game is never refused over a name (D197's rule for history).
+- **The cabinet is the authority:** when the cart comes home it writes the name from the name question into `cart.json` and onto the Changelog line if Claude left it off.
+- **`cart_version.jsonl`** records `version_name`, `named_by` (the maker) and `name_picked` (`tile`, `said`, `claude` for "You pick", or `desktop`). The make's `studio_session` record keeps the name question as asked and answered (`name_turn`), apart from the game's questions.
+- **Lineage is untouched:** ids, `version`, `parent`, `family` and `branch` are as before. The name is a label; nothing sorts or links by it.
+- **Never changed in place:** there's no rename. If one is ever wanted it's a new record, and the Manager is the place (not in this round).
+
+**D473. A name's rules.** *(The plan's rules; Claude.)*
+- At most 16 characters, the same as a maker's name (D87). Plain ASCII: the cabinet's font. No quotes (the Changelog quotes it), no full stop left by speech-to-text, single spaces, first letter a capital.
+- Not the game's title, and not a name another version on the same line has, whatever the capitals. Another maker's line can use the same name.
+- One place holds the rules: `studio-kit/spec/src/version-name.js`, shared by the sandbox's validator, the CLI, the service and the desktop tool.
+
+**D474. Where the name shows, and how old carts show.** *(The plan's D458, as built. Claude.)*
+- **Shelf (S1):** the tag that said "v3" says "Faster logs". Two tags share a column (the name over NEW), and the title now stops at the wider of the two.
+- **"See other versions" (S3):** "Faster logs (newest)" with "v3" small beside the day.
+- **Making (R7):** the header reads "Making Faster logs" once the name is picked.
+- **Result (R8):** "Faster logs is ready!" and "Bigger frog is still saved."
+- **The plan and the coin check (R6, R3):** "Bigger frog stays saved", when the version being changed has a name.
+- **Manager:** Games shows "newest: Faster logs (v3)" under the count; plays and makes show "Faster logs (v3)".
+- **MCP:** `list_carts` has `version_name` on every cart (null for none). `publish_cart` takes an optional `version_name` for a maker's own next version; a bad or used one is refused with the reason, since a grown-up is at the desk. The plugin's skill asks the maker for one.
+- **A version with no name** (every version made before today, any first version, and any make where no name came out) shows exactly as it did: "v2" on the shelf, "Version 2" in lists and sentences, "v2" in the Manager. Nothing was migrated and nothing needs to be.
+- **Not built:** naming a version that already exists, and names for downloaded (guest) games' versions.
+- **Tested:** the rules and the spec (`studio-kit/spec/test/version-name.test.js`); the tool relay (`studio-kit/cli/test/driver.test.js`); a whole change on the replay, each answer, the logs, and every screen's words (`cabinet/service/test/version-name.test.js`); every named screen at the widest name in the fit test; `publish_cart`; the Manager's activity. `scripts/flows/arcade.drive` walks it in headless Chromium. **Not yet proven:** a live make with the new brief (it needs the apply), and the kids saying a name at the Picade.
 
 ## 2026-11-14 — AI in games (D480-D489, AI-in-games worker)
 

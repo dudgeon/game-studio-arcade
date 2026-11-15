@@ -149,8 +149,12 @@ const studio = createStudio({
   // No key and not replaying: the Picade before connect-picade.sh (D252). Its screens say so, not "No Wi-Fi".
   connected: replaying || Boolean(values.config),
   findCart: (id) => {
-    const c = listCarts(roots).find((x) => x.id === id);
-    return c ? { id: c.id, dir: c.dir, version: c.version, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id } : null;
+    const all = listCarts(roots);
+    const c = all.find((x) => x.id === id);
+    if (!c) return null;
+    // Every name this game's line has used, so a new version's is its own (D473).
+    const names = all.filter((x) => (x.branch ?? x.id) === (c.branch ?? c.id) && x.version_name).map((x) => /** @type {string} */ (x.version_name));
+    return { id: c.id, dir: c.dir, version: c.version, version_name: c.version_name, names, maker: c.maker, family: c.family, branch: c.branch, title: c.title, session_id: c.session_id };
   },
   recheckMs: config.recheck_s ? config.recheck_s * 1000 : undefined,
   api: async (resume, what) => {

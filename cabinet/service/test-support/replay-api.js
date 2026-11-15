@@ -22,7 +22,7 @@ export function stepsFrom(recorded) {
 
 /** Where a recording stands with `answered` questions and plans answered. */
 function resumePoint(recorded, answered) {
-  const asks = new Set(recorded.filter((e) => e.type === "agent.custom_tool_use" && (e.name === "ask_player" || e.name === "show_plan")).map((e) => e.id));
+  const asks = new Set(recorded.filter((e) => e.type === "agent.custom_tool_use" && (e.name === "ask_player" || e.name === "show_plan" || e.name === "name_version")).map((e) => e.id));
   let at = recorded.findIndex((e) => e.type === "user.message") + 1;
   let n = 0;
   for (let i = at; i < recorded.length && n < answered; i++) {
