@@ -2306,15 +2306,17 @@ Geoff chose D459 on the round-two walkthrough: "the kit in software, plus sub-pi
 - **The showcase cart, `runtime/examples/motion/`:** four scenes that use every module, gliding: RUN (a scroller), DRIVE (a ring road on the perspective floor), MAZE (first person), SPIN (stacked cars round a tower). A full cart with a spec and eight auto rules, not on any shelf. `node runtime/dev-server.js`, then `/runtime/play.html?cart=/carts/motion/game.js`.
 - **The playtest's frame time now leaves out the first 30 frames of each of its four runs** (`WARMUP_FRAMES`). Each run is a fresh cart in a fresh worker or page, and those frames run cold code: on a pixel-heavy cart they swung the 95th percentile between 1 and 10 ms from run to run on the mini while the median never moved. The report's `frameTime.frames` is 2,280, not 2,400. The gate's budget and D311's "advisory until calibrated" are unchanged.
 - **Who times the glide picture:** the browser driver, so the cabinet's gate. The node driver draws the framebuffer only and keeps its 4 ms budget for the game's own work (D64); with the glide buffer a full-screen floor had too little room under it to be a fair check in the sandbox.
-- **Measured on the Mac mini, 2026-11-14** (Node 22 and Playwright's Chromium at 1024×768; the mini was busy with other work, so these are a guide):
+- **Measured on the Mac mini, 2026-11-14** (Node 22, and Playwright's Chromium at 1024×768, each over 2,280 frames):
 
-| Cart | Node driver, median | Chromium, median | Chromium, 95th |
-| --- | --- | --- | --- |
-| The five older templates, before this change | 0.010 to 0.023 ms | | |
-| The five older templates, after | 0.010 to 0.024 ms | 1.0 ms | 1.7 to 2.0 ms |
-| `scroller` (gliding) | 0.05 ms | 1.4 ms | 2.5 ms |
-| The showcase, all four scenes (gliding) | 0.3 ms | 1.7 ms | 3.0 ms |
+| Cart | Node driver, median | Node, 95th | Chromium, median | Chromium, 95th |
+| --- | --- | --- | --- | --- |
+| The five older templates, on the runtime before this change | 0.009 to 0.022 ms | 0.03 to 0.10 ms | | |
+| The five older templates, after | 0.010 to 0.023 ms | 0.04 to 0.10 ms | 0.8 to 0.9 ms | 1.1 to 1.5 ms |
+| `scroller` (gliding) | 0.02 ms | 0.13 ms | 1.1 ms | 1.5 ms |
+| `racer` (gliding, a floor every frame) | 0.06 ms | 0.34 ms | 1.2 ms | 1.6 ms |
+| `maze3d` (gliding, walls every frame) | 0.08 ms | 0.32 ms | 1.2 ms | 1.9 ms |
+| The showcase, all four scenes (gliding) | 0.17 ms | 0.82 ms | 1.3 ms | 1.8 ms |
 
-- The Chromium figures include the round trip to the page and putting the picture on the canvas, as the gate's do; its clock ticks in 0.1 ms. Scene by scene in Node after warm-up, medians, framebuffer only and then with the glide buffer at 4×: RUN 0.05 and 0.13 ms, DRIVE 0.39 and 0.61, MAZE 0.17 and 0.52, SPIN 0.32 and 0.49.
-- **So on the mini, glide costs about 0.4 ms a frame in Chromium** (a 1024×768 picture to convert and show instead of 256×192), and the heaviest scene about 0.7 ms more than a plain game. The plan measured the Picade's own games at 2 ms median and 5 to 7 ms at the 95th percentile, and "just showing the buffer" at 0.2 ms; sixteen times the pixels suggests 2 to 4 ms more for a gliding game there. That's inside 16.7 ms, but it's an estimate, not a measurement.
+- The Chromium figures include the round trip to the page and putting the picture on the canvas, as the gate's do; its clock ticks in 0.1 ms. The node figures are the framebuffer only. With the glide buffer at 4× in Node, the showcase's scenes take 0.13 ms (RUN), 0.61 (DRIVE), 0.52 (MAZE) and 0.49 (SPIN) at the median.
+- **So on the mini, a gliding game costs 0.3 to 0.5 ms a frame more in Chromium than a plain one,** floor or walls included. The older carts are no slower. The plan measured the Picade's own games at 2 ms median and 5 to 7 ms at the 95th percentile, and "just showing the buffer" at 0.2 ms; sixteen times the pixels suggests 2 to 4 ms more for a gliding game there. That's inside 16.7 ms, but it's an estimate, not a measurement.
 - **Not yet proven on the Picade or the virtual cabinet:** these frame times on the real hardware, and how glide looks on the panel. Neither cabinet was touched. The check is the showcase through the gate on each, which needs a turn from the director. D462's 12 ms line should wait for it.
